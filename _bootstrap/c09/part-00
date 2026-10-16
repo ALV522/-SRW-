@@ -1,0 +1,219 @@
+diff -ruN '--exclude=__pycache__' '--exclude=*.pyc' srw_github_stage/.github/workflows/ci.yml srw_conv09_work/.github/workflows/ci.yml
+--- srw_github_stage/.github/workflows/ci.yml	1970-01-01 00:00:00.000000000 +0000
++++ srw_conv09_work/.github/workflows/ci.yml	2026-10-16 17:25:36.199259208 +0000
+@@ -0,0 +1,43 @@
++name: SRW Source Gate
++
++on:
++  push:
++    branches: [main, "dev/**"]
++  pull_request:
++    branches: [main]
++  workflow_dispatch:
++
++permissions:
++  contents: read
++
++jobs:
++  source-gate:
++    name: source-gate (${{ matrix.os }}, py3.12)
++    strategy:
++      fail-fast: false
++      matrix:
++        os: [ubuntu-latest, windows-latest]
++    runs-on: ${{ matrix.os }}
++
++    steps:
++      - name: Checkout
++        uses: actions/checkout@v4
++
++      - name: Setup Python 3.12
++        uses: actions/setup-python@v5
++        with:
++          python-version: "3.12"
++          cache: pip
++          cache-dependency-path: requirements-ci.txt
++
++      - name: Install source-test dependencies
++        run: python -m pip install --upgrade pip -r requirements-ci.txt
++
++      - name: Verify release-truth binding
++        run: python scripts/check_release_truth.py
++
++      - name: Run capability-recovery source gate
++        env:
++          PYTHONPATH: backend
++          SRW_TEST_RESOURCE_STRICT: "1"
++        run: python scripts/run_convergence_verification.py
++diff -ruN '--exclude=__pycache__' '--exclude=*.pyc' srw_github_stage/ARCHITECTURE.md srw_conv09_work/ARCHITECTURE.md
++--- srw_github_stage/ARCHITECTURE.md	1970-01-01 00:00:00.000000000 +0000
+++++ srw_conv09_work/ARCHITECTURE.md	2026-10-16 17:25:34.724738671 +0000
++@@ -0,0 +1,51 @@
+++# SRW Architecture Truth
+++
+++## Product boundary
+++
+++SRW is a local-first recruitment operations and decision-support workbench. The current architecture treats **v0.8.12-R2 as the capability-completeness reference** and does not use UI simplification as permission to remove mature evidence, lineage, privacy, calibration, governance or release semantics.
+++
+++## Core layers
+++
+++- `backend/srw/kernel`: IDs, hashing, clock and invariant primitives.
+++- `backend/srw/runtime`: database/schema, settings, capability loading, local-boundary and lifecycle infrastructure.
+++- `backend/srw/modules`: durable domain capabilities. Candidate material/evidence, protocol, decision, identity, calibration, feedback, operations, planning, intelligence, knowledge governance and project portability live here.
+++- `backend/srw/api`: HTTP adapters. New capability work should prefer small dedicated route modules instead of adding more surface area to `fullworkbench.py`.
+++- `backend/srw/surfaces`: read-oriented product projections/workspaces.
+++- `frontend/dist`: current retained browser/WebView2 surface. It is a product asset in the present source baseline; a future frontend-source rebuild must preserve capability parity before replacing it.
+++- `desktop/SRW.Desktop`: inherited WPF/WebView2 Host source. Host ABI is restored; the exact native binary remains carrier-gated.
+++- `convergence_tests`: current capability-recovery regression suite. Tests must be self-contained and must not require production candidate data or production Knowledge DB bytes.
+++- `verification`: historical/current evidence records. Reference evidence must never be presented as newly executed evidence.
+++
+++## Decision truth
+++
+++The central semantic chain is:
+++
+++`Source → Claim → Evidence/Verification → Criterion Judgment → Assessment → Human Decision`
+++
+++Important invariants:
+++
+++1. Missing evidence is unknown, not zero.
+++2. AI proposals are not human decisions.
+++3. Material/protocol context changes make old judgments and decisions historical unless explicitly carried/reaffirmed under current gates.
+++4. Operational priority is not candidate ranking.
+++5. Market/channel intelligence is planning evidence, not candidate scoring input.
+++6. Privacy-safe AI projection is used on the actual remote-provider path.
+++7. Source grounding must remain traceable to the original material.
+++
+++## Local security boundary
+++
+++The HTTP surface is local-only. Requests with non-local Host headers are rejected. Browser mutations carrying `Origin`/`Referer` must be same-origin. Native Host/API calls may omit `Origin` but still remain restricted by the local Host boundary and, for lifecycle shutdown, the Host session token.
+++
+++## Knowledge boundary
+++
+++The five active Knowledge databases are governed artifacts, not mutable runtime scratch data. Operational learning follows:
+++
+++`human-confirmed action → feedback draft → curation proposal → governance review → prepared package → semantic diff/digest → explicit activation → rollback history`
+++
+++High-risk ontology creation remains export-only until its full validation contract is restored.
+++
+++## Release truth
+++
+++`VERSION`, `BUILD_INFO.json`, `backend/srw/release_state.json`, `PORTABLE_MANIFEST.json`, `VERIFICATION_TRUTH.json` and the code-level schema revision must agree for a tagged release. `scripts/check_release_truth.py` is the source gate for that binding.
+++
+++Git history is the development truth from the Convergence 08 baseline onward. Portable/native ZIP files belong in GitHub Releases, not normal Git history.
++diff -ruN '--exclude=__pycache__' '--exclude=*.pyc' srw_github_stage/DEVELOPMENT_STATE.md srw_conv09_work/DEVELOPMENT_STATE.md
++--- srw_github_stage/DEVELOPMENT_STATE.md	1970-01-01 00:00:00.000000000 +0000
+++++ srw_conv09_work/DEVELOPMENT_STATE.md	2026-10-16 17:28:01.119349215 +0000
++@@ -0,0 +1,60 @@
+++# SRW Development State
+++
+++## Stable source baseline
+++
+++- Git baseline: `Convergence 08 capability recovery`
+++- Release metadata: `1.0.0-alpha10-convergence08`
+++- Schema: `v1_0014`
+++- Capability reference: `v0.8.12-R2`
+++- Reference test inventory: 725 v0.8.12 backend tests (reference only, not claimed executed)
+++
+++## Active development line
+++
+++Branch: `dev/convergence09`
+++
+++Convergence 09 focuses on restoring **system/release integrity gates** before adding more surface features.
+++
+++Implemented on the development branch:
+++
+++- Local-only Host boundary for all HTTP requests.
+++- Same-origin browser mutation guard while preserving native/local API clients that omit `Origin`.
+++- Startup cleanup for SRW-owned interrupted backup/restore staging artifacts.
+++- Structured system diagnostics with database/data/frontend/task/backup/Knowledge checks.
+++- SQLite/thread/process resource-probe primitives derived from the v0.8.12 verification truth model.
+++- Release metadata/schema binding gate.
+++- Source-controlled minimal Knowledge fixtures, so GitHub CI does not require production Knowledge DB binaries.
+++- GitHub Actions source gate for Linux and Windows on Python 3.12.
+++
+++Current local source regression: **55/55 PASS**.
+++
+++## Product invariants retained
+++
+++- Evidence-first assessment; Missing ≠ 0.
+++- Human final decision boundary.
+++- Material/protocol lineage and stale-decision semantics.
+++- Privacy-safe remote AI path.
+++- Source grounding and graphical PDF evidence inspection.
+++- Canonical identity review/merge.
+++- Calibration and two-reviewer Gold.
+++- Decision Operations / feedback / learning loop.
+++- Recruitment planning and channel intelligence separated from hiring rank.
+++- Controlled Knowledge Apply with exact rollback.
+++- Project package portability with historical context preservation.
+++- WPF/WebView2 Host ABI restored; exact native binary remains carrier-gated.
+++
+++## Remaining high-priority debt
+++
+++1. Restore additional runtime/system/release gates from the 725-test reference.
+++2. Expand the strict resource-residual gate to exact Windows/native-artifact verification and additional v0.8.12 probes.
+++3. Continue decomposition of `fullworkbench.py` and legacy frontend without capability loss.
+++4. Broaden Knowledge controlled apply only with complete target-specific validation.
+++5. Assemble exact Windows Native artifact when the audited v0.8.8 carrier is available and run Windows GUI smoke.
+++6. Validate ranking/extraction on a real anonymized resume corpus.
+++
+++## Git workflow
+++
+++- `main`: tested, merged development truth.
+++- `dev/convergenceXX`: active version integration branch.
+++- Focused branches may be used for larger isolated work.
+++- Pull requests must pass the GitHub Actions source gate before merge.
+++- Release tags and release artifacts are created only after release metadata and exact-artifact verification are closed.
++diff -ruN '--exclude=__pycache__' '--exclude=*.pyc' srw_github_stage/backend/srw/api/app.py srw_conv09_work/backend/srw/api/app.py
++--- srw_github_stage/backend/srw/api/app.py	2026-10-16 11:24:46.000000000 +0000
+++++ srw_conv09_work/backend/srw/api/app.py	2026-10-16 17:22:14.313059571 +0000
++@@ -29,6 +29,8 @@
++ from srw.runtime.db.session import create_v1_engine, create_v1_session_factory, v1_session_scope
++ from srw.runtime.default_capabilities import register_default_lazy_capabilities
++ from srw.runtime.settings import RuntimeSettingsRepository, SecretStore, SessionSecretStore, FileSecretStore, get_settings_surface
+++from srw.runtime.local_boundary import LocalBoundaryMiddleware
+++from srw.runtime.maintenance import cleanup_stale_backup_artifacts
++ from srw.providers.contracts import ProviderFailureError, ProviderNotReadyError, ProviderOutputInvalidError
++ from srw.providers.runtime import ProviderRuntime
++ from srw.privacy.service import build_source_privacy_projection, rebind_privacy_safe_proposals
++@@ -113,6 +115,7 @@
++     register_default_lazy_capabilities(registry)
++     resolved_data_dir = Path(data_dir).resolve() if data_dir is not None else Path.cwd() / "data"
++     resolved_data_dir.mkdir(parents=True, exist_ok=True)
+++    startup_cleanup = cleanup_stale_backup_artifacts(resolved_data_dir)
++     # Desktop Host ABI: when the WPF host owns the workspace it provides a stable
++     # instance/session identity through environment variables. Browser mode keeps
++     # generating an ephemeral instance id exactly as before.
++@@ -666,11 +669,14 @@
++         },
++     )
++ 
+++    app.add_middleware(LocalBoundaryMiddleware)
+++
++     from srw.api.fullworkbench import install_full_workbench_routes
++     database_path = Path(str(engine.url.database)).resolve() if engine.url.database and str(engine.url.database) != ":memory:" else (resolved_data_dir / "srw_v1.db")
++     install_full_workbench_routes(
++         app, factory, registry, secrets,
++         data_dir=resolved_data_dir, knowledge_dir=resolved_knowledge_dir, database_path=database_path,
+++        frontend_dist=Path(frontend_dist).resolve() if frontend_dist is not None else None,
++         evaluation_policy_revision=evaluation_policy_revision,
++     )
++     from srw.api.governance import install_governance_routes
++@@ -711,6 +717,7 @@
++             app.routes.append(Route("/v1/{asset_path:path}", v1_frontend, methods=["GET"]))
++ 
++     app.state.shutdown_callback = None
+++    app.state.startup_cleanup = startup_cleanup
++     app.state.runtime_identity = {
++         "instance_id": instance_id, "session_id": runtime_session_id, "release_id": release_id,
++         "runtime": runtime_mode, "edition": edition,
++diff -ruN '--exclude=__pycache__' '--exclude=*.pyc' srw_github_stage/backend/srw/api/fullworkbench.py srw_conv09_work/backend/srw/api/fullworkbench.py
++--- srw_github_stage/backend/srw/api/fullworkbench.py	2026-10-16 11:15:02.000000000 +0000
+++++ srw_conv09_work/backend/srw/api/fullworkbench.py	2026-10-16 17:22:14.989492663 +0000
++@@ -196,7 +196,7 @@
++     except Exception as exc: raise ProviderFailureError(f"ASR request failed: {exc}") from exc
++ 
++ 
++-def install_full_workbench_routes(app, factory, registry, secrets, *, data_dir: Path, knowledge_dir: Path, database_path: Path, evaluation_policy_revision: str) -> None:
+++def install_full_workbench_routes(app, factory, registry, secrets, *, data_dir: Path, knowledge_dir: Path, database_path: Path, frontend_dist: Path | None = None, evaluation_policy_revision: str) -> None:
++     data_dir=Path(data_dir); knowledge_dir=Path(knowledge_dir); blobs=BlobStore(data_dir/"blobs"); knowledge=KnowledgeServ
