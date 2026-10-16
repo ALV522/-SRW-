@@ -40,7 +40,7 @@ credentials.json
 local_settings.json
 
 # SRW runtime / user data
-runtime/
+/runtime/
 data/
 workspace/
 uploads/
