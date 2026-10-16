@@ -23,7 +23,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          cat _bootstrap/c09/part-* > /tmp/convergence09.patch
+          cat _bootstrap/c09/part-* | base64 -d > /tmp/convergence09.patch
           git apply --check -p1 /tmp/convergence09.patch
 
       - name: Apply Convergence 09
