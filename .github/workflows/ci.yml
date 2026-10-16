@@ -2,9 +2,9 @@ name: SRW Source Gate
 
 on:
   push:
-    branches: [main, "dev/**"]
+    branches: [main, "dev/**", "fix/**"]
   pull_request:
-    branches: [main]
+    branches: [main, "dev/**"]
   workflow_dispatch:
 
 permissions:
