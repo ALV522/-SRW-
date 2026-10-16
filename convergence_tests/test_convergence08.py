@@ -17,6 +17,7 @@ from srw.api.app import create_v1_app
 from srw.modules.candidate.models import Claim, Source
 from srw.modules.knowledge_packages.service import ControlledKnowledgePackages
 from srw.runtime.db.session import create_v1_engine, create_v1_session_factory
+from knowledge_fixture import create_minimal_knowledge_tree
 
 ROOT = Path(__file__).resolve().parents[1]
 
@@ -27,6 +28,7 @@ class Convergence08Test(unittest.TestCase):
         self.root = Path(self.tmp.name)
         self.db = self.root / 'test.db'
         self.data = self.root / 'data'
+        self.knowledge = create_minimal_knowledge_tree(self.root / 'knowledge' / 'active')
 
     def tearDown(self):
         self.tmp.cleanup()
@@ -35,7 +37,7 @@ class Convergence08Test(unittest.TestCase):
         return create_v1_app(
             f"sqlite+pysqlite:///{self.db.as_posix()}",
             data_dir=self.data,
-            knowledge_dir=ROOT / 'knowledge' / 'active',
+            knowledge_dir=self.knowledge,
             frontend_dist=ROOT / 'frontend' / 'dist',
         )
 
@@ -102,8 +104,8 @@ class Convergence08Test(unittest.TestCase):
             self.assertIn(mismatch.status_code, {404,409})
 
     def test_competency_alias_controlled_apply_is_digest_guarded_and_exactly_rollbackable(self):
-        active = self.root / 'knowledge' / 'active'
-        shutil.copytree(ROOT / 'knowledge' / 'active' / 'competency', active / 'competency')
+        active = self.root / 'knowledge-copy' / 'active'
+        shutil.copytree(self.knowledge / 'competency', active / 'competency')
         mgr = ControlledKnowledgePackages(data_dir=self.root/'data-km', active_dir=active)
         db = active / 'competency' / 'knowledge.db'; before = db.read_bytes()
         con = sqlite3.connect(db)
@@ -125,8 +127,8 @@ class Convergence08Test(unittest.TestCase):
         mgr.rollback(actor='KM'); self.assertEqual(db.read_bytes(), before)
 
     def test_competency_alias_conflict_is_blocked_before_prepare_completes(self):
-        active = self.root / 'knowledge2' / 'active'
-        shutil.copytree(ROOT / 'knowledge' / 'active' / 'competency', active / 'competency')
+        active = self.root / 'knowledge-copy2' / 'active'
+        shutil.copytree(self.knowledge / 'competency', active / 'competency')
         db = active / 'competency' / 'knowledge.db'
         con = sqlite3.connect(db)
         rows = con.execute("SELECT competency_id FROM competency WHERE status='active' ORDER BY competency_id LIMIT 2").fetchall()
