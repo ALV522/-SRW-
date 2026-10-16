@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import asdict
+from contextlib import asynccontextmanager
 from pathlib import Path
 import hashlib, json, os, uuid
 from time import perf_counter
@@ -657,7 +658,18 @@ def create_v1_app(
     async def provider_output_handler(_request: Request, exc: Exception) -> Response:
         return error_response(exc, status_code=422, code="provider_output_invalid")
 
+    @asynccontextmanager
+    async def _app_lifespan(_app: Starlette):
+        try:
+            yield
+        finally:
+            # SQLite keeps file handles in pooled connections even after each
+            # request Session closes. Disposing the application-owned Engine is
+            # required for Windows to delete/move its workspace and test DBs.
+            engine.dispose()
+
     app = Starlette(
+        lifespan=_app_lifespan,
         routes=routes,
         exception_handlers={
             V1NotFoundError: not_found_handler,
