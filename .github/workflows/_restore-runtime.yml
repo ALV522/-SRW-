@@ -1,0 +1,43 @@
+name: Restore tracked runtime source
+
+on:
+  push:
+    branches:
+      - dev/convergence09
+    paths:
+      - "_bootstrap/runtime/READY"
+
+permissions:
+  contents: write
+
+jobs:
+  restore-runtime:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: dev/convergence09
+          fetch-depth: 0
+      - name: Reconstruct patch
+        shell: bash
+        run: |
+          set -euo pipefail
+          cat _bootstrap/runtime/part-* | base64 -d > /tmp/runtime.patch.gz
+          echo "2ce212754f1c699ab039439aa306f5a1cc2ba1066adbf4be41a28c7771f09090  /tmp/runtime.patch.gz" | sha256sum -c -
+          gzip -dc /tmp/runtime.patch.gz > /tmp/runtime.patch
+          git apply --check -p1 /tmp/runtime.patch
+      - name: Apply runtime source
+        shell: bash
+        run: |
+          set -euo pipefail
+          git apply -p1 /tmp/runtime.patch
+          rm -rf _bootstrap/runtime
+      - name: Commit runtime source
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git commit -m "Fix: restore tracked runtime source omitted by ignore rules"
+          git push origin HEAD:dev/convergence09
