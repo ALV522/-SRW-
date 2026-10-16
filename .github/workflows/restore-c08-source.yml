@@ -1,0 +1,84 @@
+name: Restore missing C08 source from audited archive
+
+on:
+  push:
+    branches:
+      - repair/c08-source-and-ci
+    paths:
+      - ".github/workflows/restore-c08-source.yml"
+      - ".gitignore"
+
+permissions:
+  contents: write
+
+jobs:
+  restore:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          persist-credentials: true
+      - name: Reconstruct original audited source archive
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import subprocess,hashlib
+          from pathlib import Path
+          historical="a304723982faf88637107739456a323d03fda417"
+          paths=subprocess.check_output(["git","ls-tree","-r","--name-only",historical],text=True).splitlines()
+          parts=sorted(x for x in paths if x.startswith("_bootstrap/source.dec.part"))
+          assert len(parts)==78,(len(parts),parts)
+          payload=bytearray()
+          for part in parts:
+              text=subprocess.check_output(["git","show",f"{historical}:{part}"],text=True).strip()
+              payload.extend(int(b) for b in text.replace("\n",",").split(",") if b.strip())
+          raw=bytes(payload)
+          digest=hashlib.sha256(raw).hexdigest()
+          expected="26ac95f6c650ae1e6bc481da967ab2078f7578c6a11697d1c6525415008798f6"
+          assert digest==expected,(digest,expected)
+          Path("/tmp/srw-c08-source.zip").write_bytes(raw)
+          print("Verified C08 source ZIP",len(raw),"bytes",digest)
+          PY
+      - name: Restore only missing files, verify entire source manifest
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import hashlib,zipfile
+          from pathlib import Path
+          lines=Path("SOURCE_RECOVERY_MANIFEST.sha256").read_text(encoding="utf-8").splitlines()
+          entries=dict(row.split("  ",1)[::-1] for row in lines)
+          assert len(entries)==212 and len(lines)==len(entries)
+          original=Path("/tmp/srw-c08-source.zip")
+          with zipfile.ZipFile(original) as z:
+              assert z.testzip() is None
+              expected=set(z.namelist())-{"SOURCE_RECOVERY_MANIFEST.sha256"}
+              assert expected==set(entries),(sorted(set(entries)-expected),sorted(expected-set(entries)))
+              missing=[p for p in entries if not Path(p).is_file()]
+              assert len(missing)==13,(len(missing),missing)
+              assert all(p.startswith("backend/srw/runtime/") for p in missing),missing
+              for p,expected_hash in entries.items():
+                  data=z.read(p)
+                  assert hashlib.sha256(data).hexdigest()==expected_hash,p
+                  if Path(p).exists():
+                      assert hashlib.sha256(Path(p).read_bytes()).hexdigest()==expected_hash,"existing tracked file differs: "+p
+                  else:
+                      path=Path(p)
+                      path.parent.mkdir(parents=True,exist_ok=True)
+                      path.write_bytes(data)
+              for p,h in entries.items():
+                  assert hashlib.sha256(Path(p).read_bytes()).hexdigest()==h,p
+          print("Recovered",len(missing),"runtime source files; 212/212 SHA-256 verified")
+          PY
+      - name: Commit restored runtime files
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -f backend/srw/runtime/
+          git diff --cached --quiet && exit 1
+          git commit -m "fix: restore 13 missing runtime source files (C08 manifest 212/212)"
+          git push origin HEAD:repair/c08-source-and-ci
