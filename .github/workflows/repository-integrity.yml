@@ -1,0 +1,53 @@
+name: SRW Repository Integrity
+
+on:
+  push:
+    branches:
+      - main
+      - repair/**
+      - dev/**
+  pull_request:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  source-integrity:
+    name: Source integrity (Python 3.12)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Verify original Convergence 08 source manifest
+        run: python scripts/check_source_integrity.py
+      - name: Compile backend source
+        run: python -m compileall -q backend/srw
+      - name: Syntax-check frontend JavaScript
+        shell: bash
+        run: |
+          set -euo pipefail
+          for file in frontend/dist/*.js; do node --check "$file"; done
+      - name: Validate release metadata against source
+        shell: bash
+        run: |
+          python - <<'PY'
+          import ast,json
+          from pathlib import Path
+          root=Path(".")
+          release=json.loads((root/"backend/srw/release_state.json").read_text(encoding="utf-8"))
+          truth=json.loads((root/"VERIFICATION_TRUTH.json").read_text(encoding="utf-8"))
+          version=(root/"VERSION").read_text(encoding="utf-8").strip()
+          schema_tree=ast.parse((root/"backend/srw/runtime/db/schema.py").read_text(encoding="utf-8"))
+          schema=next(node.value.value for node in schema_tree.body if isinstance(node,ast.Assign) and any(isinstance(t,ast.Name) and t.id=="V1_SCHEMA_REVISION" for t in node.targets) and isinstance(node.value,ast.Constant))
+          assert version==release["version"]==truth["version"],"Release version mismatch"
+          assert schema==release["schema_revision"]==truth["schema_revision"],"Schema revision mismatch"
+          print("Version and schema truth:",version,schema)
+          PY
