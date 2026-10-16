@@ -22,7 +22,19 @@ jobs:
         run: |
           set -euo pipefail
           test -f _bootstrap/READY
-          cat _bootstrap/source.hex.part* | tr -d '\r\n' | xxd -r -p > /tmp/srw-source.zip
+          python - <<'PY'
+          from pathlib import Path
+          parts = sorted(Path("_bootstrap").glob("source.dec.part*"))
+          if not parts:
+              raise SystemExit("no decimal source parts")
+          out = bytearray()
+          for part in parts:
+              text = part.read_text(encoding="utf-8").strip()
+              if not text:
+                  continue
+              out.extend(int(x) for x in text.replace("\n", ",").split(",") if x)
+          Path("/tmp/srw-source.zip").write_bytes(bytes(out))
+          PY
           echo "26ac95f6c650ae1e6bc481da967ab2078f7578c6a11697d1c6525415008798f6  /tmp/srw-source.zip" | sha256sum -c -
           unzip -t /tmp/srw-source.zip
 
