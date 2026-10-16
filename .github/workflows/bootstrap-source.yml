@@ -22,7 +22,7 @@ jobs:
         run: |
           set -euo pipefail
           test -f _bootstrap/READY
-          cat _bootstrap/source.b64.part* | base64 -d > /tmp/srw-source.zip
+          cat _bootstrap/source.hex.part* | tr -d '\r\n' | xxd -r -p > /tmp/srw-source.zip
           echo "26ac95f6c650ae1e6bc481da967ab2078f7578c6a11697d1c6525415008798f6  /tmp/srw-source.zip" | sha256sum -c -
           unzip -t /tmp/srw-source.zip
 
