@@ -1,0 +1,88 @@
+{
+  "release": {
+    "product": "SRW",
+    "surface": "v1-core",
+    "version": "1.0.0-alpha10-convergence05",
+    "schema_revision": "v1_0013",
+    "evaluation_policy_revision": "policy.v1",
+    "instance_id": "9fee5d8c3f56443ba13b2638e2629268",
+    "data_dir_identity": "fa95904f5c0f34fd0457de1753c6d0120d0dad3a6e37d198cdbd8fb233d2ccf2"
+  },
+  "route_count": 121,
+  "project_id": "17bdc6be-7889-4b5f-8f05-eb64ada97b16",
+  "candidate_id": "69052c6c-8b0b-4408-8362-c5d213a9455d",
+  "decision_action_initial": {
+    "id": "320fba22-3a66-4a37-b695-089205b5e65b",
+    "context": "70e057b14927bfd6dbf8d829dad025569feb705796d59ab0fe63ecc7182dbff8",
+    "status_after_material_change": "stale"
+  },
+  "decision_action_current": {
+    "id": "3094dc1e-0ced-4a29-8c04-8a43f8a865a1",
+    "context": "211ea4aedffac037639befca328bd439c601e5760b39bea86fedd5533b1344f4",
+    "completed": true
+  },
+  "material_revision_changed": true,
+  "feedback": {
+    "status": "applied",
+    "type": "mixed",
+    "candidate_facts": 1,
+    "job_requirements": 1,
+    "conflicts": 1,
+    "follow_up_questions": 3
+  },
+  "planning": {
+    "project_id": "17bdc6be-7889-4b5f-8f05-eb64ada97b16",
+    "plan": {
+      "configured": true,
+      "target_hires": 2,
+      "target_date": "2026-12-01",
+      "owner": "TA Lead",
+      "source_channels": [
+        "referral",
+        "campus"
+      ],
+      "notes": "smoke"
+    },
+    "pipeline": {
+      "new": 1
+    },
+    "candidate_count": 1,
+    "hired_count": 0,
+    "remaining_hires": 2,
+    "assessment": {
+      "assessed_count": 1,
+      "publishable_count": 0,
+      "decision_ready_count": 0,
+      "average_evidence_coverage": 0.0
+    },
+    "open_actions": {
+      "total": 0,
+      "by_type": {}
+    },
+    "bottlenecks": [
+      {
+        "code": "LOW_EVIDENCE_COVERAGE",
+        "severity": "high",
+        "text": "候选人平均证据覆盖不足 70%，应优先补证而不是扩大排名。"
+      }
+    ],
+    "semantics": {
+      "operational_priority_is_not_hiring_rank": true,
+      "missing_is_not_zero": true
+    }
+  },
+  "knowledge_loop": {
+    "knowledge_feedback_count": 1,
+    "curation_count": 1,
+    "export_file": "c1594dd4-34fe-449c-a298-6f58bdb6df8c.json",
+    "active_knowledge_mutated": false
+  },
+  "active_knowledge_hashes_unchanged": true,
+  "active_knowledge_hashes": {
+    "competency/knowledge.db": "b9cc9890c7a544aa5f13fd4cd4e8aa4ebfa57039c3579bb7a16f1b57f334d563",
+    "job_info/knowledge.db": "59bf5cb394a59597e5c05b7dcd727ad33c1190a5ef1512c59e423414c3ed2d17",
+    "market_reference/knowledge.db": "32e58df7572d11913e99b4806519760a3fb102c90aebc243e1e5c7c324e085c1",
+    "reference/knowledge.db": "f7ad00899e1d9996e7b0f12569ec6e4e4c9355f9674a74ae8e9e69877c5bfd31",
+    "taxonomy/knowledge.db": "9fc9183b0450924d8e29eb3534485ae39dea828992d6e41aac3b857ec0cb7dc5"
+  }
+}

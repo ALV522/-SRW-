@@ -1,0 +1,38 @@
+{
+  "compile": "PASS",
+  "unittest_count": 31,
+  "unittest": "PASS",
+  "javascript": [
+    {
+      "file": "app.js",
+      "status": "PASS"
+    },
+    {
+      "file": "convergence03.js",
+      "status": "PASS"
+    },
+    {
+      "file": "convergence04.js",
+      "status": "PASS"
+    },
+    {
+      "file": "convergence05.js",
+      "status": "PASS"
+    },
+    {
+      "file": "convergence06.js",
+      "status": "PASS"
+    }
+  ],
+  "release": {
+    "schema": "srw.v1.release-state.v1",
+    "version": "1.0.0-alpha10-convergence06",
+    "schema_revision": "v1_0014",
+    "artifact_profile": "business_convergence_06_08x_capability_recovery",
+    "parent": {
+      "name": "SRW_v1.0_Business_Convergence_05_08x_Capability_Recovery_Portable.zip",
+      "sha256": "b5d4a3f2dbb5d7e0b077acea217f758116b47d8bc10d0f8bdedd528157077d6d",
+      "version": "1.0.0-alpha10-convergence05"
+    }
+  }
+}

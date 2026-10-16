@@ -1,0 +1,47 @@
+{
+  "port": 36139,
+  "version": "1.0.0-alpha10-convergence08",
+  "ready": {
+    "status": "ready",
+    "version": "1.0.0-alpha10-convergence08",
+    "schemaVersion": "v1_0014",
+    "databaseReady": true,
+    "knowledgeReady": true,
+    "issues": []
+  },
+  "info": {
+    "apiVersion": "v1",
+    "product": "SRW",
+    "version": "1.0.0-alpha10-convergence08",
+    "schemaVersion": "v1_0014",
+    "runtime": "desktop",
+    "edition": "windows",
+    "instanceId": "c08-host-instance",
+    "releaseId": "1.0.0-alpha10-convergence08",
+    "sessionId": "c08-host-session",
+    "dataScopeId": "08114354eab5aaad6ae274ba0cce7f12355661e8e027c0bbd46f34c13debf9bb",
+    "frontend": {
+      "mode": "static_dist"
+    },
+    "capabilities": {
+      "desktop": true,
+      "nativeFileDialogs": false,
+      "secureSecretStore": false,
+      "notifications": false,
+      "clipboard": true,
+      "downloads": true,
+      "externalNavigation": true,
+      "gracefulShutdown": true,
+      "lifecycleSessionTokenSupported": true,
+      "lifecycleSessionTokenRequired": true
+    },
+    "readiness": {
+      "status": "ready"
+    }
+  },
+  "root_status": 200,
+  "wrong_shutdown": 403,
+  "shutdown_status": 202,
+  "process_exit": 0,
+  "log_tail": "INFO:     Started server process [1961]\nINFO:     Waiting for application startup.\nINFO:     Application startup complete.\nINFO:     Uvicorn running on http://127.0.0.1:36139 (Press CTRL+C to quit)\nINFO:     127.0.0.1:34728 - \"GET /api/v1/runtime/ready HTTP/1.1\" 200 OK\nINFO:     127.0.0.1:34732 - \"GET /api/v1/runtime/info HTTP/1.1\" 200 OK\nINFO:     127.0.0.1:34746 - \"GET / HTTP/1.1\" 200 OK\nINFO:     127.0.0.1:34760 - \"POST /api/v1/runtime/shutdown HTTP/1.1\" 403 Forbidden\nINFO:     127.0.0.1:34768 - \"POST /api/v1/runtime/shutdown HTTP/1.1\" 202 Accepted\nINFO:     Shutting down\nINFO:     Waiting for application shutdown.\nINFO:     Application shutdown complete.\nINFO:     Finished server process [1961]\n"
+}

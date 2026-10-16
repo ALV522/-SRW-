@@ -1,0 +1,59 @@
+{
+  "queued": {
+    "task_id": "1767a527-9765-4205-abb2-7f0e8391f410",
+    "job_id": "ec842c2b-fe12-4eab-a6f2-15a9f3367af7",
+    "task_status": "queued"
+  },
+  "worker_executed": true,
+  "task": {
+    "task_id": "1767a527-9765-4205-abb2-7f0e8391f410",
+    "type": "evidence_extract",
+    "status": "succeeded",
+    "candidate_id": "f42b0a18-1625-4b55-a6c1-c000ba869ded",
+    "source_id": "cd28b4b0-d49d-478f-9fbd-4a4999fd8fd3",
+    "result_source_id": null,
+    "progress_current": 1,
+    "progress_total": 1,
+    "attempt_count": 1,
+    "started_at": "2026-10-16T05:37:45.217675",
+    "finished_at": "2026-10-16T05:37:45.226932",
+    "duration_ms": 10,
+    "error_code": "",
+    "error_message": "",
+    "result": {
+      "source_id": "cd28b4b0-d49d-478f-9fbd-4a4999fd8fd3",
+      "proposed": 1,
+      "created": 1,
+      "duplicate": 0,
+      "rejected": 0,
+      "claim_ids": [
+        "1514d51b-c2ea-4fa2-8cbc-5cf0bd0b17b5"
+      ]
+    },
+    "created_at": "2026-10-16T05:37:45.206422"
+  },
+  "ai_run": {
+    "run_id": "bdeed529-91bc-4ead-9b4d-2a6a211573f4",
+    "task_type": "evidence_extract",
+    "project_id": "f58048f0-359e-4338-8a90-8a47cbefb6be",
+    "candidate_id": "f42b0a18-1625-4b55-a6c1-c000ba869ded",
+    "source_id": "cd28b4b0-d49d-478f-9fbd-4a4999fd8fd3",
+    "provider_kind": "deepseek",
+    "model_name": "deepseek-v4-flash",
+    "prompt_version": "evidence.claims.v1",
+    "schema_version": "claim-proposals.v1",
+    "input_hash": "0e820531b431273f0c1ddb3fe99746cefe73f5ce6adbfca9c7867eb99dcbcb03",
+    "output_hash": "b299d8209adfd077b1d3c9dddb9fc80de04c4e5d575eb11a77d2d4d9310236ec",
+    "input_safety_meta_json": "{\"durable_task_id\":\"1767a527-9765-4205-abb2-7f0e8391f410\",\"length_preserved\":true,\"privacy_projection\":true,\"redaction_counts\":{\"phone\":1}}",
+    "status": "succeeded",
+    "error_class": "",
+    "error_code": "",
+    "retry_count": 0,
+    "latency_ms": 8,
+    "started_at": "2026-10-16T05:37:45.221735",
+    "finished_at": "2026-10-16T05:37:45.226268",
+    "raw_input_stored": false,
+    "raw_output_stored": false,
+    "api_key_stored": false
+  }
+}

@@ -1,0 +1,20 @@
+{
+  "runtime": {
+    "parent_files": 1611,
+    "exact_files": 1611,
+    "mismatches": [],
+    "missing": [],
+    "extra": [],
+    "exact": true
+  },
+  "knowledge_active": {
+    "parent_files": 5,
+    "exact_files": 5,
+    "mismatches": [],
+    "missing": [],
+    "extra": [],
+    "exact": true
+  },
+  "parent_artifact": "SRW_v1.0_Business_Convergence_03_Portable.zip",
+  "parent_sha256": "6db994977f7cbab540a844fd228f7dd28232bebc2a5f2c6721f237ee2f70a3f9"
+}

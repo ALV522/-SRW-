@@ -1,0 +1,151 @@
+{
+  "status": "PASS",
+  "proposal_id": "e32ad008-7022-464e-acd8-c840fd6cc99b",
+  "package_id": "curation-e32ad008-7022-464e-acd8-c840fd6cc99b",
+  "semantic_diff": {
+    "sources": [
+      {
+        "source_type": "taxonomy",
+        "added": 2,
+        "removed": 0,
+        "changed": 0,
+        "tables": [
+          {
+            "table": "canonical_role",
+            "added": 0,
+            "removed": 0,
+            "changed": 0,
+            "examples": {
+              "added": [],
+              "removed": [],
+              "changed": []
+            }
+          },
+          {
+            "table": "specialization",
+            "added": 0,
+            "removed": 0,
+            "changed": 0,
+            "examples": {
+              "added": [],
+              "removed": [],
+              "changed": []
+            }
+          },
+          {
+            "table": "title_alias",
+            "added": 1,
+            "removed": 0,
+            "changed": 0,
+            "examples": {
+              "added": [
+                "CUR-AF178C67609F416B"
+              ],
+              "removed": [],
+              "changed": []
+            }
+          },
+          {
+            "table": "title_mapping",
+            "added": 1,
+            "removed": 0,
+            "changed": 0,
+            "examples": {
+              "added": [
+                "CURMAP-262C861FDEE74DB3"
+              ],
+              "removed": [],
+              "changed": []
+            }
+          }
+        ]
+      }
+    ],
+    "totals": {
+      "added": 2,
+      "removed": 0,
+      "changed": 0
+    }
+  },
+  "wrong_digest_status": 409,
+  "activation": {
+    "status": "active",
+    "package_id": "curation-e32ad008-7022-464e-acd8-c840fd6cc99b",
+    "source_type": "taxonomy",
+    "sha256": "06760d471a38c6a46e46586c184375a852632da1792e7aaa08f5dce1bda35bdd",
+    "rollback_available": true,
+    "semantic_diff": {
+      "sources": [
+        {
+          "source_type": "taxonomy",
+          "added": 2,
+          "removed": 0,
+          "changed": 0,
+          "tables": [
+            {
+              "table": "canonical_role",
+              "added": 0,
+              "removed": 0,
+              "changed": 0,
+              "examples": {
+                "added": [],
+                "removed": [],
+                "changed": []
+              }
+            },
+            {
+              "table": "specialization",
+              "added": 0,
+              "removed": 0,
+              "changed": 0,
+              "examples": {
+                "added": [],
+                "removed": [],
+                "changed": []
+              }
+            },
+            {
+              "table": "title_alias",
+              "added": 1,
+              "removed": 0,
+              "changed": 0,
+              "examples": {
+                "added": [
+                  "CUR-AF178C67609F416B"
+                ],
+                "removed": [],
+                "changed": []
+              }
+            },
+            {
+              "table": "title_mapping",
+              "added": 1,
+              "removed": 0,
+              "changed": 0,
+              "examples": {
+                "added": [
+                  "CURMAP-262C861FDEE74DB3"
+                ],
+                "removed": [],
+                "changed": []
+              }
+            }
+          ]
+        }
+      ],
+      "totals": {
+        "added": 2,
+        "removed": 0,
+        "changed": 0
+      }
+    }
+  },
+  "rollback": {
+    "status": "rolled_back",
+    "package_id": "curation-e32ad008-7022-464e-acd8-c840fd6cc99b",
+    "source_type": "taxonomy",
+    "sha256": "9fc9183b0450924d8e29eb3534485ae39dea828992d6e41aac3b857ec0cb7dc5",
+    "active_knowledge_mutated": true
+  },
+  "byte_exact_rollback": true
+}

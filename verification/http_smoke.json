@@ -1,0 +1,65 @@
+{
+  "info": {
+    "product": "SRW",
+    "surface": "v1-core",
+    "version": "1.0.0-alpha10-convergence06",
+    "schema_revision": "v1_0014",
+    "evaluation_policy_revision": "policy.v1",
+    "instance_id": "a6aa0aa9863640488ba7e64505bde984",
+    "data_dir_identity": "c50def4ad82ab79000dd067a8a32e67386ca8b4071b1ab2162b5171fff697358"
+  },
+  "route_count": 128,
+  "project_id": "31fab7bb-6f6d-4bf6-a10d-88113686e9e7",
+  "recruitment_intelligence": {
+    "project_id": "31fab7bb-6f6d-4bf6-a10d-88113686e9e7",
+    "channels": [
+      {
+        "channel": "内推",
+        "sourced": 20,
+        "contacted": 15,
+        "screened": 10,
+        "interviewed": 5,
+        "offered": 2,
+        "hired": 1,
+        "spend_cny": 1000.0,
+        "confirmed_observations": 1,
+        "observations": 1,
+        "all_human_confirmed": true,
+        "contact_rate": 0.75,
+        "screen_rate": 0.6667,
+        "interview_rate": 0.5,
+        "offer_rate": 0.4,
+        "hire_rate_from_sourced": 0.05,
+        "cost_per_hire_cny": 1000.0
+      }
+    ],
+    "configured_channels": [
+      "内推",
+      "招聘网站"
+    ],
+    "measurement_gaps": [
+      "招聘网站"
+    ],
+    "planning_flags": [
+      {
+        "code": "CHANNEL_MEASUREMENT_GAP",
+        "severity": "medium",
+        "text": "已配置渠道缺少效果观测：招聘网站"
+      }
+    ],
+    "market": {
+      "available": true,
+      "signals": [],
+      "guardrail": "市场参考仅用于招聘计划与渠道判断，不直接转化为候选人分数或录用结论。"
+    },
+    "semantics": {
+      "channel_efficiency_is_not_candidate_rank": true,
+      "market_signal_is_not_candidate_score": true,
+      "unconfirmed_observation_is_advisory_only": true
+    }
+  },
+  "knowledge_packages": {
+    "packages": []
+  },
+  "frontend_convergence06_status": 200
+}

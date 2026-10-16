@@ -1,0 +1,92 @@
+{
+  "schema": "srw.convergence03-http-smoke.v1",
+  "checks": {
+    "info": {
+      "status": 200,
+      "version": "1.0.0-alpha10-convergence03",
+      "schema_revision": "v1_0011"
+    },
+    "create_project": 200,
+    "save_protocol": 200,
+    "publish_protocol": 200,
+    "candidate_Alpha": 200,
+    "candidate_Beta": 200,
+    "candidate_Gamma": 200,
+    "candidate_DuplicateTarget": 200,
+    "candidate_DuplicateSource": 200,
+    "alpha_file_upload": 200,
+    "source_file": {
+      "status": 200,
+      "body_match": true,
+      "content_type": "text/plain; charset=utf-8",
+      "inline": true
+    },
+    "source_Beta": 200,
+    "source_Gamma": 200,
+    "source_DuplicateSource": 200,
+    "verify_Alpha_exp": 200,
+    "verify_Alpha_comm": 200,
+    "verify_Beta_exp": 200,
+    "verify_Beta_comm": 200,
+    "verify_Gamma_exp": 200,
+    "shortlist_preview": {
+      "status": 200,
+      "ranked": [
+        "Alpha",
+        "Beta"
+      ],
+      "unranked_count": 3,
+      "final_decision": false
+    },
+    "shortlist_publish": {
+      "status": 200,
+      "publication_id": "af50ee8e-85d0-4c20-80a3-910f23e5bfeb",
+      "ranked_count": 2
+    },
+    "shortlist_history": {
+      "status": 200,
+      "count": 1
+    },
+    "contact_DuplicateTarget": 200,
+    "contact_DuplicateSource": 200,
+    "identity_scan": {
+      "status": 200,
+      "created": 1
+    },
+    "identity_pending": {
+      "status": 200,
+      "count": 1
+    },
+    "identity_confirm_same": {
+      "status": 200,
+      "merge_performed": false
+    },
+    "merge_preview": {
+      "status": 200,
+      "can_merge": true,
+      "source_current_source_count": 1,
+      "history_rewrite": false
+    },
+    "merge_commit": {
+      "status": 200,
+      "merged": true,
+      "source_archived": true,
+      "history_rewritten": false,
+      "cloned_sources": 1
+    },
+    "identity_history": {
+      "status": 200,
+      "count": 1
+    },
+    "merged_restore_blocked": {
+      "status": 409,
+      "detail": "merged source identity cannot be restored; open the canonical candidate instead"
+    },
+    "frontend_module": {
+      "status": 200,
+      "contains_shortlist": true,
+      "contains_source_viewer": true
+    },
+    "route_count": 102
+  }
+}

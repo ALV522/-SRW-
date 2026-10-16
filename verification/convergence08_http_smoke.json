@@ -1,0 +1,19 @@
+{
+  "registered_routes": 140,
+  "create_project": 200,
+  "publish_protocol": 200,
+  "create_candidate": 200,
+  "publish_material": 200,
+  "export_package": 200,
+  "package_sha256": "8dbb852a9024e7ddbf29237eeeff08cc127fd4409017737d84b0b490bbd3c0fa",
+  "package_bytes": 2223,
+  "import_preview": 200,
+  "preview_blob_count": 0,
+  "wrong_digest_blocked": 409,
+  "import_commit": 200,
+  "imported_project_id": "97bc02bb-98aa-42db-a118-4273c2e68af2",
+  "requires_reevaluation": true,
+  "imported_candidate_list": 200,
+  "imported_candidate_count": 1,
+  "root_frontend": 200
+}

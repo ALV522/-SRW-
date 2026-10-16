@@ -1,0 +1,19 @@
+{
+  "parent": "Convergence05",
+  "runtime": {
+    "current_count": 1611,
+    "parent_count": 1611,
+    "identical_count": 1611,
+    "added": [],
+    "removed": [],
+    "changed": []
+  },
+  "active_knowledge": {
+    "current_count": 5,
+    "parent_count": 5,
+    "identical_count": 5,
+    "added": [],
+    "removed": [],
+    "changed": []
+  }
+}

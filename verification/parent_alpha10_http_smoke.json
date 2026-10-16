@@ -1,0 +1,8 @@
+{
+  "version": "1.0.0-alpha10",
+  "schema": "v1_0009",
+  "contact_semantics": "contact_execution_priority_not_hiring_rank",
+  "phone_questions": 4,
+  "scorecard_disagreement": true,
+  "handoff_candidates": 1
+}

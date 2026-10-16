@@ -1,0 +1,70 @@
+{
+  "schema": "srw.convergence02-http-smoke.v1",
+  "checks": {
+    "info": {
+      "status": 200,
+      "body": {
+        "product": "SRW",
+        "surface": "v1-core",
+        "version": "1.0.0-alpha10-convergence02",
+        "schema_revision": "v1_0010",
+        "evaluation_policy_revision": "policy.v1",
+        "instance_id": "5f16b62d15b54d06a6ac378f45032865",
+        "data_dir_identity": "deddbff3401da3328057a2f243453f54614cee197d07bf0a3234a0035a374e89"
+      }
+    },
+    "create_project": 200,
+    "create_candidate_Alice": 200,
+    "create_candidate_Alice duplicate": 200,
+    "contact_0a575bba": 200,
+    "contact_bf393d1a": 200,
+    "identity_scan": {
+      "status": 200,
+      "created": 1
+    },
+    "identity_list": {
+      "status": 200,
+      "count": 1
+    },
+    "identity_resolve": {
+      "status": 200,
+      "merge_performed": false
+    },
+    "anchor_create": {
+      "status": 200,
+      "lifecycle": "observed"
+    },
+    "anchor_human_reviewed": {
+      "status": 200,
+      "lifecycle": "human_reviewed"
+    },
+    "anchor_candidate": {
+      "status": 200,
+      "lifecycle": "candidate"
+    },
+    "anchor_gold": {
+      "status": 200,
+      "lifecycle": "gold"
+    },
+    "judgment_review_create": {
+      "status": 200,
+      "error_class": "evidence"
+    },
+    "source_create": 200,
+    "privacy_view": {
+      "status": 200,
+      "redactions": {
+        "email": 1,
+        "phone": 1,
+        "name": 1
+      },
+      "length_preserved": true,
+      "pii_absent": true
+    },
+    "dashboard": {
+      "status": 200,
+      "pending_identity_reviews": 0,
+      "open_judgment_reviews": 1
+    }
+  }
+}

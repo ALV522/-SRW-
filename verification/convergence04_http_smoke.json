@@ -1,0 +1,49 @@
+{
+  "schema": {
+    "status": "ready",
+    "schema_revision": "v1_0012"
+  },
+  "ai_run": {
+    "run_id": "c1ad9c12-947e-43bb-a97b-d3940f1a5695",
+    "task_type": "evidence_extract",
+    "project_id": "2d78c944-0000-4b7b-a08a-e1d189cf7e6c",
+    "candidate_id": "c78848ac-fdb4-4e87-916d-0608e5f5a5e3",
+    "source_id": "be6ce2d5-998c-4d38-b2c4-e0d6e61be285",
+    "provider_kind": "deepseek",
+    "model_name": "deepseek-v4-flash",
+    "prompt_version": "evidence.claims.v1",
+    "schema_version": "claim-proposals.v1",
+    "input_hash": "04b53ebd312cded9fa8670e6fcd01d239e16f6d9831c575b7dfba9de5f0e5f02",
+    "output_hash": "327a0595e889651447f0eb70960f1ac45b544d7269c25f593c1895a20288ad34",
+    "input_safety_meta_json": "{\"length_preserved\":true,\"privacy_projection\":true,\"redaction_counts\":{\"email\":1,\"name\":1,\"phone\":1}}",
+    "status": "succeeded",
+    "error_class": "",
+    "error_code": "",
+    "retry_count": 0,
+    "latency_ms": 8,
+    "started_at": "2026-10-16T05:33:34.391883",
+    "finished_at": "2026-10-16T05:33:34.402069",
+    "raw_input_stored": false,
+    "raw_output_stored": false,
+    "api_key_stored": false
+  },
+  "stale_workspace": {
+    "stale_decision_id": "689ddfdc-73b9-4162-b895-e43c6b063bd2",
+    "decision_reaffirmable": true
+  },
+  "reaffirmation": {
+    "decision_id": "efb14530-fcd5-434d-9bfb-5badd83beb13",
+    "decision": "advance",
+    "reason": "new material does not change conclusion",
+    "decision_context_hash": "94789bad61b9349ab0d837c5a15474e11d8a56f1f51659d590a9e5c6889fb174",
+    "reaffirmed_from_decision_id": "689ddfdc-73b9-4162-b895-e43c6b063bd2",
+    "actor": "reviewer2",
+    "created_at": "2026-10-16T05:33:34.449078+00:00"
+  },
+  "route_checks": {
+    "ai_runs": true,
+    "decision_history": true,
+    "reaffirm": true,
+    "privacy_redaction": true
+  }
+}

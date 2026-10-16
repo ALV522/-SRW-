@@ -1,0 +1,11 @@
+{
+  "schema": "srw.v1.release-state.v1",
+  "version": "1.0.0-alpha10-convergence08",
+  "schema_revision": "v1_0014",
+  "artifact_profile": "business_convergence_08_08x_capability_recovery_portability",
+  "parent": {
+    "name": "SRW_v1.0_Business_Convergence_07_08x_Native_Host_Recovery_Portable.zip",
+    "sha256": "f3a29b2553a0189fd353de80a9ea0061cb5fdde4756efecdbd9fe135bee979e8",
+    "version": "1.0.0-alpha10-convergence07"
+  }
+}

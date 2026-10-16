@@ -1,0 +1,53 @@
+{
+  "compile": "PASS",
+  "unittest_count": 46,
+  "unittest": "PASS",
+  "javascript": [
+    {
+      "file": "app.js",
+      "status": "PASS",
+      "stderr": ""
+    },
+    {
+      "file": "convergence03.js",
+      "status": "PASS",
+      "stderr": ""
+    },
+    {
+      "file": "convergence04.js",
+      "status": "PASS",
+      "stderr": ""
+    },
+    {
+      "file": "convergence05.js",
+      "status": "PASS",
+      "stderr": ""
+    },
+    {
+      "file": "convergence06.js",
+      "status": "PASS",
+      "stderr": ""
+    },
+    {
+      "file": "convergence07.js",
+      "status": "PASS",
+      "stderr": ""
+    },
+    {
+      "file": "convergence08.js",
+      "status": "PASS",
+      "stderr": ""
+    }
+  ],
+  "release": {
+    "schema": "srw.v1.release-state.v1",
+    "version": "1.0.0-alpha10-convergence08",
+    "schema_revision": "v1_0014",
+    "artifact_profile": "business_convergence_08_08x_sourceviewer_governance_verification",
+    "parent": {
+      "name": "SRW_v1.0_Business_Convergence_07_08x_Native_Host_Recovery_Portable.zip",
+      "sha256": "f3a29b2553a0189fd353de80a9ea0061cb5fdde4756efecdbd9fe135bee979e8",
+      "version": "1.0.0-alpha10-convergence07"
+    }
+  }
+}

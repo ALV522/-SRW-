@@ -1,0 +1,19 @@
+{
+  "schema": "srw.parent-asset-inheritance.v1",
+  "parent": "SRW_v1.0_Business_Convergence_02_Portable.zip",
+  "parent_sha256": "fa5d809571f8f6dbe3ad3940fb7581aff2db4c55c954572cedd988a54688b786",
+  "runtime": {
+    "parent_files": 1611,
+    "exact": 1611,
+    "changed": 0,
+    "missing": 0,
+    "diffs": []
+  },
+  "knowledge_active_dbs": {
+    "parent_files": 5,
+    "exact": 5,
+    "changed": 0,
+    "missing": 0,
+    "diffs": []
+  }
+}
