@@ -1,0 +1,123 @@
+name: Bootstrap SRW source baseline
+
+on:
+  push:
+    paths:
+      - "_bootstrap/READY"
+
+permissions:
+  contents: write
+
+jobs:
+  unpack-source:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Reconstruct and verify source archive
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -f _bootstrap/READY
+          cat _bootstrap/source.b64.part* | base64 -d > /tmp/srw-source.zip
+          echo "26ac95f6c650ae1e6bc481da967ab2078f7578c6a11697d1c6525415008798f6  /tmp/srw-source.zip" | sha256sum -c -
+          unzip -t /tmp/srw-source.zip
+
+      - name: Extract source baseline
+        shell: bash
+        run: |
+          set -euo pipefail
+          tmpdir="$(mktemp -d)"
+          unzip -q /tmp/srw-source.zip -d "$tmpdir"
+          rsync -a --exclude='.git' "$tmpdir"/ ./
+          rm -rf _bootstrap
+          rm -f .github/workflows/bootstrap-source.yml
+
+      - name: Ensure repository ignore rules
+        shell: bash
+        run: |
+          cat > .gitignore <<'EOF'
+          # Python
+          __pycache__/
+          *.py[cod]
+          .pytest_cache/
+          .mypy_cache/
+          .ruff_cache/
+          .coverage
+          htmlcov/
+          .venv/
+          venv/
+
+          # Node / frontend
+          node_modules/
+          .npm/
+          .yarn/
+          *.tsbuildinfo
+
+          # .NET / Visual Studio
+          **/bin/
+          **/obj/
+          .vs/
+
+          # IDE / OS
+          .idea/
+          .vscode/
+          .DS_Store
+          Thumbs.db
+          desktop.ini
+
+          # Secrets / local configuration
+          .env
+          .env.*
+          !.env.example
+          *.pem
+          *.key
+          *.pfx
+          *.p12
+          secrets.json
+          credentials.json
+          local_settings.json
+
+          # SRW runtime / user data
+          runtime/
+          data/
+          workspace/
+          uploads/
+          backups/
+          exports/
+          logs/
+          temp/
+          tmp/
+          *.db-wal
+          *.db-shm
+          *.db-journal
+          content/
+          blobs/
+          source_blobs/
+
+          # Build / release artifacts
+          *.zip
+          *.7z
+          *.rar
+          artifacts/
+          release/
+          releases/
+
+          # Local verification output
+          verification/tmp/
+          verification/local/
+          verification/runtime/
+          EOF
+
+      - name: Commit reconstructed source tree
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git commit -m "Baseline: Convergence 08 capability recovery" || exit 0
+          git push
