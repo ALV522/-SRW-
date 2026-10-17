@@ -22,7 +22,7 @@ python scripts/check_release_truth.py
 python scripts/run_convergence_verification.py
 ```
 
-The current suite contains **85 source regression tests**. Actual PASS evidence is the GitHub Actions run for the exact commit, on both Ubuntu and Windows. CI enables `SRW_TEST_RESOURCE_STRICT=1` and uploads logs. Historical C08 reports remain under `verification/`; they are not current-run evidence. The 725-test v0.8.12 inventory is a reference, not a claim of full parity.
+The current suite contains **86 source regression tests**. Actual PASS evidence is the GitHub Actions run for the exact commit, on both Ubuntu and Windows. CI enables `SRW_TEST_RESOURCE_STRICT=1` and uploads logs. Historical C08 reports remain under `verification/`; they are not current-run evidence. The 725-test v0.8.12 inventory is a reference, not a claim of full parity.
 
 ## Delivery boundary
 
@@ -39,3 +39,5 @@ C11 review routing: dashboard identity, judgment and Claim review entries carry 
 ### Windows Portable input preflight
 
 Run `python scripts/portable_input_preflight.py` against the separately supplied v0.8.8 Windows carrier, embedded Python runtime and five audited production Knowledge DBs. The default external manifest path is `PRODUCTION_KNOWLEDGE.sha256` (five SHA-256 lines relative to `knowledge/active`). A missing carrier, runtime or trusted manifest yields exit code 2 and a machine-readable BLOCKED report. This check does not generate a ZIP, verify the provenance of an externally supplied manifest, or certify the Windows GUI. Do not add production Knowledge data or private candidate records to Git.
+
+The native assembly candidate uses a source-manifest allowlist instead of copying the entire project root, and stages only the explicitly supplied runtime, five audited Knowledge DBs and exact inherited Host. The output is labelled UNVERIFIED until target-Windows GUI and workflow acceptance; do not use it as a signed or certified release.
