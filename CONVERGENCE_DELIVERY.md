@@ -13,3 +13,14 @@
 ## Verification boundary
 
 The current build verifies source/HTTP behavior, PDF page rendering, knowledge apply/rollback, project-package round trip and tamper guards, export/restore safety, JavaScript syntax, Runtime/Knowledge inheritance and Host ABI. It still does not claim Windows WPF GUI acceptance without assembling from the exact audited v0.8.8 carrier and running the resulting artifact on Windows. External-provider live calls and real-corpus ranking calibration remain environment/data dependent.
+
+
+## Convergence 10
+
+- Release identity: `1.0.0-alpha10-convergence10`; schema remains `v1_0014`.
+- Adds `GET /api/v1/system/diagnostics/export` for a deterministic privacy-safe support ZIP.
+- Diagnostic bundle includes only normalized release/health/count metadata and an internal SHA-256 manifest.
+- Explicit exclusions: candidate/resume content, Source blobs, database bytes, provider secrets and local paths.
+- Adds three focused regression tests; cumulative source suite target is 68 tests.
+- Adds a reviewed source-manifest generator; CI emits a candidate manifest but the integrity gate remains fail-closed.
+- Portable/native artifacts remain outside this source-only delivery until embedded runtime, production Knowledge and exact Windows carrier acceptance are completed.
