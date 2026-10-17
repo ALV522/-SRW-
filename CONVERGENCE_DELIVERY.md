@@ -24,3 +24,14 @@ The current build verifies source/HTTP behavior, PDF page rendering, knowledge a
 - Adds three focused regression tests; cumulative source suite target is 68 tests.
 - Adds a reviewed source-manifest generator; CI emits a candidate manifest but the integrity gate remains fail-closed.
 - Portable/native artifacts remain outside this source-only delivery until embedded runtime, production Knowledge and exact Windows carrier acceptance are completed.
+
+
+## Convergence 11 — Business Workflow Closure
+
+- Release identity: `1.0.0-alpha10-convergence11`; schema remains `v1_0014`.
+- Promotes the existing decision workbench from an internal service into the primary dashboard as an actionable business queue.
+- Shows only the highest-priority current work item for each candidate, preserving the evidence/decision context rather than presenting raw task volume.
+- Adds direct navigation from the dashboard into the relevant candidate evidence/decision workspace or interview workflow.
+- Exposes the privacy-safe diagnostics ZIP from the settings UI instead of leaving it as an API-only capability.
+- Adds three product-facing regression tests; cumulative source suite target is 71 tests.
+- Keeps the next objective explicitly product-first: close complete recruiting workflows before additional infrastructure convergence.
