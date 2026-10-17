@@ -63,3 +63,9 @@ The current build verifies source/HTTP behavior, PDF page rendering, knowledge a
 - Add `scripts/portable_input_preflight.py` to inventory exact inherited carrier SHA, embedded Python and five Knowledge DBs against an external audited hash manifest.
 - Fail closed on missing/mismatched inputs, malformed manifest, SQLite errors or missing required Knowledge search tables; do not package synthetic fixture data.
 - Two synthetic source-level regressions, 85-test target. Actual runtime, Knowledge authenticity, native packaging and WPF/WebView2 GUI remain unverified.
+
+## C11 Native assembler source allowlist
+
+- Remove unsafe staging of all root contents; use reviewed source hashes and separately supplied runtime/Knowledge/Host assets only.
+- Fix PowerShell reserved `$Host` variable collision; use current versioned UNVERIFIED candidate name rather than stale C07 release filename.
+- Add Windows PowerShell parse/source-contract test; 86-test target. No actual native assembly or WPF GUI acceptance claim.
