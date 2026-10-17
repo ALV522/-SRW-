@@ -5,6 +5,7 @@ This is an execution plan, not a completed acceptance report. C11 prioritizes co
 | Flow | Actions | Required result |
 |---|---|---|
 | Daily work queue | Open dashboard, select highest-priority candidate action, enter the target workflow | One actionable next step per candidate; direct navigation preserves project/candidate context |
+| Operations queue | Create an overdue contact and complete an interview without submitted feedback; open both from dashboard | Operator lands in contact workbench or scorecard workflow without searching for the candidate manually |
 | Project and criteria | Create project, publish requirements, edit and republish | Clear active revision; prior evaluation context retained |
 | Intake and identity | Import PDF/text, add new revision, review duplicate identity | Current material correct; canonical merge keeps provenance |
 | Evidence | Open claim source, inspect PDF highlight, confirm or reject | Visible original evidence; mismatch rejected; missing stays unknown |

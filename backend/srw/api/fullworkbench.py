@@ -228,6 +228,57 @@ def install_full_workbench_routes(app, factory, registry, secrets, *, data_dir: 
             stale_reevaluations=s.scalar(select(func.count(ReevaluationDraft.id)).where(ReevaluationDraft.state=="stale")) or 0
             pending_identity=s.scalar(select(func.count(CandidateIdentityReview.id)).where(CandidateIdentityReview.status=="pending")) or 0
             open_judgment_reviews=s.scalar(select(func.count(JudgmentReviewItem.id)).where(JudgmentReviewItem.state=="open")) or 0
+            operational_items=[]
+            contact_rows=s.execute(
+                select(CandidateActionPlan,Candidate.display_name,Project.title)
+                .join(Candidate,Candidate.id==CandidateActionPlan.candidate_id)
+                .join(Project,Project.id==CandidateActionPlan.project_id)
+                .where(
+                    CandidateActionPlan.next_contact_at.is_not(None),
+                    CandidateActionPlan.next_contact_at<now,
+                    CandidateActionPlan.contact_status.in_(("to_contact","callback","attempted")),
+                    Candidate.archived.is_(False),
+                    Project.status!="archived",
+                )
+                .order_by(CandidateActionPlan.next_contact_at.asc(),CandidateActionPlan.id)
+                .limit(6)
+            ).all()
+            for plan,candidate_name,project_title in contact_rows:
+                operational_items.append({
+                    "kind":"overdue_contact",
+                    "project_id":plan.project_id,
+                    "project_title":project_title,
+                    "candidate_id":plan.candidate_id,
+                    "candidate_name":candidate_name,
+                    "event_id":"",
+                    "title":"逾期联系",
+                    "detail":plan.next_contact_at.isoformat() if plan.next_contact_at else "",
+                })
+            feedback_rows=s.execute(
+                select(RecruitmentEvent,Candidate.display_name,Project.id,Project.title)
+                .join(Candidate,Candidate.id==RecruitmentEvent.candidate_id)
+                .join(Project,Project.id==Candidate.project_id)
+                .where(
+                    RecruitmentEvent.event_state=="completed",
+                    RecruitmentEvent.event_type=="interview",
+                    ~RecruitmentEvent.id.in_(select(InterviewScorecardSubmission.event_id).where(InterviewScorecardSubmission.state=="submitted")),
+                    Candidate.archived.is_(False),
+                    Project.status!="archived",
+                )
+                .order_by(RecruitmentEvent.scheduled_at.asc(),RecruitmentEvent.created_at.asc(),RecruitmentEvent.id)
+                .limit(6)
+            ).all()
+            for event,candidate_name,project_id,project_title in feedback_rows:
+                operational_items.append({
+                    "kind":"pending_interview_feedback",
+                    "project_id":project_id,
+                    "project_title":project_title,
+                    "candidate_id":event.candidate_id,
+                    "candidate_name":candidate_name,
+                    "event_id":event.id,
+                    "title":"待提交面试反馈",
+                    "detail":event.title or "结构化面试",
+                })
             workbench=get_workbench(s,evaluation_policy_revision=evaluation_policy_revision)
             return JSONResponse({
                 "metrics":metrics,"recent":recent,"recent_activity":recent,
@@ -237,6 +288,7 @@ def install_full_workbench_routes(app, factory, registry, secrets, *, data_dir: 
                 "upcoming_interviews":int(upcoming),
                 "evidence_review_backlog":int(metrics["unreviewed_claims"]),
                 "operational_todos":{"overdue_contacts":int(overdue),"today_contacts":int(today_contacts),"pending_interview_feedback":int(pending_scorecards),"stale_reevaluations":int(stale_reevaluations),"pending_identity_reviews":int(pending_identity),"open_judgment_reviews":int(open_judgment_reviews)},
+                "operational_queue":{"items":operational_items[:12],"total":len(operational_items)},
                 "decision_workbench":{
                     "conflict_count":workbench.conflict_count,
                     "verify_count":workbench.verify_count,
