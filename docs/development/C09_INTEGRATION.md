@@ -23,3 +23,5 @@ Local verification: 65/65 regression tests passed; compile, frontend syntax, str
 Publishing status: automated approval review rejected GitHub create_tree twice, including after confirming the existing private repository ALV522/-SRW- (id 1358834882), admin/push permissions and scanning the 31 changed text files for credential patterns. The stated requirement is explicit end-user authorization naming this payload and destination. No new remote tree/commit/branch/PR was created. Dual-OS CI and main merge remain pending that authorization.
 
 Local Git commits are review checkpoints only, not upstream history. Do not push this reconstructed local history. The planned remote commit must retain the actual upstream main/C09 parents recorded above.
+
+Remote execution update: user explicitly authorized upload and merge after dual-OS CI. PR #5 was created from a real two-parent upstream integration commit; remote tree matched the reviewed local tree. Windows CI then reproduced an 8.3 short-path discrepancy (RUNNER~1 versus runneradmin) in the real SQLite-handle test. Normalize enumerated paths with realpath/normcase; retain the test and require a fresh dual-OS run.

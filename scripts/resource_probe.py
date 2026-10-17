@@ -26,7 +26,9 @@ def _sqlite_open_files() -> list[str]:
     # Probe errors deliberately propagate: unavailable evidence is not PASS.
     # /proc may expose a different PID namespace in containerized CI.
     process_id = int(os.readlink('/proc/self')) if os.name == 'posix' and os.path.islink('/proc/self') else os.getpid()
-    result = {entry.path for entry in psutil.Process(process_id).open_files()
+    # Windows handle enumeration may use 8.3 aliases (RUNNER~1). Canonicalize
+    # before comparing snapshots so one file has one identity across probes.
+    result = {os.path.normcase(os.path.realpath(entry.path)) for entry in psutil.Process(process_id).open_files()
               if is_sqlite_fd_target(entry.path)}
     # Linux /proc also exposes already-unlinked SQLite handles.
     fd_root = Path('/proc/self/fd')
