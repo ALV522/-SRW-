@@ -48,6 +48,7 @@ from srw.runtime.db.session import v1_session_scope
 from srw.runtime.jobs.engine import JobEngine
 from srw.runtime.jobs.models import Job
 from srw.runtime.settings import RuntimeSettingsRepository
+from srw.surfaces.workbench import get_workbench
 
 
 def _body_dict(body: Any) -> dict[str, Any]:
@@ -227,6 +228,7 @@ def install_full_workbench_routes(app, factory, registry, secrets, *, data_dir: 
             stale_reevaluations=s.scalar(select(func.count(ReevaluationDraft.id)).where(ReevaluationDraft.state=="stale")) or 0
             pending_identity=s.scalar(select(func.count(CandidateIdentityReview.id)).where(CandidateIdentityReview.status=="pending")) or 0
             open_judgment_reviews=s.scalar(select(func.count(JudgmentReviewItem.id)).where(JudgmentReviewItem.state=="open")) or 0
+            workbench=get_workbench(s,evaluation_policy_revision=evaluation_policy_revision)
             return JSONResponse({
                 "metrics":metrics,"recent":recent,"recent_activity":recent,
                 "requisitions_by_status":requisitions,
@@ -235,6 +237,22 @@ def install_full_workbench_routes(app, factory, registry, secrets, *, data_dir: 
                 "upcoming_interviews":int(upcoming),
                 "evidence_review_backlog":int(metrics["unreviewed_claims"]),
                 "operational_todos":{"overdue_contacts":int(overdue),"today_contacts":int(today_contacts),"pending_interview_feedback":int(pending_scorecards),"stale_reevaluations":int(stale_reevaluations),"pending_identity_reviews":int(pending_identity),"open_judgment_reviews":int(open_judgment_reviews)},
+                "decision_workbench":{
+                    "conflict_count":workbench.conflict_count,
+                    "verify_count":workbench.verify_count,
+                    "ready_count":workbench.ready_count,
+                    "items":[{
+                        "work_item_id":x.work_item_id,
+                        "project_id":x.project_id,
+                        "project_title":x.project_title,
+                        "candidate_id":x.candidate_id,
+                        "candidate_name":x.candidate_name,
+                        "criterion_name":x.criterion_name,
+                        "action_type":x.action_type,
+                        "reason":x.reason,
+                    } for x in workbench.items[:12]],
+                    "total":len(workbench.items),
+                },
             })
 
     async def provider_settings(_r):
