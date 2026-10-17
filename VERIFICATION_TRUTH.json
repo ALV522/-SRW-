@@ -1,8 +1,8 @@
 {
   "schema": "srw.verification-truth.v1",
-  "version": "1.0.0-alpha10-convergence10",
+  "version": "1.0.0-alpha10-convergence11",
   "schema_revision": "v1_0014",
-  "profile": "business_convergence_10_source",
+  "profile": "business_convergence_11_source",
   "verification_policy": "Evidence is bound to the exact GitHub Actions commit; source tests are not desktop or production acceptance.",
   "required_gates": [
     "source_integrity",
@@ -11,9 +11,10 @@
     "frontend_syntax",
     "capability_regression",
     "resource_residual",
-    "privacy_safe_diagnostics"
+    "privacy_safe_diagnostics",
+    "business_workflow_queue"
   ],
-  "current_evidence": "GitHub Actions SRW Source Gate for the exact C10 commit; 68-test regression, strict resource gate and uploaded source evidence",
+  "current_evidence": "GitHub Actions SRW Source Gate for the exact C11 commit; 71-test regression, strict resource gate, product workflow queue and uploaded source evidence",
   "historical_evidence": "verification/history/convergence08/VERIFICATION_TRUTH.json",
   "deferred": {
     "windows_native_gui": "Requires exact audited carrier and target-Windows GUI acceptance",

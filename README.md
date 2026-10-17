@@ -1,14 +1,15 @@
-# SRW — Business Convergence 10
+# SRW — Business Convergence 11
 
 SRW is a local-first recruitment operations and decision-support workbench. **v0.8.12-R2 remains the capability-completeness reference.** Preserve evidence, lineage, privacy, calibration, operations and knowledge governance while improving workflow usability.
 
 ## Current source baseline
 
-- Version: `1.0.0-alpha10-convergence10`; schema: `v1_0014` (unchanged).
+- Version: `1.0.0-alpha10-convergence11`; schema: `v1_0014` (unchanged).
 - C08 capability recovery is retained: PDF evidence highlighting, controlled knowledge aliases and exact rollback, project-package portability, guarded backup/CSV export, identity review, assessment, decision operations and planning.
 - C09 adds local Host/same-origin boundaries, diagnostics, interrupted-backup cleanup, application shutdown disposal, and self-contained test Knowledge fixtures.
 - Integration retains current-source SHA-256 verification alongside the immutable C08 inventory, cross-platform SQLite file-handle probes, pinned test dependencies and reproducible source archives.
 - C10 adds a deterministic privacy-safe diagnostic ZIP endpoint. The bundle exposes release/schema/check/resource metadata only and explicitly excludes candidate content, source blobs, database bytes, provider secrets and local paths.
+- C11 starts product workflow closure: the dashboard now exposes a prioritized per-candidate business queue, with one highest-value next action per candidate and direct navigation into the relevant candidate or interview workflow. The settings surface also exposes the privacy-safe diagnostics export directly.
 
 ## Verify from a clean checkout
 
@@ -21,7 +22,7 @@ python scripts/check_release_truth.py
 python scripts/run_convergence_verification.py
 ```
 
-The current suite contains **68 source regression tests**. Actual PASS evidence is the GitHub Actions run for the exact commit, on both Ubuntu and Windows. CI enables `SRW_TEST_RESOURCE_STRICT=1` and uploads logs. Historical C08 reports remain under `verification/`; they are not current-run evidence. The 725-test v0.8.12 inventory is a reference, not a claim of full parity.
+The current suite contains **71 source regression tests**. Actual PASS evidence is the GitHub Actions run for the exact commit, on both Ubuntu and Windows. CI enables `SRW_TEST_RESOURCE_STRICT=1` and uploads logs. Historical C08 reports remain under `verification/`; they are not current-run evidence. The 725-test v0.8.12 inventory is a reference, not a claim of full parity.
 
 ## Delivery boundary
 

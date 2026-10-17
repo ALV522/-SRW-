@@ -1,6 +1,6 @@
 {
   "schema": "srw.build-info.v1",
-  "version": "1.0.0-alpha10-convergence10",
-  "release_id": "1.0.0-alpha10-convergence10",
-  "source_revision": "convergence10-system-integrity"
+  "version": "1.0.0-alpha10-convergence11",
+  "release_id": "1.0.0-alpha10-convergence11",
+  "source_revision": "convergence11-business-workflow-closure"
 }

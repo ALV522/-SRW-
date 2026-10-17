@@ -1,8 +1,8 @@
 {
   "product": "SRW",
-  "version": "1.0.0-alpha10-convergence10",
+  "version": "1.0.0-alpha10-convergence11",
   "schema_revision": "v1_0014",
-  "profile": "business_convergence_10_source",
+  "profile": "business_convergence_11_source",
   "artifact_kind": "source",
   "source_manifest": "SOURCE_MANIFEST.sha256",
   "capability_baseline": "v0.8.12-R2",
