@@ -53,7 +53,7 @@ jobs:
           python -m pip freeze > artifacts/test-environment.txt
       - name: Build verified source archive
         if: matrix.os == 'ubuntu-latest'
-        run: python scripts/build_source_archive.py --output artifacts/SRW_Convergence10_Source.zip --commit ${{ github.sha }}
+        run: python scripts/build_source_archive.py --output artifacts/SRW_Convergence11_Source.zip --commit ${{ github.sha }}
       - name: Upload exact-commit evidence
         if: always()
         uses: actions/upload-artifact@v4
