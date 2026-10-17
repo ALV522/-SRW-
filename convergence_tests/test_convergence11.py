@@ -11,10 +11,12 @@ from starlette.testclient import TestClient
 from knowledge_fixture import create_minimal_knowledge_tree
 from srw.api.app import create_v1_app
 from srw.kernel.clock import utc_now
-from srw.modules.candidate.models import Candidate, MaterialRevision
+from srw.modules.candidate.models import Candidate, MaterialRevision, Claim, Source
 from srw.modules.protocol.models import Project, ProtocolRevision
 from srw.modules.recruiting.operations_models import CandidateActionPlan
 from srw.modules.fullworkbench import RecruitmentEvent
+from srw.modules.identity.models import CandidateIdentityReview
+from srw.modules.calibration.models import JudgmentReviewItem
 from srw.modules.work.models import WorkItem
 from srw.runtime.db.schema import create_v1_schema
 from srw.runtime.db.session import create_v1_engine, create_v1_session_factory
@@ -142,8 +144,9 @@ class Convergence11BusinessWorkflowTest(unittest.TestCase):
                 session.add(project)
                 session.flush()
                 contact_candidate = Candidate(project_id=project.id, display_name="待联系候选人")
+                today_candidate = Candidate(project_id=project.id, display_name="今日联系候选人")
                 feedback_candidate = Candidate(project_id=project.id, display_name="待反馈候选人")
-                session.add_all([contact_candidate, feedback_candidate])
+                session.add_all([contact_candidate, today_candidate, feedback_candidate])
                 session.flush()
                 plan = CandidateActionPlan(
                     project_id=project.id,
@@ -154,6 +157,15 @@ class Convergence11BusinessWorkflowTest(unittest.TestCase):
                     next_contact_at=utc_now() - timedelta(days=1),
                     reason="候选人要求回拨",
                 )
+                today_plan = CandidateActionPlan(
+                    project_id=project.id,
+                    candidate_id=today_candidate.id,
+                    priority="today",
+                    owner="TA",
+                    contact_status="to_contact",
+                    next_contact_at=utc_now() + timedelta(hours=1),
+                    reason="今日首次联系",
+                )
                 event = RecruitmentEvent(
                     candidate_id=feedback_candidate.id,
                     event_type="interview",
@@ -161,10 +173,11 @@ class Convergence11BusinessWorkflowTest(unittest.TestCase):
                     event_state="completed",
                     outcome="proceed",
                 )
-                session.add_all([plan, event])
+                session.add_all([plan, today_plan, event])
                 session.flush()
                 project_id = project.id
                 contact_candidate_id = contact_candidate.id
+                today_candidate_id = today_candidate.id
                 feedback_candidate_id = feedback_candidate.id
                 event_id = event.id
         finally:
@@ -176,11 +189,115 @@ class Convergence11BusinessWorkflowTest(unittest.TestCase):
         queue = response.json()["operational_queue"]
         by_kind = {item["kind"]: item for item in queue["items"]}
         self.assertIn("overdue_contact", by_kind)
+        self.assertIn("today_contact", by_kind)
         self.assertIn("pending_interview_feedback", by_kind)
+        self.assertEqual(queue["total"], 3)
         self.assertEqual(by_kind["overdue_contact"]["project_id"], project_id)
         self.assertEqual(by_kind["overdue_contact"]["candidate_id"], contact_candidate_id)
+        self.assertEqual(by_kind["today_contact"]["candidate_id"], today_candidate_id)
         self.assertEqual(by_kind["pending_interview_feedback"]["candidate_id"], feedback_candidate_id)
         self.assertEqual(by_kind["pending_interview_feedback"]["event_id"], event_id)
+
+    def test_dashboard_review_center_links_identity_judgment_and_claim_review(self):
+        engine = create_v1_engine(f"sqlite+pysqlite:///{self.db.as_posix()}")
+        create_v1_schema(engine)
+        factory = create_v1_session_factory(engine)
+        try:
+            with factory.begin() as session:
+                project = Project(title="复核招聘", status="open")
+                archived_project = Project(title="已归档招聘", status="archived")
+                session.add_all([project, archived_project])
+                session.flush()
+
+                candidate_a = Candidate(project_id=project.id, display_name="候选人甲")
+                candidate_b = Candidate(project_id=project.id, display_name="候选人乙")
+                archived_candidate = Candidate(project_id=archived_project.id, display_name="历史候选人")
+                session.add_all([candidate_a, candidate_b, archived_candidate])
+                session.flush()
+
+                identity = CandidateIdentityReview(
+                    project_id=project.id,
+                    candidate_a_id=candidate_a.id,
+                    candidate_b_id=candidate_b.id,
+                    match_reason="exact_email",
+                    match_value_hash="i" * 64,
+                    source="deterministic_contact",
+                    status="pending",
+                )
+                judgment = JudgmentReviewItem(
+                    project_id=project.id,
+                    candidate_id=candidate_a.id,
+                    trigger="human_override",
+                    criterion_key="experience",
+                    before="partial",
+                    after="met",
+                    reason="evidence_error",
+                    error_class="evidence_error",
+                    actor="reviewer",
+                    state="open",
+                )
+                source = Source(
+                    candidate_id=candidate_a.id,
+                    source_kind="resume",
+                    content_hash="c" * 64,
+                    media_type="text/plain",
+                    text_content="负责招聘项目并完成交付。",
+                    metadata_json="{}",
+                )
+                archived_source = Source(
+                    candidate_id=archived_candidate.id,
+                    source_kind="resume",
+                    content_hash="a" * 64,
+                    media_type="text/plain",
+                    text_content="历史材料",
+                    metadata_json="{}",
+                )
+                session.add_all([identity, judgment, source, archived_source])
+                session.flush()
+                claim = Claim(
+                    candidate_id=candidate_a.id,
+                    source_id=source.id,
+                    normalized_text="负责招聘项目并完成交付",
+                    claim_hash="d" * 64,
+                    source_locator_json="{}",
+                    proposal_metadata_json="{}",
+                    authority="source",
+                    confirmation_state="unreviewed",
+                )
+                archived_claim = Claim(
+                    candidate_id=archived_candidate.id,
+                    source_id=archived_source.id,
+                    normalized_text="不应进入当前复核中心",
+                    claim_hash="e" * 64,
+                    source_locator_json="{}",
+                    proposal_metadata_json="{}",
+                    authority="source",
+                    confirmation_state="unreviewed",
+                )
+                session.add_all([claim, archived_claim])
+                session.flush()
+                project_id = project.id
+                candidate_id = candidate_a.id
+                claim_id = claim.id
+        finally:
+            engine.dispose()
+
+        with TestClient(self._app()) as client:
+            response = client.get("/api/v1/dashboard")
+        self.assertEqual(response.status_code, 200, response.text)
+        payload = response.json()
+        queue = payload["review_queue"]
+        self.assertEqual(queue["identity_count"], 1)
+        self.assertEqual(queue["judgment_count"], 1)
+        self.assertEqual(queue["claim_count"], 1)
+        self.assertEqual(queue["total"], 3)
+        self.assertEqual(payload["evidence_review_backlog"], 1)
+        by_kind = {item["kind"]: item for item in queue["items"]}
+        self.assertEqual(set(by_kind), {"identity_review", "judgment_review", "unreviewed_claim"})
+        self.assertEqual(by_kind["unreviewed_claim"]["project_id"], project_id)
+        self.assertEqual(by_kind["unreviewed_claim"]["candidate_id"], candidate_id)
+        self.assertEqual(by_kind["unreviewed_claim"]["claim_id"], claim_id)
+        self.assertNotIn("历史候选人", json.dumps(queue, ensure_ascii=False))
 
     def test_frontend_exposes_actionable_queue_and_safe_diagnostic_export(self):
         app_js = (ROOT / "frontend" / "dist" / "app.js").read_text(encoding="utf-8")
@@ -189,6 +306,8 @@ class Convergence11BusinessWorkflowTest(unittest.TestCase):
         self.assertIn("每位候选人只显示当前最高优先级动作", app_js)
         self.assertIn("运营执行队列", app_js)
         self.assertIn("openOperationalItem", app_js)
+        self.assertIn("复核中心", app_js)
+        self.assertIn("openReviewItem", app_js)
         self.assertIn("/api/v1/system/diagnostics/export", app_js)
         self.assertIn("导出隐私安全诊断包", app_js)
 
