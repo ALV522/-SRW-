@@ -1,10 +1,11 @@
 name: SRW Repository Integrity
 on:
   push:
-    branches: [main, "repair/**", "dev/**", "integration/**"]
-  pull_request:
     branches: [main]
   workflow_dispatch:
+concurrency:
+  group: srw-repository-integrity-${{ github.ref }}
+  cancel-in-progress: true
 permissions:
   contents: read
 jobs:
