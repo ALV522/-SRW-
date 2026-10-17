@@ -330,6 +330,32 @@ def install_full_workbench_routes(app, factory, registry, secrets, *, data_dir: 
                     "title":"逾期联系",
                     "detail":plan.next_contact_at.isoformat() if plan.next_contact_at else "",
                 })
+            today_contact_rows=s.execute(
+                select(CandidateActionPlan,Candidate.display_name,Project.title)
+                .join(Candidate,Candidate.id==CandidateActionPlan.candidate_id)
+                .join(Project,Project.id==CandidateActionPlan.project_id)
+                .where(
+                    CandidateActionPlan.next_contact_at.is_not(None),
+                    CandidateActionPlan.next_contact_at>=now,
+                    CandidateActionPlan.next_contact_at<today_end,
+                    CandidateActionPlan.contact_status.in_(("to_contact","callback","attempted")),
+                    Candidate.archived.is_(False),
+                    Project.status!="archived",
+                )
+                .order_by(CandidateActionPlan.next_contact_at.asc(),CandidateActionPlan.id)
+                .limit(6)
+            ).all()
+            for plan,candidate_name,project_title in today_contact_rows:
+                operational_items.append({
+                    "kind":"today_contact",
+                    "project_id":plan.project_id,
+                    "project_title":project_title,
+                    "candidate_id":plan.candidate_id,
+                    "candidate_name":candidate_name,
+                    "event_id":"",
+                    "title":"今日联系",
+                    "detail":plan.next_contact_at.isoformat() if plan.next_contact_at else "",
+                })
             feedback_rows=s.execute(
                 select(RecruitmentEvent,Candidate.display_name,Project.id,Project.title)
                 .join(Candidate,Candidate.id==RecruitmentEvent.candidate_id)
@@ -371,7 +397,7 @@ def install_full_workbench_routes(app, factory, registry, secrets, *, data_dir: 
                     "judgment_count":int(open_judgment_reviews),
                     "claim_count":int(metrics["unreviewed_claims"]),
                 },
-                "operational_queue":{"items":operational_items[:12],"total":len(operational_items)},
+                "operational_queue":{"items":operational_items[:12],"total":int(overdue)+int(today_contacts)+int(pending_scorecards)},
                 "decision_workbench":{
                     "conflict_count":workbench.conflict_count,
                     "verify_count":workbench.verify_count,
