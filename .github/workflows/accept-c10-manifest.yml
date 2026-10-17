@@ -1,0 +1,36 @@
+name: Accept reviewed C10 source manifest
+on:
+  push:
+    branches: [dev/convergence10-system-integrity]
+    paths: [_manifest_accept/READY]
+
+permissions:
+  contents: write
+
+jobs:
+  accept:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: dev/convergence10-system-integrity
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Remove one-time acceptor and refresh reviewed manifest
+        shell: bash
+        run: |
+          set -euo pipefail
+          git rm -f _manifest_accept/READY .github/workflows/accept-c10-manifest.yml
+          python scripts/refresh_source_manifest.py --write
+          python scripts/check_source_integrity.py
+      - name: Commit reviewed source truth
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add SOURCE_MANIFEST.sha256
+          git commit -m "build: accept reviewed C10 source manifest"
+          git push origin HEAD:dev/convergence10-system-integrity
