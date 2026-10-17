@@ -3,7 +3,7 @@ from __future__ import annotations
 import json
 import tempfile
 import unittest
-from datetime import timedelta
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 from starlette.testclient import TestClient
@@ -18,6 +18,7 @@ from srw.modules.fullworkbench import RecruitmentEvent
 from srw.modules.identity.models import CandidateIdentityReview
 from srw.modules.calibration.models import JudgmentReviewItem
 from srw.modules.work.models import WorkItem
+from srw.surfaces.daily_queue import local_day_end_utc
 from srw.runtime.db.schema import create_v1_schema
 from srw.runtime.db.session import create_v1_engine, create_v1_session_factory
 
@@ -163,7 +164,7 @@ class Convergence11BusinessWorkflowTest(unittest.TestCase):
                     priority="today",
                     owner="TA",
                     contact_status="to_contact",
-                    next_contact_at=utc_now() + timedelta(hours=1),
+                    next_contact_at=utc_now() + min(timedelta(minutes=1), (local_day_end_utc(utc_now()) - utc_now()) / 2),
                     reason="今日首次联系",
                 )
                 event = RecruitmentEvent(
@@ -479,6 +480,86 @@ class Convergence11BusinessWorkflowTest(unittest.TestCase):
         self.assertIn("权重", app_js)
         self.assertIn("核实阶段", app_js)
         self.assertIn("criterion-card", styles)
+
+    def test_calendar_today_ends_at_local_midnight_not_rolling_24_hours(self):
+        # 23:45 in UTC+8 on Oct 17; only 15 minutes remain in the local day.
+        local_zone = timezone(timedelta(hours=8))
+        now = datetime(2026, 10, 17, 15, 45, tzinfo=timezone.utc)
+        self.assertEqual(
+            local_day_end_utc(now, zone=local_zone),
+            datetime(2026, 10, 17, 16, 0, tzinfo=timezone.utc),
+        )
+        self.assertLess(local_day_end_utc(now, zone=local_zone) - now, timedelta(hours=1))
+        self.assertEqual(
+            local_day_end_utc(now, zone=timezone.utc),
+            datetime(2026, 10, 18, 0, 0, tzinfo=timezone.utc),
+        )
+        with self.assertRaises(ValueError):
+            local_day_end_utc(datetime(2026, 10, 17, 15, 45))
+
+    def test_priority_queue_ranks_conflicts_and_ignores_archived_projects(self):
+        project_id, candidate_id, _work_item_id = self._seed_work_item()
+        engine = create_v1_engine(f"sqlite+pysqlite:///{self.db.as_posix()}")
+        factory = create_v1_session_factory(engine)
+        try:
+            with factory.begin() as session:
+                active_project = session.get(Project, project_id)
+                conflict = Candidate(project_id=project_id, display_name="ZZZ 冲突候选人")
+                session.add(conflict)
+                session.flush()
+                material = MaterialRevision(
+                    candidate_id=conflict.id, revision=1, source_set_hash="b" * 64, provenance_json="{}"
+                )
+                session.add(material)
+                session.flush()
+                conflict.current_material_revision_id = material.id
+                session.add(WorkItem(
+                    project_id=project_id, candidate_id=conflict.id,
+                    criterion_key="experience", criterion_name="相关经验",
+                    protocol_revision_id=active_project.current_protocol_revision_id,
+                    material_revision_id=material.id, type="RESOLVE_CONFLICT",
+                    priority=10, reason="发现证据冲突", decision_context_hash="b" * 64, state="open",
+                ))
+
+                archived = Project(title="归档招聘项目", status="archived")
+                session.add(archived)
+                session.flush()
+                protocol = ProtocolRevision(
+                    project_id=archived.id, revision=1, state="published",
+                    payload_json='{"criteria":[]}', provenance_json="{}", content_hash="a" * 64,
+                )
+                session.add(protocol)
+                session.flush()
+                archived.current_protocol_revision_id = protocol.id
+                old_candidate = Candidate(project_id=archived.id, display_name="AAA 历史候选人")
+                session.add(old_candidate)
+                session.flush()
+                old_material = MaterialRevision(
+                    candidate_id=old_candidate.id, revision=1,
+                    source_set_hash="a" * 64, provenance_json="{}",
+                )
+                session.add(old_material)
+                session.flush()
+                old_candidate.current_material_revision_id = old_material.id
+                session.add(WorkItem(
+                    project_id=archived.id, candidate_id=old_candidate.id,
+                    criterion_key="old", criterion_name="归档判断",
+                    protocol_revision_id=protocol.id, material_revision_id=old_material.id,
+                    type="RESOLVE_CONFLICT", priority=0,
+                    reason="不应出现在活动队列", decision_context_hash="a" * 64,
+                    state="open",
+                ))
+        finally:
+            engine.dispose()
+        with TestClient(self._app()) as client:
+            response = client.get("/api/v1/dashboard")
+        self.assertEqual(response.status_code, 200, response.text)
+        wb = response.json()["decision_workbench"]
+        self.assertEqual(wb["total"], 2)
+        self.assertEqual(wb["conflict_count"], 1)
+        self.assertEqual(wb["items"][0]["action_type"], "RESOLVE_CONFLICT")
+        self.assertEqual(wb["items"][1]["candidate_id"], candidate_id)
+        self.assertTrue(all(x["project_id"] == project_id for x in wb["items"]))
 
     def test_frontend_exposes_actionable_queue_and_safe_diagnostic_export(self):
         app_js = (ROOT / "frontend" / "dist" / "app.js").read_text(encoding="utf-8")

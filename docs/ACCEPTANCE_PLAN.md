@@ -4,6 +4,8 @@ This is an execution plan, not a completed acceptance report. C11 prioritizes co
 
 | Flow | Actions | Required result |
 |---|---|---|
+| Queue priority and scope | Seed archived projects, active evidence conflicts, ordinary verification and a greater-than-12 candidate queue | Archived projects never appear; conflicts precede verification; preview and total counts remain distinct |
+| Local contact day | Create contacts spanning local midnight, including tomorrow morning less than 24 hours away | Tomorrow never appears in today's queue; overdue and today share host-local calendar semantics |
 | Daily work queue | Open dashboard, select highest-priority candidate action, enter the target workflow | One actionable next step per candidate; direct navigation preserves project/candidate context |
 | Operations queue | Create overdue and same-day contacts and complete an interview without submitted feedback; open each from dashboard | Operator lands in contact workbench or scorecard workflow without searching for the candidate manually |
 | Review center | Seed a pending identity review, open judgment correction and unreviewed Claim; open each from dashboard; resolve the judgment item with a note | Identity/judgment items enter Quality Governance; Claim opens the correct candidate evidence workspace; judgment review leaves the open queue after explicit resolution; archived recruiting work is excluded |

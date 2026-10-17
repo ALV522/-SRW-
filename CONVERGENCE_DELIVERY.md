@@ -45,3 +45,9 @@ The current build verifies source/HTTP behavior, PDF page rendering, knowledge a
 - Exposes the privacy-safe diagnostics ZIP from the settings UI instead of leaving it as an API-only capability.
 - Adds twelve product-facing regression tests; cumulative source suite target is 80 tests.
 - Keeps the next objective explicitly product-first: close complete recruiting workflows before additional infrastructure convergence.
+
+## C11 P1 active queue correctness
+
+- Exclude archived projects from decision work; prioritize conflicts before verification by explicit rank, and query scoped project workbench instead of materializing all projects.
+- Correct today's contacts from rolling 24-hour horizon to local calendar day; balance overdue, feedback and today preview categories.
+- Add two regression tests, target 82 total after PR #17's 80-test baseline. Exact CI remains the source of pass evidence.

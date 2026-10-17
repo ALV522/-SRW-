@@ -22,7 +22,7 @@ python scripts/check_release_truth.py
 python scripts/run_convergence_verification.py
 ```
 
-The current suite contains **80 source regression tests**. Actual PASS evidence is the GitHub Actions run for the exact commit, on both Ubuntu and Windows. CI enables `SRW_TEST_RESOURCE_STRICT=1` and uploads logs. Historical C08 reports remain under `verification/`; they are not current-run evidence. The 725-test v0.8.12 inventory is a reference, not a claim of full parity.
+The current suite contains **82 source regression tests**. Actual PASS evidence is the GitHub Actions run for the exact commit, on both Ubuntu and Windows. CI enables `SRW_TEST_RESOURCE_STRICT=1` and uploads logs. Historical C08 reports remain under `verification/`; they are not current-run evidence. The 725-test v0.8.12 inventory is a reference, not a claim of full parity.
 
 ## Delivery boundary
 
@@ -31,3 +31,5 @@ This repository and its CI ZIP are **source artifacts**, not standalone Portable
 `START.bat` targets a complete Portable assembly. `BUILD_WINDOWS_NATIVE.bat` additionally requires the audited exact v0.8.8 Windows carrier. Source CI on Windows does not certify WPF/WebView2 GUI behavior. External-provider live calls and real-corpus calibration remain pending.
 
 See [development state](DEVELOPMENT_STATE.md), [release procedure](docs/RELEASE_PROCESS.md), [acceptance plan](docs/ACCEPTANCE_PLAN.md), and [architecture](ARCHITECTURE.md).
+
+C11 P1 queue correctness: exclude archived projects from decision work, sort across candidates by explicit business priority, use local calendar midnight instead of a rolling 24-hour window for today's contacts, and keep overdue/contact/feedback preview categories represented.
