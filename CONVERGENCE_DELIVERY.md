@@ -57,3 +57,9 @@ The current build verifies source/HTTP behavior, PDF page rendering, knowledge a
 - Pass review_id and claim_id from the review queue to their destination views.
 - Mark exact identity/judgment and Claim records, scroll/highlight and focus their action controls; surface stale items.
 - Add one focused regression (83 tests overall). Live WebView2 click-path acceptance still required.
+
+## C11 Portable dependency preflight
+
+- Add `scripts/portable_input_preflight.py` to inventory exact inherited carrier SHA, embedded Python and five Knowledge DBs against an external audited hash manifest.
+- Fail closed on missing/mismatched inputs, malformed manifest, SQLite errors or missing required Knowledge search tables; do not package synthetic fixture data.
+- Two synthetic source-level regressions, 85-test target. Actual runtime, Knowledge authenticity, native packaging and WPF/WebView2 GUI remain unverified.

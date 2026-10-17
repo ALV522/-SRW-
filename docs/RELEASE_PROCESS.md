@@ -12,6 +12,9 @@ The source hash manifest and Git history jointly protect against accidental omis
 
 ## Portable and Native promotion
 
+Before attempting assembly, run `python scripts/portable_input_preflight.py` with the exact Windows carrier, embedded Python and a trusted external `PRODUCTION_KNOWLEDGE.sha256` inventory. Exit code 2 blocks promotion. Passing this inventory only establishes presence, expected SHA hashes and read-only SQLite validity; it does not prove the external manifest's provenance, runtime launch or GUI acceptance.
+
+
 A Portable build must include the separately audited embedded runtime and five production Knowledge DBs, their hashes and an exact-artifact check. Never ship synthetic test Knowledge fixtures as production data. Verify launcher dependencies, backup/restore and data migration on the assembled artifact.
 
 Native additionally requires SRW_v0.8.8_Windows_Portable.zip with SHA-256 f12933a1f6639168911af3788d207ced521be8a50841d7d39e7a2169eed3d5ab and target-machine WPF/WebView2 GUI acceptance. The historical Web Portable asset is not interchangeable with this carrier.
