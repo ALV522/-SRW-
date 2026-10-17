@@ -39,6 +39,7 @@ The current build verifies source/HTTP behavior, PDF page rendering, knowledge a
 - Replaces raw-JSON candidate brief/project handoff modals with readable operator summaries; project handoff still offers the complete JSON payload as a deliberate download.
 - Makes dashboard contact actions candidate-specific by opening the exact action plan rather than the generic contact queue.
 - Promotes Candidate Workspace from a large modal into a full project page with dedicated Evidence & Decision, Process & Follow-up, and Offer sections; candidate business context and core actions stay visible without stacking nested modals.
+- Embeds candidate-specific phone/interview records, scheduling/completion, independent Scorecards and reevaluation drafts into Process & Follow-up, while retaining the project-wide flow page for cross-candidate coordination.
 - Exposes the privacy-safe diagnostics ZIP from the settings UI instead of leaving it as an API-only capability.
-- Adds eight product-facing regression tests; cumulative source suite target is 76 tests.
+- Adds nine product-facing regression tests; cumulative source suite target is 77 tests.
 - Keeps the next objective explicitly product-first: close complete recruiting workflows before additional infrastructure convergence.
