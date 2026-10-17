@@ -6,6 +6,7 @@ import sqlite3
 import tempfile
 import unittest
 from pathlib import Path
+from contextlib import closing
 
 from scripts.portable_input_preflight import DB_TABLES, audit
 
@@ -32,8 +33,9 @@ class PortableInputPreflightTest(unittest.TestCase):
             folder = self.root / "knowledge" / "active" / name
             folder.mkdir(parents=True)
             db_path = folder / "knowledge.db"
-            with sqlite3.connect(db_path) as db:
+            with closing(sqlite3.connect(db_path)) as db:
                 db.execute(f'CREATE TABLE "{table}" (id INTEGER PRIMARY KEY)')
+                db.commit()
             sha = hashlib.sha256(db_path.read_bytes()).hexdigest()
             entries.append(f"{sha}  {name}/knowledge.db")
         (self.root / "PRODUCTION_KNOWLEDGE.sha256").write_text(
