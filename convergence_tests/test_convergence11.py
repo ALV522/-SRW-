@@ -377,6 +377,9 @@ class Convergence11BusinessWorkflowTest(unittest.TestCase):
         self.assertIn("完成复核", app_js)
         self.assertIn("resolveJudgmentReview", app_js)
         self.assertIn("证据错误", app_js)
+        self.assertIn("candidateBriefHtml", app_js)
+        self.assertIn("handoffHtml", app_js)
+        self.assertIn("下载完整交接 JSON", app_js)
         self.assertIn("/api/v1/system/diagnostics/export", app_js)
         self.assertIn("导出隐私安全诊断包", app_js)
 
