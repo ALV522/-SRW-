@@ -3,6 +3,9 @@ from __future__ import annotations
 import hashlib
 import json
 import sqlite3
+import shutil
+import subprocess
+import sys
 import tempfile
 import unittest
 from pathlib import Path
@@ -78,6 +81,36 @@ class PortableInputPreflightTest(unittest.TestCase):
             x["name"] == "taxonomy/knowledge.db" and x["status"] == "BLOCKED"
             for x in blocked["checks"]
         ))
+
+
+    def test_native_assembler_stages_only_reviewed_inputs(self):
+        root = Path(__file__).resolve().parents[1]
+        script = root / "scripts" / "build_windows_native_from_v088.ps1"
+        content = script.read_text(encoding="utf-8")
+        self.assertIn("CopyReviewedSources $Root $stage", content)
+        self.assertIn("SOURCE_MANIFEST.sha256", content)
+        self.assertIn("portable_input_preflight.py", content)
+        self.assertIn("PRODUCTION_KNOWLEDGE.sha256", content)
+        self.assertIn("_Windows_Native_UNVERIFIED.zip", content)
+        self.assertIn("$hostExe", content)
+        self.assertNotIn("Copy-Item -Path (Join-Path $Root '*')", content)
+        self.assertNotIn("$host = Join-Path", content)
+
+        # Parse, but never execute, the PowerShell assembly script on Windows CI.
+        if sys.platform == "win32" and shutil.which("powershell"):
+            escaped_path = str(script).replace("'", "''")
+            cmd = (
+                "$t=$null;$e=$null;"
+                "[void][System.Management.Automation.Language.Parser]::ParseFile('"
+                + escaped_path
+                + "',[ref]$t,[ref]$e);"
+                "if($e.Count -ne 0){$e|Out-String|Write-Error;exit 1}"
+            )
+            result = subprocess.run(
+                ["powershell", "-NoProfile", "-NonInteractive", "-Command", cmd],
+                capture_output=True, text=True, timeout=30, check=False,
+            )
+            self.assertEqual(result.returncode, 0, result.stderr)
 
 
 if __name__ == "__main__":
