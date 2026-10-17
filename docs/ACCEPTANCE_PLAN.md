@@ -24,6 +24,7 @@ This is an execution plan, not a completed acceptance report. C11 prioritizes co
 | Context change | Change criteria/material after decision | Old decision historical; explicit reevaluation/reaffirmation required |
 | Operations and feedback | Accept/start/complete action; classify feedback | Context-bound actions; no automatic ontology mutation |
 | Knowledge | Preview alias change, apply exact digest, rollback | Target validation; correct diff; exact rollback |
+| Native stage allowlist | Place synthetic user-data directories and untracked secrets next to verified source, then assemble with audited external assets | Untracked candidate data, backups and secrets never enter the staging directory/ZIP; resulting candidate labelled UNVERIFIED |
 | Portable input preflight | Run preflight with missing carrier/Knowledge and with separately audited complete inputs | Missing or hash-mismatched inputs are BLOCKED, never represented as a ready Windows build; provenance and GUI remain separate gates |
 | Portability | Export project; preview/import into another instance | Source blobs preserved; IDs remapped; old decisions historical |
 | Restart and recovery | Restart, back up, restore, interrupt and retry | Business state durable; known staging cleaned; live data preserved |
