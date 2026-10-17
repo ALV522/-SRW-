@@ -6,7 +6,7 @@ This is an execution plan, not a completed acceptance report. C11 prioritizes co
 |---|---|---|
 | Daily work queue | Open dashboard, select highest-priority candidate action, enter the target workflow | One actionable next step per candidate; direct navigation preserves project/candidate context |
 | Operations queue | Create overdue and same-day contacts and complete an interview without submitted feedback; open each from dashboard | Operator lands in contact workbench or scorecard workflow without searching for the candidate manually |
-| Review center | Seed a pending identity review, open judgment correction and unreviewed Claim; open each from dashboard | Identity/judgment items enter Quality Governance; Claim opens the correct candidate evidence workspace; archived recruiting work is excluded |
+| Review center | Seed a pending identity review, open judgment correction and unreviewed Claim; open each from dashboard; resolve the judgment item with a note | Identity/judgment items enter Quality Governance; Claim opens the correct candidate evidence workspace; judgment review leaves the open queue after explicit resolution; archived recruiting work is excluded |
 | Project guidance | Open a draft project, an active project with decision work, and an interview/Offer-stage project | Project home shows the correct next action and routes to the correct business tab without requiring internal-system knowledge |
 | Project and criteria | Create project, publish requirements, edit and republish | Clear active revision; prior evaluation context retained |
 | Intake and identity | Import PDF/text, add new revision, review duplicate identity | Current material correct; canonical merge keeps provenance |
