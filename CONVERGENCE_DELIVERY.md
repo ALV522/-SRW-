@@ -41,6 +41,7 @@ The current build verifies source/HTTP behavior, PDF page rendering, knowledge a
 - Promotes Candidate Workspace from a large modal into a full project page with dedicated Evidence & Decision, Process & Follow-up, and Offer sections; candidate business context and core actions stay visible without stacking nested modals.
 - Embeds candidate-specific phone/interview records, scheduling/completion, independent Scorecards and reevaluation drafts into Process & Follow-up, while retaining the project-wide flow page for cross-candidate coordination.
 - Rebuilds Job Setup as a real four-step Draft wizard (role basics → employment plan → owners/business context → review). System/Knowledge suggestions are readable draft cards and only enter the criteria editor after an explicit human action; publishing remains separate.
+- Criteria editing now preserves recruitment context, decision policy, existing criterion metadata, positive weights and assessment-stage membership instead of reconstructing a reduced Draft.
 - Exposes the privacy-safe diagnostics ZIP from the settings UI instead of leaving it as an API-only capability.
-- Adds ten product-facing regression tests; cumulative source suite target is 78 tests.
+- Adds twelve product-facing regression tests; cumulative source suite target is 80 tests.
 - Keeps the next objective explicitly product-first: close complete recruiting workflows before additional infrastructure convergence.
