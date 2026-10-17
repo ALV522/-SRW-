@@ -299,6 +299,32 @@ class Convergence11BusinessWorkflowTest(unittest.TestCase):
         self.assertEqual(by_kind["unreviewed_claim"]["claim_id"], claim_id)
         self.assertNotIn("历史候选人", json.dumps(queue, ensure_ascii=False))
 
+    def test_project_pipeline_returns_operator_next_action(self):
+        project_id, _candidate_id, _work_item_id = self._seed_work_item()
+        with TestClient(self._app()) as client:
+            active = client.get(f"/api/v1/projects/{project_id}/pipeline")
+            self.assertEqual(active.status_code, 200, active.text)
+            workflow = active.json()["workflow_summary"]
+            self.assertTrue(workflow["criteria_published"])
+            self.assertEqual(workflow["candidate_count"], 1)
+            self.assertEqual(workflow["candidates_without_material"], 0)
+            self.assertEqual(workflow["decision_work_candidates"], 1)
+            self.assertEqual(workflow["next_action"]["key"], "review_evidence")
+            self.assertEqual(workflow["next_action"]["tab"], "cockpit")
+
+            created = client.post(
+                "/api/v1/projects",
+                json={"title":"空项目","role_title":"数据分析师","brief_summary":""},
+            )
+            self.assertEqual(created.status_code, 200, created.text)
+            draft_project_id = created.json()["project_id"]
+            draft = client.get(f"/api/v1/projects/{draft_project_id}/pipeline")
+            self.assertEqual(draft.status_code, 200, draft.text)
+            draft_workflow = draft.json()["workflow_summary"]
+            self.assertFalse(draft_workflow["criteria_published"])
+            self.assertEqual(draft_workflow["next_action"]["key"], "publish_criteria")
+            self.assertEqual(draft_workflow["next_action"]["tab"], "criteria")
+
     def test_frontend_exposes_actionable_queue_and_safe_diagnostic_export(self):
         app_js = (ROOT / "frontend" / "dist" / "app.js").read_text(encoding="utf-8")
         self.assertIn("今日业务队列", app_js)
@@ -308,6 +334,10 @@ class Convergence11BusinessWorkflowTest(unittest.TestCase):
         self.assertIn("openOperationalItem", app_js)
         self.assertIn("复核中心", app_js)
         self.assertIn("openReviewItem", app_js)
+        self.assertIn("项目推进", app_js)
+        self.assertIn("建岗与标准", app_js)
+        self.assertIn("候选人收件", app_js)
+        self.assertIn("筛选与决策", app_js)
         self.assertIn("/api/v1/system/diagnostics/export", app_js)
         self.assertIn("导出隐私安全诊断包", app_js)
 
