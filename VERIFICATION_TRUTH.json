@@ -14,7 +14,7 @@
     "privacy_safe_diagnostics",
     "business_workflow_queue"
   ],
-  "current_evidence": "GitHub Actions SRW Source Gate for the exact C11 commit; 77-test regression, strict resource gate, guided project workflow, actionable operations/review closure and full-page candidate workspace with interview/reevaluation flow, plus uploaded source evidence",
+  "current_evidence": "GitHub Actions SRW Source Gate for the exact C11 commit; 78-test regression, strict resource gate, guided project/candidate workflows, actionable operations/review closure, and a draft-only four-step job setup wizard with human-reviewed suggestions",
   "historical_evidence": "verification/history/convergence08/VERIFICATION_TRUTH.json",
   "deferred": {
     "windows_native_gui": "Requires exact audited carrier and target-Windows GUI acceptance",

@@ -383,6 +383,19 @@ class Convergence11BusinessWorkflowTest(unittest.TestCase):
         self.assertIn("完成并反馈", app_js)
         self.assertIn("＋ 复评草案", app_js)
 
+    def test_job_setup_is_a_real_four_step_draft_wizard(self):
+        app_js = (ROOT / "frontend" / "dist" / "app.js").read_text(encoding="utf-8")
+        styles = (ROOT / "frontend" / "dist" / "styles.css").read_text(encoding="utf-8")
+        self.assertIn("jobSetupProgress", app_js)
+        self.assertIn("jobSetupMove", app_js)
+        self.assertIn("岗位基本信息", app_js)
+        self.assertIn("用工与计划", app_js)
+        self.assertIn("责任人与业务背景", app_js)
+        self.assertIn("确认建岗草案", app_js)
+        self.assertIn("applyJobSetupSuggestions", app_js)
+        self.assertIn("不会自动发布", app_js)
+        self.assertIn("wizard-steps", styles)
+
     def test_frontend_exposes_actionable_queue_and_safe_diagnostic_export(self):
         app_js = (ROOT / "frontend" / "dist" / "app.js").read_text(encoding="utf-8")
         self.assertIn("今日业务队列", app_js)
