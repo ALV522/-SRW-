@@ -208,7 +208,12 @@ def install_full_workbench_routes(app, factory, registry, secrets, *, data_dir: 
                 "projects":s.scalar(select(func.count(Project.id)).where(Project.status!="archived")) or 0,
                 "candidates":s.scalar(select(func.count(Candidate.id)).where(Candidate.archived.is_(False))) or 0,
                 "open_tasks":s.scalar(select(func.count(TaskRecord.id)).where(TaskRecord.status.in_(("queued","running","waiting_provider","failed")))) or 0,
-                "unreviewed_claims":s.scalar(select(func.count(Claim.id)).where(Claim.confirmation_state=="unreviewed")) or 0,
+                "unreviewed_claims":s.scalar(
+                    select(func.count(Claim.id))
+                    .join(Candidate,Candidate.id==Claim.candidate_id)
+                    .join(Project,Project.id==Candidate.project_id)
+                    .where(Claim.confirmation_state=="unreviewed",Candidate.archived.is_(False),Project.status!="archived")
+                ) or 0,
             }
             req_rows=s.execute(select(Project.status,func.count(Project.id)).group_by(Project.status)).all()
             requisitions={str(status):int(count) for status,count in req_rows}
@@ -226,8 +231,79 @@ def install_full_workbench_routes(app, factory, registry, secrets, *, data_dir: 
             today_contacts=s.scalar(select(func.count(CandidateActionPlan.id)).where(CandidateActionPlan.next_contact_at.is_not(None),CandidateActionPlan.next_contact_at>=now,CandidateActionPlan.next_contact_at<today_end,CandidateActionPlan.contact_status.in_(("to_contact","callback","attempted")))) or 0
             pending_scorecards=s.scalar(select(func.count(RecruitmentEvent.id)).where(RecruitmentEvent.event_state=="completed",RecruitmentEvent.event_type=="interview",~RecruitmentEvent.id.in_(select(InterviewScorecardSubmission.event_id).where(InterviewScorecardSubmission.state=="submitted")))) or 0
             stale_reevaluations=s.scalar(select(func.count(ReevaluationDraft.id)).where(ReevaluationDraft.state=="stale")) or 0
-            pending_identity=s.scalar(select(func.count(CandidateIdentityReview.id)).where(CandidateIdentityReview.status=="pending")) or 0
-            open_judgment_reviews=s.scalar(select(func.count(JudgmentReviewItem.id)).where(JudgmentReviewItem.state=="open")) or 0
+            pending_identity=s.scalar(
+                select(func.count(CandidateIdentityReview.id))
+                .join(Project,Project.id==CandidateIdentityReview.project_id)
+                .where(CandidateIdentityReview.status=="pending",Project.status!="archived")
+            ) or 0
+            open_judgment_reviews=s.scalar(
+                select(func.count(JudgmentReviewItem.id))
+                .join(Project,Project.id==JudgmentReviewItem.project_id)
+                .where(JudgmentReviewItem.state=="open",Project.status!="archived")
+            ) or 0
+            review_items=[]
+            identity_rows=s.scalars(
+                select(CandidateIdentityReview)
+                .join(Project,Project.id==CandidateIdentityReview.project_id)
+                .where(CandidateIdentityReview.status=="pending",Project.status!="archived")
+                .order_by(CandidateIdentityReview.created_at.asc(),CandidateIdentityReview.id)
+                .limit(4)
+            ).all()
+            for review in identity_rows:
+                project=s.get(Project,review.project_id)
+                candidate_a=s.get(Candidate,review.candidate_a_id)
+                candidate_b=s.get(Candidate,review.candidate_b_id)
+                review_items.append({
+                    "kind":"identity_review",
+                    "project_id":review.project_id,
+                    "project_title":project.title if project else "",
+                    "candidate_id":"",
+                    "candidate_name":"",
+                    "review_id":review.id,
+                    "claim_id":"",
+                    "title":"候选人身份复核",
+                    "detail":f"{candidate_a.display_name if candidate_a else review.candidate_a_id} ↔ {candidate_b.display_name if candidate_b else review.candidate_b_id} · {review.match_reason}",
+                })
+            judgment_rows=s.execute(
+                select(JudgmentReviewItem,Project.title,Candidate.display_name)
+                .join(Project,Project.id==JudgmentReviewItem.project_id)
+                .outerjoin(Candidate,Candidate.id==JudgmentReviewItem.candidate_id)
+                .where(JudgmentReviewItem.state=="open",Project.status!="archived")
+                .order_by(JudgmentReviewItem.created_at.asc(),JudgmentReviewItem.id)
+                .limit(4)
+            ).all()
+            for review,project_title,candidate_name in judgment_rows:
+                review_items.append({
+                    "kind":"judgment_review",
+                    "project_id":review.project_id,
+                    "project_title":project_title,
+                    "candidate_id":review.candidate_id or "",
+                    "candidate_name":candidate_name or "",
+                    "review_id":review.id,
+                    "claim_id":"",
+                    "title":"判断纠错复核",
+                    "detail":f"{review.criterion_key} · {review.before} → {review.after} · {review.reason}",
+                })
+            claim_rows=s.execute(
+                select(Claim,Candidate.display_name,Project.id,Project.title)
+                .join(Candidate,Candidate.id==Claim.candidate_id)
+                .join(Project,Project.id==Candidate.project_id)
+                .where(Claim.confirmation_state=="unreviewed",Candidate.archived.is_(False),Project.status!="archived")
+                .order_by(Claim.created_at.asc(),Claim.id)
+                .limit(6)
+            ).all()
+            for claim,candidate_name,project_id,project_title in claim_rows:
+                review_items.append({
+                    "kind":"unreviewed_claim",
+                    "project_id":project_id,
+                    "project_title":project_title,
+                    "candidate_id":claim.candidate_id,
+                    "candidate_name":candidate_name,
+                    "review_id":"",
+                    "claim_id":claim.id,
+                    "title":"待确认事实",
+                    "detail":claim.normalized_text[:180],
+                })
             operational_items=[]
             contact_rows=s.execute(
                 select(CandidateActionPlan,Candidate.display_name,Project.title)
@@ -288,6 +364,13 @@ def install_full_workbench_routes(app, factory, registry, secrets, *, data_dir: 
                 "upcoming_interviews":int(upcoming),
                 "evidence_review_backlog":int(metrics["unreviewed_claims"]),
                 "operational_todos":{"overdue_contacts":int(overdue),"today_contacts":int(today_contacts),"pending_interview_feedback":int(pending_scorecards),"stale_reevaluations":int(stale_reevaluations),"pending_identity_reviews":int(pending_identity),"open_judgment_reviews":int(open_judgment_reviews)},
+                "review_queue":{
+                    "items":review_items[:14],
+                    "total":int(pending_identity)+int(open_judgment_reviews)+int(metrics["unreviewed_claims"]),
+                    "identity_count":int(pending_identity),
+                    "judgment_count":int(open_judgment_reviews),
+                    "claim_count":int(metrics["unreviewed_claims"]),
+                },
                 "operational_queue":{"items":operational_items[:12],"total":len(operational_items)},
                 "decision_workbench":{
                     "conflict_count":workbench.conflict_count,
