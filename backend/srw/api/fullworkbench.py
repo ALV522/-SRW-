@@ -49,6 +49,7 @@ from srw.runtime.jobs.engine import JobEngine
 from srw.runtime.jobs.models import Job
 from srw.runtime.settings import RuntimeSettingsRepository
 from srw.surfaces.workbench import get_workbench
+from srw.surfaces.daily_queue import local_day_end_utc
 
 
 def _body_dict(body: Any) -> dict[str, Any]:
@@ -238,7 +239,7 @@ def install_full_workbench_routes(app, factory, registry, secrets, *, data_dir: 
                     Project.status!="archived",
                 )
             ) or 0
-            today_end=now+timedelta(days=1)
+            today_end=local_day_end_utc(now)
             today_contacts=s.scalar(
                 select(func.count(CandidateActionPlan.id))
                 .join(Candidate,Candidate.id==CandidateActionPlan.candidate_id)
@@ -351,7 +352,7 @@ def install_full_workbench_routes(app, factory, registry, secrets, *, data_dir: 
                     Project.status!="archived",
                 )
                 .order_by(CandidateActionPlan.next_contact_at.asc(),CandidateActionPlan.id)
-                .limit(6)
+                .limit(4)
             ).all()
             for plan,candidate_name,project_title in contact_rows:
                 operational_items.append({
@@ -377,7 +378,7 @@ def install_full_workbench_routes(app, factory, registry, secrets, *, data_dir: 
                     Project.status!="archived",
                 )
                 .order_by(CandidateActionPlan.next_contact_at.asc(),CandidateActionPlan.id)
-                .limit(6)
+                .limit(4)
             ).all()
             for plan,candidate_name,project_title in today_contact_rows:
                 operational_items.append({
@@ -402,7 +403,7 @@ def install_full_workbench_routes(app, factory, registry, secrets, *, data_dir: 
                     Project.status!="archived",
                 )
                 .order_by(RecruitmentEvent.scheduled_at.asc(),RecruitmentEvent.created_at.asc(),RecruitmentEvent.id)
-                .limit(6)
+                .limit(4)
             ).all()
             for event,candidate_name,project_id,project_title in feedback_rows:
                 operational_items.append({
@@ -415,6 +416,10 @@ def install_full_workbench_routes(app, factory, registry, secrets, *, data_dir: 
                     "title":"待提交面试反馈",
                     "detail":event.title or "结构化面试",
                 })
+            operational_items.sort(key=lambda x: (
+                {"overdue_contact":0,"pending_interview_feedback":1,"today_contact":2}.get(x["kind"],99),
+                x.get("detail",""),x.get("candidate_id",""),
+            ))
             workbench=get_workbench(s,evaluation_policy_revision=evaluation_policy_revision)
             return JSONResponse({
                 "metrics":metrics,"recent":recent,"recent_activity":recent,
@@ -1269,7 +1274,7 @@ def install_full_workbench_routes(app, factory, registry, secrets, *, data_dir: 
                     ~RecruitmentEvent.id.in_(select(InterviewScorecardSubmission.event_id).where(InterviewScorecardSubmission.state=="submitted")),
                 )
             ) or 0
-            project_workbench=[x for x in get_workbench(s,evaluation_policy_revision=evaluation_policy_revision).items if x.project_id==pid]
+            project_workbench=get_workbench(s,evaluation_policy_revision=evaluation_policy_revision,project_id=pid).items
             decision_work=len(project_workbench)
             offer_followups=sum(int(offers.get(status,0) or 0) for status in ("draft","approved","sent"))
             stages=base.get("stages") or {}
