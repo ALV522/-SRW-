@@ -34,6 +34,7 @@ The current build verifies source/HTTP behavior, PDF page rendering, knowledge a
 - Adds direct navigation from the dashboard into the relevant candidate evidence/decision workspace or interview workflow.
 - Adds an operational action center for overdue and same-day candidate contacts plus completed interviews still missing submitted feedback.
 - Adds a unified review center for candidate identity review, judgment-correction review and unreviewed AI / Source Claims, with direct navigation back to human review surfaces.
+- Reorders the project navigation around the recruiting workflow and adds a project-level next-action engine covering criteria, intake/material completeness, evidence/decision work, interview feedback/scheduling and Offer follow-up.
 - Exposes the privacy-safe diagnostics ZIP from the settings UI instead of leaving it as an API-only capability.
-- Adds five product-facing regression tests; cumulative source suite target is 73 tests.
+- Adds six product-facing regression tests; cumulative source suite target is 74 tests.
 - Keeps the next objective explicitly product-first: close complete recruiting workflows before additional infrastructure convergence.
