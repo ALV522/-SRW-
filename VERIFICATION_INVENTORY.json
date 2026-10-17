@@ -39,7 +39,7 @@
     "note": "Reference inventory only; these 725 v0.8.12-R2 backend tests are not claimed as executed in Convergence 08."
   },
   "current": {
-    "convergence_test_count": 76,
+    "convergence_test_count": 77,
     "files": [
       {
         "file": "test_assessment.py",
@@ -91,13 +91,13 @@
       },
       {
         "file": "test_convergence11.py",
-        "test_methods": 8
+        "test_methods": 9
       }
     ],
     "evidence": "GitHub Actions log/artifact for exact source commit"
   },
   "recovered_gates": [],
   "parity_status": "PARTIAL",
-  "parity_note": "76 current source tests vs 725 historical reference tests; no full parity or exact Windows GUI claim.",
+  "parity_note": "77 current source tests vs 725 historical reference tests; no full parity or exact Windows GUI claim.",
   "historical_recovered_gates": "verification/history/convergence08/VERIFICATION_INVENTORY.json"
 }
