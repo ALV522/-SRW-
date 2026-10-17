@@ -361,6 +361,18 @@ class Convergence11BusinessWorkflowTest(unittest.TestCase):
             self.assertEqual(open_rows.status_code, 200, open_rows.text)
             self.assertEqual(open_rows.json()["reviews"], [])
 
+    def test_candidate_workspace_is_full_page_product_surface(self):
+        app_js = (ROOT / "frontend" / "dist" / "app.js").read_text(encoding="utf-8")
+        styles = (ROOT / "frontend" / "dist" / "styles.css").read_text(encoding="utf-8")
+        self.assertIn("candidate-workspace-page", app_js)
+        self.assertIn("candidate-workspace-tabs", app_js)
+        self.assertIn("证据与判断", app_js)
+        self.assertIn("流程与跟进", app_js)
+        self.assertIn("closeCandidateWorkspace", app_js)
+        self.assertIn("setCandidateSection", app_js)
+        self.assertIn("candidate-workspace-page", styles)
+        self.assertIn("candidate-workspace-head", styles)
+
     def test_frontend_exposes_actionable_queue_and_safe_diagnostic_export(self):
         app_js = (ROOT / "frontend" / "dist" / "app.js").read_text(encoding="utf-8")
         self.assertIn("今日业务队列", app_js)
