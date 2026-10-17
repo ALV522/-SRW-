@@ -43,6 +43,7 @@ from srw.providers.runtime import ProviderRuntime
 from srw.privacy.service import build_source_privacy_projection, rebind_privacy_safe_proposals
 from srw.release import get_release_state
 from srw.runtime.db.schema import V1_SCHEMA_REVISION
+from srw.runtime.diagnostic_bundle import build_privacy_safe_diagnostic_bundle
 from srw.runtime.db.session import v1_session_scope
 from srw.runtime.jobs.engine import JobEngine
 from srw.runtime.jobs.models import Job
@@ -1336,6 +1337,14 @@ def install_full_workbench_routes(app, factory, registry, secrets, *, data_dir: 
         with factory() as s:
             rel=get_release_state();return JSONResponse(diagnostics(s,data_dir=data_dir,knowledge_dir=knowledge_dir,database_path=database_path,frontend_dist=frontend_dist,version=rel["version"],schema_revision=V1_SCHEMA_REVISION))
 
+    async def diag_export(_r):
+        with factory() as s:
+            rel=get_release_state()
+            payload=diagnostics(s,data_dir=data_dir,knowledge_dir=knowledge_dir,database_path=database_path,frontend_dist=frontend_dist,version=rel["version"],schema_revision=V1_SCHEMA_REVISION)
+            raw=build_privacy_safe_diagnostic_bundle(payload,rel)
+        headers={"Content-Disposition":f'attachment; filename="srw-diagnostics-{rel["version"]}.zip"',"Cache-Control":"no-store"}
+        return Response(raw,media_type="application/zip",headers=headers)
+
     routes=[
       Route('/api/v1/dashboard',dashboard, methods=['GET']),
       Route('/api/v1/settings/providers',provider_settings, methods=['GET']),Route('/api/v1/settings/providers/{name:str}',provider_update, methods=['PATCH']),Route('/api/v1/settings/providers/{name:str}/test',provider_probe, methods=['POST']),
@@ -1363,6 +1372,6 @@ def install_full_workbench_routes(app, factory, registry, secrets, *, data_dir: 
       Route('/api/v1/candidates/{candidate_id:str}/action-plan',candidate_action_plan,methods=['GET','PATCH']),Route('/api/v1/projects/{project_id:str}/contact-queue',project_contact_queue,methods=['GET']),Route('/api/v1/candidates/{candidate_id:str}/phone-script',candidate_phone_script,methods=['GET']),
       Route('/api/v1/events/{event_id:str}/scorecards',event_scorecards,methods=['GET','POST']),
       Route('/api/v1/candidates/{candidate_id:str}/brief',candidate_brief,methods=['GET']),Route('/api/v1/projects/{project_id:str}/handoff',project_handoff,methods=['GET']),Route('/api/v1/projects/{project_id:str}/contact-list.csv',contact_list_csv,methods=['GET']),
-      Route('/api/v1/system/backups',backups, methods=['POST']),Route('/api/v1/system/backups',backup_list, methods=['GET']),Route('/api/v1/system/backups/{filename:str}',backup_download, methods=['GET']),Route('/api/v1/system/backups/{filename:str}/restore',schedule_restore, methods=['POST']),Route('/api/v1/system/restore/cancel',cancel_restore, methods=['POST']),Route('/api/v1/system/diagnostics',diag, methods=['GET']),
+      Route('/api/v1/system/backups',backups, methods=['POST']),Route('/api/v1/system/backups',backup_list, methods=['GET']),Route('/api/v1/system/backups/{filename:str}',backup_download, methods=['GET']),Route('/api/v1/system/backups/{filename:str}/restore',schedule_restore, methods=['POST']),Route('/api/v1/system/restore/cancel',cancel_restore, methods=['POST']),Route('/api/v1/system/diagnostics',diag, methods=['GET']),Route('/api/v1/system/diagnostics/export',diag_export, methods=['GET']),
     ]
     app.routes.extend(routes)

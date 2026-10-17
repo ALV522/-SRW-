@@ -51,3 +51,10 @@ Knowledge governance expands cautiously. Competency aliases are structurally sim
 3. deepen longitudinal ATS/source intelligence without feeding market signals into candidate scoring;
 4. assemble with the exact v0.8.8 Windows carrier and run exact-artifact WPF/WebView2 smoke;
 5. continue decomposing `fullworkbench.py` and legacy frontend only after capability parity is protected.
+
+
+## Convergence 10 system-integrity recovery
+
+C10 extends the 0.8.x system/release discipline rather than adding presentation-only surface area. A new privacy-safe diagnostic bundle projects only version/schema identity, normalized health checks, aggregate counts, storage/task counters and Knowledge availability into a deterministic ZIP with an internal SHA-256 manifest. Candidate content, Source blobs, SQLite bytes, provider secrets and local filesystem paths are excluded by construction and guarded by regression tests.
+
+The repository source-truth workflow is also tightened: CI emits a candidate source manifest as evidence before the fail-closed integrity gate. Reviewed changes still require an explicit SOURCE_MANIFEST update; CI does not silently rewrite source truth.

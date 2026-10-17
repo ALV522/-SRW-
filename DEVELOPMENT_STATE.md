@@ -1,14 +1,14 @@
-# SRW Development State — Convergence 09
+# SRW Development State — Convergence 10
 
-Version: `1.0.0-alpha10-convergence09`; schema `v1_0014`; capability reference `v0.8.12-R2`.
+Version: `1.0.0-alpha10-convergence10`; schema `v1_0014`; capability reference `v0.8.12-R2`.
 
 ## Integrated capabilities
 
-C08 business capabilities are retained. C09 supplies local-only Host and browser same-origin checks, known interrupted-backup cleanup, structured diagnostics, independent synthetic Knowledge fixtures, SQLite shutdown disposal and Ubuntu/Windows Python 3.12 regression gates.
+C08 business capabilities are retained. C09 supplies local-only Host and browser same-origin checks, known interrupted-backup cleanup, structured diagnostics, independent synthetic Knowledge fixtures, SQLite shutdown disposal and Ubuntu/Windows Python 3.12 regression gates. C10 adds a privacy-safe deterministic diagnostic support bundle with explicit exclusion of candidate content, Source blobs, database bytes, provider secrets and local filesystem paths.
 
 Integration separates immutable C08 source history from the current complete source hash inventory. Windows file-handle checks now enumerate real process handles through psutil instead of returning an empty Linux-only /proc result. A real SQLite open/close test runs on each OS. Probe errors fail the run rather than manufacturing PASS.
 
-The current suite contains 65 tests. Runtime counts and results are emitted by CI for the exact commit. This document does not substitute for that evidence. Release identity is C09 throughout; historical C08 metadata is preserved under verification/history/convergence08.
+The current suite contains 68 tests. Runtime counts and results are emitted by CI for the exact commit. This document does not substitute for that evidence. Release identity is C10 throughout; historical C08 metadata is preserved under verification/history/convergence08.
 
 ## Delivery
 

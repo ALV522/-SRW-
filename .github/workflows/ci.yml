@@ -27,6 +27,12 @@ jobs:
           node-version: '22'
       - name: Install pinned source-test dependencies
         run: python -m pip install -r requirements-ci.txt
+      - name: Render candidate source manifest
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p artifacts
+          python scripts/refresh_source_manifest.py > artifacts/SOURCE_MANIFEST.candidate.sha256
       - name: Verify source manifest
         run: python scripts/check_source_integrity.py
       - name: Verify release identity
