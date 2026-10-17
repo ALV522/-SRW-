@@ -144,8 +144,9 @@ class Convergence11BusinessWorkflowTest(unittest.TestCase):
                 session.add(project)
                 session.flush()
                 contact_candidate = Candidate(project_id=project.id, display_name="待联系候选人")
+                today_candidate = Candidate(project_id=project.id, display_name="今日联系候选人")
                 feedback_candidate = Candidate(project_id=project.id, display_name="待反馈候选人")
-                session.add_all([contact_candidate, feedback_candidate])
+                session.add_all([contact_candidate, today_candidate, feedback_candidate])
                 session.flush()
                 plan = CandidateActionPlan(
                     project_id=project.id,
@@ -156,6 +157,15 @@ class Convergence11BusinessWorkflowTest(unittest.TestCase):
                     next_contact_at=utc_now() - timedelta(days=1),
                     reason="候选人要求回拨",
                 )
+                today_plan = CandidateActionPlan(
+                    project_id=project.id,
+                    candidate_id=today_candidate.id,
+                    priority="today",
+                    owner="TA",
+                    contact_status="to_contact",
+                    next_contact_at=utc_now() + timedelta(hours=1),
+                    reason="今日首次联系",
+                )
                 event = RecruitmentEvent(
                     candidate_id=feedback_candidate.id,
                     event_type="interview",
@@ -163,10 +173,11 @@ class Convergence11BusinessWorkflowTest(unittest.TestCase):
                     event_state="completed",
                     outcome="proceed",
                 )
-                session.add_all([plan, event])
+                session.add_all([plan, today_plan, event])
                 session.flush()
                 project_id = project.id
                 contact_candidate_id = contact_candidate.id
+                today_candidate_id = today_candidate.id
                 feedback_candidate_id = feedback_candidate.id
                 event_id = event.id
         finally:
@@ -178,9 +189,12 @@ class Convergence11BusinessWorkflowTest(unittest.TestCase):
         queue = response.json()["operational_queue"]
         by_kind = {item["kind"]: item for item in queue["items"]}
         self.assertIn("overdue_contact", by_kind)
+        self.assertIn("today_contact", by_kind)
         self.assertIn("pending_interview_feedback", by_kind)
+        self.assertEqual(queue["total"], 3)
         self.assertEqual(by_kind["overdue_contact"]["project_id"], project_id)
         self.assertEqual(by_kind["overdue_contact"]["candidate_id"], contact_candidate_id)
+        self.assertEqual(by_kind["today_contact"]["candidate_id"], today_candidate_id)
         self.assertEqual(by_kind["pending_interview_feedback"]["candidate_id"], feedback_candidate_id)
         self.assertEqual(by_kind["pending_interview_feedback"]["event_id"], event_id)
 
