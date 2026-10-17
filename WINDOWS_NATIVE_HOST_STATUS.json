@@ -1,6 +1,6 @@
 {
   "schema": "srw.windows-native-host-status.v1",
-  "release": "1.0.0-alpha10-convergence09",
+  "release": "1.0.0-alpha10-convergence10",
   "host_source": "desktop/SRW.Desktop inherited from v0.8.12-R2",
   "host_binary_in_web_portable": false,
   "runtime_abi": {
@@ -22,5 +22,5 @@
     "assembler": "BUILD_WINDOWS_NATIVE.bat",
     "status": "DEFERRED_MISSING_EXACT_CARRIER_IN_CURRENT_BUILD_ENVIRONMENT"
   },
-  "claim_boundary": "C09 is a source artifact. Host ABI tests are in CI; the exact native artifact and Windows GUI acceptance remain pending."
+  "claim_boundary": "C10 is a source artifact. Host ABI/source tests run in CI; the exact native artifact and Windows GUI acceptance remain pending."
 }
