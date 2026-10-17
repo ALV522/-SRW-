@@ -32,7 +32,8 @@ The current build verifies source/HTTP behavior, PDF page rendering, knowledge a
 - Promotes the existing decision workbench from an internal service into the primary dashboard as an actionable business queue.
 - Shows only the highest-priority current work item for each candidate, preserving the evidence/decision context rather than presenting raw task volume.
 - Adds direct navigation from the dashboard into the relevant candidate evidence/decision workspace or interview workflow.
-- Adds an operational action center for overdue candidate contacts and completed interviews still missing submitted feedback.
+- Adds an operational action center for overdue and same-day candidate contacts plus completed interviews still missing submitted feedback.
+- Adds a unified review center for candidate identity review, judgment-correction review and unreviewed AI / Source Claims, with direct navigation back to human review surfaces.
 - Exposes the privacy-safe diagnostics ZIP from the settings UI instead of leaving it as an API-only capability.
-- Adds four product-facing regression tests; cumulative source suite target is 72 tests.
+- Adds five product-facing regression tests; cumulative source suite target is 73 tests.
 - Keeps the next objective explicitly product-first: close complete recruiting workflows before additional infrastructure convergence.
