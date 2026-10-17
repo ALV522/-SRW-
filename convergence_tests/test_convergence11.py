@@ -373,6 +373,16 @@ class Convergence11BusinessWorkflowTest(unittest.TestCase):
         self.assertIn("candidate-workspace-page", styles)
         self.assertIn("candidate-workspace-head", styles)
 
+    def test_candidate_process_workspace_contains_interview_and_reevaluation_actions(self):
+        app_js = (ROOT / "frontend" / "dist" / "app.js").read_text(encoding="utf-8")
+        self.assertIn("candidateEventsHtml", app_js)
+        self.assertIn("candidateReevaluationHtml", app_js)
+        self.assertIn("电话筛选与面试", app_js)
+        self.assertIn("复评与上下文变化", app_js)
+        self.assertIn("独立 Scorecard", app_js)
+        self.assertIn("完成并反馈", app_js)
+        self.assertIn("＋ 复评草案", app_js)
+
     def test_frontend_exposes_actionable_queue_and_safe_diagnostic_export(self):
         app_js = (ROOT / "frontend" / "dist" / "app.js").read_text(encoding="utf-8")
         self.assertIn("今日业务队列", app_js)
