@@ -1,4 +1,4 @@
-const state={page:'dashboard',projects:[],projectId:null,projectTab:'overview',candidateId:null,candidateSection:'evidence',candidateReturnTab:'candidates',providers:null,health:false,candidateQuery:'',candidateArchive:'active',candidateMaterial:'all',candidateStage:'all',candidatePage:0,candidateLimit:25,candidateRows:[],taskStatus:'',taskType:'',taskPage:0,taskLimit:50,cockpitPage:0,cockpitLimit:25,auditOffset:0,flowQuery:'',handoffPayload:null,jobSetupStep:1,jobSetupDraft:null,jobSetupSuggestions:[],criteriaStageDefs:[],criteriaRecruitmentContext:{},criteriaDecisionPolicy:{},criteriaBrief:{}};
+const state={page:'dashboard',projects:[],projectId:null,projectTab:'overview',candidateId:null,candidateSection:'evidence',candidateReturnTab:'candidates',providers:null,health:false,candidateQuery:'',candidateArchive:'active',candidateMaterial:'all',candidateStage:'all',candidatePage:0,candidateLimit:25,candidateRows:[],taskStatus:'',taskType:'',taskPage:0,taskLimit:50,cockpitPage:0,cockpitLimit:25,auditOffset:0,flowQuery:'',handoffPayload:null,jobSetupStep:1,jobSetupDraft:null,jobSetupSuggestions:[],criteriaStageDefs:[],criteriaRecruitmentContext:{},criteriaDecisionPolicy:{},criteriaBrief:{},criteriaOriginalByKey:{}};
 const $=s=>document.querySelector(s); const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const fmt=n=>new Intl.NumberFormat('zh-CN').format(Number(n||0));
 async function api(path,opts={}){const r=await fetch(path,{headers:{'Content-Type':'application/json',...(opts.headers||{})},...opts});let body;const ct=r.headers.get('content-type')||'';body=ct.includes('json')?await r.json():await r.text();if(!r.ok){const msg=body?.detail||body?.error?.code||String(body);throw new Error(msg)}return body}
@@ -38,6 +38,7 @@ async function criteriaTab(el,p){
   const d=await api(`/api/v1/projects/${state.projectId}/protocol-workspace`);
   const active=d.draft||d.current||{};
   const criteria=active.criteria||[];
+  state.criteriaOriginalByKey=Object.fromEntries(criteria.filter(x=>x&&typeof x==='object').map(x=>[String(x.criterion_key||x.key||''),{...x}]).filter(([k])=>k));
   state.criteriaBrief={...(active.brief||{})};
   state.criteriaRecruitmentContext={...(active.recruitment_context||{})};
   state.criteriaDecisionPolicy={...(active.decision_policy||{})};
@@ -71,8 +72,10 @@ function collectCriteria(){
     if(!name)return null;
     const weight=Number(r.querySelector('.c-weight').value||1);
     if(!Number.isFinite(weight)||weight<=0)throw new Error(`“${name}”的权重必须大于 0`);
+    const criterion_key=ensureCriterionKey(r);
     return {
-      criterion_key:ensureCriterionKey(r),
+      ...(state.criteriaOriginalByKey[criterion_key]||{}),
+      criterion_key,
       name,
       definition:r.querySelector('.c-definition').value.trim(),
       weight,
