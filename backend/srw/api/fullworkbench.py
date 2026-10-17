@@ -226,10 +226,44 @@ def install_full_workbench_routes(app, factory, registry, secrets, *, data_dir: 
             now=datetime.now(timezone.utc); horizon=now+timedelta(days=14)
             upcoming=s.scalar(select(func.count(RecruitmentEvent.id)).where(RecruitmentEvent.event_state=="scheduled",RecruitmentEvent.scheduled_at.is_not(None),RecruitmentEvent.scheduled_at>=now,RecruitmentEvent.scheduled_at<=horizon)) or 0
             recent=[{"event_type":x.event_type,"entity_type":x.entity_type,"entity_id":x.entity_id,"actor":x.actor,"created_at":x.created_at.isoformat()} for x in s.scalars(select(AuditEvent).order_by(AuditEvent.created_at.desc()).limit(12)).all()]
-            overdue=s.scalar(select(func.count(CandidateActionPlan.id)).where(CandidateActionPlan.next_contact_at.is_not(None),CandidateActionPlan.next_contact_at<now,CandidateActionPlan.contact_status.in_(("to_contact","callback","attempted")))) or 0
+            overdue=s.scalar(
+                select(func.count(CandidateActionPlan.id))
+                .join(Candidate,Candidate.id==CandidateActionPlan.candidate_id)
+                .join(Project,Project.id==CandidateActionPlan.project_id)
+                .where(
+                    CandidateActionPlan.next_contact_at.is_not(None),
+                    CandidateActionPlan.next_contact_at<now,
+                    CandidateActionPlan.contact_status.in_(("to_contact","callback","attempted")),
+                    Candidate.archived.is_(False),
+                    Project.status!="archived",
+                )
+            ) or 0
             today_end=now+timedelta(days=1)
-            today_contacts=s.scalar(select(func.count(CandidateActionPlan.id)).where(CandidateActionPlan.next_contact_at.is_not(None),CandidateActionPlan.next_contact_at>=now,CandidateActionPlan.next_contact_at<today_end,CandidateActionPlan.contact_status.in_(("to_contact","callback","attempted")))) or 0
-            pending_scorecards=s.scalar(select(func.count(RecruitmentEvent.id)).where(RecruitmentEvent.event_state=="completed",RecruitmentEvent.event_type=="interview",~RecruitmentEvent.id.in_(select(InterviewScorecardSubmission.event_id).where(InterviewScorecardSubmission.state=="submitted")))) or 0
+            today_contacts=s.scalar(
+                select(func.count(CandidateActionPlan.id))
+                .join(Candidate,Candidate.id==CandidateActionPlan.candidate_id)
+                .join(Project,Project.id==CandidateActionPlan.project_id)
+                .where(
+                    CandidateActionPlan.next_contact_at.is_not(None),
+                    CandidateActionPlan.next_contact_at>=now,
+                    CandidateActionPlan.next_contact_at<today_end,
+                    CandidateActionPlan.contact_status.in_(("to_contact","callback","attempted")),
+                    Candidate.archived.is_(False),
+                    Project.status!="archived",
+                )
+            ) or 0
+            pending_scorecards=s.scalar(
+                select(func.count(RecruitmentEvent.id))
+                .join(Candidate,Candidate.id==RecruitmentEvent.candidate_id)
+                .join(Project,Project.id==Candidate.project_id)
+                .where(
+                    RecruitmentEvent.event_state=="completed",
+                    RecruitmentEvent.event_type=="interview",
+                    ~RecruitmentEvent.id.in_(select(InterviewScorecardSubmission.event_id).where(InterviewScorecardSubmission.state=="submitted")),
+                    Candidate.archived.is_(False),
+                    Project.status!="archived",
+                )
+            ) or 0
             stale_reevaluations=s.scalar(select(func.count(ReevaluationDraft.id)).where(ReevaluationDraft.state=="stale")) or 0
             pending_identity=s.scalar(
                 select(func.count(CandidateIdentityReview.id))
