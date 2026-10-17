@@ -6,6 +6,7 @@ from starlette.responses import JSONResponse
 from starlette.routing import Route
 
 from srw.kernel.errors import V1InvariantError
+from srw.modules.candidate.models import Candidate
 from srw.modules.identity.service import (
     scan_project_identity,
     list_identity_reviews,
@@ -132,7 +133,11 @@ def install_governance_routes(app, factory) -> None:
         project_id = request.path_params["project_id"]
         if request.method == "GET":
             with factory() as session:
-                return JSONResponse({"project_id": project_id, "reviews": list_reviews(session, project_id, state=request.query_params.get("state") or None)})
+                rows=list_reviews(session, project_id, state=request.query_params.get("state") or None)
+                for row in rows:
+                    candidate=session.get(Candidate,row.get("candidate_id")) if row.get("candidate_id") else None
+                    row["candidate_name"]=candidate.display_name if candidate else ""
+                return JSONResponse({"project_id": project_id, "reviews": rows})
         body = await _json_body(request)
         with v1_session_scope(factory) as session:
             return JSONResponse(create_review(
