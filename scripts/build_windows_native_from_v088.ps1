@@ -103,7 +103,7 @@ try {
   Set-Content -Encoding ASCII -LiteralPath ($OutZip + '.sha256') -Value "$outSha  $(Split-Path -Leaf $OutZip)"
   Write-Host "Windows Native candidate assembled: $OutZip" -ForegroundColor Green
   Write-Host "SHA-256: $outSha" -ForegroundColor Green
-  Write-Host 'Windows WPF/WebView2 GUI and user workflow acceptance remain required.' -ForegroundColor Yellow
+  Write-Host 'Exact Windows GUI smoke remains required before any release promotion; WPF/WebView2 business acceptance is also pending.' -ForegroundColor Yellow
 } finally {
   Remove-Item -LiteralPath $tmp -Recurse -Force -ErrorAction SilentlyContinue
 }
