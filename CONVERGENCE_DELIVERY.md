@@ -38,6 +38,7 @@ The current build verifies source/HTTP behavior, PDF page rendering, knowledge a
 - Reorders the project navigation around the recruiting workflow and adds a project-level next-action engine covering criteria, intake/material completeness, evidence/decision work, interview feedback/scheduling and Offer follow-up.
 - Replaces raw-JSON candidate brief/project handoff modals with readable operator summaries; project handoff still offers the complete JSON payload as a deliberate download.
 - Makes dashboard contact actions candidate-specific by opening the exact action plan rather than the generic contact queue.
+- Promotes Candidate Workspace from a large modal into a full project page with dedicated Evidence & Decision, Process & Follow-up, and Offer sections; candidate business context and core actions stay visible without stacking nested modals.
 - Exposes the privacy-safe diagnostics ZIP from the settings UI instead of leaving it as an API-only capability.
-- Adds seven product-facing regression tests; cumulative source suite target is 75 tests.
+- Adds eight product-facing regression tests; cumulative source suite target is 76 tests.
 - Keeps the next objective explicitly product-first: close complete recruiting workflows before additional infrastructure convergence.
