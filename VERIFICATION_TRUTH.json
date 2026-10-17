@@ -14,7 +14,7 @@
     "privacy_safe_diagnostics",
     "business_workflow_queue"
   ],
-  "current_evidence": "GitHub Actions SRW Source Gate for the exact C11 commit; 72-test regression, strict resource gate, product workflow and operations queues, and uploaded source evidence",
+  "current_evidence": "GitHub Actions SRW Source Gate for the exact C11 commit; 73-test regression, strict resource gate, product workflow, operations and review queues, and uploaded source evidence",
   "historical_evidence": "verification/history/convergence08/VERIFICATION_TRUTH.json",
   "deferred": {
     "windows_native_gui": "Requires exact audited carrier and target-Windows GUI acceptance",
