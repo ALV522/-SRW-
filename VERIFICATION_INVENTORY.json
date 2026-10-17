@@ -1,6 +1,6 @@
 {
   "schema": "srw.verification-inventory.v1",
-  "release": "1.0.0-alpha10-convergence09",
+  "release": "1.0.0-alpha10-convergence10",
   "schema_revision": "v1_0014",
   "reference": {
     "release": "v0.8.12-R2",
@@ -39,7 +39,7 @@
     "note": "Reference inventory only; these 725 v0.8.12-R2 backend tests are not claimed as executed in Convergence 08."
   },
   "current": {
-    "convergence_test_count": 65,
+    "convergence_test_count": 68,
     "files": [
       {
         "file": "test_assessment.py",
@@ -84,12 +84,16 @@
       {
         "file": "test_source_archive.py",
         "test_methods": 2
+      },
+      {
+        "file": "test_convergence10.py",
+        "test_methods": 3
       }
     ],
     "evidence": "GitHub Actions log/artifact for exact source commit"
   },
   "recovered_gates": [],
   "parity_status": "PARTIAL",
-  "parity_note": "65 current source tests vs 725 historical reference tests; no full parity or exact Windows GUI claim.",
+  "parity_note": "68 current source tests vs 725 historical reference tests; no full parity or exact Windows GUI claim.",
   "historical_recovered_gates": "verification/history/convergence08/VERIFICATION_INVENTORY.json"
 }
