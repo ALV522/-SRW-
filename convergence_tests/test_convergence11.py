@@ -325,6 +325,42 @@ class Convergence11BusinessWorkflowTest(unittest.TestCase):
             self.assertEqual(draft_workflow["next_action"]["key"], "publish_criteria")
             self.assertEqual(draft_workflow["next_action"]["tab"], "criteria")
 
+    def test_judgment_review_can_be_completed_from_product_api(self):
+        project_id, candidate_id, _work_item_id = self._seed_work_item()
+        with TestClient(self._app()) as client:
+            created = client.post(
+                f"/api/v1/projects/{project_id}/calibration/reviews",
+                json={
+                    "trigger":"human_override",
+                    "criterion_key":"experience",
+                    "before":"partial",
+                    "after":"met",
+                    "reason":"evidence_error",
+                    "actor":"reviewer",
+                    "candidate_id":candidate_id,
+                },
+            )
+            self.assertEqual(created.status_code, 200, created.text)
+            review_id = created.json()["review_id"]
+
+            listed = client.get(f"/api/v1/projects/{project_id}/calibration/reviews?state=open")
+            self.assertEqual(listed.status_code, 200, listed.text)
+            rows = listed.json()["reviews"]
+            self.assertEqual(len(rows), 1)
+            self.assertEqual(rows[0]["review_id"], review_id)
+            self.assertEqual(rows[0]["candidate_name"], "候选人甲")
+
+            resolved = client.post(
+                f"/api/v1/calibration/reviews/{review_id}/resolve",
+                json={"actor":"reviewer2","note":"已核对证据并完成纠错"},
+            )
+            self.assertEqual(resolved.status_code, 200, resolved.text)
+            self.assertEqual(resolved.json()["state"], "resolved")
+
+            open_rows = client.get(f"/api/v1/projects/{project_id}/calibration/reviews?state=open")
+            self.assertEqual(open_rows.status_code, 200, open_rows.text)
+            self.assertEqual(open_rows.json()["reviews"], [])
+
     def test_frontend_exposes_actionable_queue_and_safe_diagnostic_export(self):
         app_js = (ROOT / "frontend" / "dist" / "app.js").read_text(encoding="utf-8")
         self.assertIn("今日业务队列", app_js)
@@ -338,6 +374,9 @@ class Convergence11BusinessWorkflowTest(unittest.TestCase):
         self.assertIn("建岗与标准", app_js)
         self.assertIn("候选人收件", app_js)
         self.assertIn("筛选与决策", app_js)
+        self.assertIn("完成复核", app_js)
+        self.assertIn("resolveJudgmentReview", app_js)
+        self.assertIn("证据错误", app_js)
         self.assertIn("/api/v1/system/diagnostics/export", app_js)
         self.assertIn("导出隐私安全诊断包", app_js)
 
