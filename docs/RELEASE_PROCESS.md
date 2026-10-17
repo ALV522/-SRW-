@@ -17,7 +17,7 @@ Before attempting assembly, run `python scripts/portable_input_preflight.py` wit
 
 A Portable build must include the separately audited embedded runtime and five production Knowledge DBs, their hashes and an exact-artifact check. Never ship synthetic test Knowledge fixtures as production data. Verify launcher dependencies, backup/restore and data migration on the assembled artifact.
 
-Native additionally requires SRW_v0.8.8_Windows_Portable.zip with SHA-256 f12933a1f6639168911af3788d207ced521be8a50841d7d39e7a2169eed3d5ab and target-machine WPF/WebView2 GUI acceptance. The historical Web Portable asset is not interchangeable with this carrier.
+Native assembly must stage only reviewed files listed by SOURCE_MANIFEST.sha256 plus separately audited runtime, Knowledge DBs and exact inherited Host. The candidate ZIP name includes UNVERIFIED and must not be published as production without GUI and data-exclusion acceptance. Native additionally requires SRW_v0.8.8_Windows_Portable.zip with SHA-256 f12933a1f6639168911af3788d207ced521be8a50841d7d39e7a2169eed3d5ab and target-machine WPF/WebView2 GUI acceptance. The historical Web Portable asset is not interchangeable with this carrier.
 
 ## Rollback
 
