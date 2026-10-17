@@ -1,15 +1,19 @@
 name: SRW Source Gate
 on:
   push:
-    branches: [main, "dev/**", "fix/**", "integration/**"]
+    branches: [main]
   pull_request:
-    branches: [main, "dev/**"]
+    branches: [main]
   workflow_dispatch:
+concurrency:
+  group: srw-source-gate-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
 permissions:
   contents: read
 jobs:
   source-gate:
     name: source-gate (${{ matrix.os }}, py3.12)
+    if: github.event_name != 'pull_request' || github.event.pull_request.draft == false
     strategy:
       fail-fast: false
       matrix:
@@ -49,7 +53,7 @@ jobs:
           python -m pip freeze > artifacts/test-environment.txt
       - name: Build verified source archive
         if: matrix.os == 'ubuntu-latest'
-        run: python scripts/build_source_archive.py --output artifacts/SRW_Convergence09_Source.zip --commit ${{ github.sha }}
+        run: python scripts/build_source_archive.py --output artifacts/SRW_Convergence10_Source.zip --commit ${{ github.sha }}
       - name: Upload exact-commit evidence
         if: always()
         uses: actions/upload-artifact@v4
