@@ -396,6 +396,90 @@ class Convergence11BusinessWorkflowTest(unittest.TestCase):
         self.assertIn("不会自动发布", app_js)
         self.assertIn("wizard-steps", styles)
 
+    def test_protocol_draft_roundtrip_keeps_job_context_and_stage_semantics(self):
+        with TestClient(self._app()) as client:
+            created = client.post(
+                "/api/v1/projects",
+                json={"title":"语义保留项目","role_title":"产品经理","brief_summary":"负责增长产品"},
+            )
+            self.assertEqual(created.status_code, 200, created.text)
+            project_id = created.json()["project_id"]
+
+            setup = client.patch(
+                f"/api/v1/projects/{project_id}/job-setup",
+                json={
+                    "role_title":"高级产品经理",
+                    "headcount":2,
+                    "location":"上海",
+                    "level":"Senior",
+                    "employment_type":"full_time",
+                    "compensation":"面议",
+                    "target_start_date":"2027-01-15",
+                    "recruiter_owner":"TA-A",
+                    "hiring_manager":"HM-B",
+                    "jd_text":"负责核心产品与跨团队协作",
+                },
+            )
+            self.assertEqual(setup.status_code, 200, setup.text)
+
+            workspace = client.get(f"/api/v1/projects/{project_id}/protocol-workspace")
+            self.assertEqual(workspace.status_code, 200, workspace.text)
+            draft = workspace.json()["draft"]
+            revision_id = workspace.json()["draft_revision_id"]
+            context = draft["recruitment_context"]
+            self.assertEqual(context["headcount"], 2)
+            self.assertEqual(context["hiring_manager"], "HM-B")
+
+            payload = {
+                "brief": dict(draft["brief"]),
+                "criteria": [{
+                    "criterion_key":"product_impact",
+                    "name":"产品影响力",
+                    "definition":"能够用可验证结果说明产品影响",
+                    "weight":2.5,
+                    "decision_critical":True,
+                    "verification_required":True,
+                    "verification_probes":["请说明一个有量化结果的产品案例"],
+                    "custom_metadata":{"preserve":True},
+                }],
+                "assessment_stages":[
+                    {"stage_key":"resume","name":"简历筛选","criteria":["product_impact"],"custom_stage_field":"keep"},
+                    {"stage_key":"interview","name":"面试","criteria":["product_impact"]},
+                ],
+                "decision_policy":{"human_final":True,"custom_policy":"keep"},
+                "recruitment_context":dict(context),
+            }
+            saved = client.patch(
+                f"/api/v1/protocol-revisions/{revision_id}",
+                json={"payload":payload,"provenance":{"ui":"test"}},
+            )
+            self.assertEqual(saved.status_code, 200, saved.text)
+
+            reread = client.get(f"/api/v1/projects/{project_id}/protocol-workspace")
+            self.assertEqual(reread.status_code, 200, reread.text)
+            result = reread.json()["draft"]
+            self.assertEqual(result["recruitment_context"]["location"], "上海")
+            self.assertEqual(result["criteria"][0]["weight"], 2.5)
+            self.assertTrue(result["criteria"][0]["custom_metadata"]["preserve"])
+            self.assertEqual(result["assessment_stages"][0]["criteria"], ["product_impact"])
+            self.assertEqual(result["assessment_stages"][0]["custom_stage_field"], "keep")
+            self.assertEqual(result["decision_policy"]["custom_policy"], "keep")
+
+    def test_criteria_editor_preserves_protocol_fields_instead_of_rebuilding_them(self):
+        app_js = (ROOT / "frontend" / "dist" / "app.js").read_text(encoding="utf-8")
+        styles = (ROOT / "frontend" / "dist" / "styles.css").read_text(encoding="utf-8")
+        self.assertIn("criteriaOriginalByKey", app_js)
+        self.assertIn("criteriaRecruitmentContext", app_js)
+        self.assertIn("criteriaDecisionPolicy", app_js)
+        self.assertIn("collectAssessmentStages", app_js)
+        self.assertIn("recruitment_context:{...state.criteriaRecruitmentContext}", app_js)
+        self.assertIn("decision_policy:{...state.criteriaDecisionPolicy,human_final:true}", app_js)
+        self.assertIn("...(state.criteriaOriginalByKey[criterion_key]||{})", app_js)
+        self.assertIn("标准定义 / 判断口径", app_js)
+        self.assertIn("权重", app_js)
+        self.assertIn("核实阶段", app_js)
+        self.assertIn("criterion-card", styles)
+
     def test_frontend_exposes_actionable_queue_and_safe_diagnostic_export(self):
         app_js = (ROOT / "frontend" / "dist" / "app.js").read_text(encoding="utf-8")
         self.assertIn("今日业务队列", app_js)
