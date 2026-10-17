@@ -41,28 +41,28 @@ local_settings.json
 
 # SRW runtime / user data
 /runtime/
-data/
-workspace/
-uploads/
-backups/
-exports/
-logs/
-temp/
-tmp/
+/data/
+/workspace/
+/uploads/
+/backups/
+/exports/
+/logs/
+/temp/
+/tmp/
 *.db-wal
 *.db-shm
 *.db-journal
-content/
-blobs/
-source_blobs/
+/content/
+/blobs/
+/source_blobs/
 
 # Build / release artifacts
 *.zip
 *.7z
 *.rar
-artifacts/
-release/
-releases/
+/artifacts/
+/release/
+/releases/
 
 # Local verification output
 verification/tmp/

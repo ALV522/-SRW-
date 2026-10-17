@@ -9,11 +9,12 @@ from srw.modules.recruitment_intelligence.service import record_observation,inte
 from srw.modules.knowledge_packages.service import ControlledKnowledgePackages
 from srw.runtime.db.schema import V1_SCHEMA_REVISION,V1SchemaMeta,create_v1_schema
 from srw.runtime.db.session import create_v1_engine,create_v1_session_factory
+from knowledge_fixture import create_minimal_knowledge_tree
 
 ROOT=Path(__file__).resolve().parents[1]
 class Convergence06Test(unittest.TestCase):
  def setUp(self):
-  self.tmp=tempfile.TemporaryDirectory();self.root=Path(self.tmp.name);self.db=self.root/'test.db';self.engine=create_v1_engine(f'sqlite+pysqlite:///{self.db}');create_v1_schema(self.engine);self.factory=create_v1_session_factory(self.engine)
+  self.tmp=tempfile.TemporaryDirectory();self.root=Path(self.tmp.name);self.knowledge=create_minimal_knowledge_tree(self.root/'knowledge'/'active');self.db=self.root/'test.db';self.engine=create_v1_engine(f'sqlite+pysqlite:///{self.db}');create_v1_schema(self.engine);self.factory=create_v1_session_factory(self.engine)
  def tearDown(self):self.engine.dispose();self.tmp.cleanup()
  def _project(self,s):
   p=Project(title='招聘',status='open');s.add(p);s.flush();repo=ProtocolRepository(s);d=repo.create_draft(p.id,{'brief':{'title':'招聘','summary':''},'recruitment_context':{'role_title':'招聘','location':'北京'},'criteria':[],'assessment_stages':[],'decision_policy':{'human_final':True}});repo.publish(d.id);return p
@@ -21,11 +22,11 @@ class Convergence06Test(unittest.TestCase):
   with self.factory() as s:
    p=self._project(s);upsert_plan(s,p.id,target_hires=2,target_date='2026-12-01',owner='TA',source_channels=['内推','招聘网站'],notes='')
    record_observation(s,p.id,channel='内推',period='2026Q4',sourced=20,contacted=16,screened=10,interviewed=6,offered=2,hired=1,spend_cny=1000,human_confirmed=True,provenance='ATS export + human confirm',notes='')
-   snap=intelligence_snapshot(s,p.id,knowledge_dir=ROOT/'knowledge'/'active',role_title='招聘',location='北京')
+   snap=intelligence_snapshot(s,p.id,knowledge_dir=self.knowledge,role_title='招聘',location='北京')
    self.assertEqual(snap['channels'][0]['channel'],'内推');self.assertEqual(snap['channels'][0]['hire_rate_from_sourced'],0.05);self.assertIn('招聘网站',snap['measurement_gaps']);self.assertTrue(snap['semantics']['channel_efficiency_is_not_candidate_rank']);self.assertTrue(snap['semantics']['market_signal_is_not_candidate_score'])
    with self.assertRaises(Exception):record_observation(s,p.id,channel='bad',period='',sourced=1,contacted=2,screened=0,interviewed=0,offered=0,hired=0,spend_cny=0,human_confirmed=False,provenance='manual',notes='')
  def test_controlled_knowledge_apply_is_two_phase_digest_guarded_and_rollback_exact(self):
-  active=self.root/'knowledge'/'active';shutil.copytree(ROOT/'knowledge'/'active'/'taxonomy',active/'taxonomy');mgr=ControlledKnowledgePackages(data_dir=self.root/'data',active_dir=active)
+  active=self.root/'knowledge-copy'/'active';shutil.copytree(self.knowledge/'taxonomy',active/'taxonomy');mgr=ControlledKnowledgePackages(data_dir=self.root/'data',active_dir=active)
   taxonomy=active/'taxonomy'/'knowledge.db';before=taxonomy.read_bytes()
   con=sqlite3.connect(taxonomy);target=con.execute("SELECT role_id FROM canonical_role ORDER BY role_id LIMIT 1").fetchone()[0];con.close()
   manifest=mgr.prepare_taxonomy_alias(proposal_id='p-test',source_title='Convergence Test Alias 9917',target_id=target,target_type='role',reviewer='KM',reason='test')

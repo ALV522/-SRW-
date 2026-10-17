@@ -1,0 +1,181 @@
+{
+  "schema": "srw.verification-inventory.v1",
+  "release": "1.0.0-alpha10-convergence08",
+  "schema_revision": "v1_0014",
+  "reference": {
+    "release": "v0.8.12-R2",
+    "backend_test_count": 725,
+    "suite": "backend/tests",
+    "inventory_sha256": "3d1c4e3ee4f16c9554e78e78895c90d3bf11985cb794aca7409425371a64bbac",
+    "families": {
+      "ai_runs": 1,
+      "audit": 1,
+      "candidates": 27,
+      "db": 16,
+      "decision_operations": 18,
+      "evaluation": 13,
+      "feedback": 17,
+      "intelligence": 13,
+      "interviews": 11,
+      "knowledge": 49,
+      "m5": 32,
+      "other": 5,
+      "planning": 13,
+      "projects": 11,
+      "providers": 23,
+      "release": 211,
+      "runtime": 9,
+      "system": 104,
+      "tasks": 4,
+      "templates": 4,
+      "v0810": 40,
+      "v085": 15,
+      "v086": 18,
+      "v087": 24,
+      "v088": 24,
+      "v089": 19,
+      "workspace": 3
+    },
+    "note": "Reference inventory only; these 725 v0.8.12-R2 backend tests are not claimed as executed in Convergence 08."
+  },
+  "current": {
+    "convergence_test_count": 46,
+    "files": [
+      {
+        "file": "test_assessment.py",
+        "test_methods": 7
+      },
+      {
+        "file": "test_convergence02.py",
+        "test_methods": 8
+      },
+      {
+        "file": "test_convergence03.py",
+        "test_methods": 3
+      },
+      {
+        "file": "test_convergence04.py",
+        "test_methods": 5
+      },
+      {
+        "file": "test_convergence05.py",
+        "test_methods": 5
+      },
+      {
+        "file": "test_convergence06.py",
+        "test_methods": 3
+      },
+      {
+        "file": "test_convergence07.py",
+        "test_methods": 6
+      },
+      {
+        "file": "test_convergence08.py",
+        "test_methods": 9
+      }
+    ],
+    "latest_regression": "verification/convergence08_regression.txt",
+    "runner_output": "verification/convergence08_runner_output.json",
+    "http_smoke": "verification/convergence08_http_smoke.json",
+    "windows_host_abi_http_smoke": "verification/convergence08_windows_host_abi_http_smoke.json"
+  },
+  "recovered_gates": [
+    {
+      "gate": "missing_is_not_zero",
+      "status": "PASS",
+      "evidence": "test_assessment.py"
+    },
+    {
+      "gate": "privacy_safe_remote_ai",
+      "status": "PASS",
+      "evidence": "test_convergence02.py"
+    },
+    {
+      "gate": "source_grounding",
+      "status": "PASS",
+      "evidence": "test_convergence02.py"
+    },
+    {
+      "gate": "identity_non_destructive_merge",
+      "status": "PASS",
+      "evidence": "test_convergence03.py"
+    },
+    {
+      "gate": "calibration_two_reviewer_gold",
+      "status": "PASS",
+      "evidence": "test_convergence02.py"
+    },
+    {
+      "gate": "ai_run_ledger_no_raw_payload",
+      "status": "PASS",
+      "evidence": "test_convergence04.py"
+    },
+    {
+      "gate": "decision_reaffirmation_lineage",
+      "status": "PASS",
+      "evidence": "test_convergence04.py"
+    },
+    {
+      "gate": "decision_operations_and_feedback",
+      "status": "PASS",
+      "evidence": "test_convergence05.py"
+    },
+    {
+      "gate": "controlled_knowledge_apply_and_exact_rollback",
+      "status": "PASS",
+      "evidence": "test_convergence06.py"
+    },
+    {
+      "gate": "recruitment_channel_intelligence_semantics",
+      "status": "PASS",
+      "evidence": "test_convergence06.py"
+    },
+    {
+      "gate": "windows_wpf_host_runtime_abi",
+      "status": "PASS",
+      "evidence": "test_convergence07.py + convergence07_windows_host_abi_http_smoke.json"
+    },
+    {
+      "gate": "windows_native_carrier_sha_guard",
+      "status": "PASS",
+      "evidence": "test_convergence07.py + BUILD_WINDOWS_NATIVE.bat"
+    },
+    {
+      "gate": "sourcing_csv_preview_digest_atomic_commit",
+      "status": "PASS",
+      "evidence": "test_convergence07.py"
+    },
+    {
+      "gate": "pdf_grounding_graphical_highlight",
+      "status": "PASS",
+      "evidence": "test_convergence08.py + convergence08_http_smoke.json"
+    },
+    {
+      "gate": "competency_alias_controlled_apply_exact_rollback",
+      "status": "PASS",
+      "evidence": "test_convergence08.py"
+    },
+    {
+      "gate": "backup_duplicate_member_guard",
+      "status": "PASS",
+      "evidence": "test_convergence08.py"
+    },
+    {
+      "gate": "spreadsheet_formula_injection_guard",
+      "status": "PASS",
+      "evidence": "test_convergence08.py"
+    },
+    {
+      "gate": "project_package_portability_historical_context",
+      "status": "PASS",
+      "evidence": "test_convergence08.py + convergence08_http_smoke.json"
+    },
+    {
+      "gate": "project_package_preview_digest_tamper_guard",
+      "status": "PASS",
+      "evidence": "test_convergence08.py"
+    }
+  ],
+  "parity_status": "PARTIAL",
+  "parity_note": "The v0.8.12 reference contains 725 backend tests. Convergence 08 executes 46 focused recovery tests, including project portability and deeper system/release guards, but does not claim full 0.8 CI parity or exact Windows GUI acceptance."
+}

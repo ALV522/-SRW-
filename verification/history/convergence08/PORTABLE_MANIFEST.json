@@ -1,0 +1,15 @@
+{
+  "product": "SRW",
+  "version": "1.0.0-alpha10-convergence08",
+  "schema_revision": "v1_0014",
+  "profile": "business_convergence_08_08x_capability_recovery_portability",
+  "parent_artifact": "SRW_v1.0_Business_Convergence_07_08x_Native_Host_Recovery_Portable.zip",
+  "parent_sha256": "f3a29b2553a0189fd353de80a9ea0061cb5fdde4756efecdbd9fe135bee979e8",
+  "windows_native_host_binary_included": false,
+  "windows_native_host_abi": "PASS",
+  "windows_native_assembler": "BUILD_WINDOWS_NATIVE.bat",
+  "managed_file_count": 1829,
+  "source_recovery_managed_file_count": 212,
+  "capability_baseline": "v0.8.12-R2",
+  "verification": "46/46 focused recovery tests PASS"
+}

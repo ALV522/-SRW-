@@ -1,0 +1,53 @@
+name: SRW Source Gate
+on:
+  push:
+    branches: [main, "dev/**", "fix/**", "integration/**"]
+  pull_request:
+    branches: [main, "dev/**"]
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  source-gate:
+    name: source-gate (${{ matrix.os }}, py3.12)
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: pip
+          cache-dependency-path: requirements-ci.txt
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Install pinned source-test dependencies
+        run: python -m pip install -r requirements-ci.txt
+      - name: Verify source manifest
+        run: python scripts/check_source_integrity.py
+      - name: Verify release identity
+        run: python scripts/check_release_truth.py
+      - name: Run capability and resource regression
+        shell: bash
+        env:
+          PYTHONPATH: backend
+          SRW_TEST_RESOURCE_STRICT: '1'
+        run: |
+          set -euo pipefail
+          mkdir -p artifacts
+          python scripts/run_convergence_verification.py 2>&1 | tee artifacts/source-gate.log
+          python -m pip freeze > artifacts/test-environment.txt
+      - name: Build verified source archive
+        if: matrix.os == 'ubuntu-latest'
+        run: python scripts/build_source_archive.py --output artifacts/SRW_Convergence09_Source.zip --commit ${{ github.sha }}
+      - name: Upload exact-commit evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: srw-source-${{ matrix.os }}-${{ github.sha }}
+          path: artifacts/
+          if-no-files-found: warn

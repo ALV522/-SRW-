@@ -1,0 +1,19 @@
+# C09 acceptance work remaining
+
+This is an execution plan, not a completed acceptance report. Use synthetic/anonymized inputs, never production candidate files in Git or CI artifacts.
+
+| Flow | Actions | Required result |
+|---|---|---|
+| Project and criteria | Create project, publish requirements, edit and republish | Clear active revision; prior evaluation context retained |
+| Intake and identity | Import PDF/text, add new revision, review duplicate identity | Current material correct; canonical merge keeps provenance |
+| Evidence | Open claim source, inspect PDF highlight, confirm or reject | Visible original evidence; mismatch rejected; missing stays unknown |
+| Assessment and decision | Complete verification, compare, record human decision | Only eligible evidence-closed candidates ranked; human boundary retained |
+| Context change | Change criteria/material after decision | Old decision historical; explicit reevaluation/reaffirmation required |
+| Operations and feedback | Accept/start/complete action; classify feedback | Context-bound actions; no automatic ontology mutation |
+| Knowledge | Preview alias change, apply exact digest, rollback | Target validation; correct diff; exact rollback |
+| Portability | Export project; preview/import into another instance | Source blobs preserved; IDs remapped; old decisions historical |
+| Restart and recovery | Restart, back up, restore, interrupt and retry | Business state durable; known staging cleaned; live data preserved |
+| Windows GUI | Launch/close/relaunch, open files, view evidence, export | No leaked process/SQLite lock; usable WPF/WebView2 flow |
+| External AI | Configure real provider, timeout/limit/error cases | Actual privacy projection; clear retry and failure status |
+
+Record for each run: exact commit/artifact hash, OS/runtime, dataset identity, actions, observed result, evidence location and unresolved defects. API regression is a prerequisite; it does not mark UI rows complete.

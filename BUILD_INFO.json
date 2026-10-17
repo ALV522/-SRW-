@@ -1,6 +1,6 @@
 {
   "schema": "srw.build-info.v1",
-  "version": "1.0.0-alpha10-convergence08",
-  "release_id": "1.0.0-alpha10-convergence08",
-  "source_revision": "convergence08-08x-capability-recovery-portability"
+  "version": "1.0.0-alpha10-convergence09",
+  "release_id": "1.0.0-alpha10-convergence09",
+  "source_revision": "convergence09-source-integration"
 }
