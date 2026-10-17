@@ -3,6 +3,7 @@ from __future__ import annotations
 import argparse
 import hashlib
 import subprocess
+import sys
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -40,7 +41,7 @@ def main() -> int:
         (ROOT / CURRENT).write_text(rendered, encoding="utf-8")
         print(f"wrote {CURRENT} with {len(rendered.splitlines())} entries")
     else:
-        print(rendered, end="")
+        sys.stdout.buffer.write(rendered.encode("utf-8"))
     return 0
 
 
