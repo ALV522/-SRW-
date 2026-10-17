@@ -60,7 +60,7 @@ def knowledge_checks(knowledge: Path, manifest: Path) -> list[dict]:
             checks.append({"name": rel, "status": "BLOCKED", "reason": "Audited Knowledge hash mismatch"})
             continue
         try:
-            with sqlite3.connect(f"file:{path.as_posix()}?mode=ro", uri=True) as db:
+            with sqlite3.connect(path.resolve().as_uri() + "?mode=ro", uri=True) as db:
                 integrity = db.execute("PRAGMA quick_check").fetchone()
                 table_exists = db.execute(
                     "SELECT 1 FROM sqlite_master WHERE name=? AND type IN ('table','view')",
