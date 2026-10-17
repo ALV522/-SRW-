@@ -14,7 +14,7 @@
     "privacy_safe_diagnostics",
     "business_workflow_queue"
   ],
-  "current_evidence": "Exact-commit CI evidence required for 83 source tests, including review queue IDs and frontend deep-link wiring; real browser click/scroll acceptance remains deferred.",
+  "current_evidence": "Exact-commit CI must confirm 85 source regression tests including missing-assets, Knowledge hash and SQLite preflight; Portable assembly/Windows GUI verification remain deferred.",
   "historical_evidence": "verification/history/convergence08/VERIFICATION_TRUTH.json",
   "deferred": {
     "windows_native_gui": "Requires exact audited carrier and target-Windows GUI acceptance",
