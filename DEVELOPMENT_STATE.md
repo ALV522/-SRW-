@@ -8,7 +8,7 @@ C08 business capabilities are retained. C09 supplies local-only Host and browser
 
 Integration separates immutable C08 source history from the current complete source hash inventory. Windows file-handle checks now enumerate real process handles through psutil instead of returning an empty Linux-only /proc result. A real SQLite open/close test runs on each OS. Probe errors fail the run rather than manufacturing PASS.
 
-The current suite contains 82 tests. Runtime counts and results are emitted by CI for the exact commit. This document does not substitute for that evidence. Release identity is C11 throughout; historical C08 metadata is preserved under verification/history/convergence08.
+The current suite contains 83 tests. Runtime counts and results are emitted by CI for the exact commit. This document does not substitute for that evidence. Release identity is C11 throughout; historical C08 metadata is preserved under verification/history/convergence08.
 
 ## Delivery
 
@@ -32,3 +32,7 @@ main contains reviewed, merged source. Integration/fix branches use PRs and both
 ## P1 active queue and calendar correction
 
 Current decision-work items exclude archived projects and rank globally by explicit business priority, not task-type spelling. Project-level workbench lookup is scoped at query time. The operational queue applies host-local calendar midnight for today's contacts and limits each preview category separately before sorting. Windows user-flow/GUI acceptance remains pending.
+
+## Exact review item navigation
+
+Identity and judgment review dashboard links now carry review_id, and Claim review links carry claim_id. The destination focus routine locates the exact active record, scrolls to it and highlights it; it reports stale/missing targets instead of silently showing an unrelated list. This is frontend source coverage until real browser E2E acceptance.

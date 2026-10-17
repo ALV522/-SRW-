@@ -51,3 +51,9 @@ The current build verifies source/HTTP behavior, PDF page rendering, knowledge a
 - Exclude archived projects from decision work; prioritize conflicts before verification by explicit rank, and query scoped project workbench instead of materializing all projects.
 - Correct today's contacts from rolling 24-hour horizon to local calendar day; balance overdue, feedback and today preview categories.
 - Add two regression tests, target 82 total after PR #17's 80-test baseline. Exact CI remains the source of pass evidence.
+
+## C11 P1 exact review navigation
+
+- Pass review_id and claim_id from the review queue to their destination views.
+- Mark exact identity/judgment and Claim records, scroll/highlight and focus their action controls; surface stale items.
+- Add one focused regression (83 tests overall). Live WebView2 click-path acceptance still required.
