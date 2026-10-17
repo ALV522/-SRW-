@@ -21,7 +21,7 @@ function CopyReviewedSources($rootDir, $stageDir) {
   if (!(Test-Path -LiteralPath $manifest)) { throw 'SOURCE_MANIFEST.sha256 missing' }
   foreach ($line in (Get-Content -LiteralPath $manifest -Encoding UTF8)) {
     if (![string]::IsNullOrWhiteSpace($line)) {
-      if ($line -notmatch '^([0-9a-fA-F]{64})  (.+)$') { throw 'Malformed source manifest entry' }
+      if ($line -match '^([0-9a-fA-F]{64})  (.+)$') { } else { throw 'Malformed source manifest entry' }
       $expected = $Matches[1].ToLowerInvariant()
       $relative = $Matches[2]
       if ($relative -match '^[\\/]' -or $relative -match '^[a-zA-Z]:' -or $relative.Contains('\')) {
@@ -65,7 +65,6 @@ try {
   # The three externally supplied artifact families are explicitly staged.
   Copy-Item -LiteralPath (Join-Path $Root 'runtime') -Destination $stage -Recurse -Force
   foreach ($name in @('taxonomy','job_info','competency','market_reference','reference')) {
-    $relativeDb = Join-Path (Join-Path $name 'knowledge.db') ''
     $srcDb = Join-Path (Join-Path (Join-Path $Root 'knowledge\active') $name) 'knowledge.db'
     $dstDb = Join-Path (Join-Path (Join-Path $stage 'knowledge\active') $name) 'knowledge.db'
     New-Item -ItemType Directory -Force -Path (Split-Path -Parent $dstDb) | Out-Null
