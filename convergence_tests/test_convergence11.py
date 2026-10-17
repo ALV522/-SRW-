@@ -280,6 +280,8 @@ class Convergence11BusinessWorkflowTest(unittest.TestCase):
                 project_id = project.id
                 candidate_id = candidate_a.id
                 claim_id = claim.id
+                identity_id = identity.id
+                judgment_id = judgment.id
         finally:
             engine.dispose()
 
@@ -298,6 +300,8 @@ class Convergence11BusinessWorkflowTest(unittest.TestCase):
         self.assertEqual(by_kind["unreviewed_claim"]["project_id"], project_id)
         self.assertEqual(by_kind["unreviewed_claim"]["candidate_id"], candidate_id)
         self.assertEqual(by_kind["unreviewed_claim"]["claim_id"], claim_id)
+        self.assertEqual(by_kind["identity_review"]["review_id"], identity_id)
+        self.assertEqual(by_kind["judgment_review"]["review_id"], judgment_id)
         self.assertNotIn("历史候选人", json.dumps(queue, ensure_ascii=False))
 
     def test_project_pipeline_returns_operator_next_action(self):
@@ -560,6 +564,17 @@ class Convergence11BusinessWorkflowTest(unittest.TestCase):
         self.assertEqual(wb["items"][0]["action_type"], "RESOLVE_CONFLICT")
         self.assertEqual(wb["items"][1]["candidate_id"], candidate_id)
         self.assertTrue(all(x["project_id"] == project_id for x in wb["items"]))
+
+    def test_review_shortcuts_target_the_exact_record_not_just_the_page(self):
+        app_js = (ROOT / "frontend" / "dist" / "app.js").read_text(encoding="utf-8")
+        styles = (ROOT / "frontend" / "dist" / "styles.css").read_text(encoding="utf-8")
+        self.assertIn("openReviewItem=async(kind,pid,cid,reviewId='',claimId='')", app_js)
+        self.assertIn("'srw-review-'+reviewId", app_js)
+        self.assertIn("'srw-claim-'+claimId", app_js)
+        self.assertIn('id="srw-review-${esc(x.review_id)}"', app_js)
+        self.assertIn('id="srw-claim-${esc(c.claim_id)}"', app_js)
+        self.assertIn("review-item-focused", app_js)
+        self.assertIn("review-item-focused", styles)
 
     def test_frontend_exposes_actionable_queue_and_safe_diagnostic_export(self):
         app_js = (ROOT / "frontend" / "dist" / "app.js").read_text(encoding="utf-8")
