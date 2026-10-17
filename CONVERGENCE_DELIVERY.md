@@ -36,6 +36,8 @@ The current build verifies source/HTTP behavior, PDF page rendering, knowledge a
 - Adds a unified review center for candidate identity review, judgment-correction review and unreviewed AI / Source Claims, with direct navigation back to human review surfaces.
 - Closes judgment-correction review as a real product workflow: candidate context is shown, error labels are human-readable, and open review items can be explicitly resolved with an audited human note.
 - Reorders the project navigation around the recruiting workflow and adds a project-level next-action engine covering criteria, intake/material completeness, evidence/decision work, interview feedback/scheduling and Offer follow-up.
+- Replaces raw-JSON candidate brief/project handoff modals with readable operator summaries; project handoff still offers the complete JSON payload as a deliberate download.
+- Makes dashboard contact actions candidate-specific by opening the exact action plan rather than the generic contact queue.
 - Exposes the privacy-safe diagnostics ZIP from the settings UI instead of leaving it as an API-only capability.
 - Adds seven product-facing regression tests; cumulative source suite target is 75 tests.
 - Keeps the next objective explicitly product-first: close complete recruiting workflows before additional infrastructure convergence.
