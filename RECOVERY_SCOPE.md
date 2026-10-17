@@ -1,5 +1,5 @@
-# Convergence 08 Source Recovery Scope
+# Convergence 09 source scope
 
-The source recovery package contains all current backend/frontend source, Convergence 01–08 recovery tests, release/verification scripts, desktop Host source and recovery documentation needed to continue development without the 74 MB embedded Windows runtime.
+Contains backend/frontend and desktop Host source, Convergence recovery tests, synthetic Knowledge fixtures, release/verification tools and documentation. SOURCE_MANIFEST.sha256 covers current tracked files; SOURCE_RECOVERY_MANIFEST.sha256 is the preserved 212-file C08 historical inventory.
 
-It intentionally excludes the large embedded runtime and active Knowledge database binaries; those remain in the complete Portable artifact and are verified by parent-inheritance evidence.
+Does not contain embedded runtime, production Knowledge databases, candidate materials or a certified Windows Native binary. CI creates a deterministic source ZIP and SHA-256 sidecar bound to the exact commit. See docs/RELEASE_PROCESS.md for promotion and rollback.

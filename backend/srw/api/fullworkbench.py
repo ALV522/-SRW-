@@ -196,7 +196,7 @@ def _asr_bytes(session,secrets,raw:bytes,filename:str,media_type:str) -> str:
     except Exception as exc: raise ProviderFailureError(f"ASR request failed: {exc}") from exc
 
 
-def install_full_workbench_routes(app, factory, registry, secrets, *, data_dir: Path, knowledge_dir: Path, database_path: Path, evaluation_policy_revision: str) -> None:
+def install_full_workbench_routes(app, factory, registry, secrets, *, data_dir: Path, knowledge_dir: Path, database_path: Path, frontend_dist: Path | None = None, evaluation_policy_revision: str) -> None:
     data_dir=Path(data_dir); knowledge_dir=Path(knowledge_dir); blobs=BlobStore(data_dir/"blobs"); knowledge=KnowledgeService(knowledge_dir)
 
     async def dashboard(_r):
@@ -1334,7 +1334,7 @@ def install_full_workbench_routes(app, factory, registry, secrets, *, data_dir: 
 
     async def diag(_r):
         with factory() as s:
-            rel=get_release_state();return JSONResponse(diagnostics(s,data_dir=data_dir,knowledge_dir=knowledge_dir,database_path=database_path,version=rel["version"],schema_revision=V1_SCHEMA_REVISION))
+            rel=get_release_state();return JSONResponse(diagnostics(s,data_dir=data_dir,knowledge_dir=knowledge_dir,database_path=database_path,frontend_dist=frontend_dist,version=rel["version"],schema_revision=V1_SCHEMA_REVISION))
 
     routes=[
       Route('/api/v1/dashboard',dashboard, methods=['GET']),

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import asdict
+from contextlib import asynccontextmanager
 from pathlib import Path
 import hashlib, json, os, uuid
 from time import perf_counter
@@ -29,6 +30,8 @@ from srw.runtime.db.schema import V1_SCHEMA_REVISION, create_v1_schema
 from srw.runtime.db.session import create_v1_engine, create_v1_session_factory, v1_session_scope
 from srw.runtime.default_capabilities import register_default_lazy_capabilities
 from srw.runtime.settings import RuntimeSettingsRepository, SecretStore, SessionSecretStore, FileSecretStore, get_settings_surface
+from srw.runtime.local_boundary import LocalBoundaryMiddleware
+from srw.runtime.maintenance import cleanup_stale_backup_artifacts
 from srw.providers.contracts import ProviderFailureError, ProviderNotReadyError, ProviderOutputInvalidError
 from srw.providers.runtime import ProviderRuntime
 from srw.privacy.service import build_source_privacy_projection, rebind_privacy_safe_proposals
@@ -113,6 +116,7 @@ def create_v1_app(
     register_default_lazy_capabilities(registry)
     resolved_data_dir = Path(data_dir).resolve() if data_dir is not None else Path.cwd() / "data"
     resolved_data_dir.mkdir(parents=True, exist_ok=True)
+    startup_cleanup = cleanup_stale_backup_artifacts(resolved_data_dir)
     # Desktop Host ABI: when the WPF host owns the workspace it provides a stable
     # instance/session identity through environment variables. Browser mode keeps
     # generating an ephemeral instance id exactly as before.
@@ -654,7 +658,18 @@ def create_v1_app(
     async def provider_output_handler(_request: Request, exc: Exception) -> Response:
         return error_response(exc, status_code=422, code="provider_output_invalid")
 
+    @asynccontextmanager
+    async def _app_lifespan(_app: Starlette):
+        try:
+            yield
+        finally:
+            # SQLite keeps file handles in pooled connections even after each
+            # request Session closes. Disposing the application-owned Engine is
+            # required for Windows to delete/move its workspace and test DBs.
+            engine.dispose()
+
     app = Starlette(
+        lifespan=_app_lifespan,
         routes=routes,
         exception_handlers={
             V1NotFoundError: not_found_handler,
@@ -666,11 +681,14 @@ def create_v1_app(
         },
     )
 
+    app.add_middleware(LocalBoundaryMiddleware)
+
     from srw.api.fullworkbench import install_full_workbench_routes
     database_path = Path(str(engine.url.database)).resolve() if engine.url.database and str(engine.url.database) != ":memory:" else (resolved_data_dir / "srw_v1.db")
     install_full_workbench_routes(
         app, factory, registry, secrets,
         data_dir=resolved_data_dir, knowledge_dir=resolved_knowledge_dir, database_path=database_path,
+        frontend_dist=Path(frontend_dist).resolve() if frontend_dist is not None else None,
         evaluation_policy_revision=evaluation_policy_revision,
     )
     from srw.api.governance import install_governance_routes
@@ -711,6 +729,7 @@ def create_v1_app(
             app.routes.append(Route("/v1/{asset_path:path}", v1_frontend, methods=["GET"]))
 
     app.state.shutdown_callback = None
+    app.state.startup_cleanup = startup_cleanup
     app.state.runtime_identity = {
         "instance_id": instance_id, "session_id": runtime_session_id, "release_id": release_id,
         "runtime": runtime_mode, "edition": edition,

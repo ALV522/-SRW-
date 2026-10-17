@@ -21,7 +21,7 @@ DATA = ROOT / "data"
 DB = DATA / "srw_v1.db"
 FRONTEND = ROOT / "frontend" / "dist"
 KNOWLEDGE = ROOT / "knowledge" / "active"
-EXPECTED_VERSION = "1.0.0-alpha10-convergence08"
+EXPECTED_VERSION = (ROOT / "VERSION").read_text(encoding="utf-8").strip()
 EXPECTED_SCHEMA = "v1_0014"
 DATA.mkdir(parents=True, exist_ok=True)
 

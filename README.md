@@ -1,23 +1,31 @@
-# SRW — Business Convergence 08
+# SRW — Business Convergence 09
 
-## Product direction
+SRW is a local-first recruitment operations and decision-support workbench. **v0.8.12-R2 remains the capability-completeness reference.** Preserve evidence, lineage, privacy, calibration, operations and knowledge governance while improving workflow usability.
 
-Convergence 08 treats **v0.8.12-R2 as the capability-completeness reference**. The objective is not a lighter replacement. The objective is to retain 0.8.x evidence, lineage, privacy, calibration, decision operations, knowledge governance, intelligence, portability and release discipline while improving workflow organization and desktop usability.
+## Current source baseline
 
-## C08 additions
+- Version: `1.0.0-alpha10-convergence09`; schema: `v1_0014` (unchanged).
+- C08 capability recovery is retained: PDF evidence highlighting, controlled knowledge aliases and exact rollback, project-package portability, guarded backup/CSV export, identity review, assessment, decision operations and planning.
+- C09 adds local Host/same-origin boundaries, diagnostics, interrupted-backup cleanup, application shutdown disposal, and self-contained test Knowledge fixtures.
+- Integration adds current-source SHA-256 verification alongside the immutable C08 inventory, cross-platform SQLite file-handle probes, pinned test dependencies and reproducible source archives.
 
-- Claim → PDF graphical grounding: verified page/bbox is rendered as an image with the evidence rectangle highlighted.
-- Controlled competency-alias curation with semantic diff, exact digest activation and byte-exact rollback.
-- Backup restore rejects duplicate ZIP entries, unsafe paths and excessive expanded payloads before SQLite access.
-- Candidate/contact CSV exports guard formula-leading text fields for spreadsheet safety.
-- Full project package portability: project-scoped business state plus content-addressed Source blobs, strict ZIP/blob/schema validation, Preview → exact SHA-256 → Commit, ID remapping and historical Decision Context preservation.
-- Project package import is explicitly PII-bearing and requires current-context reevaluation; old decisions never silently become current.
-- Cumulative capability-recovery tests: **46/46 PASS**.
+## Verify from a clean checkout
 
-## Windows Native Host
+Requires Python 3.12 and Node.js 22. Create/activate a virtual environment, then run:
 
-The current artifact remains Host-ready and includes the restored WPF/WebView2 Host source and ABI. `BUILD_WINDOWS_NATIVE.bat` still requires the exact audited v0.8.8 Windows carrier SHA-256 and refuses mismatches. A Windows Native ZIP is not claimed until the exact carrier is available and the assembled artifact is smoke-tested on Windows.
+```sh
+python -m pip install -r requirements-ci.txt
+python scripts/check_source_integrity.py
+python scripts/check_release_truth.py
+python scripts/run_convergence_verification.py
+```
 
-## Verification
+The current suite contains **65 source regression tests**. Actual PASS evidence is the GitHub Actions run for the exact commit, on both Ubuntu and Windows. CI enables `SRW_TEST_RESOURCE_STRICT=1` and uploads logs. Historical C08 reports remain under `verification/`; they are not current-run evidence. The 725-test v0.8.12 inventory is a reference, not a claim of full parity.
 
-Use `VERIFY_CAPABILITY_RECOVERY.bat` for the cumulative recovery suite. `VERIFICATION_INVENTORY.json` distinguishes current executed gates from the 725-test v0.8.12 reference inventory.
+## Delivery boundary
+
+This repository and its CI ZIP are **source artifacts**, not standalone Portable installers. The embedded Windows Python runtime and five production Knowledge databases are not included. Test fixtures are synthetic and must not be installed as production Knowledge.
+
+`START.bat` targets a complete Portable assembly. `BUILD_WINDOWS_NATIVE.bat` additionally requires the audited exact v0.8.8 Windows carrier. Source CI on Windows does not certify WPF/WebView2 GUI behavior. External-provider live calls and real-corpus calibration remain pending.
+
+See [development state](DEVELOPMENT_STATE.md), [release procedure](docs/RELEASE_PROCESS.md), [acceptance plan](docs/ACCEPTANCE_PLAN.md), and [architecture](ARCHITECTURE.md).

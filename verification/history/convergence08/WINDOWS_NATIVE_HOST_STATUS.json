@@ -1,0 +1,26 @@
+{
+  "schema": "srw.windows-native-host-status.v1",
+  "release": "1.0.0-alpha10-convergence08",
+  "host_source": "desktop/SRW.Desktop inherited from v0.8.12-R2",
+  "host_binary_in_web_portable": false,
+  "runtime_abi": {
+    "status": "PASS",
+    "contracts": [
+      "VERSION",
+      "BUILD_INFO.json",
+      "scripts/run_local.py",
+      "/api/v1/runtime/ready",
+      "/api/v1/runtime/info",
+      "/api/v1/runtime/shutdown",
+      "/ root frontend"
+    ],
+    "http_process_smoke": "verification/convergence08_windows_host_abi_http_smoke.json"
+  },
+  "binary_inheritance": {
+    "carrier": "SRW_v0.8.8_Windows_Portable.zip",
+    "required_sha256": "f12933a1f6639168911af3788d207ced521be8a50841d7d39e7a2169eed3d5ab",
+    "assembler": "BUILD_WINDOWS_NATIVE.bat",
+    "status": "DEFERRED_MISSING_EXACT_CARRIER_IN_CURRENT_BUILD_ENVIRONMENT"
+  },
+  "claim_boundary": "The current Portable is Host-ready and process-smoke tested, but does not contain a newly fabricated WPF binary. The assembler only inherits the audited Host from the exact v0.8.8 carrier and still requires target-Windows GUI smoke before runtime truth promotion."
+}

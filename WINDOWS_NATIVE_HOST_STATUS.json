@@ -1,10 +1,10 @@
 {
   "schema": "srw.windows-native-host-status.v1",
-  "release": "1.0.0-alpha10-convergence08",
+  "release": "1.0.0-alpha10-convergence09",
   "host_source": "desktop/SRW.Desktop inherited from v0.8.12-R2",
   "host_binary_in_web_portable": false,
   "runtime_abi": {
-    "status": "PASS",
+    "status": "SOURCE_REGRESSION_REQUIRED",
     "contracts": [
       "VERSION",
       "BUILD_INFO.json",
@@ -14,7 +14,7 @@
       "/api/v1/runtime/shutdown",
       "/ root frontend"
     ],
-    "http_process_smoke": "verification/convergence08_windows_host_abi_http_smoke.json"
+    "http_process_smoke": "Historical only: verification/convergence08_windows_host_abi_http_smoke.json"
   },
   "binary_inheritance": {
     "carrier": "SRW_v0.8.8_Windows_Portable.zip",
@@ -22,5 +22,5 @@
     "assembler": "BUILD_WINDOWS_NATIVE.bat",
     "status": "DEFERRED_MISSING_EXACT_CARRIER_IN_CURRENT_BUILD_ENVIRONMENT"
   },
-  "claim_boundary": "The current Portable is Host-ready and process-smoke tested, but does not contain a newly fabricated WPF binary. The assembler only inherits the audited Host from the exact v0.8.8 carrier and still requires target-Windows GUI smoke before runtime truth promotion."
+  "claim_boundary": "C09 is a source artifact. Host ABI tests are in CI; the exact native artifact and Windows GUI acceptance remain pending."
 }

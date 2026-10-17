@@ -185,7 +185,7 @@ def create_backup(data_dir: Path, database_path: Path) -> Path:
         shutil.rmtree(tmp,ignore_errors=True)
 
 
-def diagnostics(session: Session, *, data_dir: Path, knowledge_dir: Path, database_path: Path, version: str, schema_revision: str) -> dict[str,Any]:
+def diagnostics(session: Session, *, data_dir: Path, knowledge_dir: Path, database_path: Path, version: str, schema_revision: str, frontend_dist: Path | None = None, backup_retention: int = 14) -> dict[str,Any]:
     import importlib
     protocol_models = importlib.import_module("srw.modules.protocol.models")
     candidate_models = importlib.import_module("srw.modules.candidate.models")
@@ -215,7 +215,24 @@ def diagnostics(session: Session, *, data_dir: Path, knowledge_dir: Path, databa
             if path.is_file():
                 try: data_bytes+=path.stat().st_size
                 except OSError: pass
+    backup_root=data_dir/"backups"; backup_root.mkdir(parents=True,exist_ok=True)
+    backups=list(backup_root.glob("*.zip"))
+    frontend_ok=True
+    if frontend_dist is not None:
+        fd=Path(frontend_dist); frontend_ok=(fd/"index.html").is_file()
+    knowledge_status=KnowledgeService(knowledge_dir).status()
+    knowledge_ready=all((Path(knowledge_dir)/name/"knowledge.db").is_file() for name in ("taxonomy","job_info","competency","market_reference","reference"))
+    checks=[
+      {"name":"database_integrity","status":"ok" if quick_check.lower()=="ok" else "error","detail":quick_check},
+      {"name":"data_directory","status":"ok" if data_dir.is_dir() else "error","detail":str(data_dir)},
+      {"name":"frontend_assets","status":"ok" if frontend_ok else "error","detail":str(frontend_dist or "not-configured")},
+      {"name":"background_tasks","status":"ok" if task_counts.get("failed",0)==0 else "warning","detail":task_counts},
+      {"name":"backups","status":"ok","detail":{"count":len(backups),"retention":backup_retention}},
+      {"name":"knowledge","status":"ok" if knowledge_ready else "warning","detail":knowledge_status},
+    ]
+    overall="error" if any(x["status"]=="error" for x in checks) else ("warning" if any(x["status"]=="warning" for x in checks) else "ok")
     return {
+      "overall_status":overall,"checks":checks,"local_only":True,"backup_retention":backup_retention,
       "version":version,"schema_revision":schema_revision,
       "counts":{
         "projects":session.scalar(select(func.count(protocol_models.Project.id))) or 0,
@@ -229,5 +246,5 @@ def diagnostics(session: Session, *, data_dir: Path, knowledge_dir: Path, databa
       "storage":{"data_bytes":data_bytes,"blob_files":blob_files,"blob_bytes":blob_bytes,"missing_source_blobs":missing},
       "pending_restore":(data_dir/"pending_restore.json").is_file(),
       "paths":{"data":str(data_dir),"knowledge":str(Path(knowledge_dir))},
-      "knowledge":KnowledgeService(knowledge_dir).status(),
+      "knowledge":knowledge_status,
     }

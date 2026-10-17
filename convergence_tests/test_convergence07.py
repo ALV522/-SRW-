@@ -9,6 +9,7 @@ from starlette.testclient import TestClient
 
 from srw.api.app import create_v1_app
 from srw.modules.recruitment_intelligence.importer import preview_csv
+from knowledge_fixture import create_minimal_knowledge_tree
 
 ROOT = Path(__file__).resolve().parents[1]
 
@@ -17,6 +18,7 @@ class Convergence07Test(unittest.TestCase):
     def setUp(self):
         self.tmp = tempfile.TemporaryDirectory()
         self.root = Path(self.tmp.name)
+        self.knowledge = create_minimal_knowledge_tree(self.root/'knowledge'/'active')
 
     def tearDown(self):
         self.tmp.cleanup()
@@ -25,7 +27,7 @@ class Convergence07Test(unittest.TestCase):
         return create_v1_app(
             f"sqlite+pysqlite:///{(self.root/'test.db').as_posix()}",
             data_dir=self.root/'data',
-            knowledge_dir=ROOT/'knowledge'/'active',
+            knowledge_dir=self.knowledge,
             frontend_dist=ROOT/'frontend'/'dist',
         )
 
