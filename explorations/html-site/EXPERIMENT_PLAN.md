@@ -83,7 +83,7 @@ E1 is accepted only after live Windows EXE + browser inspection with identical c
 
 ## Source-build E1/E2 package and E2a acceptance (verified)
 
-At commit `0e8eacbd20ae3e609d3161c84910ddeec8a4b3ce`:
+At commit `481162b65ffb612fd4509a76647c0b0e50302c6a`:
 
 - complete package assembled with all required runtime Python sources, HTML, fixtures, manifests and pinned dependencies;
 - top-level E1 `START_HERE.cmd` / E2 `START_E2.cmd` actual Windows launch paths passed;
@@ -94,3 +94,14 @@ At commit `0e8eacbd20ae3e609d3161c84910ddeec8a4b3ce`:
 - E2b production transactional CAS inside the SRW Core remains **not implemented**, and Native WPF/WebView2 plus production Knowledge acceptance remain open.
 
 The accepted artifact is a source-demo ZIP with separate Python dependency setup, **not** a Windows runtime/EXE release.
+
+## Final E1/E2 quality milestone — 481162b65ffb612fd4509a76647c0b0e50302c6a
+
+Latest successful combined CI: https://github.com/ALV522/-SRW-/actions/runs/39152520579
+
+- 15 E1/package tests and 4 E2 concurrency/security tests per OS;
+- ten real Chromium/API/SQLite business tests;
+- actual E1/E2 Windows batch launch and source ZIP assembly PASS;
+- E1 candidate/project URL deep links restored across refresh/back navigation;
+- E2 390px mobile page width and concurrent same-ETag one-winner/one-stale behavior verified;
+- downloadable complete source demonstration artifact, not a native Windows EXE.
