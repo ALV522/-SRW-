@@ -17,11 +17,14 @@ echo.
 rem This launcher must live at REPO_ROOT\explorations\html-site\
 rem Dragging/copying only the CMD or the html-site folder cannot supply the
 rem Python backend; the packaged START_HERE.cmd preserves the full layout.
-rem FOR %%~fI does not reliably collapse the parent segments on Windows.
-rem PUSHD performs actual directory resolution before assigning a canonical path.
-pushd "%~dp0..\.." || goto :missing_sources
-set "SRW_REPO_ROOT=%CD%"
-popd
+rem Keep .. segments intact: Windows filesystem resolves them when opening
+rem paths. Prior FOR/PUSHD canonicalization attempted to use the wrong directory.
+rem The packaged top-level START_HERE.cmd may set SRW_E1_PACKAGE_ROOT.
+if defined SRW_E1_PACKAGE_ROOT (
+    set "SRW_REPO_ROOT=%SRW_E1_PACKAGE_ROOT%"
+) else (
+    set "SRW_REPO_ROOT=%~dp0..\.."
+)
 if not exist "%SRW_REPO_ROOT%\requirements-ci.txt" goto :missing_sources
 if not exist "%SRW_REPO_ROOT%\browser_acceptance\serve.py" goto :missing_sources
 if not exist "%SRW_REPO_ROOT%\backend\srw\api\app.py" goto :missing_sources
