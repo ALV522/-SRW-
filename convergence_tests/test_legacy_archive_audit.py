@@ -7,7 +7,7 @@ import unittest
 import zipfile
 from pathlib import Path
 
-from scripts.audit_legacy_archives import ArchiveAuditError, audit_catalog, inspect_archive
+from scripts.audit_legacy_archives import ArchiveAuditError, _safe_member, audit_catalog, inspect_archive
 
 
 class LegacyArchiveAuditTests(unittest.TestCase):
@@ -34,6 +34,12 @@ class LegacyArchiveAuditTests(unittest.TestCase):
     def test_zip_slip_blocks_before_extraction(self):
         for member in ("../private.txt", "/root/private", "C:/private", "data\\evil.db", "CON.txt"):
             with self.subTest(member=member):
+                # Windows zipfile.ZipInfo canonicalizes backslashes when writing.
+                # Assert the raw unsafe spelling at the path-parser boundary.
+                if "\\" in member:
+                    with self.assertRaises(ArchiveAuditError):
+                        _safe_member(member)
+                    continue
                 path = self._zip(files=[(member, b"synthetic")])
                 with self.assertRaises(ArchiveAuditError):
                     inspect_archive(path)
