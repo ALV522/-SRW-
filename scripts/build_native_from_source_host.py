@@ -104,6 +104,20 @@ def assemble(root: Path, inputs: Path, host: Path, out: Path, *,
     dependency_result = check(runtime_dir, requirements)
     if dependency_result["status"] != "PINNED_METADATA_MATCH":
         raise PayloadError("recovered legacy Python is not compatible with current C11 pinned requirements")
+    if dependency_result.get("c11_overlay_on_path"):
+        report_path = inputs / "RUNTIME_UPGRADE_AUDIT.json"
+        if report_path.is_symlink() or not report_path.is_file():
+            raise PayloadError("C11 overlay requires an embedded Python smoke audit")
+        try:
+            upgrade_truth = json.loads(report_path.read_text(encoding="utf-8-sig"))
+        except (ValueError, OSError, UnicodeError) as exc:
+            raise PayloadError("invalid C11 embedded Python smoke audit") from exc
+        if (upgrade_truth.get("schema") != "srw.c11-runtime-overlay-build.v1" or
+            upgrade_truth.get("status") != "C11_RUNTIME_SMOKE_PASS" or
+            upgrade_truth.get("embedded_python_smoke") is not True or
+            upgrade_truth.get("source_runtime_unmodified") is not True or
+            upgrade_truth.get("requirements_sha256") != sha256_file(requirements)):
+            raise PayloadError("embedded Python smoke audit or C11 dependency identity mismatch")
     knowledge_dir = inputs / "knowledge" / "active"
     knowledge_manifest = inputs / "PRODUCTION_KNOWLEDGE.sha256"
     checked = knowledge_checks(knowledge_dir, knowledge_manifest)
