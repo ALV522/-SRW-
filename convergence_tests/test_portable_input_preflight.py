@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import hashlib
+import os
 import json
 import sqlite3
 import shutil
@@ -67,7 +68,7 @@ class PortableInputPreflightTest(unittest.TestCase):
             [sys.executable, str(root / "scripts" / "portable_input_preflight.py"),
              "--root", str(self.root)],
             cwd=self.root, capture_output=True, text=True, timeout=20, check=False,
-            env={"PYTHONIOENCODING": "utf-8"},
+            env={**os.environ, "PYTHONIOENCODING": "utf-8", "PYTHONPATH": ""},
         )
         self.assertEqual(result.returncode, 2, result.stderr)
         report = json.loads(result.stdout)
