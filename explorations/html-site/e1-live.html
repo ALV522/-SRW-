@@ -69,7 +69,10 @@ const state={
  currentProjectCandidates:[],
  currentCandidate:null,
  currentWorkspace:null,
- currentBrief:null
+ currentBrief:null,
+ serviceInfo:null,
+ runtimeInfo:null,
+ liveError:''
 };
 
 const mock={
@@ -151,16 +154,34 @@ async function getJson(path){
 }
 
 async function loadLive(){
- if(location.protocol==='file:') return false;
+ if(location.protocol==='file:') {
+  state.liveError='直接打开 HTML 文件不会连接真实数据；请通过只读 bridge 打开。';
+  return false;
+ }
  try{
-  await getJson('/health/ready');
-  const [dashboard,projects]=await Promise.all([getJson('/api/v1/dashboard'),getJson('/api/v1/projects')]);
+  const [ready,info,runtime,dashboard,projects]=await Promise.all([
+   getJson('/health/ready'),
+   getJson('/api/v1/info'),
+   getJson('/api/v1/runtime/info'),
+   getJson('/api/v1/dashboard'),
+   getJson('/api/v1/projects')
+  ]);
+  if(ready.status!=='ready'||info.product!=='SRW'||runtime.product!=='SRW') {
+   throw new Error('连接的不是就绪的 SRW 后端');
+  }
+  if(info.instance_id!==runtime.instanceId||info.data_dir_identity!==runtime.dataScopeId) {
+   throw new Error('SRW 实例身份不一致，拒绝混用数据源');
+  }
   state.dashboard=dashboard;
   state.projects=projects.projects||[];
+  state.serviceInfo=info;
+  state.runtimeInfo=runtime;
+  state.liveError='';
   state.mode='live';
-  setApiState('LIVE · GET-only','live');
+  setApiState('LIVE · '+String(runtime.edition||'web')+' · GET-only','live');
   return true;
  }catch(err){
+  state.liveError=String(err.message||err);
   console.warn('E1 live adapter fallback:',err);
   return false;
  }
@@ -182,7 +203,7 @@ function home(){
  const todos=d.operational_todos||{},st=d.candidates_by_stage||{},wb=d.decision_workbench||{items:[]},oq=d.operational_queue||{items:[]},rq=d.review_queue||{items:[]};
  root.innerHTML=
  '<div class="hero"><div><h1>今天要处理什么</h1><div class="muted">E1 直接读取 SRW 的真实业务状态，但不允许任何写操作。</div></div><button class="btn primary" onclick="projectsPage()">进入招聘项目</button></div>'+
- '<div class="notice '+(state.mode==='mock'?'warn':'')+'">'+(state.mode==='live'?'当前是 <strong>Live read-only</strong>：页面来自实验 HTML，数据直接读取本机 SRW 后端。Web 与 EXE 因此可以天然看到同一份权威数据。':'当前是 <strong>Mock 模式</strong>。将此页面由 SRW 本机服务同源托管后，可自动读取真实数据。')+'</div>'+
+ '<div class="notice '+(state.mode==='mock'?'warn':'')+'">'+(state.mode==='live'?'当前是 <strong>Live read-only</strong>：页面来自实验 HTML，数据直接读取本机 SRW 后端。Web 与 EXE 因此可以天然看到同一份权威数据。':'当前是 <strong>Mock 模式，不是真实招聘数据</strong>。'+esc(state.liveError||'没有检测到 SRW 后端。')+' 请启动正式 SRW 服务并使用 E1 Bridge。')+'</div>'+
  '<div class="grid">'+[
   ['逾期联系',todos.overdue_contacts||0],
   ['待面试反馈',todos.pending_interview_feedback||0],
@@ -326,7 +347,7 @@ function reviewPage(){
 function architecturePage(){
  setTitle('双载体架构');
  root.innerHTML='<div class="hero"><div><h1>Web + EXE，共享一套数据</h1><div class="muted">核心原则：两种界面不是两套产品，更不是两套数据库。</div></div></div>'+
- '<section class="panel"><div class="pb"><div class="three">'+
+ '<section class="panel"><div class="pb">'+(state.runtimeInfo?'<div class="notice"><strong>当前连接：</strong> SRW '+esc(state.runtimeInfo.version||'')+' / '+esc(state.runtimeInfo.edition||'')+' / Instance '+esc(String(state.runtimeInfo.instanceId||'').slice(0,12))+'… / DataScope '+esc(String(state.runtimeInfo.dataScopeId||'').slice(0,12))+'…（同机 EXE 与 Web 必须一致）</div>':'<div class="notice warn">当前 Mock 模式，尚未核验任何 EXE 实例身份。</div>')+'<div class="three">'
  '<div class="card"><small>Web Carrier</small><strong style="font-size:18px">Browser</strong><div class="muted tiny">HTML / CSS / JS</div></div>'+
  '<div class="card"><small>Authoritative Core</small><strong style="font-size:18px">SRW Service</strong><div class="muted tiny">API + SQLite + Blob + Jobs</div></div>'+
  '<div class="card"><small>Windows Carrier</small><strong style="font-size:18px">EXE / WebView2</strong><div class="muted tiny">同一 Web UI + native lifecycle</div></div>'+
