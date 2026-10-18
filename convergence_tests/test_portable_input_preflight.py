@@ -61,6 +61,19 @@ class PortableInputPreflightTest(unittest.TestCase):
         self.assertTrue(all(x["status"] == "BLOCKED" for x in result["checks"]))
         self.assertNotIn(str(self.root), json.dumps(result))
 
+    def test_preflight_cli_runs_standalone_from_an_unrelated_directory(self):
+        root = Path(__file__).resolve().parents[1]
+        result = subprocess.run(
+            [sys.executable, str(root / "scripts" / "portable_input_preflight.py"),
+             "--root", str(self.root)],
+            cwd=self.root, capture_output=True, text=True, timeout=20, check=False,
+            env={"PYTHONIOENCODING": "utf-8"},
+        )
+        self.assertEqual(result.returncode, 2, result.stderr)
+        report = json.loads(result.stdout)
+        self.assertFalse(report["inputs_complete"])
+        self.assertTrue(any(item["name"] == "runtime_manifest" for item in report["checks"]))
+
     def test_exact_hash_inventory_and_sqlite_checks_fail_closed(self):
         self._seed_inputs()
         complete = audit(self.root)
