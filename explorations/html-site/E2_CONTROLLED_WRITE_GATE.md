@@ -26,7 +26,7 @@ Consequently two open carriers could overwrite one another with stale updates.
 This is manageable in a single-user modal but not a sufficient contract for
 simultaneous Web + EXE writers.
 
-## Phase E2a — synthetic-only two-client proof
+## Phase E2a — synthetic-only two-client proof (COMPLETED at proxy-contract level)
 
 - Start one real backend with disposable SQLite, like E1;
 - open two independently isolated browser contexts (one imitates the desktop
@@ -106,3 +106,13 @@ blob transfer, idempotency, conflict resolution and tombstone semantics.
 
 Only after this evidence should code be selectively reviewed for promotion
 to the production Web + EXE development line.
+
+## E2a verified implementation and operational limitation
+
+Code: `e2_synthetic_bridge.py`, `e2-live.html`, `run_e2_demo.py`, `test_e2_synthetic.py`, `browser_acceptance/test_e2_real_backend.py`, bundled `START_E2.cmd`.
+
+GitHub Actions: https://github.com/ALV522/-SRW-/actions/runs/39151649763
+
+Two real Chromium client contexts share a temporary SRW C11 backend and SQLite database. Client A's Action Plan patch persists and creates a real SRW audit event. Client B's stale If-Match attempt receives 412 and leaves A's committed state unchanged. Client B explicitly re-fetches and can then save successfully. Disallowed candidate IDs/fields and other mutation routes are refused. Ubuntu and Windows source demo smoke and full Windows CMD launch passed.
+
+**This verifies E2a, not E2b.** The experimental bridge serializes mutations that pass through that bridge but the current C11 production API does not have a transactional Action Plan revision guard. A direct backend client may interleave between bridge-level read and business PATCH. Real Web+EXE multiwriter support requires Core-owned atomic conditional updates, authentication and conflict-domain audit testing.
