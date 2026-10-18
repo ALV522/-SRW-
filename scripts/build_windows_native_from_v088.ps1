@@ -59,7 +59,7 @@ function CopyAuditedRuntime($runtimeRoot, $runtimeManifest, $runtimeStage) {
       if ([string]::IsNullOrWhiteSpace($part) -or $part -eq '.' -or $part -eq '..' -or $part.EndsWith('.') -or $part.EndsWith(' ')) { throw 'Unsafe Runtime path segment' }
       if ($part -in @('data','backups','backup','uploads','workspace','candidates','secrets','credentials','private','logs')) { throw 'Private Runtime folder prohibited' }
     }
-    if ($parts[-1] -in @('.env','provider_secrets.json','secrets.json','credentials.json') -or ($parts[-1] -match '\.(pem|key|pfx|p12|db|sqlite)$' -and $relative -cne 'Lib/site-packages/certifi/cacert.pem')) { throw 'Private Runtime file prohibited' }
+    if ($parts[-1] -in @('.env','provider_secrets.json','secrets.json','credentials.json') -or ($parts[-1] -match '\.(pem|key|pfx|p12|db|sqlite)$' -and $relative -cne 'Lib/site-packages/certifi/cacert.pem' -and $relative -cne 'Lib/c11-overlay/certifi/cacert.pem')) { throw 'Private Runtime file prohibited' }
     $src = $runtimeRoot
     foreach ($part in $parts) {
       $src = Join-Path $src $part

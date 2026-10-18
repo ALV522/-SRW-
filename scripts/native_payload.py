@@ -21,7 +21,7 @@ LINE = re.compile(r"^([0-9a-fA-F]{64})  (.+)$")
 PRIVATE_DIRS = {"data", "backups", "backup", "uploads", "workspace", "candidates", "secrets", "credentials", "private", "logs"}
 PRIVATE_FILES = {".env", "provider_secrets.json", "secrets.json", "credentials.json"}
 # certifi's public CA trust store is a TLS dependency, not a private key.
-PUBLIC_CA_BUNDLE = "Lib/site-packages/certifi/cacert.pem"
+PUBLIC_CA_BUNDLES = {"Lib/site-packages/certifi/cacert.pem", "Lib/c11-overlay/certifi/cacert.pem"}
 
 
 class PayloadError(ValueError):
@@ -66,7 +66,7 @@ def read_manifest(path: Path, *, runtime: bool = False) -> dict[str, str]:
         folded.add(name.casefold())
         if runtime and (any(x.casefold() in PRIVATE_DIRS for x in parts) or
                         parts[-1].casefold() in PRIVATE_FILES or
-                        (parts[-1].lower().endswith((".pem", ".key", ".pfx", ".p12", ".db", ".sqlite")) and name != PUBLIC_CA_BUNDLE)):
+                        (parts[-1].lower().endswith((".pem", ".key", ".pfx", ".p12", ".db", ".sqlite")) and name not in PUBLIC_CA_BUNDLES)):
             raise PayloadError("private file prohibited in runtime inventory")
         result[name] = match[1].lower()
     if not result or (runtime and "python.exe" not in result):

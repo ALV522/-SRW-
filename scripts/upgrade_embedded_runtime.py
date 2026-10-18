@@ -94,8 +94,8 @@ def upgrade(
 ) -> dict:
     if sys.version_info[:2] != (3, 12) or os.name != "nt":
         raise PayloadError("Runtime upgrade requires Windows CPython 3.12 host")
-    if destination.exists() and (destination.is_symlink() or not destination.is_dir() or any(destination.iterdir())):
-        raise PayloadError("output directory must be empty")
+    if destination.exists():
+        raise PayloadError("output path must not exist; historical inputs are never overwritten")
     expected_wheels = validate_wheelhouse(wheelhouse)
     runtime = old / "runtime"
     audit_runtime(runtime, old / "PRODUCTION_RUNTIME.sha256")
