@@ -1,0 +1,359 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>SRW E1 · Read-only Live Web Exploration</title>
+<style>
+:root{--bg:#f5f7fb;--panel:#fff;--line:#e4e8ef;--text:#172033;--muted:#6c7688;--accent:#315efb;--accent2:#2447c9;--soft:#eef3ff;--good:#087a53;--goodbg:#eaf8f2;--warn:#9a6200;--warnbg:#fff4df;--bad:#b42318;--badbg:#fff0ee;--shadow:0 10px 30px rgba(20,31,55,.07)}
+*{box-sizing:border-box}html,body{margin:0;min-height:100%;font:14px/1.5 system-ui,-apple-system,"Segoe UI","Microsoft YaHei",sans-serif;color:var(--text);background:var(--bg)}button,input{font:inherit}
+.app{min-height:100vh;display:grid;grid-template-columns:242px minmax(0,1fr)}
+aside{background:#111827;color:#fff;padding:18px 14px;position:sticky;top:0;height:100vh;z-index:8}
+.brand{padding:7px 10px 18px}.brand strong{display:block;font-size:21px}.brand b{display:block;font-size:12px;font-weight:600;color:#dbe4f0}.brand small{color:#8f9bad}
+.nav-label{font-size:11px;color:#687386;text-transform:uppercase;padding:10px 10px 4px}.nav button{width:100%;border:0;background:transparent;color:#cbd5e1;text-align:left;padding:11px 12px;border-radius:9px;margin:2px 0;cursor:pointer}.nav button:hover,.nav button.active{background:#263248;color:#fff}
+.side-note{position:absolute;bottom:16px;left:14px;right:14px;color:#8793a6;font-size:11px;padding:10px;border-top:1px solid #273244}
+main{min-width:0}.topbar{height:64px;background:#fff;border-bottom:1px solid var(--line);display:flex;align-items:center;justify-content:space-between;padding:0 28px;position:sticky;top:0;z-index:5}.topbar .right{display:flex;align-items:center;gap:8px}
+.content{padding:26px;max-width:1480px;margin:auto}.hero{display:flex;align-items:flex-start;justify-content:space-between;gap:20px;margin-bottom:18px}.hero h1{margin:0 0 5px;font-size:27px}.muted{color:var(--muted)}.tiny{font-size:12px}
+.badge,.pill{display:inline-flex;align-items:center;padding:4px 8px;border-radius:999px;font-size:12px;background:#f1f4f8;color:#526072;white-space:nowrap}.pill.good,.badge.good{background:var(--goodbg);color:var(--good)}.pill.warn,.badge.warn{background:var(--warnbg);color:var(--warn)}.pill.bad,.badge.bad{background:var(--badbg);color:var(--bad)}.badge.live{background:#eaf8f2;color:#087a53}
+.btn{border:1px solid var(--line);background:#fff;padding:8px 11px;border-radius:8px;cursor:pointer;color:var(--text)}.btn:hover{background:#f8fafc}.btn.primary{background:var(--accent);border-color:var(--accent);color:#fff}.btn.primary:hover{background:var(--accent2)}.btn.small{padding:6px 9px;font-size:12px}
+.notice{padding:12px 14px;border:1px solid #aebfff;background:var(--soft);border-radius:10px;color:#2a47a8;margin-bottom:16px}.notice.warn{border-color:#e5c26c;background:#fff8e9;color:#805600}
+.grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:14px}.card,.panel{background:#fff;border:1px solid var(--line);border-radius:14px;box-shadow:var(--shadow)}.card{padding:16px}.card small{color:var(--muted)}.card strong{display:block;font-size:26px;margin-top:6px}.panel{margin-top:16px}.ph{padding:15px 18px;border-bottom:1px solid var(--line);display:flex;align-items:center;justify-content:space-between;gap:12px}.ph h2,.ph h3{margin:0}.pb{padding:16px 18px}
+.list{display:grid;gap:9px}.item{display:flex;align-items:center;justify-content:space-between;gap:15px;padding:12px;border:1px solid var(--line);border-radius:10px}.item-title{font-weight:650}.item-note{font-size:12px;color:var(--muted);margin-top:3px}.actions{display:flex;gap:7px;flex-wrap:wrap;align-items:center}
+.flow{display:grid;grid-template-columns:repeat(7,minmax(90px,1fr));gap:8px}.step{padding:12px 8px;text-align:center;border:1px solid var(--line);background:#fafbfc;border-radius:10px}.step strong{display:block;font-size:20px}.step span{font-size:12px;color:var(--muted)}
+.two{display:grid;grid-template-columns:1.2fr .8fr;gap:16px}.three{display:grid;grid-template-columns:repeat(3,1fr);gap:12px}
+table{width:100%;border-collapse:collapse}th,td{text-align:left;padding:10px 8px;border-bottom:1px solid var(--line);vertical-align:top}th{color:var(--muted);font-weight:600;font-size:12px}.table-wrap{overflow:auto}
+.project-head{background:#fff;border:1px solid var(--line);border-radius:14px;padding:18px;display:flex;justify-content:space-between;gap:16px;align-items:flex-start}.project-head h1{margin:3px 0}
+.workspace{display:grid;grid-template-columns:300px minmax(0,1fr);gap:16px}.candidate-side{padding:18px;position:sticky;top:82px;align-self:start}.candidate-side h1{font-size:26px;margin:7px 0 2px}.stat{padding:11px 0;border-bottom:1px solid var(--line)}.stat:last-child{border:0}.stat small{display:block;color:var(--muted)}.stat strong{font-size:15px}
+.tabs{display:flex;gap:4px;padding:0 15px;border-bottom:1px solid var(--line);overflow:auto}.tabs button{border:0;background:none;color:var(--muted);padding:13px 10px;cursor:pointer;white-space:nowrap}.tabs button.active{color:var(--accent);border-bottom:2px solid var(--accent)}
+.source,.criterion,.claim{border:1px solid var(--line);border-radius:10px;padding:12px;margin:9px 0}.source.current{border-color:#9ab1ff;background:#f9fbff}.claim.unreviewed{border-left:3px solid #e9aa21}.claim.confirmed{border-left:3px solid var(--good)}.claim.rejected{border-left:3px solid #a5adba;opacity:.75}.criterion .row{display:flex;justify-content:space-between;gap:10px}.code{font-family:ui-monospace,SFMono-Regular,Consolas,monospace;font-size:12px;white-space:pre-wrap;background:#f8fafc;border:1px solid var(--line);padding:10px;border-radius:8px}
+.empty{padding:28px;text-align:center;color:var(--muted)}.loading{padding:40px;text-align:center;color:var(--muted)}.error{padding:13px;border-radius:9px;background:var(--badbg);color:var(--bad);border:1px solid #f2bbb5}
+@media(max-width:1050px){.app{grid-template-columns:82px 1fr}.brand b,.brand small,.nav .label,.nav-label,.side-note{display:none}.grid{grid-template-columns:repeat(2,1fr)}.two,.workspace{grid-template-columns:1fr}.candidate-side{position:static}.flow{grid-template-columns:repeat(4,1fr)}}
+@media(max-width:680px){.topbar{padding:0 14px}.content{padding:14px}.grid,.three{grid-template-columns:1fr}.flow{grid-template-columns:repeat(2,1fr)}.hero,.project-head{display:block}.actions{margin-top:10px}}
+</style>
+</head>
+<body>
+<div class="app">
+<aside>
+ <div class="brand"><strong>SRW</strong><b>Web Exploration E1</b><small>read-only live adapter</small></div>
+ <div class="nav-label">Recruitment</div>
+ <div class="nav">
+  <button class="active" data-page="home">⌂ <span class="label">工作台</span></button>
+  <button data-page="projects">▣ <span class="label">招聘项目</span></button>
+  <button data-page="candidates">◉ <span class="label">候选人</span></button>
+  <button data-page="review">✓ <span class="label">复核中心</span></button>
+ </div>
+ <div class="nav-label">System</div>
+ <div class="nav">
+  <button data-page="architecture">◇ <span class="label">双载体架构</span></button>
+ </div>
+ <div class="side-note">Exploration branch only<br>GET-only API client<br>No production writes</div>
+</aside>
+<main>
+ <div class="topbar">
+  <strong id="top-title">工作台</strong>
+  <div class="right"><span class="badge" id="api-state">初始化</span><span class="badge warn">EXPERIMENT</span></div>
+ </div>
+ <div class="content" id="root"><div class="loading">正在初始化探索版…</div></div>
+</main>
+</div>
+<script>
+'use strict';
+
+const root=document.querySelector('#root');
+const state={
+ mode:'mock',
+ dashboard:null,
+ projects:[],
+ currentProject:null,
+ currentProjectPipeline:null,
+ currentProjectCandidates:[],
+ currentCandidate:null,
+ currentWorkspace:null,
+ currentBrief:null
+};
+
+const mock={
+ dashboard:{
+  metrics:{projects:4,candidates:37},
+  operational_todos:{overdue_contacts:3,pending_interview_feedback:2,pending_identity_reviews:1,open_judgment_reviews:2},
+  evidence_review_backlog:6,
+  candidates_by_stage:{new:8,screening:7,shortlisted:6,phone_screen:4,interview:5,offer:3,hired:4},
+  decision_workbench:{conflict_count:2,verify_count:4,ready_count:3,total:9,items:[
+   {project_id:'p1',candidate_id:'c1',candidate_name:'林澄',project_title:'产品经理招聘',action_type:'VERIFY_CRITERION',reason:'项目领导经验缺少可定位证据'},
+   {project_id:'p2',candidate_id:'c2',candidate_name:'周言',project_title:'AI 产品招聘',action_type:'RESOLVE_CONFLICT',reason:'任职时间存在材料冲突'},
+   {project_id:'p3',candidate_id:'c3',candidate_name:'陈知夏',project_title:'招聘分析师',action_type:'MAKE_DECISION',reason:'证据闭合，可进入人工决定'}
+  ]},
+  operational_queue:{total:5,items:[
+   {kind:'overdue_contact',project_id:'p1',candidate_id:'c1',title:'逾期联系',candidate_name:'林澄',project_title:'产品经理招聘',detail:'昨天 16:00'},
+   {kind:'today_contact',project_id:'p2',candidate_id:'c2',title:'今日联系',candidate_name:'周言',project_title:'AI 产品招聘',detail:'今天 10:30'},
+   {kind:'pending_interview_feedback',project_id:'p3',candidate_id:'c3',title:'待提交面试反馈',candidate_name:'陈知夏',project_title:'招聘分析师',detail:'业务二面'}
+  ]},
+  review_queue:{identity_count:1,judgment_count:2,claim_count:6,total:9,items:[
+   {kind:'identity_review',project_id:'p3',title:'候选人身份复核',project_title:'招聘分析师',detail:'陈知夏 ↔ 陈知霞 · exact_email'},
+   {kind:'judgment_review',project_id:'p2',candidate_id:'c2',title:'判断纠错复核',candidate_name:'周言',project_title:'AI 产品招聘',detail:'leadership · partial → met'},
+   {kind:'unreviewed_claim',project_id:'p1',candidate_id:'c1',title:'待确认事实',candidate_name:'林澄',project_title:'产品经理招聘',detail:'负责 8 人跨职能团队'}
+  ]}
+ },
+ projects:[
+  {project_id:'p1',title:'产品经理招聘',status:'open',protocol_state:'published',protocol_title:'产品经理',candidate_count:9,open_work_count:2},
+  {project_id:'p2',title:'AI 产品招聘',status:'open',protocol_state:'published',protocol_title:'AI 产品经理',candidate_count:12,open_work_count:3},
+  {project_id:'p3',title:'招聘分析师',status:'open',protocol_state:'published',protocol_title:'招聘分析师',candidate_count:8,open_work_count:1},
+  {project_id:'p4',title:'HRBP 校招',status:'draft',protocol_state:'draft',protocol_title:'HRBP',candidate_count:0,open_work_count:0}
+ ],
+ candidates:{
+  p1:[
+   {candidate_id:'c1',display_name:'林澄',pipeline_stage:'screening',has_material:true},
+   {candidate_id:'c4',display_name:'赵清',pipeline_stage:'phone_screen',has_material:true}
+  ],
+  p2:[{candidate_id:'c2',display_name:'周言',pipeline_stage:'interview',has_material:true}],
+  p3:[{candidate_id:'c3',display_name:'陈知夏',pipeline_stage:'shortlisted',has_material:true}]
+ },
+ workspaces:{
+  c1:{candidate_id:'c1',display_name:'林澄',decision_ready:false,readiness_label:'仍有 1 个阻塞项',blocking_count:1,decision_label:'',decision_reason:'',sources:[
+   {source_id:'s1',source_kind:'resume',media_type:'application/pdf',filename:'resume.pdf',text_preview:'负责推荐系统产品从 0 到 1 交付，并参与跨职能团队协作。',has_text:true,in_current_material:true,content_url:'#'}
+  ],claims:[
+   {claim_id:'cl1',source_id:'s1',normalized_text:'负责推荐系统产品从 0 到 1 交付',confirmation_state:'confirmed',authority:'source'},
+   {claim_id:'cl2',source_id:'s1',normalized_text:'负责 8 人跨职能团队',confirmation_state:'unreviewed',authority:'source'}
+  ],criteria:[
+   {criterion_key:'delivery',name:'产品交付经验',status_label:'已确认',evidence_label:'强',reason:'已有可定位项目经历',gap:'',probe:'',decision_critical:true,verification_required:false},
+   {criterion_key:'leadership',name:'团队领导经验',status_label:'仍需核实',evidence_label:'证据一般',reason:'团队人数与职责尚未确认',gap:'核实是否直接管理团队',probe:'请说明团队规模与直接管理关系',decision_critical:true,verification_required:true}
+  ]},
+  c2:{candidate_id:'c2',display_name:'周言',decision_ready:false,readiness_label:'存在证据冲突',blocking_count:1,decision_label:'',sources:[],claims:[],criteria:[]},
+  c3:{candidate_id:'c3',display_name:'陈知夏',decision_ready:true,readiness_label:'可进行人工决定',blocking_count:0,decision_label:'',sources:[],claims:[],criteria:[]}
+ },
+ summaries:{
+  c1:{candidate_id:'c1',project_id:'p1',display_name:'林澄',pipeline_stage:'screening',has_material:true,contact:{phone:'138****1234',email:'lin@example.com',user_confirmed:true},offer_status:''},
+  c2:{candidate_id:'c2',project_id:'p2',display_name:'周言',pipeline_stage:'interview',has_material:true,contact:{phone:'',email:'zhou@example.com',user_confirmed:true},offer_status:''},
+  c3:{candidate_id:'c3',project_id:'p3',display_name:'陈知夏',pipeline_stage:'shortlisted',has_material:true,contact:{phone:'',email:'',user_confirmed:false},offer_status:''}
+ },
+ pipelines:{
+  p1:{project_status:'open',total_candidates:9,stages:{new:2,screening:3,shortlisted:2,phone_screen:1,interview:1,offer:0,hired:0},offers_by_status:{draft:0,approved:0,sent:0},upcoming_interviews:1,workflow_summary:{criteria_published:true,candidate_count:9,candidates_without_material:1,decision_work_candidates:2,unreviewed_claims:3,pending_interview_feedback:0,upcoming_interviews:1,offer_followups:0,next_action:{key:'review_evidence',label:'处理证据与判断',tab:'cockpit',reason:'2 位候选人存在当前决策待办，3 条事实等待人工确认。'}}},
+  p2:{project_status:'open',total_candidates:12,stages:{new:1,screening:2,shortlisted:2,phone_screen:2,interview:3,offer:2,hired:0},offers_by_status:{draft:1,approved:0,sent:1},upcoming_interviews:2,workflow_summary:{criteria_published:true,candidate_count:12,candidates_without_material:0,decision_work_candidates:1,unreviewed_claims:1,pending_interview_feedback:2,upcoming_interviews:2,offer_followups:2,next_action:{key:'review_evidence',label:'处理证据与判断',tab:'cockpit',reason:'1 位候选人存在当前决策待办，1 条事实等待人工确认。'}}}
+ }
+};
+
+const stageLabels={new:'新候选人',screening:'简历筛选',shortlisted:'短名单',phone_screen:'电话筛选',interview:'面试',offer:'Offer',hired:'录用',rejected:'拒绝',talent_pool:'人才池',withdrawn:'退出'};
+const projectStatus={draft:'草案',open:'招聘中',paused:'暂停',filled:'已招满',closed:'已关闭',archived:'已归档'};
+const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const fmt=n=>new Intl.NumberFormat('zh-CN').format(Number(n||0));
+const stage=s=>stageLabels[s]||s||'—';
+const pill=(text,cls='')=>'<span class="pill '+cls+'">'+esc(text)+'</span>';
+const setTitle=t=>document.querySelector('#top-title').textContent=t;
+const setApiState=(text,cls='')=>{const e=document.querySelector('#api-state');e.textContent=text;e.className='badge '+cls};
+
+async function getJson(path){
+ if(!path.startsWith('/')) throw new Error('E1 only permits same-origin absolute paths');
+ const response=await fetch(path,{method:'GET',headers:{Accept:'application/json'},cache:'no-store'});
+ if(!response.ok) throw new Error('GET '+path+' → HTTP '+response.status);
+ const ct=response.headers.get('content-type')||'';
+ if(!ct.includes('json')) throw new Error('Expected JSON from '+path);
+ return response.json();
+}
+
+async function loadLive(){
+ if(location.protocol==='file:') return false;
+ try{
+  await getJson('/health/ready');
+  const [dashboard,projects]=await Promise.all([getJson('/api/v1/dashboard'),getJson('/api/v1/projects')]);
+  state.dashboard=dashboard;
+  state.projects=projects.projects||[];
+  state.mode='live';
+  setApiState('LIVE · GET-only','live');
+  return true;
+ }catch(err){
+  console.warn('E1 live adapter fallback:',err);
+  return false;
+ }
+}
+
+function queuePanel(title,note,items){
+ return '<section class="panel"><div class="ph"><div><h2>'+esc(title)+'</h2><div class="muted tiny">'+esc(note)+'</div></div></div><div class="pb"><div class="list">'+
+ (items?.length?items.map(x=>{
+  const canCandidate=Boolean(x.candidate_id);
+  const target=canCandidate?`openCandidate('${esc(x.candidate_id)}','${esc(x.project_id||'')}')`:`openProject('${esc(x.project_id||'')}')`;
+  return '<div class="item"><div><div class="item-title">'+esc((x.candidate_name?x.candidate_name+' · ':'')+(x.title||x.project_title||x.action_type||'待处理'))+'</div><div class="item-note">'+esc([x.project_title,x.reason,x.detail].filter(Boolean).join(' · '))+'</div></div><button class="btn primary small" onclick="'+target+'">查看</button></div>';
+ }).join(''):'<div class="empty">当前没有待处理事项</div>')+
+ '</div></div></section>';
+}
+
+function home(){
+ setTitle('工作台');
+ const d=state.dashboard||mock.dashboard;
+ const todos=d.operational_todos||{},st=d.candidates_by_stage||{},wb=d.decision_workbench||{items:[]},oq=d.operational_queue||{items:[]},rq=d.review_queue||{items:[]};
+ root.innerHTML=
+ '<div class="hero"><div><h1>今天要处理什么</h1><div class="muted">E1 直接读取 SRW 的真实业务状态，但不允许任何写操作。</div></div><button class="btn primary" onclick="projectsPage()">进入招聘项目</button></div>'+
+ '<div class="notice '+(state.mode==='mock'?'warn':'')+'">'+(state.mode==='live'?'当前是 <strong>Live read-only</strong>：页面来自实验 HTML，数据直接读取本机 SRW 后端。Web 与 EXE 因此可以天然看到同一份权威数据。':'当前是 <strong>Mock 模式</strong>。将此页面由 SRW 本机服务同源托管后，可自动读取真实数据。')+'</div>'+
+ '<div class="grid">'+[
+  ['逾期联系',todos.overdue_contacts||0],
+  ['待面试反馈',todos.pending_interview_feedback||0],
+  ['待人工复核',(todos.pending_identity_reviews||0)+(todos.open_judgment_reviews||0)+(d.evidence_review_backlog||0)],
+  ['当前候选人',d.metrics?.candidates||0]
+ ].map(x=>'<div class="card"><small>'+esc(x[0])+'</small><strong>'+fmt(x[1])+'</strong></div>').join('')+'</div>'+
+ queuePanel('今日业务队列','判断、证据核实和人工决定',wb.items||[])+
+ queuePanel('运营执行队列','联系与面试反馈等实际动作',oq.items||[])+
+ queuePanel('复核中心','身份、判断纠错与待确认事实',rq.items||[])+
+ '<section class="panel"><div class="ph"><h2>招聘漏斗</h2></div><div class="pb"><div class="flow">'+
+ [['new','新候选人'],['screening','筛选'],['shortlisted','短名单'],['phone_screen','电话筛选'],['interview','面试'],['offer','Offer'],['hired','录用']].map(([k,l])=>'<div class="step"><strong>'+fmt(st[k]||0)+'</strong><span>'+l+'</span></div>').join('')+
+ '</div></div></section>';
+ activate('home');
+}
+
+function projectCard(p){
+ const statusCls=p.status==='open'?'good':p.status==='draft'?'warn':'';
+ return '<div class="item"><div><div class="item-title">'+esc(p.title)+' '+pill(projectStatus[p.status]||p.status,statusCls)+'</div><div class="item-note">'+esc(p.protocol_title||'未命名岗位')+' · '+fmt(p.candidate_count)+' 位候选人 · '+fmt(p.open_work_count)+' 个开放待办</div></div><button class="btn primary" onclick="openProject(\''+esc(p.project_id)+'\')">打开项目</button></div>';
+}
+
+function projectsPage(){
+ setTitle('招聘项目');
+ root.innerHTML='<div class="hero"><div><h1>招聘项目</h1><div class="muted">项目状态直接来自当前 SRW 数据库。</div></div></div><section class="panel"><div class="ph"><h2>项目列表</h2><span class="badge">'+fmt(state.projects.length)+' 个</span></div><div class="pb"><div class="list">'+
+ (state.projects.length?state.projects.map(projectCard).join(''):'<div class="empty">没有项目</div>')+
+ '</div></div></section>';
+ activate('projects');
+}
+
+async function openProject(projectId){
+ setTitle('招聘项目');
+ root.innerHTML='<div class="loading">正在读取项目…</div>';
+ let project=state.projects.find(x=>x.project_id===projectId)||null;
+ let pipe, candidates;
+ try{
+  if(state.mode==='live'){
+   [pipe,candidates]=await Promise.all([
+    getJson('/api/v1/projects/'+encodeURIComponent(projectId)+'/pipeline'),
+    getJson('/api/v1/projects/'+encodeURIComponent(projectId)+'/candidates?archived=active&limit=100&offset=0')
+   ]);
+  }else{
+   pipe=mock.pipelines[projectId]||{stages:{},workflow_summary:{next_action:{label:'继续推进候选人',reason:'Mock 项目'}}};
+   candidates={candidates:mock.candidates[projectId]||[],total:(mock.candidates[projectId]||[]).length};
+  }
+  state.currentProject=project||{project_id:projectId,title:'项目'};
+  state.currentProjectPipeline=pipe;
+  state.currentProjectCandidates=candidates.candidates||[];
+  renderProject();
+ }catch(err){
+  root.innerHTML='<div class="error"><strong>项目读取失败</strong><div>'+esc(err.message)+'</div></div>';
+ }
+}
+
+function renderProject(){
+ const p=state.currentProject||{},pipe=state.currentProjectPipeline||{},s=pipe.stages||{},w=pipe.workflow_summary||{},next=w.next_action||{};
+ root.innerHTML=
+ '<div class="project-head"><div><button class="btn small" onclick="projectsPage()">← 返回项目</button><h1>'+esc(p.title||'项目')+'</h1><div class="actions">'+pill(projectStatus[pipe.project_status||p.status]||pipe.project_status||p.status,(pipe.project_status||p.status)==='open'?'good':'warn')+pill(p.protocol_title||'')+'</div></div><div><div class="muted tiny">系统建议的当前动作</div><strong style="font-size:18px">'+esc(next.label||'继续推进')+'</strong><div class="item-note">'+esc(next.reason||'')+'</div></div></div>'+
+ '<div class="grid" style="margin-top:16px">'+[
+  ['候选人',w.candidate_count??pipe.total_candidates??0],
+  ['缺材料',w.candidates_without_material||0],
+  ['决策待办',w.decision_work_candidates||0],
+  ['待确认事实',w.unreviewed_claims||0]
+ ].map(x=>'<div class="card"><small>'+x[0]+'</small><strong>'+fmt(x[1])+'</strong></div>').join('')+'</div>'+
+ '<section class="panel"><div class="ph"><h2>招聘漏斗</h2></div><div class="pb"><div class="flow">'+
+ [['new','新候选人'],['screening','筛选'],['shortlisted','短名单'],['phone_screen','电话筛选'],['interview','面试'],['offer','Offer'],['hired','录用']].map(([k,l])=>'<div class="step"><strong>'+fmt(s[k]||0)+'</strong><span>'+l+'</span></div>').join('')+
+ '</div></div></section>'+
+ '<section class="panel"><div class="ph"><div><h2>候选人</h2><div class="muted tiny">E1 从项目 Candidate API 读取</div></div><span class="badge">'+fmt(state.currentProjectCandidates.length)+' 人</span></div><div class="pb">'+candidateTable(state.currentProjectCandidates)+'</div></section>';
+ activate('projects');
+}
+
+function candidateTable(rows){
+ if(!rows?.length) return '<div class="empty">暂无候选人</div>';
+ return '<div class="table-wrap"><table><thead><tr><th>候选人</th><th>阶段</th><th>材料</th><th></th></tr></thead><tbody>'+
+ rows.map(c=>'<tr><td><strong>'+esc(c.display_name)+'</strong></td><td>'+pill(stage(c.pipeline_stage),c.pipeline_stage==='interview'?'warn':'')+'</td><td>'+(c.has_material?pill('已导入','good'):pill('待材料','warn'))+'</td><td><button class="btn primary small" onclick="openCandidate(\''+esc(c.candidate_id)+'\',\''+esc(c.project_id||state.currentProject?.project_id||'')+'\')">打开工作空间</button></td></tr>').join('')+
+ '</tbody></table></div>';
+}
+
+function candidatesPage(){
+ setTitle('候选人');
+ const rows=state.currentProjectCandidates?.length?state.currentProjectCandidates:Object.values(mock.candidates).flat();
+ root.innerHTML='<div class="hero"><div><h1>候选人</h1><div class="muted">Candidate Workspace 是 Web 与 EXE 共享的核心业务对象。</div></div></div>'+
+ '<div class="notice">E1 不提供跨项目全局候选人 API，因此 Live 模式下这里展示最近打开项目的候选人；项目内数据为真实读取。</div>'+
+ '<section class="panel"><div class="pb">'+candidateTable(rows)+'</div></section>';
+ activate('candidates');
+}
+
+async function openCandidate(candidateId,projectId=''){
+ setTitle('候选人工作空间');
+ root.innerHTML='<div class="loading">正在读取候选人工作空间…</div>';
+ try{
+  let summary,workspace,brief;
+  if(state.mode==='live'){
+   [summary,workspace,brief]=await Promise.all([
+    getJson('/api/v1/candidates/'+encodeURIComponent(candidateId)+'/summary'),
+    getJson('/api/v1/candidates/'+encodeURIComponent(candidateId)+'/workspace'),
+    getJson('/api/v1/candidates/'+encodeURIComponent(candidateId)+'/brief').catch(()=>null)
+   ]);
+  }else{
+   summary=mock.summaries[candidateId]||{candidate_id:candidateId,project_id:projectId,display_name:'Mock Candidate',pipeline_stage:'new',contact:{}};
+   workspace=mock.workspaces[candidateId]||{candidate_id:candidateId,display_name:summary.display_name,readiness_label:'Mock workspace',blocking_count:0,sources:[],claims:[],criteria:[]};
+   brief=null;
+  }
+  state.currentCandidate=summary;
+  state.currentWorkspace=workspace;
+  state.currentBrief=brief;
+  renderCandidate();
+ }catch(err){
+  root.innerHTML='<div class="error"><strong>候选人读取失败</strong><div>'+esc(err.message)+'</div></div>';
+ }
+}
+
+function renderCandidate(){
+ const s=state.currentCandidate||{},w=state.currentWorkspace||{},b=state.currentBrief||{},contact=s.contact||{},plan=b.action_plan||{};
+ const sources=w.sources||[],claims=w.claims||[],criteria=w.criteria||[];
+ const backProject=s.project_id||state.currentProject?.project_id||'';
+ root.innerHTML=
+ '<div class="hero"><div><button class="btn small" onclick="'+(backProject?'openProject(\''+esc(backProject)+'\')':'projectsPage()')+'">← 返回项目</button></div></div>'+
+ '<div class="workspace">'+
+ '<section class="card candidate-side"><div class="actions">'+pill(stage(s.pipeline_stage),'warn')+(contact.user_confirmed?pill('联系方式已确认','good'):pill('联系方式待确认','warn'))+'</div><h1>'+esc(s.display_name||w.display_name||'候选人')+'</h1><div class="muted">Candidate Workspace · GET-only</div>'+
+ '<div class="stat"><small>决策状态</small><strong>'+esc(w.readiness_label||'—')+'</strong></div>'+
+ '<div class="stat"><small>当前人工决定</small><strong>'+esc(w.decision_label||'未决定')+'</strong></div>'+
+ '<div class="stat"><small>阻塞项</small><strong>'+fmt(w.blocking_count||0)+'</strong></div>'+
+ '<div class="stat"><small>Offer</small><strong>'+esc(s.offer_status||'尚无')+'</strong></div>'+
+ '<div class="stat"><small>下次联系</small><strong>'+esc(plan.next_contact_at||'未安排')+'</strong></div>'+
+ '<div class="stat"><small>联系方式</small><div>'+esc(contact.phone||'未录电话')+'</div><div>'+esc(contact.email||'未录邮箱')+'</div></div></section>'+
+ '<section class="panel" style="margin:0"><div class="tabs"><button class="active">证据与判断</button><button disabled>面试（E2）</button><button disabled>决定（E2）</button><button disabled>Offer（E2）</button></div><div class="pb">'+
+ '<div class="two"><div><h3>来源材料</h3>'+(sources.length?sources.map(src=>'<div class="source '+(src.in_current_material?'current':'')+'"><div class="actions">'+pill(src.source_kind||'source')+(src.in_current_material?pill('当前材料','good'):'')+'</div><strong>'+esc(src.filename||src.media_type||src.source_id)+'</strong><div class="item-note">'+esc(src.text_preview||(!src.has_text?'二进制材料':'无预览'))+'</div></div>').join(''):'<div class="empty">暂无材料</div>')+'</div>'+
+ '<div><h3>Claims</h3>'+(claims.length?claims.map(cl=>'<div class="claim '+esc(cl.confirmation_state)+'"><div class="actions">'+pill(cl.confirmation_state,cl.confirmation_state==='confirmed'?'good':cl.confirmation_state==='unreviewed'?'warn':'')+'</div><div>'+esc(cl.normalized_text)+'</div><div class="item-note">Source '+esc(cl.source_id)+' · '+esc(cl.authority||'')+'</div></div>').join(''):'<div class="empty">暂无 Claim</div>')+'</div></div>'+
+ '<div style="margin-top:18px"><h3>评价标准与核实</h3>'+(criteria.length?criteria.map(cr=>'<div class="criterion"><div class="row"><strong>'+esc(cr.name||cr.criterion_key)+'</strong><div class="actions">'+pill(cr.status_label||'—',String(cr.status_label).includes('矛盾')?'bad':String(cr.status_label).includes('核实')?'warn':'good')+pill('证据 '+(cr.evidence_label||'—'))+'</div></div><div class="item-note">'+esc(cr.reason||cr.gap||cr.probe||'—')+'</div></div>').join(''):'<div class="empty">暂无评价标准或尚未发布</div>')+'</div>'+
+ '<div class="notice" style="margin-top:16px"><strong>E1 观察点：</strong>当前页面已经直接消费与 EXE 相同的 Candidate Workspace API。若两种载体连接同一个 SRW Service，它们不需要互相“同步数据库”，因为看到的是同一权威状态。</div>'+
+ '</div></section></div>';
+ activate('candidates');
+}
+
+function reviewPage(){
+ setTitle('复核中心');
+ const r=(state.dashboard||mock.dashboard).review_queue||{items:[]};
+ root.innerHTML='<div class="hero"><div><h1>复核中心</h1><div class="muted">E1 只读查看需要人工处理的治理事项。</div></div></div>'+queuePanel('待人工复核','身份、判断纠错与待确认事实',r.items||[]);
+ activate('review');
+}
+
+function architecturePage(){
+ setTitle('双载体架构');
+ root.innerHTML='<div class="hero"><div><h1>Web + EXE，共享一套数据</h1><div class="muted">核心原则：两种界面不是两套产品，更不是两套数据库。</div></div></div>'+
+ '<section class="panel"><div class="pb"><div class="three">'+
+ '<div class="card"><small>Web Carrier</small><strong style="font-size:18px">Browser</strong><div class="muted tiny">HTML / CSS / JS</div></div>'+
+ '<div class="card"><small>Authoritative Core</small><strong style="font-size:18px">SRW Service</strong><div class="muted tiny">API + SQLite + Blob + Jobs</div></div>'+
+ '<div class="card"><small>Windows Carrier</small><strong style="font-size:18px">EXE / WebView2</strong><div class="muted tiny">同一 Web UI + native lifecycle</div></div>'+
+ '</div><div class="notice" style="margin-top:16px">同一台机器上，Web 和 EXE 都连接 <code>127.0.0.1</code> 的同一个 SRW Service。因此从 EXE 修改候选人以后，Web 刷新即可看到变化；反之亦然。信息互通来自<strong>共同权威数据源</strong>，而不是两个数据库之间的脆弱同步。</div>'+
+ '<div class="two"><div><h3>仍由 Core 持有</h3><div class="list">'+['SQLite / Schema','Files & Blob Store','OCR / ASR Jobs','AI Provider & Secrets','Knowledge DB','Evidence / Decision / Audit'].map(x=>'<div class="item"><span>'+x+'</span>'+pill('authoritative','good')+'</div>').join('')+'</div><div><h3>Carrier 只负责</h3><div class="list">'+['页面与导航','视图状态','发起 API 操作','显示任务进度','打开原始材料','桌面生命周期（EXE）'].map(x=>'<div class="item"><span>'+x+'</span>'+pill('presentation')+'</div>').join('')+'</div></div>'+
+ '</div></section>';
+ activate('architecture');
+}
+
+function activate(page){
+ document.querySelectorAll('.nav button').forEach(b=>b.classList.toggle('active',b.dataset.page===page));
+}
+function route(page){
+ ({home,projects:projectsPage,candidates:candidatesPage,review:reviewPage,architecture:architecturePage}[page]||home)();
+}
+document.querySelectorAll('.nav button').forEach(b=>b.addEventListener('click',()=>route(b.dataset.page)));
+
+(async function init(){
+ const live=await loadLive();
+ if(!live){
+  state.mode='mock';
+  state.dashboard=mock.dashboard;
+  state.projects=mock.projects;
+  setApiState(location.protocol==='file:'?'MOCK · file://':'MOCK · API unavailable','warn');
+ }
+ home();
+})();
+</script>
+</body>
+</html>
