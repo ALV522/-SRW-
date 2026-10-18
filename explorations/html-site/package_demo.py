@@ -43,6 +43,7 @@ START_HERE = r"""@echo off
 setlocal EnableExtensions
 chcp 65001 >nul
 cd /d "%~dp0"
+set "SRW_E1_PACKAGE_ROOT=%~dp0"
 if not exist "explorations\html-site\run_e1_demo_windows.cmd" (
     echo Demo package is incomplete. Extract the entire ZIP before running.
     pause
