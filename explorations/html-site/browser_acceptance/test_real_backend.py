@@ -283,6 +283,21 @@ class RealBackendE1Browser(unittest.TestCase):
         self.assertFalse(self.errors, self.errors)
         self.assertTrue(all(method == "GET" for method, _ in self.requests), self.requests)
 
+    def test_07_project_and_candidate_deep_links_survive_refresh(self):
+        self.open_live()
+        self.open_candidate()
+        expected="#/projects/"+self.pid+"/candidates/"+self.cid
+        self.assertEqual(self.page.evaluate("location.hash"),expected)
+        self.page.reload()
+        expect(self.page.locator(".candidate-side h1")).to_have_text(self.candidate_name)
+        self.assertEqual(self.page.evaluate("location.hash"),expected)
+        self.page.go_back()
+        expect(self.page.locator("#root h1")).to_have_text(self.project_name)
+        self.assertEqual(self.page.evaluate("location.hash"),"#/projects/"+self.pid)
+        self.page.goto(self.web+"/"+expected,wait_until="domcontentloaded")
+        expect(self.page.locator(".candidate-side h1")).to_have_text(self.candidate_name)
+        self.assertFalse(self.errors,self.errors)
+
     def test_06_mobile_viewport_has_no_page_horizontal_overflow(self):
         mobile = self.browser.new_context(
             locale="zh-CN",
