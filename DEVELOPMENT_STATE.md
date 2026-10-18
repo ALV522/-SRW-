@@ -8,7 +8,7 @@ C08 business capabilities are retained. C09 supplies local-only Host and browser
 
 Integration separates immutable C08 source history from the current complete source hash inventory. Windows file-handle checks now enumerate real process handles through psutil instead of returning an empty Linux-only /proc result. A real SQLite open/close test runs on each OS. Probe errors fail the run rather than manufacturing PASS.
 
-The current suite contains 85 tests. Runtime counts and results are emitted by CI for the exact commit. This document does not substitute for that evidence. Release identity is C11 throughout; historical C08 metadata is preserved under verification/history/convergence08.
+The current suite contains 86 tests. Runtime counts and results are emitted by CI for the exact commit. This document does not substitute for that evidence. Release identity is C11 throughout; historical C08 metadata is preserved under verification/history/convergence08.
 
 ## Delivery
 
@@ -40,3 +40,7 @@ Identity and judgment review dashboard links now carry review_id, and Claim revi
 ## Windows Portable input readiness
 
 Added a non-destructive, source-level Portable input preflight for the exact inherited Windows carrier SHA, embedded runtime entrypoint and five externally audited Knowledge hashes with SQLite integrity/table checks. It fails closed with a machine-readable report when files are absent or mismatched. No runtime/Knowledge bytes are stored in Git and no Portable/Native artifact is declared built. The external manifest's provenance and exact Windows GUI acceptance remain separate manual gates.
+
+## Native assembly hardening
+
+Fixed the legacy assembler's source-root wildcard copy that could accidentally include workspace data, backups and local secrets. It now stages only SOURCE_MANIFEST-listed reviewed source, the exact carrier's inherited Host and separately preflighted runtime and five production Knowledge DBs; output filenames reflect C11 and mark unverified GUI status. The PowerShell script uses hostExe instead of PowerShell's reserved Host variable. No actual native binary has been produced or GUI accepted in CI.

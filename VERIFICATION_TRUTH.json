@@ -14,7 +14,7 @@
     "privacy_safe_diagnostics",
     "business_workflow_queue"
   ],
-  "current_evidence": "Exact-commit CI must confirm 85 source regression tests including missing-assets, Knowledge hash and SQLite preflight; Portable assembly/Windows GUI verification remain deferred.",
+  "current_evidence": "Exact-commit CI required for 86 source regression tests including restricted native-assembler staging and Windows PowerShell syntax parsing; real artifact/GUI remain deferred.",
   "historical_evidence": "verification/history/convergence08/VERIFICATION_TRUTH.json",
   "deferred": {
     "windows_native_gui": "Requires exact audited carrier and target-Windows GUI acceptance",
