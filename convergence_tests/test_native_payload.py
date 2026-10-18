@@ -107,6 +107,27 @@ class NativePayloadTests(unittest.TestCase):
         self.assertEqual(result["files"], 2)
         self.assertEqual(sorted(x.name for x in dest.iterdir()), ["python.exe", "python312.dll"])
 
+    def test_public_certifi_ca_bundle_is_allowed_but_private_pem_is_blocked(self):
+        ca_path = self.runtime / "Lib" / "site-packages" / "certifi" / "cacert.pem"
+        ca_path.parent.mkdir(parents=True)
+        ca_path.write_bytes(b"synthetic public CA certificate bytes")
+        with self.runtime_manifest.open("a", encoding="utf-8") as stream:
+            stream.write(
+                f"{digest(ca_path.read_bytes())}  Lib/site-packages/certifi/cacert.pem\\n"
+            )
+        target = self.root / "approved" / "runtime"
+        stage_runtime(self.runtime, self.runtime_manifest, target)
+        self.assertEqual(
+            (target / "Lib" / "site-packages" / "certifi" / "cacert.pem").read_bytes(),
+            b"synthetic public CA certificate bytes",
+        )
+        with self.runtime_manifest.open("a", encoding="utf-8") as stream:
+            stream.write(
+                f"{digest(b'private')}  other/private.pem\\n"
+            )
+        with self.assertRaises(PayloadError):
+            audit_runtime(self.runtime, self.runtime_manifest)
+
     def test_runtime_binary_tampering_blocks_staging(self):
         (self.runtime / "python.exe").write_bytes(b"changed")
         with self.assertRaises(PayloadError):

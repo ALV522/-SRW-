@@ -59,7 +59,95 @@ function CopyAuditedRuntime($runtimeRoot, $runtimeManifest, $runtimeStage) {
       if ([string]::IsNullOrWhiteSpace($part) -or $part -eq '.' -or $part -eq '..' -or $part.EndsWith('.') -or $part.EndsWith(' ')) { throw 'Unsafe Runtime path segment' }
       if ($part -in @('data','backups','backup','uploads','workspace','candidates','secrets','credentials','private','logs')) { throw 'Private Runtime folder prohibited' }
     }
-    if ($parts[-1] -in @('.env','provider_secrets.json','secrets.json','credentials.json') -or $parts[-1] -match '\.(pem|key|pfx|p12|db|sqlite)$') { throw 'Private Runtime file prohibited' }
+    if ($parts[-1] -in @('.env','provider_secrets.json','secrets.json','credentials.json') -or ($parts[-1] -match '\.(pem|key|pfx|p12|db|sqlite)
+    $src = $runtimeRoot
+    foreach ($part in $parts) {
+      $src = Join-Path $src $part
+      if (!(Test-Path -LiteralPath $src)) { throw 'Runtime inventory input missing' }
+      if ((Get-Item -LiteralPath $src).Attributes -band [IO.FileAttributes]::ReparsePoint) { throw 'Runtime inventory symlink prohibited' }
+    }
+    if (!(Test-Path -LiteralPath $src -PathType Leaf)) { throw 'Runtime entry not a file' }
+    if ((Sha $src) -ne $digest) { throw 'Runtime input hash mismatch' }
+    $dst = Join-Path $runtimeStage ($relative.Replace('/', '\'))
+    New-Item -ItemType Directory -Force -Path (Split-Path -Parent $dst) | Out-Null
+    Copy-Item -LiteralPath $src -Destination $dst -Force
+    if ((Sha $dst) -ne $digest) { throw 'Runtime stage hash mismatch' }
+  }
+  if (!$seen.Contains('python.exe')) { throw 'Runtime inventory missing python.exe' }
+}
+
+$tmp = Join-Path $env:TEMP ('srw-c11-native-' + [guid]::NewGuid().ToString('N'))
+$base = Join-Path $tmp 'carrier'
+$stage = Join-Path $tmp 'stage'
+New-Item -ItemType Directory -Force -Path $base,$stage | Out-Null
+try {
+  CopyReviewedSources $Root $stage
+  CopyAuditedRuntime (Join-Path $Root 'runtime') (Join-Path $Root 'PRODUCTION_RUNTIME.sha256') (Join-Path $stage 'runtime')
+  $env:PYTHONUTF8 = '1'; $env:PYTHONDONTWRITEBYTECODE = '1'
+  $RuntimePython = Join-Path $stage 'runtime\python.exe'
+  & $RuntimePython (Join-Path $stage 'scripts\portable_input_preflight.py') --root $Root --runtime (Join-Path $stage 'runtime') --runtime-manifest (Join-Path $Root 'PRODUCTION_RUNTIME.sha256')
+  if ($LASTEXITCODE -ne 0) { throw 'Portable input preflight BLOCKED' }
+  Expand-Archive -LiteralPath $BaseZip -DestinationPath $base -Force
+  $children = @(Get-ChildItem -LiteralPath $base)
+  $baseRoot = if ($children.Count -eq 1 -and $children[0].PSIsContainer) { $children[0].FullName } else { $base }
+  $hostExe = Join-Path $baseRoot 'windows-host\SmartRecruitmentWorkbench.exe'
+  $hostTruth = Join-Path $baseRoot 'windows-host\DOTNET_BUILD_TRUTH.json'
+  if (!(Test-Path -LiteralPath $hostExe) -or !(Test-Path -LiteralPath $hostTruth)) {
+    throw 'Exact carrier is missing the audited 0.8.x Windows Host.'
+  }
+
+  # The reviewed source and audited Runtime are already staged.
+  Copy-Item -LiteralPath (Join-Path $Root 'PRODUCTION_RUNTIME.sha256') -Destination (Join-Path $stage 'PRODUCTION_RUNTIME.sha256') -Force
+  foreach ($name in @('taxonomy','job_info','competency','market_reference','reference')) {
+    $srcDb = Join-Path (Join-Path (Join-Path $Root 'knowledge\active') $name) 'knowledge.db'
+    $dstDb = Join-Path (Join-Path (Join-Path $stage 'knowledge\active') $name) 'knowledge.db'
+    New-Item -ItemType Directory -Force -Path (Split-Path -Parent $dstDb) | Out-Null
+    Copy-Item -LiteralPath $srcDb -Destination $dstDb -Force
+  }
+  Copy-Item -LiteralPath (Join-Path $Root 'PRODUCTION_KNOWLEDGE.sha256') -Destination (Join-Path $stage 'PRODUCTION_KNOWLEDGE.sha256') -Force
+  Copy-Item -LiteralPath (Join-Path $baseRoot 'windows-host') -Destination $stage -Recurse -Force
+
+  $truthObj = Get-Content -Raw -LiteralPath (Join-Path $stage 'windows-host\DOTNET_BUILD_TRUTH.json') | ConvertFrom-Json
+  $hostSha = Sha (Join-Path $stage 'windows-host\SmartRecruitmentWorkbench.exe')
+  if ($truthObj.outputs.executable_sha256 -and $hostSha -ne ([string]$truthObj.outputs.executable_sha256).ToLowerInvariant()) {
+    throw 'Inherited Windows Host binary fails carrier truth SHA-256.'
+  }
+  foreach ($p in @('VERSION','BUILD_INFO.json','scripts\run_local.py','frontend\dist\index.html','runtime\python.exe')) {
+    if (!(Test-Path -LiteralPath (Join-Path $stage $p))) { throw "Host ABI file missing: $p" }
+  }
+  $env:PYTHONUTF8 = '1'; $env:PYTHONDONTWRITEBYTECODE = '1'
+  & (Join-Path $stage 'runtime\python.exe') (Join-Path $stage 'scripts\launch_alpha10.py') --check
+  if ($LASTEXITCODE -ne 0) { throw 'Embedded Python self-check failed' }
+
+  $provenance = [ordered]@{
+    schema = 'srw.windows-native-host-inheritance.v1'
+    target_version = $Version
+    carrier_version = '0.8.8'
+    carrier_sha256 = $carrierSha
+    host_executable_sha256 = $hostSha
+    source_manifest_sha256 = (Sha (Join-Path $stage 'SOURCE_MANIFEST.sha256'))
+    runtime_manifest_sha256 = (Sha (Join-Path $stage 'PRODUCTION_RUNTIME.sha256'))
+    artifact_status = 'UNVERIFIED_GUI'
+    claim_boundary = 'Only reviewed source and explicitly validated external assets were staged. No runtime or WPF/WebView2 GUI acceptance is implied by assembly.'
+  }
+  New-Item -ItemType Directory -Force -Path (Join-Path $stage 'verification') | Out-Null
+  $provenance | ConvertTo-Json -Depth 8 | Set-Content -Encoding UTF8 -LiteralPath (Join-Path $stage 'verification\INHERITED_WINDOWS_HOST_PROVENANCE.json')
+  Remove-Item -LiteralPath $OutZip -Force -ErrorAction SilentlyContinue
+  Compress-Archive -Path (Join-Path $stage '*') -DestinationPath $OutZip -CompressionLevel Optimal
+  & $RuntimePython (Join-Path $stage 'scripts\native_payload.py') audit-zip --zip $OutZip --source-root $Root --host-root (Join-Path $baseRoot 'windows-host')
+  if ($LASTEXITCODE -ne 0) {
+    Remove-Item -LiteralPath $OutZip -Force -ErrorAction SilentlyContinue
+    throw 'Native ZIP allowlist/hash verification BLOCKED'
+  }
+  $outSha = Sha $OutZip
+  Set-Content -Encoding ASCII -LiteralPath ($OutZip + '.sha256') -Value "$outSha  $(Split-Path -Leaf $OutZip)"
+  Write-Host "Windows Native candidate assembled: $OutZip" -ForegroundColor Green
+  Write-Host "SHA-256: $outSha" -ForegroundColor Green
+  Write-Host 'Exact Windows GUI smoke remains required before any release promotion; WPF/WebView2 business acceptance is also pending.' -ForegroundColor Yellow
+} finally {
+  Remove-Item -LiteralPath $tmp -Recurse -Force -ErrorAction SilentlyContinue
+}
+ -and $relative -cne 'Lib/site-packages/certifi/cacert.pem')) { throw 'Private Runtime file prohibited' }
     $src = $runtimeRoot
     foreach ($part in $parts) {
       $src = Join-Path $src $part
