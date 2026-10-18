@@ -1,0 +1,37 @@
+name: SRW HTML E1 Sandbox
+
+on:
+  push:
+    branches:
+      - explore/html-site-prototype
+    paths:
+      - explorations/html-site/**
+      - .github/workflows/html-site-sandbox.yml
+
+concurrency:
+  group: srw-e1-sandbox-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  synthetic-e1:
+    name: E1 synthetic GET-only regression (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Check Python syntax
+        run: python -m compileall -q explorations/html-site
+      - name: Execute synthetic read-only integration tests
+        run: python -m unittest discover -s explorations/html-site -p "test_e1*.py" -v
