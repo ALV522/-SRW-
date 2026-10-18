@@ -10,9 +10,9 @@ E2a is an isolated laboratory. It reuses the **real** C11 Action Plan business
 endpoint and its native audit behavior, but runs that Core only against a
 one-time SQLite database containing synthetic candidates.
 
-## Verified at commit 0e8eacbd20ae3e609d3161c84910ddeec8a4b3ce
+## Verified at commit 481162b65ffb612fd4509a76647c0b0e50302c6a
 
-Source evidence: https://github.com/ALV522/-SRW-/actions/runs/39151649763
+Source evidence: https://github.com/ALV522/-SRW-/actions/runs/39152520579
 
 - Two independent Chromium browser contexts connect to the same disposable
   SRW backend and load the same candidate Action Plan.
@@ -25,7 +25,7 @@ Source evidence: https://github.com/ALV522/-SRW-/actions/runs/39151649763
 - Missing preconditions return HTTP **428**.
 - Other candidate IDs, unrelated writes and unlisted/privileged GETs are
   rejected by the exploration bridge.
-- Tests and runtime smoke checks succeeded on Windows and Ubuntu.
+- Four E2 guard tests per OS and three dedicated E2 Chromium tests passed (two-client conflict, write allowlist and 390px responsive layout). Runtime smoke checks succeeded on Windows and Ubuntu.
 - Windows batch entry `START_E2.cmd` executed from the actually assembled
   source demo package in CI.
 
