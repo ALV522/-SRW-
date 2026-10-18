@@ -1,3 +1,5 @@
+> **历史累计交付日志（非当前验收证据）**：本文保留 C08–C11 的演进和旧版本数据；当前源测试为 113 项（新增历史包审计测试），真实浏览器场景 3 项。最终提交及对应 Actions 结果以 [README](README.md) / [DEVELOPMENT_STATE](DEVELOPMENT_STATE.md) 为准。
+
 # SRW v1.0 Business Convergence 08 — 0.8 Capability Recovery
 
 ## Implemented

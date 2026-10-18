@@ -1,9 +1,11 @@
-# SRW C11 源码基线
+# SRW C11 当前源码基线
 
-版本：`1.0.0-alpha10-convergence11`。数据库结构：`v1_0014`。
+**主线**：GitHub `main`；**产品源码**：`1.0.0-alpha10-convergence11`；**Schema**：`v1_0014`。
 
-本包是 GitHub 源码产物，不包含内嵌 Windows Python、五个生产 Knowledge DB 或经过当前版本实机验收的原生宿主。不能把源码 ZIP 视为双击即用的 Windows Portable 成品。
+此仓库是完整可审计的**开发源码**，不是双击可用的 Windows Portable 安装包。源码测试（现为 113 项）与 3 条 Chromium 真实浏览器操作测试必须以具体 Git SHA 的 CI 为准；Windows WPF/WebView2 目标机尚未验收。
 
-使用 `python scripts/portable_input_preflight.py` 检查外部载体、运行时和生产 Knowledge 的必要输入。任何缺失会返回 BLOCKED。装配与 Windows GUI 实机验收必须另外进行。
+源码核验：`python scripts/check_source_integrity.py`、`python scripts/check_release_truth.py`、`python scripts/run_convergence_verification.py`。
 
-当前源代码与验收边界请参考 README.md、DEVELOPMENT_STATE.md、docs/ACCEPTANCE_PLAN.md；实际通过与否以对应提交的 GitHub Actions 日志为准。
+真实 Portable/Native 装配需要**单独审计**的 Python Runtime、五套生产 Knowledge DB 和精确版本的 Windows Host。缺失时必须返回 BLOCKED，而不是把合成 Knowledge 或历史 Web 包伪作正式发布。
+
+仓库入口：[README.md](README.md) · [主线治理](docs/REPOSITORY_GOVERNANCE.md) · [版本现状](DEVELOPMENT_STATE.md) · [历史开发包](docs/history/ARCHIVE_CATALOG.md) · [发布要求](docs/RELEASE_PROCESS.md)。

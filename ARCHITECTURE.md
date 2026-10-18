@@ -49,3 +49,7 @@ High-risk ontology creation remains export-only until its full validation contra
 `VERSION`, `BUILD_INFO.json`, `backend/srw/release_state.json`, `PORTABLE_MANIFEST.json`, `VERIFICATION_TRUTH.json` and the code-level schema revision must agree for a tagged release. `scripts/check_release_truth.py` is the source gate for that binding.
 
 Git history is the development truth from the Convergence 08 baseline onward. Portable/native ZIP files belong in GitHub Releases, not normal Git history.
+
+## Repository governance and historical artifact boundary (2026-10-18)
+
+See [mainline/branch/source governance](docs/REPOSITORY_GOVERNANCE.md). Historical v0.8.10/v0.8.12-R2/alpha10 ZIP files are catalogued by SHA under [docs/history](docs/history/ARCHIVE_CATALOG.md), not committed into Git. Older embedded runtimes and Knowledge DB snapshots are not automatically approved as production payloads. The separate Chromium real-browser CI passed three scripted scenarios on main 69f60b9; it is not a Native WPF Host acceptance test.
