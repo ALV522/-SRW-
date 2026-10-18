@@ -40,3 +40,7 @@ Record for each run: exact commit/artifact hash, OS/runtime, dataset identity, a
 ## Automated browser evidence
 
 See [Chromium acceptance](BROWSER_ACCEPTANCE.md). This separate CI gate executes click paths against a loopback SRW instance with real persistence and synthetic Knowledge inputs. It is not equivalent to Native Windows GUI smoke, production Knowledge validation or live AI verification. Record the exact browser workflow URL and SHA alongside release acceptance evidence.
+
+## 2026-10-18 acceptance evidence update
+
+Completed on main commit `69f60b9` (Chromium only): four-step Job Setup draft, candidate Source text intake and operator follow-up, candidate interview scheduling, human pipeline transitions into eligible Offer Draft stage, and confirmation that Offer Draft does not auto-hire. The new browser CI is separate from the 109-test source baseline; 4 extra archive-management regression tests are being added in the present PR. Uncovered workflows in the table above remain requirements, **not** completed browser or Windows Native acceptance. Exact new-commit evidence must be linked before claiming this PR verified.

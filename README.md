@@ -7,6 +7,7 @@
 ## 快速导航
 
 - [仓库组织、主线与分支治理](docs/REPOSITORY_GOVERNANCE.md)
+- [26 条现存 Git 分支盘点](docs/BRANCH_INVENTORY.md)
 - [现有能力、未决问题及开发状态](DEVELOPMENT_STATE.md)
 - [总体架构与业务不变量](ARCHITECTURE.md)
 - [真实浏览器业务验收](docs/BROWSER_ACCEPTANCE.md)
