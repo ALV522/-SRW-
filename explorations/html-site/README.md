@@ -72,11 +72,11 @@ This keeps the usability and portability advantages of a website while preservin
 
 ## Current experiment status — E1 + E2 synthetic lab
 
-**Verified** at exploration commit `0e8eacbd20ae3e609d3161c84910ddeec8a4b3ce`:
-[isolated E1/E2 GitHub Actions](https://github.com/ALV522/-SRW-/actions/runs/39151649763).
+**Verified** at exploration commit `481162b65ffb612fd4509a76647c0b0e50302c6a`:
+[isolated E1/E2 GitHub Actions](https://github.com/ALV522/-SRW-/actions/runs/39152520579).
 
-- Ubuntu and Windows: **15 E1/package tests + 3 E2 guard tests** per OS, PASS.
-- Real Chromium + C11 API + disposable SQLite: **9 tests**, PASS.
+- Ubuntu and Windows: **15 E1/package tests + 4 E2 guard tests** per OS, PASS.
+- Real Chromium + C11 API + disposable SQLite: **10 tests**, PASS.
 - Windows: actual `START_HERE.cmd --smoke` and `START_E2.cmd --smoke` executed successfully end to end, including E1's independent Python virtual environment.
 - Published a SHA-256-inventoried complete source demo artifact with both launchers.
 - E1 browser: cross-project candidates, candidate workspaces, mobile layout and direct URL history.
@@ -85,7 +85,7 @@ This keeps the usability and portability advantages of a website while preservin
 
 ## **Download the complete Windows demo ZIP (recommended)**
 
-[Download the verified E1/E2 source demo artifact from GitHub Actions](https://github.com/ALV522/-SRW-/actions/runs/39151649763/artifacts/12144953435).
+[Download the verified E1/E2 source demo artifact from GitHub Actions](https://github.com/ALV522/-SRW-/actions/runs/39152520579/artifacts/12145448946).
 
 You need a logged-in GitHub account with access to this private repository.
 
