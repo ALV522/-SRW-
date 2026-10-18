@@ -89,6 +89,23 @@ class RecoveredLegacyInputsTest(unittest.TestCase):
         self.assertEqual(report["status"], "C11_DEPENDENCIES_NOT_READY")
         self.assertFalse(report["c11_runtime_smoke_passed"])
 
+    def test_native_assembler_requires_pinned_runtime_before_preflight(self):
+        script = (Path(__file__).resolve().parents[1] / "scripts" /
+                  "build_windows_native_from_v088.ps1").read_text(encoding="utf-8")
+        self.assertIn("check_embedded_runtime_compatibility.py", script)
+        self.assertLess(
+            script.index("check_embedded_runtime_compatibility.py"),
+            script.index("portable_input_preflight.py"),
+        )
+
+    def test_windows_host_candidate_never_claims_gui_acceptance(self):
+        workflow = (Path(__file__).resolve().parents[1] / ".github" / "workflows" /
+                    "windows-host-candidate.yml").read_text(encoding="utf-8")
+        self.assertIn("RestoreLockedMode=true", workflow)
+        self.assertIn("COMPILED_ONLY_UNVERIFIED_GUI", workflow)
+        self.assertIn("gui_accepted = $false", workflow)
+        self.assertIn("runtime_included = $false", workflow)
+
     def test_runtime_compatibility_passes_only_exact_metadata(self):
         site = self.root / "runtime/Lib/site-packages/psutil-7.2.2.dist-info"
         site.mkdir(parents=True)
