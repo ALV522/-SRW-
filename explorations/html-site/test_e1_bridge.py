@@ -7,6 +7,7 @@ Run: python -m unittest discover -s explorations/html-site -p 'test_e1*.py' -v
 from __future__ import annotations
 
 import importlib.util
+import http.client
 import json
 import re
 import shutil
@@ -187,6 +188,29 @@ class E1BridgeTests(unittest.TestCase):
             with self.subTest(method=method):
                 status, _, _ = self.get("/api/v1/projects", method=method)
                 self.assertEqual(status, 405)
+        self.assertEqual(FakeSRWHandler.forwarded_mutations, [])
+
+    def test_denied_post_body_cannot_poison_next_request(self):
+        # Regression found by Chromium + real backend: a rejected HTTP/1.1
+        # POST body was previously parsed as the next GET request line.
+        conn = http.client.HTTPConnection(
+            "127.0.0.1", bridge.ReadOnlyBridge.listen_port, timeout=5
+        )
+        try:
+            conn.request(
+                "POST",
+                "/api/v1/projects",
+                body=b'{"title":"synthetic-do-not-create"}',
+                headers={"Content-Type": "application/json"},
+            )
+            response = conn.getresponse()
+            self.assertEqual(response.status, 405)
+            self.assertEqual(response.getheader("Connection"), "close")
+            response.read()
+        finally:
+            conn.close()
+        status, payload, _ = self.get("/api/v1/projects")
+        self.assertEqual(status, 200, payload)
         self.assertEqual(FakeSRWHandler.forwarded_mutations, [])
 
     def test_unlisted_get_routes_are_not_proxied(self):
