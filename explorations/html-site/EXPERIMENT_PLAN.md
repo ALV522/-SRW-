@@ -68,3 +68,15 @@ The code exists, but E1 is not complete until it is mounted under a real SRW loc
 - opening Web and EXE concurrently shows the same persisted state;
 - no write request is emitted by E1;
 - browser refresh/restart does not create divergent state.
+
+## E1 Windows adapter hardening (implemented; acceptance pending)
+
+- dynamic-port discovery from the Windows Host's `app.lock/instance.json`;
+- exact backend instance/session/version/data-scope match required for EXE mode;
+- loopback-only, GET/HEAD-only, route allowlist, no redirect following;
+- minimal Windows launcher: `run_e1_windows.cmd`;
+- synthetic HTTP/lease/security unit tests on an isolated workflow;
+- explicit LIVE vs MOCK status in the HTML UI;
+- user-run procedure: `USER_ACTIONS_WINDOWS.md`.
+
+E1 is accepted only after live Windows EXE + browser inspection with identical candidate/project state. The synthetic tests do not substitute for that acceptance.
