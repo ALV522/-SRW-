@@ -48,7 +48,7 @@ if not exist "explorations\html-site\run_e1_demo_windows.cmd" (
     pause
     exit /b 2
 )
-call "explorations\html-site\run_e1_demo_windows.cmd"
+call "explorations\html-site\run_e1_demo_windows.cmd" %*
 exit /b %ERRORLEVEL%
 """
 
