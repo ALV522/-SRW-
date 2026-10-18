@@ -108,6 +108,11 @@ class BackupRestoreIntegrityTest(unittest.TestCase):
         }))
         with zipfile.ZipFile(archive, "a") as z:
             z.writestr("data/unrelated.txt", "unsafe")
+        # Keep outer ZIP hash current; internal allowlist still must reject member.
+        marker.write_text(json.dumps({
+            "backup": archive.name, "sha256": hashlib.sha256(archive.read_bytes()).hexdigest(),
+            "schema_revision": "v1_0014",
+        }))
         with patch.object(launcher, "DATA", self.data), patch.object(launcher, "DB", self.live):
             with self.assertRaises(BackupTruthError):
                 launcher.apply_pending_restore()
