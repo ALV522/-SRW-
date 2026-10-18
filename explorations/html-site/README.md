@@ -70,43 +70,42 @@ SRW Local Application Service
 
 This keeps the usability and portability advantages of a website while preserving the capabilities that made the 0.8.x line valuable.
 
-## Current experiment status
+## Current experiment status — E1 + E2 synthetic lab
 
-- **E0 static HTML Mock:** implemented in `index.html`.
-- **E1 real C11 Web read-only integration:** implemented in `e1-live.html`, accepted for the tested source-run scope.
-- **Real Chromium + temporary SQLite acceptance:** six tests PASS, including cross-project candidates and mobile no-overflow.
-- **Ubuntu and Windows source-demo smoke:** PASS.
-- **Windows/Ubuntu Bridge tests:** 12 per platform, PASS.
-- **Native EXE ↔ Browser interoperability:** still awaiting an API-compatible, GUI-tested C11 Windows package.
+**Verified** at exploration commit `0e8eacbd20ae3e609d3161c84910ddeec8a4b3ce`:
+[isolated E1/E2 GitHub Actions](https://github.com/ALV522/-SRW-/actions/runs/39151649763).
 
-Full evidence: [E1_STATUS.md](E1_STATUS.md).
-Latest source-code acceptance: https://github.com/ALV522/-SRW-/actions/runs/39148706985
+- Ubuntu and Windows: **15 E1/package tests + 3 E2 guard tests** per OS, PASS.
+- Real Chromium + C11 API + disposable SQLite: **9 tests**, PASS.
+- Windows: actual `START_HERE.cmd --smoke` and `START_E2.cmd --smoke` executed successfully end to end, including E1's independent Python virtual environment.
+- Published a SHA-256-inventoried complete source demo artifact with both launchers.
+- E1 browser: cross-project candidates, candidate workspaces, mobile layout and direct URL history.
+- E2: two real Chromium client contexts, one actual C11 Action Plan business write, second stale write rejected as HTTP 412, then refreshed second write succeeds; C11 audit events present.
+- No official Native WPF/WebView2 C11 EXE, real Windows host acceptance or full 0.8.x parity is claimed.
 
-## Start the real Web demo WITHOUT a Windows EXE
+## **Download the complete Windows demo ZIP (recommended)**
 
-The experiment can now run actual C11 APIs using an isolated temporary
-SQLite database and synthetic candidate records. Nothing in an existing SRW
-application/data directory is opened.
+[Download the verified E1/E2 source demo artifact from GitHub Actions](https://github.com/ALV522/-SRW-/actions/runs/39151649763/artifacts/12144953435).
 
-Windows:
+You need a logged-in GitHub account with access to this private repository.
 
-```text
-explorations/html-site/run_e1_demo_windows.cmd
-```
+1. Download the Actions artifact ZIP.
+2. Extract the **whole ZIP** to its own folder.
+3. Run **`START_HERE.cmd`** for E1 read-only real-core Web.
+4. Optionally run **`START_E2.cmd`** for E2 **synthetic-only** Action Plan write-conflict lab.
 
-The Windows script expects Python 3.12, creates an independent `.e1-demo-venv`,
-installs pinned dependencies there and launches the demo in your browser.
+Python 3.12 and internet for first-time pinned-dependency installation are required;
+both launchers create a separate environment. No real user data is opened and
+all sample SQLite/Knowledge records are disposable.
 
-Cross-platform manual operation after dependencies are available:
+**Do not download only the nested launcher CMD.** The original user-reported
+failure was reproduced in Windows CI and required both canonical source
+packaging and Windows batch path fixes.
 
-```bash
-python explorations/html-site/run_e1_demo.py --open-browser
-```
-
-The browser should show `LIVE · web · GET-only`. Exit with Ctrl+C to stop both
-temporary services and delete the synthetic SQLite and Knowledge fixtures.
-
-Details: **[USER_ACTIONS_NO_EXE.md](USER_ACTIONS_NO_EXE.md)**.
+Instructions: [USER_ACTIONS_NO_EXE.md](USER_ACTIONS_NO_EXE.md).
+Evidence: [E1_STATUS.md](E1_STATUS.md).
+Synthetic E2 scope: [E2_STATUS.md](E2_STATUS.md).
+Architecture: [DUAL_CARRIER_PRODUCT_CONTRACT.md](DUAL_CARRIER_PRODUCT_CONTRACT.md).
 
 ## Run E1 on Windows (same EXE, same database)
 
