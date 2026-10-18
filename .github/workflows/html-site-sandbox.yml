@@ -8,6 +8,7 @@ on:
       - explorations/html-site/serve_e1.py
       - explorations/html-site/e1-live.html
       - explorations/html-site/test_e1_bridge.py
+      - explorations/html-site/browser_acceptance/**
       - explorations/html-site/run_e1_windows.cmd
       - .github/workflows/html-site-sandbox.yml
 
@@ -38,3 +39,35 @@ jobs:
         run: python -m compileall -q explorations/html-site
       - name: Execute synthetic read-only integration tests
         run: python -m unittest discover -s explorations/html-site -p "test_e1*.py" -v
+
+  real-browser-e1:
+    name: E1 real backend + Chromium (Ubuntu)
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: pip
+          cache-dependency-path: requirements-ci.txt
+      - name: Install pinned current backend and browser tooling
+        run: |
+          python -m pip install -r requirements-ci.txt
+          python -m pip install playwright==1.56.0
+      - name: Install Chromium browser + Linux dependencies
+        run: python -m playwright install --with-deps chromium
+      - name: Exercise live E1 browser against real C11 backend with disposable SQLite
+        env:
+          PYTHONPATH: backend
+          PYTHONUNBUFFERED: '1'
+        run: |
+          mkdir -p artifacts/html-e1-browser
+          python -m unittest discover -s explorations/html-site/browser_acceptance -p "test_*.py" -v
+      - name: Upload synthetic browser failure evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: srw-e1-real-browser-${{ github.sha }}
+          path: artifacts/html-e1-browser/
+          if-no-files-found: warn
