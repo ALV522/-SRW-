@@ -14,16 +14,19 @@ echo No existing SRW data, resume or provider key is opened.
 echo Press Ctrl+C to stop. Temporary data will be deleted.
 echo.
 
+rem This launcher must live at REPO_ROOT\explorations\html-site\
+rem Dragging/copying only the CMD or the html-site folder cannot supply the
+rem Python backend; the packaged START_HERE.cmd preserves the full layout.
 for %%I in ("%~dp0..\..") do set "SRW_REPO_ROOT=%%~fI"
-if not exist "%SRW_REPO_ROOT%\requirements-ci.txt" (
-    echo ERROR: full exploration branch source checkout is required.
-    pause
-    exit /b 2
-)
-if not exist "%SRW_REPO_ROOT%\browser_acceptance\serve.py" (
-    echo ERROR: missing browser_acceptance/serve.py.
-    pause
-    exit /b 2
+if not exist "%SRW_REPO_ROOT%\requirements-ci.txt" goto :missing_sources
+if not exist "%SRW_REPO_ROOT%\browser_acceptance\serve.py" goto :missing_sources
+if not exist "%SRW_REPO_ROOT%\backend\srw\api\app.py" goto :missing_sources
+if not exist "%SRW_REPO_ROOT%\convergence_tests\knowledge_fixture.py" goto :missing_sources
+if not exist "%SRW_REPO_ROOT%\frontend\dist\index.html" goto :missing_sources
+if /i "%~1"=="--check-layout" (
+    echo PASS: verified complete SRW E1 source bundle layout.
+    echo Root: "%SRW_REPO_ROOT%"
+    exit /b 0
 )
 
 where py >nul 2>&1
@@ -72,6 +75,27 @@ if not "%E1_EXIT%"=="0" (
 echo The synthetic server has stopped.
 pause
 exit /b %E1_EXIT%
+
+:missing_sources
+echo.
+echo ERROR: INCOMPLETE SRW E1 SOURCE PACKAGE.
+echo This is a source-layout problem, not a C11 backend startup failure.
+echo Expected repository root: "%SRW_REPO_ROOT%"
+echo.
+echo Required sibling folders under that root:
+echo   backend\srw\
+echo   frontend\dist\
+echo   browser_acceptance\serve.py
+echo   convergence_tests\knowledge_fixture.py
+echo   explorations\html-site\
+echo   requirements-ci.txt
+echo.
+echo FIX: Download the single GitHub Actions demo artifact ZIP.
+echo Extract the ENTIRE ZIP, then run START_HERE.cmd at its top level.
+echo Do not download only run_e1_demo_windows.cmd or the html-site folder.
+echo No real SRW data was opened or modified.
+pause
+exit /b 2
 
 :failed
 echo ERROR: unable to prepare isolated E1 Python environment.
