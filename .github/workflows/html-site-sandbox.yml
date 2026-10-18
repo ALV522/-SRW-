@@ -5,7 +5,10 @@ on:
     branches:
       - explore/html-site-prototype
     paths:
-      - explorations/html-site/**
+      - explorations/html-site/serve_e1.py
+      - explorations/html-site/e1-live.html
+      - explorations/html-site/test_e1_bridge.py
+      - explorations/html-site/run_e1_windows.cmd
       - .github/workflows/html-site-sandbox.yml
 
 concurrency:
