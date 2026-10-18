@@ -63,7 +63,13 @@ try {
   CopyReviewedSources $Root $stage
 
   # The three externally supplied artifact families are explicitly staged.
-  Copy-Item -LiteralPath (Join-Path $Root 'runtime') -Destination $stage -Recurse -Force
+  # Runtime bytes are staged from independently audited SHA-256 inventory only.
+  & $RuntimePython (Join-Path $Root 'scripts\native_payload.py') stage-runtime `
+    --runtime (Join-Path $Root 'runtime') `
+    --manifest (Join-Path $Root 'PRODUCTION_RUNTIME.sha256') `
+    --destination (Join-Path $stage 'runtime')
+  if ($LASTEXITCODE -ne 0) { throw 'Audited Runtime staging BLOCKED' }
+  Copy-Item -LiteralPath (Join-Path $Root 'PRODUCTION_RUNTIME.sha256') -Destination (Join-Path $stage 'PRODUCTION_RUNTIME.sha256') -Force
   foreach ($name in @('taxonomy','job_info','competency','market_reference','reference')) {
     $srcDb = Join-Path (Join-Path (Join-Path $Root 'knowledge\active') $name) 'knowledge.db'
     $dstDb = Join-Path (Join-Path (Join-Path $stage 'knowledge\active') $name) 'knowledge.db'
@@ -92,6 +98,7 @@ try {
     carrier_sha256 = $carrierSha
     host_executable_sha256 = $hostSha
     source_manifest_sha256 = (Sha (Join-Path $stage 'SOURCE_MANIFEST.sha256'))
+    runtime_manifest_sha256 = (Sha (Join-Path $stage 'PRODUCTION_RUNTIME.sha256'))
     artifact_status = 'UNVERIFIED_GUI'
     claim_boundary = 'Only reviewed source and explicitly validated external assets were staged. No runtime or WPF/WebView2 GUI acceptance is implied by assembly.'
   }
@@ -99,6 +106,13 @@ try {
   $provenance | ConvertTo-Json -Depth 8 | Set-Content -Encoding UTF8 -LiteralPath (Join-Path $stage 'verification\INHERITED_WINDOWS_HOST_PROVENANCE.json')
   Remove-Item -LiteralPath $OutZip -Force -ErrorAction SilentlyContinue
   Compress-Archive -Path (Join-Path $stage '*') -DestinationPath $OutZip -CompressionLevel Optimal
+  # Validate the actual compressed output, not only the staging tree.
+  & $RuntimePython (Join-Path $Root 'scripts\native_payload.py') audit-zip `
+    --zip $OutZip --source-root $Root --host-root (Join-Path $baseRoot 'windows-host')
+  if ($LASTEXITCODE -ne 0) {
+    Remove-Item -LiteralPath $OutZip -Force -ErrorAction SilentlyContinue
+    throw 'Native ZIP allowlist/hash validation BLOCKED'
+  }
   $outSha = Sha $OutZip
   Set-Content -Encoding ASCII -LiteralPath ($OutZip + '.sha256') -Value "$outSha  $(Split-Path -Leaf $OutZip)"
   Write-Host "Windows Native candidate assembled: $OutZip" -ForegroundColor Green
