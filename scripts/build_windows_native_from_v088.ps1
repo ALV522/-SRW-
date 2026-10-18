@@ -85,6 +85,9 @@ try {
   CopyAuditedRuntime (Join-Path $Root 'runtime') (Join-Path $Root 'PRODUCTION_RUNTIME.sha256') (Join-Path $stage 'runtime')
   $env:PYTHONUTF8 = '1'; $env:PYTHONDONTWRITEBYTECODE = '1'
   $RuntimePython = Join-Path $stage 'runtime\python.exe'
+  # SHA recovery is not dependency compatibility: block mismatched alpha10 wheel versions.
+  & $RuntimePython (Join-Path $stage 'scripts\check_embedded_runtime_compatibility.py') --runtime (Join-Path $stage 'runtime') --requirements (Join-Path $stage 'requirements-ci.txt')
+  if ($LASTEXITCODE -ne 0) { throw 'C11 embedded Runtime dependencies do not match current pinned requirements' }
   & $RuntimePython (Join-Path $stage 'scripts\portable_input_preflight.py') --root $Root --runtime (Join-Path $stage 'runtime') --runtime-manifest (Join-Path $Root 'PRODUCTION_RUNTIME.sha256')
   if ($LASTEXITCODE -ne 0) { throw 'Portable input preflight BLOCKED' }
   Expand-Archive -LiteralPath $BaseZip -DestinationPath $base -Force
