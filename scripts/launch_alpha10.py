@@ -27,7 +27,6 @@ FRONTEND = ROOT / "frontend" / "dist"
 KNOWLEDGE = ROOT / "knowledge" / "active"
 EXPECTED_VERSION = (ROOT / "VERSION").read_text(encoding="utf-8").strip()
 EXPECTED_SCHEMA = "v1_0014"
-DATA.mkdir(parents=True, exist_ok=True)
 
 
 def _sha256(path: Path) -> str:
@@ -247,7 +246,10 @@ def self_check() -> int:
             if not p.is_file() or p.read_bytes()[:16] != b"SQLite format 3\x00":
                 raise RuntimeError(f"knowledge database invalid: {name}")
         from srw.api.app import create_v1_app
-        create_v1_app("sqlite+pysqlite:///:memory:", data_dir=DATA, knowledge_dir=KNOWLEDGE, frontend_dist=FRONTEND)
+        # Validate the application without writing a real user data directory
+        # into the package staging tree during native assembly.
+        with tempfile.TemporaryDirectory(prefix="srw-native-self-check-") as td:
+            create_v1_app("sqlite+pysqlite:///:memory:", data_dir=Path(td) / "data", knowledge_dir=KNOWLEDGE, frontend_dist=FRONTEND)
         from srw.release import get_release_state
         release = get_release_state()
         if release["version"] != EXPECTED_VERSION or release["schema_revision"] != EXPECTED_SCHEMA:
@@ -301,6 +303,7 @@ def migrate_from(path: str) -> int:
 
 
 def serve() -> int:
+    DATA.mkdir(parents=True, exist_ok=True)
     kind, port, info = find_existing()
     if kind == "reuse":
         print(f"检测到同一 Business Convergence 08 数据目录已在运行：http://127.0.0.1:{port}/v1")
