@@ -59,7 +59,7 @@ if not errorlevel 1 (
 echo Attaching to EXE, verifying identity and opening browser...
 echo To stop the exploration, press Ctrl+C in this window.
 echo.
-%PYTHON_COMMAND% "%~dp0serve_e1.py" --data-root "%SRW_DATA_ROOT%" --port 8877 --open-browser
+%PYTHON_COMMAND% "%~dp0serve_e1.py" --data-root "%SRW_DATA_ROOT%" --port 0 --open-browser
 set "RESULT=%ERRORLEVEL%"
 
 echo.
