@@ -80,16 +80,42 @@ This keeps the usability and portability advantages of a website while preservin
 
 The E1 JavaScript has been syntax-validated. It has **not yet been accepted against a running Windows SRW instance**, because this exploration branch does not alter the mainline backend/static mount. Live runtime acceptance is therefore still pending.
 
-## Run E1 against an existing SRW instance
+## Run E1 on Windows (same EXE, same database)
 
-The exploration includes a loopback-only, GET-only same-origin bridge:
+The EXE uses a **dynamically allocated loopback port**, recorded in the live
+`data/app.lock/instance.json` lease. Do not assume port 8765.
 
-```bash
-python explorations/html-site/serve_e1.py --upstream http://127.0.0.1:8765 --port 8877
+1. Download the exploration branch into a directory **separate from your EXE/Portable installation**.
+2. Keep a compatible SRW Windows EXE running.
+3. Drag its `data` folder onto `run_e1_windows.cmd`, or double-click the BAT and provide that directory.
+4. The bridge validates the EXE lease's port, version, instance ID, session ID and data-root identity against the running backend.
+5. Only after validation, a browser opens with `LIVE · windows · GET-only`.
+
+Or run it manually:
+
+```powershell
+py -3 serve_e1.py --data-root "C:\\Path\\To\\SRW\\data" --port 0 --open-browser
 ```
 
-Then open `http://127.0.0.1:8877/`.
+For a running non-EXE SRW local service, specify its actual port:
 
-The bridge serves `e1-live.html` and proxies only GET/HEAD requests under `/api/` and `/health/` to the existing SRW service. POST/PATCH/PUT/DELETE return HTTP 405 locally. The upstream is restricted to loopback hosts.
+```powershell
+py -3 serve_e1.py --upstream http://127.0.0.1:8000 --port 0 --open-browser
+```
 
-This provides a safe way to test whether a browser Web carrier can observe exactly the same Project/Candidate/Evidence state as the Windows EXE without touching the production frontend or creating a second database.
+That last mode tests the Web surface but does **not** prove an EXE connection.
+
+All bridge routes are GET/HEAD-only, explicitly allowlisted and served on loopback.
+It cannot create a second SRW process or change the existing SQLite/Blob store.
+
+Read **[USER_ACTIONS_WINDOWS.md](USER_ACTIONS_WINDOWS.md)** for the minimal steps
+and what to report afterward. Do not share `instance.json` or real candidate data.
+
+## Automated synthetic checks
+
+An exploration-only workflow at `.github/workflows/html-site-sandbox.yml` runs
+`python -m unittest discover -s explorations/html-site -p "test_e1*.py" -v`
+on Ubuntu and Windows, using an entirely synthetic SRW-like HTTP fixture.
+It never reads production data and is separate from mainline CI.
+
+Passing synthetic tests is **not** a Windows EXE acceptance result.
