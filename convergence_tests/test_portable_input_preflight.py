@@ -30,7 +30,11 @@ class PortableInputPreflightTest(unittest.TestCase):
         (self.root / "SRW_v0.8.8_Windows_Portable.zip").write_bytes(b"carrier")
         runtime = self.root / "runtime"
         runtime.mkdir()
-        (runtime / "python.exe").write_bytes(b"synthetic preflight input - not an executable")
+        fake = b"synthetic preflight input - not an executable"
+        (runtime / "python.exe").write_bytes(fake)
+        (self.root / "PRODUCTION_RUNTIME.sha256").write_text(
+            hashlib.sha256(fake).hexdigest() + "  python.exe\n", encoding="utf-8"
+        )
         entries = []
         for name, table in DB_TABLES.items():
             folder = self.root / "knowledge" / "active" / name
@@ -52,7 +56,7 @@ class PortableInputPreflightTest(unittest.TestCase):
         self.assertFalse(result["windows_gui_accepted"])
         self.assertEqual(
             {x["name"] for x in result["checks"]},
-            {"windows_carrier", "embedded_runtime", "knowledge_manifest"},
+            {"windows_carrier", "embedded_runtime", "runtime_manifest", "knowledge_manifest"},
         )
         self.assertTrue(all(x["status"] == "BLOCKED" for x in result["checks"]))
         self.assertNotIn(str(self.root), json.dumps(result))
@@ -61,7 +65,7 @@ class PortableInputPreflightTest(unittest.TestCase):
         self._seed_inputs()
         complete = audit(self.root)
         self.assertTrue(complete["inputs_complete"], complete)
-        self.assertEqual(len(complete["checks"]), 8)
+        self.assertEqual(len(complete["checks"]), 9)
         self.assertFalse(complete["production_knowledge_provenance_verified"])
         self.assertFalse(complete["windows_gui_accepted"])
 
@@ -91,6 +95,9 @@ class PortableInputPreflightTest(unittest.TestCase):
         self.assertIn("SOURCE_MANIFEST.sha256", content)
         self.assertIn("portable_input_preflight.py", content)
         self.assertIn("PRODUCTION_KNOWLEDGE.sha256", content)
+        self.assertIn("PRODUCTION_RUNTIME.sha256", content)
+        self.assertIn("stage-runtime", content)
+        self.assertIn("audit-zip", content)
         self.assertIn("_Windows_Native_UNVERIFIED.zip", content)
         self.assertIn("$hostExe", content)
         self.assertNotIn("Copy-Item -Path (Join-Path $Root '*')", content)
