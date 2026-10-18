@@ -45,6 +45,36 @@ class NativePayloadTests(unittest.TestCase):
         self.assertLess(verified, execute)
         self.assertNotIn("& $RuntimePython (Join-Path $Root 'scripts\\portable_input_preflight.py')", script)
 
+    @unittest.skipUnless(sys.platform == "win32" and shutil.which("powershell"), "Windows PowerShell only")
+    def test_windows_powershell_audited_runtime_stage(self):
+        source = Path(__file__).resolve().parents[1] / "scripts" / "build_windows_native_from_v088.ps1"
+        dest = self.root / "powershell-staged"
+        (self.runtime / "provider_secrets.json").write_bytes(b"do-not-ship")
+
+        def quoted(p):
+            return "'" + str(p).replace("'", "''") + "'"
+
+        # Parse reviewed functions without invoking the real Native assembler.
+        # No production carrier, database or GUI is used in this test.
+        script = (
+            "$tokens=$null;$errors=$null;"
+            "$ast=[System.Management.Automation.Language.Parser]::ParseFile("
+            + quoted(source) + ",[ref]$tokens,[ref]$errors);"
+            "if($errors.Count -ne 0){throw 'PowerShell syntax invalid'};"
+            "foreach($fnName in @('Sha','CopyAuditedRuntime')){"
+            "$fn=$ast.Find({param($node) $node -is [System.Management.Automation.Language.FunctionDefinitionAst] -and $node.Name -eq $fnName},$true);"
+            "if(-not $fn){throw 'Missing release function'};"
+            "Invoke-Expression $fn.Extent.Text;"
+            "};"
+            "CopyAuditedRuntime " + quoted(self.runtime) + " " + quoted(self.runtime_manifest) + " " + quoted(dest) + ";"
+        )
+        run = subprocess.run(
+            ["powershell", "-NoProfile", "-NonInteractive", "-Command", script],
+            capture_output=True, text=True, timeout=30, check=False,
+        )
+        self.assertEqual(run.returncode, 0, run.stderr)
+        self.assertEqual(sorted(p.name for p in dest.iterdir()), ["python.exe", "python312.dll"])
+
     def test_portable_launcher_help_does_not_create_user_data(self):
         # Import/CLI dispatch must not write into a future Native ZIP stage.
         source = Path(__file__).resolve().parents[1] / "scripts" / "launch_alpha10.py"
