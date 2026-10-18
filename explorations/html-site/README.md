@@ -79,3 +79,17 @@ This keeps the usability and portability advantages of a website while preservin
 - E1 API ownership/safety boundary is documented in `E1_API_MATRIX.md`.
 
 The E1 JavaScript has been syntax-validated. It has **not yet been accepted against a running Windows SRW instance**, because this exploration branch does not alter the mainline backend/static mount. Live runtime acceptance is therefore still pending.
+
+## Run E1 against an existing SRW instance
+
+The exploration includes a loopback-only, GET-only same-origin bridge:
+
+```bash
+python explorations/html-site/serve_e1.py --upstream http://127.0.0.1:8765 --port 8877
+```
+
+Then open `http://127.0.0.1:8877/`.
+
+The bridge serves `e1-live.html` and proxies only GET/HEAD requests under `/api/` and `/health/` to the existing SRW service. POST/PATCH/PUT/DELETE return HTTP 405 locally. The upstream is restricted to loopback hosts.
+
+This provides a safe way to test whether a browser Web carrier can observe exactly the same Project/Candidate/Evidence state as the Windows EXE without touching the production frontend or creating a second database.
