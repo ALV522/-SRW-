@@ -169,7 +169,17 @@ class E2TwoBrowserContexts(unittest.TestCase):
         page.locator("#e2-candidate").select_option(self.cid)
         expect(page.locator("#e2-editor")).to_contain_text(self.cid)
         size=page.evaluate("({width:document.documentElement.clientWidth,scroll:document.documentElement.scrollWidth})")
-        self.assertLessEqual(size["scroll"],size["width"]+2,size)
+        offenders=page.evaluate("""() => {
+          const w=document.documentElement.clientWidth;
+          return [...document.querySelectorAll('body *')]
+            .filter(el=>el.getBoundingClientRect().right>w+2)
+            .slice(0,12).map(el=>({
+              tag:el.tagName,cls:String(el.className).slice(0,40),
+              id:el.id||'',right:Math.round(el.getBoundingClientRect().right)
+            }));
+        }""")
+        self.assertLessEqual(size["scroll"],size["width"]+2,
+                             {"size":size,"overflow_elements":offenders})
         page.screenshot(path=str(EVIDENCE/"e2-mobile-action-plan.png"),full_page=True)
 
     def test_02_e2_cannot_mutate_other_objects_or_candidates(self):
