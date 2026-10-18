@@ -12,9 +12,13 @@ import json
 import os
 import shutil
 import subprocess
+import sys
 import tempfile
 import zipfile
 from pathlib import Path
+
+if __package__ in (None, ""):
+    sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from scripts.native_payload import (
     KNOWLEDGE, PROVENANCE, PayloadError, audit_runtime,
@@ -35,6 +39,17 @@ def verified_git_sha(root: Path) -> str:
 def _verify_host(host: Path, expected_sha: str) -> dict:
     if not host.is_dir() or host.is_symlink():
         raise PayloadError("source-built Windows Host directory missing")
+    for file in host.rglob("*"):
+        if file.is_symlink():
+            raise PayloadError("symlinked Host payload")
+        if file.is_file():
+            relative = file.relative_to(host).as_posix()
+            parts = [part.casefold() for part in relative.split("/")]
+            leaf = parts[-1]
+            if (any(p in {"data", "uploads", "backups", "workspace", "private", "secrets"} for p in parts)
+                or leaf in {".env", "secrets.json", "credentials.json", "provider_secrets.json"}
+                or leaf.endswith((".db", ".sqlite", ".key", ".pfx", ".pem"))):
+                raise PayloadError("potentially private content in Windows Host input")
     metadata = host / "HOST_BUILD_CANDIDATE.json"
     if metadata.is_symlink() or not metadata.is_file():
         raise PayloadError("missing exact-source Windows Host candidate metadata")
@@ -151,7 +166,7 @@ def assemble(root: Path, inputs: Path, host: Path, out: Path, *,
                 for path in sorted(stage.rglob("*")):
                     if path.is_file():
                         zipped.write(path, path.relative_to(stage).as_posix())
-            checked_zip = audit_zip(temp_zip, root, host)
+            checked_zip = audit_zip(temp_zip, stage, host)
             os.replace(temp_zip, out)
         finally:
             temp_zip.unlink(missing_ok=True)
