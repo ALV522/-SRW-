@@ -80,3 +80,17 @@ The code exists, but E1 is not complete until it is mounted under a real SRW loc
 - user-run procedure: `USER_ACTIONS_WINDOWS.md`.
 
 E1 is accepted only after live Windows EXE + browser inspection with identical candidate/project state. The synthetic tests do not substitute for that acceptance.
+
+## Source-build E1/E2 package and E2a acceptance (verified)
+
+At commit `0e8eacbd20ae3e609d3161c84910ddeec8a4b3ce`:
+
+- complete package assembled with all required runtime Python sources, HTML, fixtures, manifests and pinned dependencies;
+- top-level E1 `START_HERE.cmd` / E2 `START_E2.cmd` actual Windows launch paths passed;
+- Chromium shows live C11 project/candidate data, handles deep links and mobile viewport;
+- E2a two synthetic clients can update real C11 Candidate Action Plan through the isolated facade; stale ETag mutation returns 412 and does not overwrite prior owner;
+- backend audit events were tested;
+- E1 remains GET-only; E2 forbids all other mutations and is started only by the disposable synthetic harness;
+- E2b production transactional CAS inside the SRW Core remains **not implemented**, and Native WPF/WebView2 plus production Knowledge acceptance remain open.
+
+The accepted artifact is a source-demo ZIP with separate Python dependency setup, **not** a Windows runtime/EXE release.
