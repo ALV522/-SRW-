@@ -36,3 +36,7 @@ This is an execution plan, not a completed acceptance report. C11 prioritizes co
 | External AI | Configure real provider, timeout/limit/error cases | Actual privacy projection; clear retry and failure status |
 
 Record for each run: exact commit/artifact hash, OS/runtime, dataset identity, actions, observed result, evidence location and unresolved defects. API regression is a prerequisite; it does not mark UI rows complete.
+
+## Automated browser evidence
+
+See [Chromium acceptance](BROWSER_ACCEPTANCE.md). This separate CI gate executes click paths against a loopback SRW instance with real persistence and synthetic Knowledge inputs. It is not equivalent to Native Windows GUI smoke, production Knowledge validation or live AI verification. Record the exact browser workflow URL and SHA alongside release acceptance evidence.

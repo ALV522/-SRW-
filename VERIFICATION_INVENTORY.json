@@ -39,7 +39,7 @@
     "note": "Reference inventory only; these 725 v0.8.12-R2 backend tests are not claimed as executed in Convergence 08."
   },
   "current": {
-    "convergence_test_count": 106,
+    "convergence_test_count": 109,
     "files": [
       {
         "file": "test_assessment.py",
@@ -48,6 +48,10 @@
       {
         "file": "test_backup_integrity.py",
         "test_methods": 6
+      },
+      {
+        "file": "test_candidate_prepublication.py",
+        "test_methods": 3
       },
       {
         "file": "test_convergence02.py",
@@ -110,6 +114,6 @@
   },
   "recovered_gates": [],
   "parity_status": "PARTIAL",
-  "parity_note": "106 current source tests vs historical 725 inventory; Native GUI and real assets remain unverified.",
+  "parity_note": "109 source regression tests (3 newly covering prepublished candidate intake) vs historical 725 reference tests; Chromium acceptance is a separate gate.",
   "historical_recovered_gates": "verification/history/convergence08/VERIFICATION_INVENTORY.json"
 }

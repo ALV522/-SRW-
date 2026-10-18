@@ -115,18 +115,29 @@ def get_candidate_workspace(
     identity = session.execute(
         select(Candidate, Project, ProtocolRevision, MaterialRevision)
         .join(Project, Candidate.project_id == Project.id)
-        .join(ProtocolRevision, ProtocolRevision.id == Project.current_protocol_revision_id)
-        .join(MaterialRevision, MaterialRevision.id == Candidate.current_material_revision_id)
+        .outerjoin(ProtocolRevision, ProtocolRevision.id == Project.current_protocol_revision_id)
+        .outerjoin(MaterialRevision, MaterialRevision.id == Candidate.current_material_revision_id)
         .where(Candidate.id == candidate_id)
     ).first()
     if identity is None:
         if session.get(Candidate, candidate_id) is None:
             raise V1NotFoundError(f"candidate not found: {candidate_id}")
-        raise V1InvariantError("candidate current decision context is incomplete")
+        raise V1InvariantError("candidate project relationship is invalid")
     candidate, project, protocol, material = identity
-    if protocol.state != "published" or material.candidate_id != candidate.id:
-        raise V1InvariantError("candidate current decision context is invalid")
-    context_hash = decision_context_hash(protocol.id, material.id, evaluation_policy_revision)
+    # Intake and material review must remain usable before a protocol is published.
+    # A missing decision context must never become a synthetic valid decision.
+    if (project.current_protocol_revision_id and protocol is None) or (
+        protocol is not None and (protocol.state != "published" or protocol.project_id != project.id)
+    ):
+        raise V1InvariantError("candidate current protocol pointer is invalid")
+    if (candidate.current_material_revision_id and material is None) or (
+        material is not None and material.candidate_id != candidate.id
+    ):
+        raise V1InvariantError("candidate current material pointer is invalid")
+    context_hash = (
+        decision_context_hash(protocol.id, material.id, evaluation_policy_revision)
+        if protocol is not None and material is not None else ""
+    )
 
     judgments = session.scalars(
         select(CriterionJudgment).where(
@@ -156,7 +167,7 @@ def get_candidate_workspace(
             MaterialSourceBinding,
             and_(
                 MaterialSourceBinding.source_id == Source.id,
-                MaterialSourceBinding.material_revision_id == material.id,
+                MaterialSourceBinding.material_revision_id == (material.id if material is not None else ""),
             ),
         )
         .where(Source.candidate_id == candidate.id)
@@ -192,6 +203,24 @@ def get_candidate_workspace(
                     proposal_reason=str(proposal_metadata.get("reason") or ""),
                 )
             )
+
+    if protocol is None or material is None:
+        reason = (
+            "岗位评价标准尚未正式发布；可先收件和核实材料，但不能提交招聘判断"
+            if protocol is None else
+            "候选人尚无已发布材料；可先导入材料，但不能提交招聘判断"
+        )
+        return CandidateWorkspace(
+            candidate_id=candidate.id,
+            display_name=candidate.display_name,
+            decision_context_hash="",
+            decision_ready=False,
+            readiness_label=reason,
+            blocking_count=0,
+            next_action=NextAction(type=NextActionType.WAIT_FOR_INPUT, reason=reason),
+            sources=tuple(source_views.values()),
+            claims=tuple(claim_views),
+        )
 
     protocol_payload = _payload(protocol.payload_json)
     criteria_payload = [row for row in (protocol_payload.get("criteria") or []) if isinstance(row, dict)]
