@@ -56,6 +56,7 @@ try {
   # Source and Runtime are independently checked before any embedded Python is launched.
   CopyReviewedSources $Root $stage
   CopyAuditedRuntime (Join-Path $Root 'runtime') (Join-Path $Root 'PRODUCTION_RUNTIME.sha256') (Join-Path $stage 'runtime')
+  $env:PYTHONUTF8 = '1'; $env:PYTHONDONTWRITEBYTECODE = '1'
   $RuntimePython = Join-Path $stage 'runtime\python.exe'
   & $RuntimePython (Join-Path $stage 'scripts\portable_input_preflight.py') `
     --root $Root --runtime (Join-Path $stage 'runtime') `
