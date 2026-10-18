@@ -121,15 +121,15 @@ class SourceBuiltHostPackagingTest(unittest.TestCase):
     def test_c11_overlay_requires_actual_embedded_runtime_smoke_audit(self):
         runtime = self.inputs / "runtime"
         (runtime / "python312._pth").write_text(
-            "python312.zip\\nLib\\\\c11-overlay\\nLib\\\\site-packages\\nimport site\\n",
+            "python312.zip\nLib\\c11-overlay\nLib\\site-packages\nimport site\n",
             encoding="utf-8",
         )
         overlay = runtime / "Lib" / "c11-overlay" / "psutil-7.2.2.dist-info"
         overlay.mkdir(parents=True)
-        (overlay / "METADATA").write_text("Name: psutil\\nVersion: 7.2.2\\n\\n")
+        (overlay / "METADATA").write_text("Name: psutil\nVersion: 7.2.2\n\n")
         files = sorted(p for p in runtime.rglob("*") if p.is_file())
         (self.inputs / "PRODUCTION_RUNTIME.sha256").write_text(
-            "".join(f"{digest(p.read_bytes())}  {p.relative_to(runtime).as_posix()}\\n" for p in files)
+            "".join(f"{digest(p.read_bytes())}  {p.relative_to(runtime).as_posix()}\n" for p in files)
         )
         with self.assertRaisesRegex(PayloadError, "smoke audit"):
             self._assemble()
