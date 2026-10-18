@@ -1,0 +1,63 @@
+name: SRW Windows Host Rebuild Candidate
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - 'desktop/**'
+      - 'global.json'
+      - '.github/workflows/windows-host-candidate.yml'
+      - 'scripts/check_embedded_runtime_compatibility.py'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  host-build:
+    name: compile-inherited-WPF-Host-unverified
+    runs-on: windows-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.302'
+      - name: Show SDK identity
+        shell: pwsh
+        run: |
+          dotnet --info
+          dotnet --version
+      - name: Build Windows Host using locked NuGet dependency versions
+        shell: pwsh
+        run: |
+          dotnet publish desktop/SRW.Desktop/SRW.Desktop.csproj -c Release -r win-x64 --self-contained false -p:RestoreLockedMode=true -o artifacts/windows-host
+          if ($LASTEXITCODE -ne 0) { throw 'Host source build FAILED' }
+          if (!(Test-Path artifacts/windows-host/SmartRecruitmentWorkbench.exe)) { throw 'Host EXE missing' }
+      - name: Generate exact Host candidate metadata
+        shell: pwsh
+        run: |
+          $exe = 'artifacts/windows-host/SmartRecruitmentWorkbench.exe'
+          $sha = (Get-FileHash -Algorithm SHA256 -LiteralPath $exe).Hash.ToLowerInvariant()
+          $truth = @{
+            schema = 'srw.windows-host-source-build-candidate.v1'
+            git_sha = $env:GITHUB_SHA
+            host_sha256 = $sha
+            dotnet_sdk = (dotnet --version)
+            target = 'net10.0-windows/win-x64'
+            self_contained = $false
+            status = 'COMPILED_ONLY_UNVERIFIED_GUI'
+            gui_accepted = $false
+            runtime_included = $false
+            knowledge_included = $false
+          }
+          $truth | ConvertTo-Json -Depth 6 | Set-Content -Encoding UTF8 'artifacts/windows-host/HOST_BUILD_CANDIDATE.json'
+          Write-Output ('Host EXE SHA256: ' + $sha)
+      - name: Publish source-built Host as CI evidence only
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: srw-windows-host-candidate-${{ github.sha }}
+          path: artifacts/windows-host/
+          if-no-files-found: warn
+          retention-days: 30

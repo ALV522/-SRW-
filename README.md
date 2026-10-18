@@ -33,7 +33,7 @@
 
 ## 当前测试与交付真相
 
-当前源代码测试总数为 **113 项**（GitHub CI 才能证明实际 PASS），外加独立的 **3 条 Chromium 真实浏览器业务验收场景**。原 `v0.8.12-R2` 的 **725 项测试**是历史版本库存参考，不能推导出当前版本达到相同的业务覆盖率。
+当前源代码测试总数为 **121 项**（GitHub CI 才能证明实际 PASS），外加独立的 **3 条 Chromium 真实浏览器业务验收场景**。原 `v0.8.12-R2` 的 **725 项测试**是历史版本库存参考，不能推导出当前版本达到相同的业务覆盖率。
 
 2026-10-18 最近已确认的整合基线 `69f60b9`：
 - [Source Gate：Ubuntu + Windows](https://github.com/ALV522/-SRW-/actions/runs/39134969100) — PASS（当时 109 项源回归）。
@@ -71,3 +71,7 @@ python scripts/run_convergence_verification.py
 ## 下一阶段
 
 按照“**完整招聘业务体验 → 真实浏览器验收 → 可信 Runtime/Knowledge → Windows Native 构建 → 目标机器验收**”推进。优先补充标准发布、人工核实/Claim、独立 Scorecard、最终决定、Offer 生命周期及项目交接的 Chromium 验收，再安排 Host/Portable 实物恢复和验收；不能只增加外观和抽象设施。
+
+## 历史资源恢复（2026-10-18）
+
+已从用户提供的 alpha10 Web Portable 中找到 **1,611 个 Windows Python Runtime 文件**，并从 v0.8.12-R2 中恢复五套经 SQLite `integrity_check` 的 Knowledge DB。同名数据库与 v0.8.10 及 alpha10 的哈希一致。请看 [旧资源恢复证据、两种 Windows Host 路线与用户所需操作](docs/LEGACY_RESOURCE_RECOVERY.md)。提供固定历史 ZIP 哈希的 `scripts/recover_archived_external_inputs.py`，以及不执行旧解释器的 `scripts/check_embedded_runtime_compatibility.py`。旧 Python 仅 5/13 项当前 C11 依赖完全匹配，**恢复成功不等于可启动**；Host 仍可选择上传精确旧载体或通过 GitHub Windows CI 从源码重新编译。两者均未实机验收。

@@ -39,8 +39,12 @@
     "note": "Reference inventory only; these 725 v0.8.12-R2 backend tests are not claimed as executed in Convergence 08."
   },
   "current": {
-    "convergence_test_count": 113,
+    "convergence_test_count": 121,
     "files": [
+      {
+        "file": "test_archived_input_recovery.py",
+        "test_methods": 7
+      },
       {
         "file": "test_assessment.py",
         "test_methods": 7
@@ -99,7 +103,7 @@
       },
       {
         "file": "test_native_payload.py",
-        "test_methods": 13
+        "test_methods": 14
       },
       {
         "file": "test_portable_input_preflight.py",
@@ -118,6 +122,6 @@
   },
   "recovered_gates": [],
   "parity_status": "PARTIAL",
-  "parity_note": "113 current source regression tests (including 4 legacy ZIP audit tests) vs the historical v0.8.12-R2 725-test reference; 3 real Chromium scenarios are separate.",
+  "parity_note": "121 current source regressions vs historical 725 test reference; new recovery/host gates are synthetic/static and separate from Windows GUI acceptance.",
   "historical_recovered_gates": "verification/history/convergence08/VERIFICATION_INVENTORY.json"
 }

@@ -59,7 +59,7 @@ function CopyAuditedRuntime($runtimeRoot, $runtimeManifest, $runtimeStage) {
       if ([string]::IsNullOrWhiteSpace($part) -or $part -eq '.' -or $part -eq '..' -or $part.EndsWith('.') -or $part.EndsWith(' ')) { throw 'Unsafe Runtime path segment' }
       if ($part -in @('data','backups','backup','uploads','workspace','candidates','secrets','credentials','private','logs')) { throw 'Private Runtime folder prohibited' }
     }
-    if ($parts[-1] -in @('.env','provider_secrets.json','secrets.json','credentials.json') -or $parts[-1] -match '\.(pem|key|pfx|p12|db|sqlite)$') { throw 'Private Runtime file prohibited' }
+    if ($parts[-1] -in @('.env','provider_secrets.json','secrets.json','credentials.json') -or ($parts[-1] -match '\.(pem|key|pfx|p12|db|sqlite)$' -and $relative -cne 'Lib/site-packages/certifi/cacert.pem')) { throw 'Private Runtime file prohibited' }
     $src = $runtimeRoot
     foreach ($part in $parts) {
       $src = Join-Path $src $part
@@ -85,6 +85,8 @@ try {
   CopyAuditedRuntime (Join-Path $Root 'runtime') (Join-Path $Root 'PRODUCTION_RUNTIME.sha256') (Join-Path $stage 'runtime')
   $env:PYTHONUTF8 = '1'; $env:PYTHONDONTWRITEBYTECODE = '1'
   $RuntimePython = Join-Path $stage 'runtime\python.exe'
+  & $RuntimePython (Join-Path $stage 'scripts\check_embedded_runtime_compatibility.py') --runtime (Join-Path $stage 'runtime') --requirements (Join-Path $stage 'requirements-ci.txt')
+  if ($LASTEXITCODE -ne 0) { throw 'C11 pinned Runtime dependencies are not satisfied' }
   & $RuntimePython (Join-Path $stage 'scripts\portable_input_preflight.py') --root $Root --runtime (Join-Path $stage 'runtime') --runtime-manifest (Join-Path $Root 'PRODUCTION_RUNTIME.sha256')
   if ($LASTEXITCODE -ne 0) { throw 'Portable input preflight BLOCKED' }
   Expand-Archive -LiteralPath $BaseZip -DestinationPath $base -Force
