@@ -70,6 +70,7 @@ const state={
  currentCandidate:null,
  currentWorkspace:null,
  currentBrief:null,
+ candidateDirectory:null,
  serviceInfo:null,
  runtimeInfo:null,
  liveError:''
@@ -273,20 +274,84 @@ function renderProject(){
  activate('projects');
 }
 
-function candidateTable(rows){
- if(!rows?.length) return '<div class="empty">暂无候选人</div>';
- return '<div class="table-wrap"><table><thead><tr><th>候选人</th><th>阶段</th><th>材料</th><th></th></tr></thead><tbody>'+
- rows.map(c=>'<tr><td><strong>'+esc(c.display_name)+'</strong></td><td>'+pill(stage(c.pipeline_stage),c.pipeline_stage==='interview'?'warn':'')+'</td><td>'+(c.has_material?pill('已导入','good'):pill('待材料','warn'))+'</td><td><button class="btn primary small" onclick="openCandidate(\''+esc(c.candidate_id)+'\',\''+esc(c.project_id||state.currentProject?.project_id||'')+'\')">打开工作空间</button></td></tr>').join('')+
+function candidateTable(rows,showProject=false){
+ if(!rows?.length) return '<div class="empty">没有符合条件的候选人</div>';
+ return '<div class="table-wrap"><table><thead><tr><th>候选人</th>'+(showProject?'<th>项目</th>':'')+'<th>阶段</th><th>材料</th><th></th></tr></thead><tbody>'+
+ rows.map(c=>'<tr><td><strong>'+esc(c.display_name)+'</strong></td>'+(showProject?'<td>'+esc(c.project_title||'—')+'</td>':'')+'<td>'+pill(stage(c.pipeline_stage),c.pipeline_stage==='interview'?'warn':'')+'</td><td>'+(c.has_material?pill('已导入','good'):pill('待材料','warn'))+'</td><td><button class="btn primary small" onclick="openCandidate(\''+esc(c.candidate_id)+'\',\''+esc(c.project_id||state.currentProject?.project_id||'')+'\')">打开工作空间</button></td></tr>').join('')+
  '</tbody></table></div>';
 }
 
-function candidatesPage(){
- setTitle('候选人');
- const rows=state.currentProjectCandidates?.length?state.currentProjectCandidates:Object.values(mock.candidates).flat();
- root.innerHTML='<div class="hero"><div><h1>候选人</h1><div class="muted">Candidate Workspace 是 Web 与 EXE 共享的核心业务对象。</div></div></div>'+
- '<div class="notice">E1 不提供跨项目全局候选人 API，因此 Live 模式下这里展示最近打开项目的候选人；项目内数据为真实读取。</div>'+
- '<section class="panel"><div class="pb">'+candidateTable(rows)+'</div></section>';
+// E1 has project-scoped candidate APIs but no global candidate directory API.
+// Build a BOUNDED read-only cross-project directory, with explicit truncation.
+async function loadCandidateDirectory(){
+ const rows=[];
+ const projects=state.projects.filter(p=>p.status!=='archived');
+ const totalExpected=projects.reduce((sum,p)=>sum+Number(p.candidate_count||0),0);
+ let truncated=false;
+ for(const p of projects){
+  const count=Number(p.candidate_count||0);
+  let offset=0;
+  while(offset<count){
+   const limit=Math.min(100,500-rows.length);
+   if(limit<=0){truncated=true;break;}
+   const data=await getJson('/api/v1/projects/'+encodeURIComponent(p.project_id)+'/candidates?archived=active&limit='+limit+'&offset='+offset);
+   const batch=data.candidates||[];
+   rows.push(...batch.map(c=>({...c,project_id:p.project_id,project_title:p.title})));
+   offset+=batch.length;
+   if(!batch.length)break;
+  }
+  if(rows.length>=500){truncated=rows.length<totalExpected;break;}
+ }
+ return {rows,totalExpected,truncated};
+}
+
+function renderCandidateDirectory(){
+ const data=state.candidateDirectory||{rows:[],totalExpected:0,truncated:false};
+ root.innerHTML='<div class="hero"><div><h1>候选人</h1><div class="muted">基于项目真实接口聚合的只读候选人目录；候选人始终保有项目上下文。</div></div><button class="btn" id="dir-refresh">刷新目录</button></div>'+
+ (data.truncated?'<div class="notice warn">数据量较大：这里只加载前 500 人，不能当作完整候选人名单。请打开具体项目查看其它候选人。</div>':'')+
+ '<section class="panel"><div class="ph"><div><h2>跨项目候选人</h2><div class="muted tiny">已读取 '+fmt(data.rows.length)+' 人'+(data.truncated?'（总量约 '+fmt(data.totalExpected)+' 人）':'')+'</div></div></div><div class="pb">'+
+ '<div class="actions" style="margin-bottom:14px"><input class="btn" style="min-width:230px;text-align:left" id="dir-search" placeholder="搜索姓名或项目"><select class="btn" id="dir-stage"><option value="">全部阶段</option>'+
+ Object.entries(stageLabels).map(([k,v])=>'<option value="'+esc(k)+'">'+esc(v)+'</option>').join('')+
+ '</select><span class="muted tiny" id="dir-count"></span></div><div id="dir-results"></div></div></section>';
+ document.querySelector('#dir-search').addEventListener('input',filterCandidateDirectory);
+ document.querySelector('#dir-stage').addEventListener('change',filterCandidateDirectory);
+ document.querySelector('#dir-refresh').addEventListener('click',()=>candidatesPage(true));
+ filterCandidateDirectory();
  activate('candidates');
+}
+
+function filterCandidateDirectory(){
+ const data=state.candidateDirectory||{rows:[]};
+ const q=(document.querySelector('#dir-search')?.value||'').trim().toLocaleLowerCase();
+ const stageFilter=document.querySelector('#dir-stage')?.value||'';
+ const rows=data.rows.filter(x=>(!q||(String(x.display_name||'')+' '+String(x.project_title||'')).toLocaleLowerCase().includes(q))&&(!stageFilter||x.pipeline_stage===stageFilter));
+ document.querySelector('#dir-count').textContent='当前显示 '+fmt(rows.length)+' 人';
+ document.querySelector('#dir-results').innerHTML=candidateTable(rows,true);
+}
+
+async function candidatesPage(force=false){
+ setTitle('候选人');
+ activate('candidates');
+ if(!state.candidateDirectory||force){
+  root.innerHTML='<div class="loading">正在读取跨项目候选人目录…</div>';
+  try{
+   if(state.mode==='live'){
+    state.candidateDirectory=await loadCandidateDirectory();
+   }else{
+    state.candidateDirectory={
+     rows:Object.entries(mock.candidates).flatMap(([pid,items])=>{
+      const project=state.projects.find(p=>p.project_id===pid);
+      return items.map(row=>({...row,project_id:pid,project_title:project?.title||'Mock Project'}));
+     }),
+     totalExpected:0,truncated:false
+    };
+   }
+  }catch(err){
+   root.innerHTML='<div class="error"><strong>候选人目录读取失败</strong><div>'+esc(err.message)+'</div></div>';
+   return;
+  }
+ }
+ renderCandidateDirectory();
 }
 
 async function openCandidate(candidateId,projectId=''){
