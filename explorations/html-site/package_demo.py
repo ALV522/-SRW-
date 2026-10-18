@@ -32,7 +32,7 @@ COPY_FILES = (
 )
 FORBIDDEN_DIRS = {
     ".git", ".venv", ".e1-demo-venv", "__pycache__", ".pytest_cache",
-    "data", "blobs", "backups", "runtime", "node_modules", "logs",
+    "data", "blobs", "backups", "node_modules", "logs",
 }
 FORBIDDEN_SUFFIXES = {".db", ".sqlite", ".sqlite3", ".pyc", ".pyo", ".log"}
 EXCLUDE_FILE_NAMES = {"instance.json", "pending_restore.json", ".env"}
