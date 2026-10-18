@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import hashlib
+from contextlib import closing
 import json
 import sqlite3
 import tempfile
@@ -28,9 +29,10 @@ class RecoveredLegacyInputsTest(unittest.TestCase):
             z.writestr("runtime/python312.dll", b"synthetic DLL bytes")
             z.writestr("runtime/Lib/site-packages/certifi/cacert.pem", b"public CA data")
         db = self.root / "fixture.db"
-        with sqlite3.connect(db) as connection:
+        with closing(sqlite3.connect(db)) as connection:
             for table in TABLES:
                 connection.execute(f"CREATE TABLE {table} (id INTEGER)")
+            connection.commit()
         with zipfile.ZipFile(knowledge, "w") as z:
             for name in DATABASES:
                 z.write(db, R2_PREFIX + name + "/knowledge.db")

@@ -8,7 +8,7 @@ C08 business capabilities are retained. C09 supplies local-only Host and browser
 
 Integration separates immutable C08 source history from the current complete source hash inventory. Windows file-handle checks now enumerate real process handles through psutil instead of returning an empty Linux-only /proc result. A real SQLite open/close test runs on each OS. Probe errors fail the run rather than manufacturing PASS.
 
-The current suite contains 113 tests. Runtime counts and results are emitted by CI for the exact commit. This document does not substitute for that evidence. Release identity is C11 throughout; historical C08 metadata is preserved under verification/history/convergence08.
+The current suite contains 121 tests. Runtime counts and results are emitted by CI for the exact commit. This document does not substitute for that evidence. Release identity is C11 throughout; historical C08 metadata is preserved under verification/history/convergence08.
 
 ## Delivery
 
@@ -68,3 +68,7 @@ The second browser run also revealed that the Offer create button was shown for 
 ## 2026-10-18 GitHub repository governance and historical ZIP audit
 
 The root README has been consolidated as the current user/developer entry point; docs/REPOSITORY_GOVERNANCE.md now records the single `main` source trunk, historical branches, module map, CI/evidence, artifact kinds and delivery blockers. docs/history/ARCHIVE_CATALOG.md and LEGACY_ARCHIVES.json record the four uploaded historical ZIPs' exact SHA-256/size and explicitly state that original archive bytes were NOT uploaded to GitHub. Three packages contain large Knowledge databases and an alpha Web Portable additionally contains executable Runtime components. No production database content was treated as cleared for publishing. A read-only ZIP safety/hash tool and four isolated tests were added. The historical 725 test inventory remains reference only; current regression count is now 113 (pending exact-commit verification on this change).
+
+## 2026-10-18 Legacy external dependency recovery and alternative Host build
+
+Actual user-uploaded alpha10 Web Portable contains 1,611 embedded Windows Python 3.12 Runtime files (99,144,143 uncompressed bytes), including the public certifi CA trust store. v0.8.12-R2 contains five intact Knowledge SQLite DBs: integrity_check=ok; their SHA-256 hashes match same-name DBs in v0.8.10 source and alpha10 Web Portable. Recovered contents/manifest have been delivered as a separate UNVERIFIED external inputs ZIP (not stored in Git). Embedded Python packages match only 5/13 pinned current C11 requirements; eight are missing/outdated, so Native preflight now explicitly rejects an incompatible Runtime before assembly. The four current user archives do not include a compiled Windows Host; v0.8.10 Assembler contains an Application Overlay, not the exact Windows Portable carrier. A new GitHub Windows Host source-build CI gate attempts an unsigned framework-dependent WPF/WebView2 Host compilation from locked .NET inputs. Compilation and WPF GUI acceptance remain separate; see docs/LEGACY_RESOURCE_RECOVERY.md.
