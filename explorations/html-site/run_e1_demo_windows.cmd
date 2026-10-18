@@ -68,11 +68,14 @@ if not exist "%E1_READY%" (
     echo ready>"%E1_READY%"
 )
 
+set "E1_DEMO_SCRIPT=run_e1_demo.py"
+if /i "%~1"=="--e2" set "E1_DEMO_SCRIPT=run_e2_demo.py"
+
 echo.
-echo Starting real SRW C11 synthetic backend + GET-only E1 web...
+echo Starting %E1_DEMO_SCRIPT% with an isolated temporary C11 backend...
 echo A browser should open automatically. No user records are used.
 echo.
-"%E1_PYTHON%" "%~dp0run_e1_demo.py" --open-browser
+"%E1_PYTHON%" "%~dp0%E1_DEMO_SCRIPT%" --open-browser
 set "E1_EXIT=%ERRORLEVEL%"
 echo.
 if not "%E1_EXIT%"=="0" (
