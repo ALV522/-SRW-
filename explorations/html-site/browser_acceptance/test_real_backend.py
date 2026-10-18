@@ -121,6 +121,23 @@ class RealBackendE1Browser(unittest.TestCase):
                 "publish_material": True,
             })
             cls.sid = material["source_id"]
+            cls.project2_name = "E1第二合成项目-" + uuid.uuid4().hex[:8]
+            cls.candidate2_name = "第二模拟候选人-" + uuid.uuid4().hex[:8]
+            p2 = request_json(cls.api, "/api/v1/projects", {
+                "title": cls.project2_name,
+                "role_title": "合成招聘运营",
+                "brief_summary": "E1 cross-project candidate directory test",
+            })
+            cls.pid2 = p2["project_id"]
+            c2 = request_json(cls.api, f"/api/v1/projects/{cls.pid2}/candidates", {
+                "display_name": cls.candidate2_name,
+            })
+            cls.cid2 = c2["candidate_id"]
+            request_json(cls.api, f"/api/v1/candidates/{cls.cid2}/stage", {
+                "stage": "shortlisted",
+                "actor": "human",
+                "reason": "synthetic directory-stage filter",
+            })
             cls.playwright = sync_playwright().start()
             cls.browser = cls.playwright.chromium.launch(headless=True)
         except BaseException:
@@ -192,7 +209,7 @@ class RealBackendE1Browser(unittest.TestCase):
     def open_candidate(self):
         self.page.locator("[data-page=projects]").click()
         expect(self.page.locator("#root")).to_contain_text(self.project_name)
-        self.page.get_by_role("button", name="打开项目").click()
+        self.page.locator(".item").filter(has_text=self.project_name).get_by_role("button", name="打开项目").click()
         expect(self.page.locator("#root h1")).to_have_text(self.project_name)
         self.page.get_by_role("button", name="打开工作空间").click()
         expect(self.page.locator(".candidate-side h1")).to_have_text(self.candidate_name)
@@ -246,6 +263,23 @@ class RealBackendE1Browser(unittest.TestCase):
         self.assertEqual(len(before), len(after))
         self.assertFalse(any(x.get("title") == "MUST_NOT_BE_CREATED" for x in after))
         self.assertFalse(self.errors, self.errors)
+
+    def test_05_cross_project_candidate_directory_search_and_filter(self):
+        self.open_live()
+        self.page.locator("[data-page=candidates]").click()
+        expect(self.page.locator("#dir-results")).to_contain_text(self.candidate_name)
+        expect(self.page.locator("#dir-results")).to_contain_text(self.candidate2_name)
+        expect(self.page.locator("#dir-results")).to_contain_text(self.project_name)
+        expect(self.page.locator("#dir-results")).to_contain_text(self.project2_name)
+        self.page.locator("#dir-search").fill(self.candidate2_name)
+        expect(self.page.locator("#dir-results")).to_contain_text(self.candidate2_name)
+        expect(self.page.locator("#dir-results")).not_to_contain_text(self.candidate_name)
+        self.page.locator("#dir-stage").select_option("shortlisted")
+        expect(self.page.locator("#dir-count")).to_have_text("当前显示 1 人")
+        self.page.get_by_role("button", name="打开工作空间").click()
+        expect(self.page.locator(".candidate-side h1")).to_have_text(self.candidate2_name)
+        self.assertFalse(self.errors, self.errors)
+        self.assertTrue(all(method == "GET" for method, _ in self.requests), self.requests)
 
     def test_04_browser_and_core_share_one_data_identity(self):
         self.open_live()
