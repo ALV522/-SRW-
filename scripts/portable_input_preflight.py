@@ -13,6 +13,7 @@ import re
 import sqlite3
 from pathlib import Path
 from contextlib import closing
+from scripts.native_payload import audit_runtime, PayloadError
 
 DB_TABLES = {
     "taxonomy": "alias_fts",
@@ -83,12 +84,14 @@ def audit(
     runtime: Path | None = None,
     knowledge: Path | None = None,
     knowledge_manifest: Path | None = None,
+    runtime_manifest: Path | None = None,
 ) -> dict:
     root = Path(root)
     carrier = Path(carrier) if carrier is not None else root / "SRW_v0.8.8_Windows_Portable.zip"
     runtime = Path(runtime) if runtime is not None else root / "runtime"
     knowledge = Path(knowledge) if knowledge is not None else root / "knowledge" / "active"
     knowledge_manifest = Path(knowledge_manifest) if knowledge_manifest is not None else root / "PRODUCTION_KNOWLEDGE.sha256"
+    runtime_manifest = Path(runtime_manifest) if runtime_manifest is not None else root / "PRODUCTION_RUNTIME.sha256"
     host_truth = json.loads((root / "WINDOWS_NATIVE_HOST_STATUS.json").read_text(encoding="utf-8"))
     required_hash = host_truth["binary_inheritance"]["required_sha256"].lower()
     checks = []
@@ -103,6 +106,11 @@ def audit(
         checks.append({"name": "embedded_runtime", "status": "PASS", "reason": "Embedded Python entrypoint present; executable/runtime smoke still required"})
     else:
         checks.append({"name": "embedded_runtime", "status": "BLOCKED", "reason": "Embedded Python runtime missing"})
+    try:
+        runtime_report = audit_runtime(runtime, runtime_manifest)
+        checks.append({"name": "runtime_manifest", "status": "PASS", "reason": f"{runtime_report['files']} Runtime file hashes match; provenance requires external audit"})
+    except (PayloadError, OSError):
+        checks.append({"name": "runtime_manifest", "status": "BLOCKED", "reason": "Audited Runtime inventory missing, invalid, or mismatched"})
     checks.extend(knowledge_checks(knowledge, knowledge_manifest))
     ready = all(x["status"] == "PASS" for x in checks)
     return {
@@ -122,9 +130,11 @@ def main() -> int:
     parser.add_argument("--runtime", type=Path)
     parser.add_argument("--knowledge", type=Path)
     parser.add_argument("--knowledge-manifest", type=Path)
+    parser.add_argument("--runtime-manifest", type=Path)
     args = parser.parse_args()
     result = audit(args.root, carrier=args.carrier, runtime=args.runtime,
-                   knowledge=args.knowledge, knowledge_manifest=args.knowledge_manifest)
+                   knowledge=args.knowledge, knowledge_manifest=args.knowledge_manifest,
+                   runtime_manifest=args.runtime_manifest)
     print(json.dumps(result, indent=2, ensure_ascii=False))
     return 0 if result["inputs_complete"] else 2
 
