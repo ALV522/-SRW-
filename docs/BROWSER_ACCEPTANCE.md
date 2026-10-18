@@ -1,0 +1,45 @@
+# SRW Chromium business acceptance
+
+This is a separate real-browser gate. It runs Chromium against the actual
+Starlette HTTP server, distributed frontend JavaScript and a disposable SQLite
+database. No HTTP responses or candidate/business actions are mocked.
+
+## Scope
+
+The initial real-browser acceptance covers:
+
+1. Open the dashboard; create a recruiting project; use all four Job Setup
+   wizard screens; save Draft; verify persisted recruitment context and that
+   saving a draft did not publish it.
+2. Create a candidate; publish pasted text material; verify Source persistence;
+   save an operator-owned follow-up plan; create a draft Offer; verify that
+   creating the Offer did not set pipeline stage to hired.
+3. Schedule a candidate interview via the Process workspace and inspect the
+   saved event using a real server API response.
+
+Each case uses a new browser context and synthetic names. The server runs only
+when SRW_SYNTHETIC_BROWSER_ACCEPTANCE=1, creates five minimal Knowledge
+fixtures in a temporary directory, and must refuse an existing data directory.
+No provider API key or production Knowledge is required. Tests do not send
+private recruitment records to GitHub.
+
+## CI command
+
+The dedicated GitHub workflow installs pinned Playwright 1.56.0 and Chromium
+on Ubuntu, then runs:
+
+    python -m unittest discover -s browser_acceptance -p 'test_*.py' -v
+
+Failures produce a synthetic server log and per-test screenshots in
+artifacts/browser, uploaded from the matching exact commit. This workflow is
+deliberately separate from the 106-test source/resource suite to avoid bringing
+a heavyweight browser dependency into Windows source verification.
+
+## Evidence boundary
+
+This establishes selected Chromium UI/API/database click paths only. It does
+not establish Microsoft WPF/WebView2 GUI behavior, external live AI/OCR/ASR
+quality, full business regression, accessibility, or a packaged Windows build.
+Do not label the 106 source tests plus Chromium cases as a percentage of
+historical 725-test parity. This document does not claim the gate passed;
+GitHub Actions on the exact source commit is the authority for that claim.
