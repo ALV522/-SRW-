@@ -39,7 +39,7 @@
     "note": "Reference inventory only; these 725 v0.8.12-R2 backend tests are not claimed as executed in Convergence 08."
   },
   "current": {
-    "convergence_test_count": 92,
+    "convergence_test_count": 106,
     "files": [
       {
         "file": "test_assessment.py",
@@ -90,8 +90,12 @@
         "test_methods": 15
       },
       {
+        "file": "test_native_payload.py",
+        "test_methods": 13
+      },
+      {
         "file": "test_portable_input_preflight.py",
-        "test_methods": 3
+        "test_methods": 4
       },
       {
         "file": "test_source_archive.py",
@@ -106,6 +110,6 @@
   },
   "recovered_gates": [],
   "parity_status": "PARTIAL",
-  "parity_note": "92 current source tests vs 725 historical reference tests; full historical test parity and Windows GUI acceptance remain deferred.",
+  "parity_note": "106 current source tests vs historical 725 inventory; Native GUI and real assets remain unverified.",
   "historical_recovered_gates": "verification/history/convergence08/VERIFICATION_INVENTORY.json"
 }

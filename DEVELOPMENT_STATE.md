@@ -8,7 +8,7 @@ C08 business capabilities are retained. C09 supplies local-only Host and browser
 
 Integration separates immutable C08 source history from the current complete source hash inventory. Windows file-handle checks now enumerate real process handles through psutil instead of returning an empty Linux-only /proc result. A real SQLite open/close test runs on each OS. Probe errors fail the run rather than manufacturing PASS.
 
-The current suite contains 86 tests. Runtime counts and results are emitted by CI for the exact commit. This document does not substitute for that evidence. Release identity is C11 throughout; historical C08 metadata is preserved under verification/history/convergence08.
+The current suite contains 106 tests. Runtime counts and results are emitted by CI for the exact commit. This document does not substitute for that evidence. Release identity is C11 throughout; historical C08 metadata is preserved under verification/history/convergence08.
 
 ## Delivery
 
@@ -48,3 +48,9 @@ Fixed the legacy assembler's source-root wildcard copy that could accidentally i
 ## C11 backup manifest and restore integrity
 
 Integrated the previously isolated backup-integrity implementation into the real backup and startup restore paths. New backup archives contain a SHA-256 manifest for the SQLite snapshot and Source blobs. Restore validates structure, member hashes, SQLite integrity, schema, limits, and disallowed paths before extracting into a temporary staging directory; tampering leaves the current database and pending marker untouched. Legacy archives remain readable under a restricted DB/blob-only layout and explicitly report weaker integrity. Automated synthetic roundtrip/tamper/restore coverage is added, but interrupt/crash injection and Windows exact-artifact validation remain pending.
+
+## Final Native ZIP payload closure
+
+Native packaging now requires an external audited manifest for every embedded Runtime file, stages only those files, and audits the entire resulting candidate ZIP against source, Runtime, Knowledge, and Host digests. Unexpected members, file tampering, and falsely claimed GUI acceptance block candidate assembly. Synthetic regressions are cross-platform. Real production assets and WPF/WebView2 acceptance remain unavailable in this source checkout.
+
+The assembler now uses PowerShell hash checks to stage an isolated Runtime and reviewed source before launching any embedded Python. The launcher self-check uses temporary data outside the release tree rather than creating staged user data. Tests protect this ordering and launcher import side effects.
