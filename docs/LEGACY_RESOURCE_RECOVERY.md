@@ -72,3 +72,7 @@ C11 当前 `requirements-ci.txt` 严格锁定 13 项依赖。旧 alpha10 Runtime
 到目标 Windows 机器测试时，需要 Windows x64、WebView2 Runtime 和 Microsoft .NET 10 Desktop Runtime（当前候选 Host 构建为 framework-dependent），或者之后将 Host 调整为 self-contained 构建。届时再运行合成候选人工作流、备份恢复、文件导入、OCR/ASR 和 Provider 降级，取得实机验收证据。
 
 **本次工作的事实边界：外部资源已恢复且静态校验通过，但 Native Windows 安装包尚未完整生成，Host 和 Runtime 的运行兼容性仍待验证。**
+
+## 源码重编译 Host 已接入 Native 候选装配路线
+
+不再只能使用旧 v0.8.8 二进制。参见 [独立 Host 装配步骤](SOURCE_HOST_NATIVE_ASSEMBLY.md)：`scripts/build_native_from_source_host.py` 可接受 GitHub 同一 Git SHA 的 WPF 重编译 Host 与前述 Runtime/Knowledge 外部文件，校验精确哈希、当前 C11 依赖版本、五库 SQLite 状态、Host build truth，并审计最终 ZIP。由于旧 alpha10 的 Python 依赖仅 5/13 项匹配，此路线会阻止不兼容 Runtime 封包，需先在目标 Windows 更新并验证。最终仍标记 UNVERIFIED_GUI。

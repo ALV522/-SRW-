@@ -39,7 +39,7 @@
     "note": "Reference inventory only; these 725 v0.8.12-R2 backend tests are not claimed as executed in Convergence 08."
   },
   "current": {
-    "convergence_test_count": 121,
+    "convergence_test_count": 125,
     "files": [
       {
         "file": "test_archived_input_recovery.py",
@@ -116,12 +116,16 @@
       {
         "file": "test_source_gate.py",
         "test_methods": 8
+      },
+      {
+        "file": "test_source_host_native_assembly.py",
+        "test_methods": 4
       }
     ],
     "evidence": "GitHub Actions log/artifact for exact source commit"
   },
   "recovered_gates": [],
   "parity_status": "PARTIAL",
-  "parity_note": "121 current source regressions vs historical 725 test reference; new recovery/host gates are synthetic/static and separate from Windows GUI acceptance.",
+  "parity_note": "125 C11 source regression cases including alternate Native packaging; historical 725 reference and desktop GUI acceptance remain separate.",
   "historical_recovered_gates": "verification/history/convergence08/VERIFICATION_INVENTORY.json"
 }
