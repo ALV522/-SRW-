@@ -14,21 +14,22 @@ E1 proves only the **EXE → shared backend → Web** read path. Web writes rema
 
 ## Start the exploration bridge
 
-Example:
+The Windows EXE chooses a **dynamic port** and owns a workspace lock. Never
+start a second service pointed at the same data directory. First locate the
+running EXE's `data/app.lock/instance.json` (or the custom data-root if set).
 
-```bash
-python explorations/html-site/serve_e1.py --upstream http://127.0.0.1:8765 --port 8877
+Recommended command:
+
+```powershell
+py -3 explorations/html-site/serve_e1.py --data-root "C:\\Path\\To\\SRW\\data" --port 0 --open-browser
 ```
 
-Open:
+The bridge reads the Windows Host lease, verifies the backend's exact identity
+and chooses a free browser port. Its HTTP routes are GET-only and allowlisted.
+The `LIVE · windows · GET-only` badge is required before continuing.
 
-```
-http://127.0.0.1:8877/
-```
-
-The bridge serves the exploration HTML and proxies only GET/HEAD API requests to the existing SRW service.
-
-Mutation methods return HTTP 405 before they reach SRW.
+For a standalone SRW Web service without an EXE lease, `--upstream` can be
+used with its known `http://127.0.0.1:PORT`; this is not Windows EXE acceptance.
 
 ## Test A — shared project state
 
