@@ -21,6 +21,9 @@ class E1PackageTests(unittest.TestCase):
             dest = Path(td) / "srw-e1-source-demo"
             pack.build(dest)
             self.assertTrue((dest / "START_HERE.cmd").is_file())
+            self.assertTrue((dest / "START_E2.cmd").is_file())
+            self.assertTrue((dest / "backend/srw/runtime/db/session.py").is_file())
+            self.assertTrue((dest / "explorations/html-site/e2_synthetic_bridge.py").is_file())
             for item in pack.COPY_DIRS + pack.COPY_FILES:
                 self.assertTrue((dest / item).exists(), item)
             self.assertFalse((dest / "data").exists())
