@@ -153,6 +153,7 @@ class E1BridgeTests(unittest.TestCase):
             [node, "--check", "-"],
             input=match.group(1),
             text=True,
+            encoding="utf-8",
             capture_output=True,
             timeout=15,
         )
