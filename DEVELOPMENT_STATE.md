@@ -8,7 +8,7 @@ C08 business capabilities are retained. C09 supplies local-only Host and browser
 
 Integration separates immutable C08 source history from the current complete source hash inventory. Windows file-handle checks now enumerate real process handles through psutil instead of returning an empty Linux-only /proc result. A real SQLite open/close test runs on each OS. Probe errors fail the run rather than manufacturing PASS.
 
-The current suite contains 125 tests. Runtime counts and results are emitted by CI for the exact commit. This document does not substitute for that evidence. Release identity is C11 throughout; historical C08 metadata is preserved under verification/history/convergence08.
+The current suite contains 132 tests. Runtime counts and results are emitted by CI for the exact commit. This document does not substitute for that evidence. Release identity is C11 throughout; historical C08 metadata is preserved under verification/history/convergence08.
 
 ## Delivery
 
@@ -76,3 +76,7 @@ Actual user-uploaded alpha10 Web Portable contains 1,611 embedded Windows Python
 ## Alternative source-built Windows Native assembly
 
 A second, separate Windows Native assembly path has been implemented using the digest-bound WPF/WebView2 Host candidate from GitHub's Windows Host build workflow rather than the exact historical v0.8.8 carrier. The new assembler requires an exact matching Git source commit, source SHA manifest, restored/runtime-upgraded Python pinned to current C11 requirements, five Knowledge SQLite databases, and matching Host build provenance. The finished ZIP is re-opened for an exact allowlist/hash audit and remains explicitly UNVERIFIED_GUI. Four synthetic packaging and privacy regression tests were added. The existing historic carrier inheritance path is preserved. This is an unverified candidate builder: the historical alpha10 Python dependencies still need compatibility updates before actual candidate packaging, and WPF/WebView2 GUI acceptance is separate.
+
+## Offline Windows Python wheel overlay (pending exact-commit acceptance)
+
+Created an independently checksum-bound Windows/Python 3.12 wheelhouse CI and a fail-closed offline Runtime upgrade utility. Original alpha10 Runtime and five historical Knowledge databases remain untouched. Upgraded packages reside under `Lib/c11-overlay`, which is inserted before legacy `Lib/site-packages` in `python312._pth`. The utility requires all C11 pinned metadata versions and executes actual isolated `python.exe` imports before emitting a new runtime SHA inventory and `RUNTIME_UPGRADE_AUDIT.json`. The alternate Native assembler now refuses an overlay with no matching C11 runtime smoke audit. Added 7 source regressions (125 -> 132). Wheelhouse CI smoke cannot validate a private recovered old Runtime until the same user recovery inputs are present on an authorized Windows execution environment; WPF/WebView2 GUI and provider-live acceptance remain pending.

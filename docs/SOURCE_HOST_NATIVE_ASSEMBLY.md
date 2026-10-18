@@ -9,7 +9,7 @@ This path avoids dependence on the historical v0.8.8 exact Windows carrier. It d
 3. A Windows Host candidate artifact **built by the GitHub Windows Host workflow for that same Git commit** and extracted to another folder. It must contain `SmartRecruitmentWorkbench.exe`, `HOST_BUILD_CANDIDATE.json`, `DOTNET_BUILD_TRUTH.json` and its framework-dependent companion binaries.
 4. A Windows Python 3.12 environment for invoking build tooling. The embedded Runtime is **not executed** during archive assembly.
 
-The historical alpha10 Runtime does **not** currently meet the 13 C11 pinned dependency requirements. Eight packages are older or absent. Restore it first but upgrade/reconstruct a separate candidate Python Runtime to match `requirements-ci.txt`; regenerate the external file manifest after controlled installation and rerun `check_embedded_runtime_compatibility.py`. Do not modify the pinned historical originals.
+The historical alpha10 Runtime initially fails eight of the thirteen C11 pinned requirements. Follow the [C11 isolated Windows Runtime upgrade procedure](RUNTIME_UPGRADE.md) to obtain a checksum-bound Windows wheelhouse, create an isolated pinned overlay, and execute actual embedded Python import smoke. The builder requires the matching `RUNTIME_UPGRADE_AUDIT.json` whenever the C11 overlay is active. Do not modify the historical original.
 
 ## Build (Windows x64)
 

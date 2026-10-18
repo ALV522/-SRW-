@@ -11,3 +11,5 @@
 仓库入口：[README.md](README.md) · [主线治理](docs/REPOSITORY_GOVERNANCE.md) · [版本现状](DEVELOPMENT_STATE.md) · [历史开发包](docs/history/ARCHIVE_CATALOG.md) · [发布要求](docs/RELEASE_PROCESS.md)。
 
 旧 ZIP 中已恢复 Runtime 与五套 Knowledge，详见 [资源恢复文档](docs/LEGACY_RESOURCE_RECOVERY.md)。原始 Python 包版本尚有 8 项不符合当前锁文件；Windows Host 实机运行仍需验收。
+
+C11 Runtime 兼容层：下载 GitHub Windows Wheelhouse 并在独立目录执行升级与实际 embedded Python smoke，步骤见 [RUNTIME_UPGRADE.md](docs/RUNTIME_UPGRADE.md)。
