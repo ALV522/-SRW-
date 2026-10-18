@@ -73,7 +73,8 @@ const state={
  candidateDirectory:null,
  serviceInfo:null,
  runtimeInfo:null,
- liveError:''
+ liveError:'',
+ replayingRoute:false
 };
 
 const mock={
@@ -217,6 +218,7 @@ function home(){
  '<section class="panel"><div class="ph"><h2>招聘漏斗</h2></div><div class="pb"><div class="flow">'+
  [['new','新候选人'],['screening','筛选'],['shortlisted','短名单'],['phone_screen','电话筛选'],['interview','面试'],['offer','Offer'],['hired','录用']].map(([k,l])=>'<div class="step"><strong>'+fmt(st[k]||0)+'</strong><span>'+l+'</span></div>').join('')+
  '</div></div></section>';
+ rememberRoute('home');
  activate('home');
 }
 
@@ -230,6 +232,7 @@ function projectsPage(){
  root.innerHTML='<div class="hero"><div><h1>招聘项目</h1><div class="muted">项目状态直接来自当前 SRW 数据库。</div></div></div><section class="panel"><div class="ph"><h2>项目列表</h2><span class="badge">'+fmt(state.projects.length)+' 个</span></div><div class="pb"><div class="list">'+
  (state.projects.length?state.projects.map(projectCard).join(''):'<div class="empty">没有项目</div>')+
  '</div></div></section>';
+ rememberRoute('projects');
  activate('projects');
 }
 
@@ -271,6 +274,7 @@ function renderProject(){
  [['new','新候选人'],['screening','筛选'],['shortlisted','短名单'],['phone_screen','电话筛选'],['interview','面试'],['offer','Offer'],['hired','录用']].map(([k,l])=>'<div class="step"><strong>'+fmt(s[k]||0)+'</strong><span>'+l+'</span></div>').join('')+
  '</div></div></section>'+
  '<section class="panel"><div class="ph"><div><h2>候选人</h2><div class="muted tiny">E1 从项目 Candidate API 读取</div></div><span class="badge">'+fmt(state.currentProjectCandidates.length)+' 人</span></div><div class="pb">'+candidateTable(state.currentProjectCandidates)+'</div></section>';
+ rememberRoute('projects/'+encodeURIComponent(p.project_id));
  activate('projects');
 }
 
@@ -317,6 +321,7 @@ function renderCandidateDirectory(){
  document.querySelector('#dir-stage').addEventListener('change',filterCandidateDirectory);
  document.querySelector('#dir-refresh').addEventListener('click',()=>candidatesPage(true));
  filterCandidateDirectory();
+ rememberRoute('candidates');
  activate('candidates');
 }
 
@@ -399,6 +404,7 @@ function renderCandidate(){
  '<div style="margin-top:18px"><h3>评价标准与核实</h3>'+(criteria.length?criteria.map(cr=>'<div class="criterion"><div class="row"><strong>'+esc(cr.name||cr.criterion_key)+'</strong><div class="actions">'+pill(cr.status_label||'—',String(cr.status_label).includes('矛盾')?'bad':String(cr.status_label).includes('核实')?'warn':'good')+pill('证据 '+(cr.evidence_label||'—'))+'</div></div><div class="item-note">'+esc(cr.reason||cr.gap||cr.probe||'—')+'</div></div>').join(''):'<div class="empty">暂无评价标准或尚未发布</div>')+'</div>'+
  '<div class="notice" style="margin-top:16px"><strong>E1 观察点：</strong>当前页面已经直接消费与 EXE 相同的 Candidate Workspace API。若两种载体连接同一个 SRW Service，它们不需要互相“同步数据库”，因为看到的是同一权威状态。</div>'+
  '</div></section></div>';
+ rememberRoute('projects/'+encodeURIComponent(s.project_id||backProject)+'/candidates/'+encodeURIComponent(s.candidate_id));
  activate('candidates');
 }
 
@@ -406,6 +412,7 @@ function reviewPage(){
  setTitle('复核中心');
  const r=(state.dashboard||mock.dashboard).review_queue||{items:[]};
  root.innerHTML='<div class="hero"><div><h1>复核中心</h1><div class="muted">E1 只读查看需要人工处理的治理事项。</div></div></div>'+queuePanel('待人工复核','身份、判断纠错与待确认事实',r.items||[]);
+ rememberRoute('review');
  activate('review');
 }
 
@@ -419,8 +426,45 @@ function architecturePage(){
  '</div><div class="notice" style="margin-top:16px">同一台机器上，Web 和 EXE 都连接 <code>127.0.0.1</code> 的同一个 SRW Service。因此从 EXE 修改候选人以后，Web 刷新即可看到变化；反之亦然。信息互通来自<strong>共同权威数据源</strong>，而不是两个数据库之间的脆弱同步。</div>'+
  '<div class="two"><div><h3>仍由 Core 持有</h3><div class="list">'+['SQLite / Schema','Files & Blob Store','OCR / ASR Jobs','AI Provider & Secrets','Knowledge DB','Evidence / Decision / Audit'].map(x=>'<div class="item"><span>'+x+'</span>'+pill('authoritative','good')+'</div>').join('')+'</div><div><h3>Carrier 只负责</h3><div class="list">'+['页面与导航','视图状态','发起 API 操作','显示任务进度','打开原始材料','桌面生命周期（EXE）'].map(x=>'<div class="item"><span>'+x+'</span>'+pill('presentation')+'</div>').join('')+'</div></div>'+
  '</div></section>';
+ rememberRoute('architecture');
  activate('architecture');
 }
+
+
+function rememberRoute(route){
+ if(state.replayingRoute) return;
+ const next='#/'+route;
+ if(location.hash!==next) history.pushState({srw_exploration:true},'',next);
+}
+
+async function restoreRouteFromHash(){
+ const route=(location.hash.startsWith('#/')?location.hash.slice(2):'home').split('/');
+ state.replayingRoute=true;
+ try{
+  if(route[0]==='projects'&&route[1]&&route[2]==='candidates'&&route[3]){
+   await openCandidate(decodeURIComponent(route[3]),decodeURIComponent(route[1]));
+  }else if(route[0]==='projects'&&route[1]){
+   await openProject(decodeURIComponent(route[1]));
+  }else if(route[0]==='candidates'){
+   await candidatesPage();
+  }else if(route[0]==='review'){
+   reviewPage();
+  }else if(route[0]==='architecture'){
+   architecturePage();
+  }else if(route[0]==='e2'&&typeof e2Page==='function'){
+   await e2Page();
+  }else if(route[0]==='projects'){
+   projectsPage();
+  }else{
+   home();
+  }
+ }catch(err){
+  root.innerHTML='<div class="error">页面恢复失败：'+esc(err.message)+'</div>';
+ }finally{
+  state.replayingRoute=false;
+ }
+}
+window.addEventListener('popstate',()=>{restoreRouteFromHash();});
 
 function activate(page){
  document.querySelectorAll('.nav button').forEach(b=>b.classList.toggle('active',b.dataset.page===page));
@@ -438,7 +482,7 @@ document.querySelectorAll('.nav button').forEach(b=>b.addEventListener('click',(
   state.projects=mock.projects;
   setApiState(location.protocol==='file:'?'MOCK · file://':'MOCK · API unavailable','warn');
  }
- home();
+ await restoreRouteFromHash();
 })();
 </script>
 </body>
