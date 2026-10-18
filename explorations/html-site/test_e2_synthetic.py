@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import importlib.util
+from concurrent.futures import ThreadPoolExecutor
 import json
 import sys
 import threading
@@ -112,6 +113,17 @@ class E2ProxyTests(unittest.TestCase):
         self.assertEqual(MutablePlanSRW.state["owner"],"Client A")
         self.assertEqual(MutablePlanSRW.mutations,1)
         self.assertNotEqual(saved[2],old_a[2])
+
+    def test_two_simultaneous_old_etags_only_one_writer_commits(self):
+        path="/api/v1/candidates/synthetic-1/action-plan"
+        initial=self.req(path)[2]
+        def write(owner):
+            return self.req(path,"PATCH",{"owner":owner},{"If-Match":initial})
+        with ThreadPoolExecutor(max_workers=2) as pool:
+            results=list(pool.map(write,["Concurrent A","Concurrent B"]))
+        self.assertEqual(sorted(x[0] for x in results),[200,412],results)
+        self.assertEqual(MutablePlanSRW.mutations,1)
+        self.assertIn(MutablePlanSRW.state["owner"],{"Concurrent A","Concurrent B"})
 
     def test_missing_if_match_unsafe_fields_and_other_methods_denied(self):
         path="/api/v1/candidates/synthetic-1/action-plan"
