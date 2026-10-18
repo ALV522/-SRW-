@@ -222,6 +222,7 @@ class RealBackendE1Browser(unittest.TestCase):
         self.open_candidate()
         expect(self.page.locator(".source")).to_contain_text(self.resume_text)
         expect(self.page.locator(".source")).to_contain_text("e1-synthetic-resume.txt")
+        self.page.screenshot(path=str(EVIDENCE / "e1-live-candidate-workspace.png"), full_page=True)
         expect(self.page.locator(".candidate-side")).to_contain_text("新候选人")
         self.assertEqual(request_json(self.web,
             f"/api/v1/candidates/{self.cid}/workspace")["sources"][0]["source_id"], self.sid)
@@ -276,10 +277,41 @@ class RealBackendE1Browser(unittest.TestCase):
         expect(self.page.locator("#dir-results")).not_to_contain_text(self.candidate_name)
         self.page.locator("#dir-stage").select_option("shortlisted")
         expect(self.page.locator("#dir-count")).to_have_text("当前显示 1 人")
+        self.page.screenshot(path=str(EVIDENCE / "e1-cross-project-directory.png"), full_page=True)
         self.page.get_by_role("button", name="打开工作空间").click()
         expect(self.page.locator(".candidate-side h1")).to_have_text(self.candidate2_name)
         self.assertFalse(self.errors, self.errors)
         self.assertTrue(all(method == "GET" for method, _ in self.requests), self.requests)
+
+    def test_06_mobile_viewport_has_no_page_horizontal_overflow(self):
+        mobile = self.browser.new_context(
+            locale="zh-CN",
+            viewport={"width": 390, "height": 844},
+            device_scale_factor=1,
+        )
+        try:
+            page = mobile.new_page()
+            page.goto(self.web + "/", wait_until="domcontentloaded")
+            expect(page.locator("#api-state")).to_have_text("LIVE · web · GET-only")
+            def check_width(label):
+                size = page.evaluate(
+                    "({width:document.documentElement.clientWidth,scroll:document.documentElement.scrollWidth})"
+                )
+                self.assertLessEqual(size["scroll"], size["width"]+2,
+                    f"{label}: page overflow {size}")
+            check_width("home")
+            page.locator("[data-page=candidates]").click()
+            expect(page.locator("#dir-results")).to_contain_text(self.candidate2_name)
+            check_width("candidate directory")
+            page.get_by_role("button", name="打开工作空间").first.click()
+            expect(page.locator(".candidate-side")).to_be_visible()
+            check_width("candidate workspace")
+            page.screenshot(
+                path=str(EVIDENCE / "e1-mobile-candidate-workspace.png"),
+                full_page=True,
+            )
+        finally:
+            mobile.close()
 
     def test_04_browser_and_core_share_one_data_identity(self):
         self.open_live()
