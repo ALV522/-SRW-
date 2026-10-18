@@ -47,7 +47,7 @@ class C11RuntimeOverlayTests(unittest.TestCase):
         self.assertFalse(report["windows_runtime_executed"])
 
     def test_unconfigured_overlay_cannot_falsely_pass(self):
-        with self.assertRaisesRegex(ValueError, "unconfigured"):
+        with self.assertRaisesRegex(ValueError, "include one C11 overlay"):
             check(self.runtime, self.lock)
 
     def test_wrong_order_is_blocked(self):
