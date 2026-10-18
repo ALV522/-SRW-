@@ -7,6 +7,7 @@ import tempfile
 import unittest
 import warnings
 import zipfile
+from contextlib import closing
 from pathlib import Path
 from unittest.mock import patch
 
@@ -31,14 +32,17 @@ class BackupRestoreIntegrityTest(unittest.TestCase):
 
     def make_db(self, path: Path, value: str):
         path.parent.mkdir(parents=True, exist_ok=True)
-        with sqlite3.connect(path) as db:
+        # Closing a sqlite3 transaction context does NOT close its connection.
+        # Windows requires explicit close before unlink, rename and temp cleanup.
+        with closing(sqlite3.connect(path)) as db:
             db.execute("CREATE TABLE v1_schema_meta (schema_revision TEXT NOT NULL)")
             db.execute("INSERT INTO v1_schema_meta VALUES ('v1_0014')")
             db.execute("CREATE TABLE workload (value TEXT NOT NULL)")
             db.execute("INSERT INTO workload VALUES (?)", (value,))
+            db.commit()
 
     def read_db(self, path: Path) -> str:
-        with sqlite3.connect(path) as db:
+        with closing(sqlite3.connect(path)) as db:
             return db.execute("SELECT value FROM workload").fetchone()[0]
 
     def make_archive(self, value="new") -> Path:
