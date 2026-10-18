@@ -1,0 +1,57 @@
+{
+  "schema": "srw.legacy-archive-catalog.v1",
+  "catalog_date": "2026-10-18",
+  "source": "User-supplied historical ZIP files; SHA-256 and ZIP directory checked locally, no provenance signature or privacy/content attestation",
+  "publication_status": "CATALOG_ONLY",
+  "privacy_review": "NOT_CLEARED",
+  "archives": [
+    {
+      "archive_id": "legacy-0810-source",
+      "version_claim": "v0.8.10",
+      "kind": "source-plus-knowledge-snapshot",
+      "filename": "SRW_v0.8.10_Source_1307674(2).zip",
+      "bytes": 45427080,
+      "sha256": "25bb54bc10fe3022b4f3dae9d6f7c598e9e960fc262884c4948130d097f130f6",
+      "zip_entries": 856,
+      "expanded_bytes": 235370332,
+      "contains_production_like_knowledge": true,
+      "upload_status": "NOT_UPLOADED"
+    },
+    {
+      "archive_id": "legacy-0810-windows-assembler",
+      "version_claim": "v0.8.10",
+      "kind": "windows-assembler-overlay",
+      "filename": "SRW_v0.8.10_Windows_Portable_Assembler (1)(2).zip",
+      "bytes": 44960321,
+      "sha256": "7d468a21572a8e353ce082238840eec5f9848e494c0be799e6e101c633d4694b",
+      "zip_entries": 6,
+      "expanded_bytes": 45407222,
+      "contains_production_like_knowledge": "nested-archive-unreviewed",
+      "upload_status": "NOT_UPLOADED"
+    },
+    {
+      "archive_id": "legacy-0812-r2-source",
+      "version_claim": "v0.8.12-R2",
+      "kind": "source-plus-knowledge-snapshot",
+      "filename": "SRW_v0.8.12-R2_Truth_Closure_Source(1)(2).zip",
+      "bytes": 46177312,
+      "sha256": "80b3b2d68de23c04d9e5a62d9701d716ee89d4ea71f7041c34d728fb1e267fb3",
+      "zip_entries": 887,
+      "expanded_bytes": 235585462,
+      "contains_production_like_knowledge": true,
+      "upload_status": "NOT_UPLOADED"
+    },
+    {
+      "archive_id": "legacy-alpha10-web-portable",
+      "version_claim": "v1.0-alpha10",
+      "kind": "historical-web-portable",
+      "filename": "SRW_v1.0-alpha10_Recruitment_Operations_Web_Portable(1)(2).zip",
+      "bytes": 76697890,
+      "sha256": "92deadadc861673fd762a8453cc0877ff21a16f5e1ea12e6172fdb2b1e6929d4",
+      "zip_entries": 1710,
+      "expanded_bytes": 322538014,
+      "contains_production_like_knowledge": true,
+      "upload_status": "NOT_UPLOADED"
+    }
+  ]
+}
