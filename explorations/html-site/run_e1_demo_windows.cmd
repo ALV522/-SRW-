@@ -85,7 +85,9 @@ echo.
 echo Starting %E1_DEMO_SCRIPT% with an isolated temporary C11 backend...
 echo No user records are used. Browser opens automatically in normal mode.
 echo.
-"%E1_PYTHON%" "%~dp0%E1_DEMO_SCRIPT%" %E1_DEMO_ARGS%
+rem We CD into the script folder at startup. Pass only the basename here;
+rem expanding %%~dp0 adjacent to another %%VAR%% double-prefixed the path on CMD.
+"%E1_PYTHON%" "%E1_DEMO_SCRIPT%" %E1_DEMO_ARGS%
 set "E1_EXIT=%ERRORLEVEL%"
 echo.
 if not "%E1_EXIT%"=="0" (
