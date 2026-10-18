@@ -1,8 +1,8 @@
 # E1 Verification Status — browser HTML + real SRW C11 backend
 
-Last confirmed source snapshot: `0e8eacbd20ae3e609d3161c84910ddeec8a4b3ce`
+Last confirmed source snapshot: `481162b65ffb612fd4509a76647c0b0e50302c6a`
 
-Independent CI: https://github.com/ALV522/-SRW-/actions/runs/39151649763
+Independent CI: https://github.com/ALV522/-SRW-/actions/runs/39152520579
 
 ## Verified
 
@@ -17,10 +17,10 @@ Independent CI: https://github.com/ALV522/-SRW-/actions/runs/39151649763
 - **E1 navigation**: direct candidate deep link, refresh, back navigation, cross-project search and stage filter.
 - **Responsive**: 390px-width mobile browser pages do not have page-wide horizontal overflow.
 - **Cross-client reads**: an independent direct-backend synthetic stage mutation is visible after E1 browser refresh.
-- **E2a**: conditional synthetic Action Plan mutation, 412 stale rejection, 428 missing precondition, 405 all other mutation paths; backend audit events visible.
+- **E2a**: four proxy guard regressions per OS, conditional synthetic Action Plan mutation, 412 stale rejection, 428 missing precondition, 405 all other mutation paths; backend audit events visible.
 
 The artifact can be retrieved from:
-https://github.com/ALV522/-SRW-/actions/runs/39151649763/artifacts/12144953435
+https://github.com/ALV522/-SRW-/actions/runs/39152520579/artifacts/12145448946
 
 The artifact is the **E1/E2 source demonstration** and must not be referred to as a Windows Portable / accepted Native EXE package.
 
