@@ -186,6 +186,18 @@ class RecruitmentBrowserAcceptance(unittest.TestCase):
         self.assertEqual(plan.get("reason"), "安排人工电话核实")
 
         self.page.locator(".candidate-workspace-tab").filter(has_text="Offer").click()
+        expect(self.page.get_by_role("button", name="创建 Offer")).to_be_disabled()
+        # Backend enforces actual human pipeline transitions. Test through the UI,
+        # not by bypassing the stage gate with direct API calls.
+        for next_stage in ("shortlisted", "interview"):
+            self.page.get_by_role("button", name="推进阶段").click()
+            self.page.locator("#stage-next").select_option(next_stage)
+            self.page.locator("#stage-reason").fill("合成验收：人工推进")
+            self.page.locator("#modal-root").get_by_role("button", name="确认推进").click()
+            expect(self.page.locator("#modal-root .modal")).to_have_count(0)
+        stage = self.get_json(f"/api/v1/candidates/{cid}/pipeline")
+        self.assertEqual(stage["current_stage"], "interview")
+        expect(self.page.get_by_role("button", name="创建 Offer")).to_be_enabled()
         self.page.get_by_role("button", name="创建 Offer").click()
         self.page.locator("#offer-title").fill("产品分析师")
         self.page.locator("#offer-start").fill("2026-12-01")
