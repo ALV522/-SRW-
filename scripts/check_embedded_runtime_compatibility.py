@@ -25,7 +25,7 @@ def check(runtime: Path, requirements: Path) -> dict:
         raise ValueError("Windows Python 3.12 embeddable Runtime is incomplete")
     installed = {}
     for metadata in sorted(site.glob("*.dist-info/METADATA")):
-        headers = Parser(headersonly=True).parsestr(metadata.read_text(encoding="utf-8", errors="replace"))
+        headers = Parser().parsestr(metadata.read_text(encoding="utf-8", errors="replace"), headersonly=True)
         if headers.get("Name") and headers.get("Version"):
             installed[norm(headers["Name"])] = headers["Version"]
     compared = []
