@@ -106,7 +106,7 @@ class SourceBuiltHostPackagingTest(unittest.TestCase):
         (self.root / "requirements-ci.txt").write_text("psutil==99.99.99\n")
         # Keep source manifest consistent so only Runtime compatibility is at issue.
         self._refresh_source_lock()
-        with self.assertRaisesRegex(PayloadError, "dependencies"):
+        with self.assertRaisesRegex(PayloadError, "not compatible"):
             self._assemble()
         self.assertFalse(self.out.exists())
 
