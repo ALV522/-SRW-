@@ -1,6 +1,10 @@
 from __future__ import annotations
 
 import hashlib
+import os
+import shutil
+import subprocess
+import sys
 import json
 import tempfile
 import unittest
@@ -29,6 +33,40 @@ class NativePayloadTests(unittest.TestCase):
             f"{digest(b'synthetic-exe')}  python.exe\n"
             f"{digest(b'synthetic-dll')}  python312.dll\n", encoding="utf-8"
         )
+
+    def test_powershell_never_executes_runtime_before_hash_staging(self):
+        root = Path(__file__).resolve().parents[1]
+        script = (root / "scripts" / "build_windows_native_from_v088.ps1").read_text(encoding="utf-8")
+        self.assertIn("CopyAuditedRuntime", script)
+        self.assertIn("CopyReviewedSources $Root $stage", script)
+        self.assertIn("audit-zip", script)
+        verified = script.index("  CopyAuditedRuntime (Join-Path $Root 'runtime')")
+        execute = script.index("  & $RuntimePython (Join-Path $stage 'scripts\\portable_input_preflight.py')")
+        self.assertLess(verified, execute)
+        self.assertNotIn("& $RuntimePython (Join-Path $Root 'scripts\\portable_input_preflight.py')", script)
+
+    def test_portable_launcher_help_does_not_create_user_data(self):
+        # Import/CLI dispatch must not write into a future Native ZIP stage.
+        source = Path(__file__).resolve().parents[1] / "scripts" / "launch_alpha10.py"
+        shadow = self.root / "shadow"
+        scripts = shadow / "scripts"
+        scripts.mkdir(parents=True)
+        shutil.copyfile(source, scripts / "launch_alpha10.py")
+        (shadow / "VERSION").write_text("synthetic", encoding="utf-8")
+        runtime_stub = shadow / "backend" / "srw" / "runtime"
+        runtime_stub.mkdir(parents=True)
+        (runtime_stub / "backup_truth.py").write_text(
+            "def extract_validated_backup(*args, **kwargs): pass\n"
+            "def write_backup_archive(*args, **kwargs): pass\n",
+            encoding="utf-8",
+        )
+        proc = subprocess.run(
+            [sys.executable, str(scripts / "launch_alpha10.py"), "--help"],
+            cwd=shadow, env={**os.environ, "PYTHONPATH": ""},
+            capture_output=True, text=True, timeout=20, check=False,
+        )
+        self.assertEqual(proc.returncode, 0, proc.stderr)
+        self.assertFalse((shadow / "data").exists())
 
     def test_stage_excludes_unlisted_secret_and_candidate_data(self):
         (self.runtime / "provider_secrets.json").write_text('{"key":"private"}')
