@@ -92,6 +92,15 @@ class SyntheticE2Bridge(ReadOnlyBridge):
     def do_GET(self) -> None:
         if not self._valid_browser_request():
             return
+        parsed=urlsplit(self.path)
+        if parsed.path in {"/","/e2-live.html"} and not parsed.query:
+            from pathlib import Path
+            page=Path(__file__).resolve().parent / "e2-live.html"
+            if page.is_file():
+                self._reply(200,page.read_bytes(),"text/html; charset=utf-8")
+            else:
+                self._deny(500,"E2 page is missing")
+            return
         if self._candidate() is not None:
             cid=self._candidate()
             try:
@@ -136,7 +145,7 @@ class SyntheticE2Bridge(ReadOnlyBridge):
         if any(not (isinstance(v,str) or v is None and k=="next_contact_at") for k,v in body.items()):
             self._reply_json(422,{"error":"Action Plan values have invalid types"})
             return
-        if body.get("priority") and body["priority"] not in {"normal","today","urgent","later"}:
+        if body.get("priority") and body["priority"] not in {"normal","today","high","low"}:
             self._reply_json(422,{"error":"Unsupported contact priority"})
             return
         if "reason" in body and len(body["reason"])>1000:
