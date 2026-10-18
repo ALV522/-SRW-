@@ -8,6 +8,9 @@ from __future__ import annotations
 
 import importlib.util
 import json
+import re
+import shutil
+import subprocess
 import tempfile
 import threading
 import unittest
@@ -138,6 +141,22 @@ class E1BridgeTests(unittest.TestCase):
                 return r.status, r.read(), r.headers
         except HTTPError as exc:
             return exc.code, exc.read(), exc.headers
+
+    def test_e1_html_javascript_parses(self):
+        node = shutil.which("node")
+        if node is None:
+            self.skipTest("Node.js not available locally")
+        html = (HERE / "e1-live.html").read_text(encoding="utf-8")
+        match = re.search(r"<script>(.*?)</script>", html, flags=re.S)
+        self.assertIsNotNone(match)
+        checked = subprocess.run(
+            [node, "--check", "-"],
+            input=match.group(1),
+            text=True,
+            capture_output=True,
+            timeout=15,
+        )
+        self.assertEqual(checked.returncode, 0, checked.stderr)
 
     def test_read_only_frontend_and_dashboard(self):
         status, html, _ = self.get("/")
