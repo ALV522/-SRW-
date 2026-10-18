@@ -5,6 +5,8 @@ The E1 experiment deliberately uses only GET endpoints.
 | Product view | Endpoint | Purpose |
 |---|---|---|
 | Connection | `/health/ready` | verify local SRW service |
+| Product identity | `/api/v1/info` | verify product, instance and data-root scope |
+| Carrier identity | `/api/v1/runtime/info` | verify Web/EXE edition, session and instance |
 | Home | `/api/v1/dashboard` | operational/decision/review queues |
 | Projects | `/api/v1/projects` | project cards |
 | Project | `/api/v1/projects/{id}/pipeline` | funnel, next action, interviews/offers |
@@ -28,3 +30,9 @@ It therefore cannot:
 - change settings.
 
 This makes E1 suitable for live-data UI exploration without changing production records.
+
+## EXE lease check
+
+The desktop WPF Host chooses a dynamic loopback port and records its metadata in `data/app.lock/instance.json`. E1 verifies `instance_id`, `session_id`, `version`, and `data_root_hash` against `/api/v1/runtime/info` before exposing its read-only browser surface. No second backend is started.
+
+The E1 bridge forwards only the explicit routes in this matrix. It does **not** proxy raw Source/Blob downloads, Knowledge or Provider/settings routes. The next experiment can extend the allowlist only with reviewed GET APIs.
