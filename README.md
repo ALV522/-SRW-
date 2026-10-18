@@ -33,7 +33,7 @@
 
 ## 当前测试与交付真相
 
-当前源代码测试总数为 **125 项**（GitHub CI 才能证明实际 PASS），外加独立的 **3 条 Chromium 真实浏览器业务验收场景**。原 `v0.8.12-R2` 的 **725 项测试**是历史版本库存参考，不能推导出当前版本达到相同的业务覆盖率。
+当前源代码测试总数为 **132 项**（GitHub CI 才能证明实际 PASS），外加独立的 **3 条 Chromium 真实浏览器业务验收场景**。原 `v0.8.12-R2` 的 **725 项测试**是历史版本库存参考，不能推导出当前版本达到相同的业务覆盖率。
 
 2026-10-18 最近已确认的整合基线 `69f60b9`：
 - [Source Gate：Ubuntu + Windows](https://github.com/ALV522/-SRW-/actions/runs/39134969100) — PASS（当时 109 项源回归）。
@@ -79,3 +79,7 @@ python scripts/run_convergence_verification.py
 ### Alternative C11 source-built Windows Host assembly
 
 A Windows/.NET 10 CI workflow now produces digest-bound, unsigned WPF Host candidate artifacts for exact source commits. `scripts/build_native_from_source_host.py` accepts that candidate and individually recovered Runtime/Knowledge inputs, validates their SHA/provenance/version requirements and audits the final UNVERIFIED GUI ZIP. It does not need the historical v0.8.8 Windows carrier, but the alpha10 Python Runtime must first be updated from its 8/13 version mismatches. See [source Host Native assembly procedure](docs/SOURCE_HOST_NATIVE_ASSEMBLY.md).
+
+### C11 Windows Python 离线兼容升级
+
+新增 [Windows Runtime 隔离升级流程](docs/RUNTIME_UPGRADE.md)：从 GitHub Windows CI 下载同一源码提交的带 SHA-256 清单的依赖 Wheelhouse；对已经恢复的 alpha10 Python 3.12 进行全新目录的 `Lib/c11-overlay` 安装，严格校验 `python312._pth` 的加载优先级，**实际运行嵌入式 Python 导入验证**，保留五个 Knowledge DB 不变。未通过嵌入式运行测试时禁止 Native 封包。旧输入文件绝不原地覆盖；Windows Host 与 WebView2 GUI 实机验收仍属于独立阶段。
