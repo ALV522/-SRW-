@@ -39,7 +39,7 @@
     "note": "Reference inventory only; these 725 v0.8.12-R2 backend tests are not claimed as executed in Convergence 08."
   },
   "current": {
-    "convergence_test_count": 102,
+    "convergence_test_count": 103,
     "files": [
       {
         "file": "test_assessment.py",
@@ -95,7 +95,7 @@
       },
       {
         "file": "test_portable_input_preflight.py",
-        "test_methods": 3
+        "test_methods": 4
       },
       {
         "file": "test_source_archive.py",
