@@ -169,6 +169,10 @@ class RecruitmentBrowserAcceptance(unittest.TestCase):
         expect(self.page.locator("#paste-material")).to_be_visible()
         workspace = self.get_json(f"/api/v1/candidates/{cid}/workspace")
         self.assertTrue(workspace.get("sources"), workspace)
+        self.assertFalse(workspace["decision_ready"])
+        self.assertEqual(workspace["decision_context_hash"], "")
+        expect(self.page.locator(".source-card")).to_contain_text("结构化调研与数据分析")
+        expect(self.page.get_by_role("button", name="记录人工决定")).to_be_disabled()
 
         self.page.locator(".candidate-workspace-tab").filter(has_text="流程与跟进").click()
         expect(self.page.get_by_role("button", name="编辑下一步")).to_be_visible()
