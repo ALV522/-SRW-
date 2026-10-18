@@ -158,6 +158,20 @@ class E2TwoBrowserContexts(unittest.TestCase):
         self.assertFalse(self.errors,self.errors)
         a.screenshot(path=str(EVIDENCE/"e2-two-client-conditional-write.png"),full_page=True)
 
+    def test_03_mobile_e2_editor_does_not_overflow(self):
+        context=self.browser.new_context(locale="zh-CN",viewport={"width":390,"height":844})
+        self.contexts.append(context)
+        page=context.new_page()
+        page.set_default_timeout(10000)
+        page.goto(self.web+"/",wait_until="domcontentloaded")
+        expect(page.locator("#api-state")).to_have_text("LIVE · web · E2 synthetic")
+        page.locator("[data-page=e2]").click()
+        page.locator("#e2-candidate").select_option(self.cid)
+        expect(page.locator("#e2-editor")).to_contain_text(self.cid)
+        size=page.evaluate("({width:document.documentElement.clientWidth,scroll:document.documentElement.scrollWidth})")
+        self.assertLessEqual(size["scroll"],size["width"]+2,size)
+        page.screenshot(path=str(EVIDENCE/"e2-mobile-action-plan.png"),full_page=True)
+
     def test_02_e2_cannot_mutate_other_objects_or_candidates(self):
         page=self.new_client()
         rest=page.context.request
