@@ -43,3 +43,7 @@ quality, full business regression, accessibility, or a packaged Windows build.
 Do not label the 106 source tests plus Chromium cases as a percentage of
 historical 725-test parity. This document does not claim the gate passed;
 GitHub Actions on the exact source commit is the authority for that claim.
+
+## Chromium-discovered regression
+
+The first browser run identified that a candidate could upload text material before publishing the recruiting protocol, but the candidate workspace API returned HTTP 409 and the UI silently suppressed this failure. The acceptance fix preserves material visibility and the human decision gate: unpublished protocol means empty decision_context_hash, decision_ready=false, WAIT_FOR_INPUT and disabled decision submission. Browser and unit tests both cover this distinction.
