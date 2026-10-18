@@ -45,3 +45,7 @@ The native assembly candidate uses a source-manifest allowlist instead of copyin
 ### Native payload checks
 
 The Windows Native assembler requires a separately audited PRODUCTION_RUNTIME.sha256 inventory of intended embedded Python files. Runtime staging copies only inventory-listed, hash-matched entries; unlisted local backups or private data remain excluded. The finished ZIP is inspected independently for exact source, Runtime, Knowledge and inherited Host files with SHA-256 checks and an explicit UNVERIFIED_GUI release status. External inventory provenance, an actual Windows executable build and GUI acceptance are still pending.
+
+### Real-browser acceptance
+
+[Chromium business acceptance](docs/BROWSER_ACCEPTANCE.md) executes isolated, synthetic, real-HTTP clicks for project/Job Setup, candidate material, follow-up, interview and Offer, in a separate Ubuntu Playwright CI workflow. Only an exact-commit successful Actions run counts as passing browser acceptance; the 106 source tests and desktop WPF/WebView2 GUI verification remain distinct gates.
