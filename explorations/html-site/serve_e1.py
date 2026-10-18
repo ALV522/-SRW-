@@ -164,8 +164,10 @@ class ReadOnlyBridge(BaseHTTPRequestHandler):
     listen_port = 0
 
     def log_message(self, fmt: str, *args) -> None:
-        # Do not log URL query parameters or private payloads.
-        print(f"[E1] {self.client_address[0]} {self.command} {fmt % args}", flush=True)
+        # Never log query strings, candidate identifiers or private payloads.
+        path = urlsplit(self.path).path
+        category = "api" if path.startswith("/api/") else "health" if path.startswith("/health/") else "static"
+        print(f"[E1] {self.client_address[0]} {self.command} {category}", flush=True)
 
     def _reply(self, status: int, payload: bytes, content_type: str) -> None:
         self.send_response(status)
