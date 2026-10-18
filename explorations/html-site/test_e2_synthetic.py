@@ -87,9 +87,15 @@ class E2ProxyTests(unittest.TestCase):
         req=Request(self.base+path,data=content,headers=hs,method=method)
         try:
             with urlopen(req,timeout=5) as resp:
-                return resp.status,json.loads(resp.read()),resp.headers.get("ETag","")
+                raw=resp.read()
+                try: payload=json.loads(raw)
+                except ValueError: payload={"text":raw.decode("utf-8",errors="replace")}
+                return resp.status,payload,resp.headers.get("ETag","")
         except HTTPError as exc:
-            return exc.code,json.loads(exc.read()),exc.headers.get("ETag","")
+            raw=exc.read()
+            try: payload=json.loads(raw)
+            except ValueError: payload={"text":raw.decode("utf-8",errors="replace")}
+            return exc.code,payload,exc.headers.get("ETag","")
 
     def test_two_clients_share_etag_and_stale_writer_rejected(self):
         path="/api/v1/candidates/synthetic-1/action-plan"
