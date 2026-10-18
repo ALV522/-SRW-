@@ -1,0 +1,58 @@
+name: SRW C11 Windows Offline Wheelhouse
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - 'requirements-ci.txt'
+      - 'scripts/upgrade_embedded_runtime.py'
+      - 'scripts/check_embedded_runtime_compatibility.py'
+      - '.github/workflows/windows-runtime-wheelhouse.yml'
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  wheelhouse:
+    runs-on: windows-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Download exact-pinned Windows binary wheels and transitive dependencies
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force artifacts/wheelhouse | Out-Null
+          python -m pip download --disable-pip-version-check --only-binary=:all: -r requirements-ci.txt --dest artifacts/wheelhouse
+          if ($LASTEXITCODE -ne 0) { throw 'One or more Windows C11 dependency wheels unavailable' }
+      - name: Create reproducible wheel integrity inventory
+        shell: pwsh
+        run: |
+          $lines = @(Get-ChildItem -LiteralPath artifacts/wheelhouse -Filter '*.whl' -File | Sort-Object Name | ForEach-Object {
+            $h = (Get-FileHash -Algorithm SHA256 -LiteralPath $_.FullName).Hash.ToLowerInvariant()
+            "$h  $($_.Name)"
+          })
+          if ($lines.Count -lt 13) { throw 'Wheelhouse incomplete' }
+          $lines | Set-Content -Encoding utf8 artifacts/wheelhouse/WHEELHOUSE.sha256
+      - name: Smoke test downloaded Windows wheels in isolated host CPython
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force artifacts/wheel-test | Out-Null
+          python -m pip install --no-index --find-links artifacts/wheelhouse --no-compile --target artifacts/wheel-test -r requirements-ci.txt
+          if ($LASTEXITCODE -ne 0) { throw 'Offline dependency install failed' }
+          $env:PYTHONPATH = (Resolve-Path artifacts/wheel-test).Path
+          python -S -c 'import anyio, certifi, click, h11, httpcore, httpx, idna, psutil, pymupdf, sqlalchemy, starlette, typing_extensions, uvicorn; print("Windows C11 binary import smoke PASS")'
+          if ($LASTEXITCODE -ne 0) { throw 'Windows binary dependency import smoke FAILED' }
+      - name: Upload checksum-bound wheelhouse (without any user data)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: srw-c11-win312-wheelhouse-${{ github.sha }}
+          path: artifacts/wheelhouse/
+          if-no-files-found: warn
+          retention-days: 30
