@@ -1,6 +1,6 @@
 # Experiment Plan
 
-## E0 — static concept
+## E0 — static concept · implemented
 
 Deliverable: `index.html`.
 
@@ -15,7 +15,7 @@ Exit condition:
 - the prototype can be opened directly with no build tool,
 - the core recruiting path is understandable without reading documentation.
 
-## E1 — read-only live adapter
+## E1 — read-only live adapter · prototype implemented, runtime acceptance pending
 
 Add an API adapter that, when served under SRW, reads:
 - `/api/v1/dashboard`
@@ -23,7 +23,7 @@ Add an API adapter that, when served under SRW, reads:
 - project pipeline endpoints
 - candidate summary/workspace endpoints
 
-No POST/PATCH/DELETE calls in E1.
+No POST/PATCH/PUT/DELETE calls in E1. The current E1 client enforces same-origin GET-only access and falls back to mock data when the SRW service is unavailable.
 
 Exit condition:
 - the exploratory frontend can display a real local database safely.
@@ -56,3 +56,15 @@ This exploration does not:
 - change current APIs,
 - create a hosted SaaS,
 - remove the local backend.
+
+## E1 acceptance still required
+
+The code exists, but E1 is not complete until it is mounted under a real SRW local origin and verified against a real database. Acceptance should check:
+
+- dashboard payload renders without mock fallback;
+- project list loads from `/api/v1/projects`;
+- project pipeline and candidate list render from real data;
+- Candidate Workspace renders Sources, Claims and Criteria from the same records visible in the EXE;
+- opening Web and EXE concurrently shows the same persisted state;
+- no write request is emitted by E1;
+- browser refresh/restart does not create divergent state.
