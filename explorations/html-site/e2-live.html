@@ -47,12 +47,12 @@ table{width:100%;border-collapse:collapse}th,td{text-align:left;padding:10px 8px
  <div class="nav">
   <button data-page="architecture">◇ <span class="label">双载体架构</span></button>
  </div>
- <div class="side-note">Exploration branch only<br>GET-only API client<br>No production writes</div>
+ <div class="side-note">Synthetic-only Action Plan PATCH<br>Other routes remain GET-only<br>Never use real candidates</div>
 </aside>
 <main>
  <div class="topbar">
   <strong id="top-title">工作台</strong>
-  <div class="right"><span class="badge" id="api-state">初始化</span><span class="badge warn">EXPERIMENT</span></div>
+  <div class="right"><span class="badge" id="api-state">初始化</span><span class="badge warn">E2 SYNTHETIC ONLY</span></div>
  </div>
  <div class="content" id="root"><div class="loading">正在初始化探索版…</div></div>
 </main>
@@ -183,7 +183,7 @@ async function loadLive(){
   state.runtimeInfo=runtime;
   state.liveError='';
   state.mode='live';
-  setApiState('LIVE · '+String(runtime.edition||'web')+' · GET-only','live');
+  setApiState('LIVE · '+String(runtime.edition||'web')+' · E2 synthetic','live');
   return true;
  }catch(err){
   state.liveError=String(err.message||err);
@@ -207,7 +207,7 @@ function home(){
  const d=state.dashboard||mock.dashboard;
  const todos=d.operational_todos||{},st=d.candidates_by_stage||{},wb=d.decision_workbench||{items:[]},oq=d.operational_queue||{items:[]},rq=d.review_queue||{items:[]};
  root.innerHTML=
- '<div class="hero"><div><h1>今天要处理什么</h1><div class="muted">E1 直接读取 SRW 的真实业务状态，但不允许任何写操作。</div></div><button class="btn primary" onclick="projectsPage()">进入招聘项目</button></div>'+
+ '<div class="hero"><div><h1>今天要处理什么</h1><div class="muted">E2 使用真实 C11 后端；仅合成候选人的跟进计划可进行条件写入，其它招聘数据保持只读。</div></div><button class="btn primary" onclick="projectsPage()">进入招聘项目</button></div>'+
  '<div class="notice '+(state.mode==='mock'?'warn':'')+'">'+(state.mode==='live'?'当前是 <strong>Live read-only</strong>：页面来自实验 HTML，数据直接读取本机 SRW 后端。Web 与 EXE 因此可以天然看到同一份权威数据。':'当前是 <strong>Mock 模式，不是真实招聘数据</strong>。'+esc(state.liveError||'没有检测到 SRW 后端。')+' 请启动正式 SRW 服务并使用 E1 Bridge。')+'</div>'+
  '<div class="grid">'+[
   ['逾期联系',todos.overdue_contacts||0],
