@@ -11,8 +11,13 @@ import hashlib
 import json
 import re
 import sqlite3
+import sys
 from pathlib import Path
 from contextlib import closing
+# Direct execution (python scripts/portable_input_preflight.py) must work on
+# clean Windows installations where the repository root is not on sys.path.
+if __package__ in (None, ""):
+    sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from scripts.native_payload import audit_runtime, PayloadError
 
 DB_TABLES = {
