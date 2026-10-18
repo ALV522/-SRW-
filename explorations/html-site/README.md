@@ -72,13 +72,41 @@ This keeps the usability and portability advantages of a website while preservin
 
 ## Current experiment status
 
-- E0 static standalone prototype: implemented in `index.html`.
-- E1 read-only live adapter: implemented in `e1-live.html`.
-- E1 is intentionally GET-only and contains no mutation API calls.
-- Web + EXE interoperability architecture is documented in `DUAL_CARRIER_ARCHITECTURE.md`.
-- E1 API ownership/safety boundary is documented in `E1_API_MATRIX.md`.
+- **E0 static HTML Mock:** implemented in `index.html`.
+- **E1 real C11 Web read-only integration:** implemented in `e1-live.html`, accepted for the tested source-run scope.
+- **Real Chromium + temporary SQLite acceptance:** six tests PASS, including cross-project candidates and mobile no-overflow.
+- **Ubuntu and Windows source-demo smoke:** PASS.
+- **Windows/Ubuntu Bridge tests:** 12 per platform, PASS.
+- **Native EXE ↔ Browser interoperability:** still awaiting an API-compatible, GUI-tested C11 Windows package.
 
-The E1 JavaScript has been syntax-validated. It has **not yet been accepted against a running Windows SRW instance**, because this exploration branch does not alter the mainline backend/static mount. Live runtime acceptance is therefore still pending.
+Full evidence: [E1_STATUS.md](E1_STATUS.md).
+Latest source-code acceptance: https://github.com/ALV522/-SRW-/actions/runs/39148706985
+
+## Start the real Web demo WITHOUT a Windows EXE
+
+The experiment can now run actual C11 APIs using an isolated temporary
+SQLite database and synthetic candidate records. Nothing in an existing SRW
+application/data directory is opened.
+
+Windows:
+
+```text
+explorations/html-site/run_e1_demo_windows.cmd
+```
+
+The Windows script expects Python 3.12, creates an independent `.e1-demo-venv`,
+installs pinned dependencies there and launches the demo in your browser.
+
+Cross-platform manual operation after dependencies are available:
+
+```bash
+python explorations/html-site/run_e1_demo.py --open-browser
+```
+
+The browser should show `LIVE · web · GET-only`. Exit with Ctrl+C to stop both
+temporary services and delete the synthetic SQLite and Knowledge fixtures.
+
+Details: **[USER_ACTIONS_NO_EXE.md](USER_ACTIONS_NO_EXE.md)**.
 
 ## Run E1 on Windows (same EXE, same database)
 
