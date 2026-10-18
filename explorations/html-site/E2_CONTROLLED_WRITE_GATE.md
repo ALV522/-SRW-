@@ -111,7 +111,7 @@ to the production Web + EXE development line.
 
 Code: `e2_synthetic_bridge.py`, `e2-live.html`, `run_e2_demo.py`, `test_e2_synthetic.py`, `browser_acceptance/test_e2_real_backend.py`, bundled `START_E2.cmd`.
 
-GitHub Actions: https://github.com/ALV522/-SRW-/actions/runs/39151649763
+GitHub Actions: https://github.com/ALV522/-SRW-/actions/runs/39152520579
 
 Two real Chromium client contexts share a temporary SRW C11 backend and SQLite database. Client A's Action Plan patch persists and creates a real SRW audit event. Client B's stale If-Match attempt receives 412 and leaves A's committed state unchanged. Client B explicitly re-fetches and can then save successfully. Disallowed candidate IDs/fields and other mutation routes are refused. Ubuntu and Windows source demo smoke and full Windows CMD launch passed.
 
