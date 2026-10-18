@@ -170,7 +170,13 @@ class ReadOnlyBridge(BaseHTTPRequestHandler):
         print(f"[E1] {self.client_address[0]} {self.command} {category}", flush=True)
 
     def _reply(self, status: int, payload: bytes, content_type: str) -> None:
+        # All E1 responses are one-request-per-connection. When an unsafe method
+        # is rejected without consuming its body, keeping HTTP/1.1 alive would
+        # make leftover bytes look like the beginning of the next request.
+        # Closing connections also avoids accidental request-body log leakage.
+        self.close_connection = True
         self.send_response(status)
+        self.send_header("Connection", "close")
         self.send_header("Content-Type", content_type)
         self.send_header("Content-Length", str(len(payload)))
         self.send_header("Cache-Control", "no-store")
