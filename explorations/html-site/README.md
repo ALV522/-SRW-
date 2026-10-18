@@ -69,3 +69,13 @@ SRW Local Application Service
 ```
 
 This keeps the usability and portability advantages of a website while preserving the capabilities that made the 0.8.x line valuable.
+
+## Current experiment status
+
+- E0 static standalone prototype: implemented in `index.html`.
+- E1 read-only live adapter: implemented in `e1-live.html`.
+- E1 is intentionally GET-only and contains no mutation API calls.
+- Web + EXE interoperability architecture is documented in `DUAL_CARRIER_ARCHITECTURE.md`.
+- E1 API ownership/safety boundary is documented in `E1_API_MATRIX.md`.
+
+The E1 JavaScript has been syntax-validated. It has **not yet been accepted against a running Windows SRW instance**, because this exploration branch does not alter the mainline backend/static mount. Live runtime acceptance is therefore still pending.
