@@ -42,7 +42,12 @@ def http_json(base: str, path: str, *, method: str = "GET",
         with urllib.request.urlopen(req, timeout=8) as resp:
             return resp.status, json.loads(resp.read().decode("utf-8")), resp.headers.get("ETag", "")
     except urllib.error.HTTPError as exc:
-        return exc.code, json.loads(exc.read().decode("utf-8")), exc.headers.get("ETag", "")
+        raw=exc.read()
+        try:
+            data=json.loads(raw.decode("utf-8"))
+        except (ValueError,UnicodeDecodeError):
+            data={"text":raw.decode("utf-8",errors="replace")}
+        return exc.code, data, exc.headers.get("ETag", "")
 
 
 def smoke_e2(api: str, web: str, candidate_id: str) -> None:
