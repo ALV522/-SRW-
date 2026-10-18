@@ -22,7 +22,7 @@ python scripts/check_release_truth.py
 python scripts/run_convergence_verification.py
 ```
 
-The current suite contains **106 source regression tests**. Actual PASS evidence is the GitHub Actions run for the exact commit, on both Ubuntu and Windows. CI enables `SRW_TEST_RESOURCE_STRICT=1` and uploads logs. Historical C08 reports remain under `verification/`; they are not current-run evidence. The 725-test v0.8.12 inventory is a reference, not a claim of full parity.
+The current suite contains **109 source regression tests**. Actual PASS evidence is the GitHub Actions run for the exact commit, on both Ubuntu and Windows. CI enables `SRW_TEST_RESOURCE_STRICT=1` and uploads logs. Historical C08 reports remain under `verification/`; they are not current-run evidence. The 725-test v0.8.12 inventory is a reference, not a claim of full parity.
 
 ## Delivery boundary
 
@@ -49,3 +49,5 @@ The Windows Native assembler requires a separately audited PRODUCTION_RUNTIME.sh
 ### Real-browser acceptance
 
 [Chromium business acceptance](docs/BROWSER_ACCEPTANCE.md) executes isolated, synthetic, real-HTTP clicks for project/Job Setup, candidate material, follow-up, interview and Offer, in a separate Ubuntu Playwright CI workflow. Only an exact-commit successful Actions run counts as passing browser acceptance; the 106 source tests and desktop WPF/WebView2 GUI verification remain distinct gates.
+
+Browser acceptance found and corrected draft-only candidate workspace behavior: materials remain visible before protocol publication; decision context stays unset and final decision remains disabled until the required published context exists.
