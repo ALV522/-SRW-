@@ -36,17 +36,24 @@ if /i "%~1"=="--check-layout" (
     exit /b 0
 )
 
+set "E1_BOOTSTRAP="
 where py >nul 2>&1
-if errorlevel 1 (
-    echo ERROR: Windows Python launcher not found.
-    echo Install Python 3.12 with the py launcher first.
-    pause
-    exit /b 3
+if not errorlevel 1 (
+    py -3.12 -c "import sys; raise SystemExit(sys.version_info[:2] != (3, 12))" >nul 2>&1
+    if not errorlevel 1 set "E1_BOOTSTRAP=py -3.12"
 )
-py -3.12 --version >nul 2>&1
-if errorlevel 1 (
-    echo ERROR: Python 3.12 is required for the pinned E1 source demo.
-    echo This script will not change or install your system Python.
+if not defined E1_BOOTSTRAP (
+    where python >nul 2>&1
+    if not errorlevel 1 (
+        python -c "import sys; raise SystemExit(sys.version_info[:2] != (3, 12))" >nul 2>&1
+        if not errorlevel 1 set "E1_BOOTSTRAP=python"
+    )
+)
+if not defined E1_BOOTSTRAP (
+    echo ERROR: Python 3.12 is required, via py -3.12 or python.
+    echo Neither installation nor system PATH will be changed.
+    if /i "%~1"=="--smoke" exit /b 3
+    if /i "%~2"=="--smoke" exit /b 3
     pause
     exit /b 3
 )
@@ -57,7 +64,7 @@ set "E1_READY=%E1_VENV%\deps-20261019.ready"
 
 if not exist "%E1_PYTHON%" (
     echo Creating isolated E1 virtual environment...
-    py -3.12 -m venv "%E1_VENV%"
+    %E1_BOOTSTRAP% -m venv "%E1_VENV%"
     if errorlevel 1 goto :failed
 )
 
@@ -69,13 +76,16 @@ if not exist "%E1_READY%" (
 )
 
 set "E1_DEMO_SCRIPT=run_e1_demo.py"
+set "E1_DEMO_ARGS=--open-browser"
 if /i "%~1"=="--e2" set "E1_DEMO_SCRIPT=run_e2_demo.py"
+if /i "%~1"=="--smoke" set "E1_DEMO_ARGS=--smoke"
+if /i "%~2"=="--smoke" set "E1_DEMO_ARGS=--smoke"
 
 echo.
 echo Starting %E1_DEMO_SCRIPT% with an isolated temporary C11 backend...
-echo A browser should open automatically. No user records are used.
+echo No user records are used. Browser opens automatically in normal mode.
 echo.
-"%E1_PYTHON%" "%~dp0%E1_DEMO_SCRIPT%" --open-browser
+"%E1_PYTHON%" "%~dp0%E1_DEMO_SCRIPT%" %E1_DEMO_ARGS%
 set "E1_EXIT=%ERRORLEVEL%"
 echo.
 if not "%E1_EXIT%"=="0" (
@@ -83,6 +93,7 @@ if not "%E1_EXIT%"=="0" (
     echo See the error above; no real SRW database was used.
 )
 echo The synthetic server has stopped.
+if /i "%E1_DEMO_ARGS%"=="--smoke" exit /b %E1_EXIT%
 pause
 exit /b %E1_EXIT%
 
