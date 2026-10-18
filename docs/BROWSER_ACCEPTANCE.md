@@ -1,6 +1,6 @@
 # SRW Chromium business acceptance
 
-This is a separate real-browser gate. It runs Chromium against the actual
+This is a separate real-browser gate (three scenarios passed on main commit 69f60b9). It runs Chromium against the actual
 Starlette HTTP server, distributed frontend JavaScript and a disposable SQLite
 database. No HTTP responses or candidate/business actions are mocked.
 

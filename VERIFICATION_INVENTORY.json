@@ -39,7 +39,7 @@
     "note": "Reference inventory only; these 725 v0.8.12-R2 backend tests are not claimed as executed in Convergence 08."
   },
   "current": {
-    "convergence_test_count": 109,
+    "convergence_test_count": 113,
     "files": [
       {
         "file": "test_assessment.py",
@@ -94,6 +94,10 @@
         "test_methods": 15
       },
       {
+        "file": "test_legacy_archive_audit.py",
+        "test_methods": 4
+      },
+      {
         "file": "test_native_payload.py",
         "test_methods": 13
       },
@@ -114,6 +118,6 @@
   },
   "recovered_gates": [],
   "parity_status": "PARTIAL",
-  "parity_note": "109 source regression tests (3 newly covering prepublished candidate intake) vs historical 725 reference tests; Chromium acceptance is a separate gate.",
+  "parity_note": "113 current source regression tests (including 4 legacy ZIP audit tests) vs the historical v0.8.12-R2 725-test reference; 3 real Chromium scenarios are separate.",
   "historical_recovered_gates": "verification/history/convergence08/VERIFICATION_INVENTORY.json"
 }

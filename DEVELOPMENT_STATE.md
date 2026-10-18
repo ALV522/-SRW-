@@ -8,7 +8,7 @@ C08 business capabilities are retained. C09 supplies local-only Host and browser
 
 Integration separates immutable C08 source history from the current complete source hash inventory. Windows file-handle checks now enumerate real process handles through psutil instead of returning an empty Linux-only /proc result. A real SQLite open/close test runs on each OS. Probe errors fail the run rather than manufacturing PASS.
 
-The current suite contains 109 tests. Runtime counts and results are emitted by CI for the exact commit. This document does not substitute for that evidence. Release identity is C11 throughout; historical C08 metadata is preserved under verification/history/convergence08.
+The current suite contains 113 tests. Runtime counts and results are emitted by CI for the exact commit. This document does not substitute for that evidence. Release identity is C11 throughout; historical C08 metadata is preserved under verification/history/convergence08.
 
 ## Delivery
 
@@ -55,12 +55,16 @@ Native packaging now requires an external audited manifest for every embedded Ru
 
 The assembler now uses PowerShell hash checks to stage an isolated Runtime and reviewed source before launching any embedded Python. The launcher self-check uses temporary data outside the release tree rather than creating staged user data. Tests protect this ordering and launcher import side effects.
 
-## Chromium browser acceptance gate (proposed)
+## Chromium browser acceptance gate (verified on 69f60b9)
 
-Added a separate Ubuntu real-Chromium/Playwright integration workflow, backed by a disposable local SQLite database and generated synthetic Knowledge fixtures. It exercises UI clicks through project creation, four-step Draft Job Setup, candidate text intake, action plan, interview scheduling and draft Offer, then checks persisted API results. This gate must pass on the exact PR and main commits before a browser-acceptance claim; WPF/WebView2 and real Windows Portable acceptance remain pending. See docs/BROWSER_ACCEPTANCE.md.
+Added a separate Ubuntu real-Chromium/Playwright integration workflow, backed by a disposable local SQLite database and generated synthetic Knowledge fixtures. It exercises UI clicks through project creation, four-step Draft Job Setup, candidate text intake, action plan, interview scheduling and draft Offer, then checks persisted API results. This gate passed 3 Chromium workflows on exact main commit 69f60b9. WPF/WebView2 and real Windows Portable acceptance remain pending. See docs/BROWSER_ACCEPTANCE.md.
 
 ## Chromium-discovered candidate intake defect
 
 The initial Chromium run exposed an HTTP 409 in candidate workspace when a newly collected and published material revision existed before job standards were published. This was incorrectly hidden as missing material by the UI. The read-only workspace now returns Source/Claim content and a blocked (empty) decision context until published protocol and material exist. Decision controls are disabled in that state; published-context calculation remains unchanged. Three additional source tests cover draft-only, post-publication and nonexistent candidate cases.
 
 The second browser run also revealed that the Offer create button was shown for an ineligible new candidate. It is now disabled unless the candidate is in interview or offer stage; Chromium acceptance verifies genuine human new -> shortlisted -> interview transitions before saving an Offer Draft. The backend stage guard is preserved.
+
+## 2026-10-18 GitHub repository governance and historical ZIP audit
+
+The root README has been consolidated as the current user/developer entry point; docs/REPOSITORY_GOVERNANCE.md now records the single `main` source trunk, historical branches, module map, CI/evidence, artifact kinds and delivery blockers. docs/history/ARCHIVE_CATALOG.md and LEGACY_ARCHIVES.json record the four uploaded historical ZIPs' exact SHA-256/size and explicitly state that original archive bytes were NOT uploaded to GitHub. Three packages contain large Knowledge databases and an alpha Web Portable additionally contains executable Runtime components. No production database content was treated as cleared for publishing. A read-only ZIP safety/hash tool and four isolated tests were added. The historical 725 test inventory remains reference only; current regression count is now 113 (pending exact-commit verification on this change).
