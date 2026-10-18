@@ -65,7 +65,7 @@ if not exist "explorations\html-site\run_e2_demo.py" (
 )
 echo E2 can modify ONLY disposable synthetic Action Plans.
 echo E2 does NOT connect to any existing SRW EXE or real user database.
-call "explorations\html-site\run_e1_demo_windows.cmd" --e2
+call "explorations\html-site\run_e1_demo_windows.cmd" --e2 %*
 exit /b %ERRORLEVEL%
 """
 
