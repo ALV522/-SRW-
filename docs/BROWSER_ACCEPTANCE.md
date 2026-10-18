@@ -47,3 +47,7 @@ GitHub Actions on the exact source commit is the authority for that claim.
 ## Chromium-discovered regression
 
 The first browser run identified that a candidate could upload text material before publishing the recruiting protocol, but the candidate workspace API returned HTTP 409 and the UI silently suppressed this failure. The acceptance fix preserves material visibility and the human decision gate: unpublished protocol means empty decision_context_hash, decision_ready=false, WAIT_FOR_INPUT and disabled decision submission. Browser and unit tests both cover this distinction.
+
+## Offer creation and human Pipeline gate
+
+Browser acceptance additionally checks that Offer creation is disabled before the candidate is in interview/offer stage, and that two deliberate human stage transitions (new -> shortlisted -> interview) enable the Offer Draft action. The server-side transition/Offer guard remains authoritative; a visible button may not bypass it.

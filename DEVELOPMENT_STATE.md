@@ -62,3 +62,5 @@ Added a separate Ubuntu real-Chromium/Playwright integration workflow, backed by
 ## Chromium-discovered candidate intake defect
 
 The initial Chromium run exposed an HTTP 409 in candidate workspace when a newly collected and published material revision existed before job standards were published. This was incorrectly hidden as missing material by the UI. The read-only workspace now returns Source/Claim content and a blocked (empty) decision context until published protocol and material exist. Decision controls are disabled in that state; published-context calculation remains unchanged. Three additional source tests cover draft-only, post-publication and nonexistent candidate cases.
+
+The second browser run also revealed that the Offer create button was shown for an ineligible new candidate. It is now disabled unless the candidate is in interview or offer stage; Chromium acceptance verifies genuine human new -> shortlisted -> interview transitions before saving an Offer Draft. The backend stage guard is preserved.
