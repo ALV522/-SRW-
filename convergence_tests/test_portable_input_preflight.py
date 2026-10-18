@@ -110,7 +110,7 @@ class PortableInputPreflightTest(unittest.TestCase):
         self.assertIn("portable_input_preflight.py", content)
         self.assertIn("PRODUCTION_KNOWLEDGE.sha256", content)
         self.assertIn("PRODUCTION_RUNTIME.sha256", content)
-        self.assertIn("stage-runtime", content)
+        self.assertIn("CopyAuditedRuntime", content)
         self.assertIn("audit-zip", content)
         self.assertIn("_Windows_Native_UNVERIFIED.zip", content)
         self.assertIn("$hostExe", content)
