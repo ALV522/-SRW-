@@ -8,6 +8,8 @@ on:
       - 'global.json'
       - '.github/workflows/windows-host-candidate.yml'
       - 'scripts/check_embedded_runtime_compatibility.py'
+  push:
+    branches: [main]
   workflow_dispatch:
 
 permissions:
@@ -52,6 +54,14 @@ jobs:
             knowledge_included = $false
           }
           $truth | ConvertTo-Json -Depth 6 | Set-Content -Encoding UTF8 'artifacts/windows-host/HOST_BUILD_CANDIDATE.json'
+          $dotnetTruth = @{
+            schema = 'srw.dotnet-build-truth.source-candidate.v1'
+            source_git_sha = $env:GITHUB_SHA
+            outputs = @{ executable_sha256 = $sha }
+            status = 'COMPILED_ONLY_UNVERIFIED_GUI'
+            gui_accepted = $false
+          }
+          $dotnetTruth | ConvertTo-Json -Depth 6 | Set-Content -Encoding UTF8 'artifacts/windows-host/DOTNET_BUILD_TRUTH.json'
           Write-Output ('Host EXE SHA256: ' + $sha)
       - name: Publish source-built Host as CI evidence only
         if: always()

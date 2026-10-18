@@ -8,7 +8,7 @@ C08 business capabilities are retained. C09 supplies local-only Host and browser
 
 Integration separates immutable C08 source history from the current complete source hash inventory. Windows file-handle checks now enumerate real process handles through psutil instead of returning an empty Linux-only /proc result. A real SQLite open/close test runs on each OS. Probe errors fail the run rather than manufacturing PASS.
 
-The current suite contains 121 tests. Runtime counts and results are emitted by CI for the exact commit. This document does not substitute for that evidence. Release identity is C11 throughout; historical C08 metadata is preserved under verification/history/convergence08.
+The current suite contains 125 tests. Runtime counts and results are emitted by CI for the exact commit. This document does not substitute for that evidence. Release identity is C11 throughout; historical C08 metadata is preserved under verification/history/convergence08.
 
 ## Delivery
 
@@ -72,3 +72,7 @@ The root README has been consolidated as the current user/developer entry point;
 ## 2026-10-18 Legacy external dependency recovery and alternative Host build
 
 Actual user-uploaded alpha10 Web Portable contains 1,611 embedded Windows Python 3.12 Runtime files (99,144,143 uncompressed bytes), including the public certifi CA trust store. v0.8.12-R2 contains five intact Knowledge SQLite DBs: integrity_check=ok; their SHA-256 hashes match same-name DBs in v0.8.10 source and alpha10 Web Portable. Recovered contents/manifest have been delivered as a separate UNVERIFIED external inputs ZIP (not stored in Git). Embedded Python packages match only 5/13 pinned current C11 requirements; eight are missing/outdated, so Native preflight now explicitly rejects an incompatible Runtime before assembly. The four current user archives do not include a compiled Windows Host; v0.8.10 Assembler contains an Application Overlay, not the exact Windows Portable carrier. A new GitHub Windows Host source-build CI gate attempts an unsigned framework-dependent WPF/WebView2 Host compilation from locked .NET inputs. Compilation and WPF GUI acceptance remain separate; see docs/LEGACY_RESOURCE_RECOVERY.md.
+
+## Alternative source-built Windows Native assembly
+
+A second, separate Windows Native assembly path has been implemented using the digest-bound WPF/WebView2 Host candidate from GitHub's Windows Host build workflow rather than the exact historical v0.8.8 carrier. The new assembler requires an exact matching Git source commit, source SHA manifest, restored/runtime-upgraded Python pinned to current C11 requirements, five Knowledge SQLite databases, and matching Host build provenance. The finished ZIP is re-opened for an exact allowlist/hash audit and remains explicitly UNVERIFIED_GUI. Four synthetic packaging and privacy regression tests were added. The existing historic carrier inheritance path is preserved. This is an unverified candidate builder: the historical alpha10 Python dependencies still need compatibility updates before actual candidate packaging, and WPF/WebView2 GUI acceptance is separate.
