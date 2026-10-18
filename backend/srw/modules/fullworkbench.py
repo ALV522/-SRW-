@@ -12,6 +12,7 @@ from sqlalchemy.orm import Mapped, Session, mapped_column
 from srw.kernel.clock import utc_now
 from srw.kernel.ids import new_id
 from srw.runtime.db.base import V1Base
+from srw.runtime.backup_truth import write_backup_archive
 
 
 class RoleTemplate(V1Base):
@@ -167,21 +168,19 @@ class KnowledgeService:
 
 def create_backup(data_dir: Path, database_path: Path) -> Path:
     data_dir=Path(data_dir); backups=data_dir/"backups"; backups.mkdir(parents=True,exist_ok=True)
-    stamp=utc_now().strftime("%Y%m%d-%H%M%S")
+    stamp=utc_now().strftime("%Y%m%d-%H%M%S-%f")
     dest=backups/f"srw-backup-{stamp}.zip"
-    # SQLite online backup gives a consistent snapshot even with WAL.
+    # SQLite online backup gives a consistent WAL-safe snapshot.
     tmp=Path(tempfile.mkdtemp(prefix="srw-backup-")); snap=tmp/"srw_v1.db"
+    src=dst=None
     try:
-        src=sqlite3.connect(str(database_path)); dst=sqlite3.connect(str(snap)); src.backup(dst); dst.close(); src.close()
-        with zipfile.ZipFile(dest,"w",zipfile.ZIP_DEFLATED) as z:
-            z.write(snap,"data/srw_v1.db")
-            for folder in ("blobs",):
-                root=data_dir/folder
-                if root.exists():
-                    for p in root.rglob("*"):
-                        if p.is_file(): z.write(p, f"data/{folder}/{p.relative_to(root).as_posix()}")
+        src=sqlite3.connect(str(database_path)); dst=sqlite3.connect(str(snap)); src.backup(dst)
+        dst.close(); dst=None; src.close(); src=None
+        write_backup_archive(dest,snap,data_dir/"blobs")
         return dest
     finally:
+        if dst is not None: dst.close()
+        if src is not None: src.close()
         shutil.rmtree(tmp,ignore_errors=True)
 
 

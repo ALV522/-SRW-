@@ -27,6 +27,8 @@ This is an execution plan, not a completed acceptance report. C11 prioritizes co
 | Native stage allowlist | Place synthetic user-data directories and untracked secrets next to verified source, then assemble with audited external assets | Untracked candidate data, backups and secrets never enter the staging directory/ZIP; resulting candidate labelled UNVERIFIED |
 | Portable input preflight | Run preflight with missing carrier/Knowledge and with separately audited complete inputs | Missing or hash-mismatched inputs are BLOCKED, never represented as a ready Windows build; provenance and GUI remain separate gates |
 | Portability | Export project; preview/import into another instance | Source blobs preserved; IDs remapped; old decisions historical |
+| Backup manifest integrity | Back up SQLite plus Source blobs, alter a ZIP member and attempt restore | Manifested backups reject tampering; existing data and pending restore marker survive failure |
+| Legacy backup compatibility | Restore a historical DB-only backup and reject extra ZIP members | Historical layout remains readable without accepting unsafe paths or undetected additions |
 | Restart and recovery | Restart, back up, restore, interrupt and retry | Business state durable; known staging cleaned; live data preserved |
 | Windows GUI | Launch/close/relaunch, open files, view evidence, export | No leaked process/SQLite lock; usable WPF/WebView2 flow |
 | External AI | Configure real provider, timeout/limit/error cases | Actual privacy projection; clear retry and failure status |
