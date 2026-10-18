@@ -205,7 +205,7 @@ class RealBackendE1Browser(unittest.TestCase):
         self.open_candidate()
         expect(self.page.locator(".source")).to_contain_text(self.resume_text)
         expect(self.page.locator(".source")).to_contain_text("e1-synthetic-resume.txt")
-        expect(self.page.locator(".candidate-side")).to_contain_text("简历筛选")
+        expect(self.page.locator(".candidate-side")).to_contain_text("新候选人")
         self.assertEqual(request_json(self.web,
             f"/api/v1/candidates/{self.cid}/workspace")["sources"][0]["source_id"], self.sid)
         self.assertFalse(self.errors, self.errors)
@@ -214,7 +214,7 @@ class RealBackendE1Browser(unittest.TestCase):
     def test_02_backend_update_visible_after_browser_refresh(self):
         self.open_live()
         self.open_candidate()
-        expect(self.page.locator(".candidate-side")).to_contain_text("简历筛选")
+        expect(self.page.locator(".candidate-side")).to_contain_text("新候选人")
         # Writes go straight to the disposable true backend, simulating another
         # carrier; E1 Web is deliberately forbidden to write.
         changed = request_json(self.api, f"/api/v1/candidates/{self.cid}/stage", {
@@ -241,7 +241,7 @@ class RealBackendE1Browser(unittest.TestCase):
         denied = self.context.request.get(
             self.web + f"/api/v1/sources/{self.sid}/file",
         )
-        self.assertEqual(denied.status, 404)
+        self.assertEqual(denied.status, 404, f"Unexpected reject: {denied.status}, {denied.text()}, synthetic source ID {self.sid!r}")
         after = request_json(self.api, "/api/v1/projects")["projects"]
         self.assertEqual(len(before), len(after))
         self.assertFalse(any(x.get("title") == "MUST_NOT_BE_CREATED" for x in after))
