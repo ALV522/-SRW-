@@ -17,6 +17,10 @@ import zipfile
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
+BACKEND = ROOT / "backend"
+if str(BACKEND) not in sys.path:
+    sys.path.insert(0, str(BACKEND))
+from srw.runtime.backup_truth import (extract_validated_backup, write_backup_archive)
 DATA = ROOT / "data"
 DB = DATA / "srw_v1.db"
 FRONTEND = ROOT / "frontend" / "dist"
@@ -145,13 +149,7 @@ def _pre_restore_backup() -> Path | None:
             src.backup(dst)
         finally:
             dst.close(); src.close()
-        with zipfile.ZipFile(dest, "w", zipfile.ZIP_DEFLATED) as z:
-            z.write(snap, "data/srw_v1.db")
-            blobs = DATA / "blobs"
-            if blobs.exists():
-                for p in blobs.rglob("*"):
-                    if p.is_file():
-                        z.write(p, "data/blobs/" + p.relative_to(blobs).as_posix())
+        write_backup_archive(dest, snap, DATA / "blobs")
     return dest
 
 
@@ -171,24 +169,18 @@ def apply_pending_restore() -> str | None:
 
     with tempfile.TemporaryDirectory(prefix="srw-restore-", dir=DATA) as td_name:
         td = Path(td_name)
-        try:
-            with zipfile.ZipFile(src, "r") as z:
-                names = z.namelist()
-                if "data/srw_v1.db" not in names:
-                    raise RuntimeError("backup missing data/srw_v1.db")
-                for n in names:
-                    pp = Path(n)
-                    if pp.is_absolute() or ".." in pp.parts:
-                        raise RuntimeError("unsafe backup path")
-                z.extractall(td)
-        except zipfile.BadZipFile as exc:
-            raise RuntimeError(f"invalid backup zip: {exc}") from exc
+        if not expected_schema:
+            raise RuntimeError("backup schema revision missing; restore aborted")
+        # Reject ZIP path traversal, duplicate members and altered bytes before
+        # any extraction or modification of the live workspace.
+        extract_validated_backup(
+            src, td, expected_archive_sha256=expected_hash,
+            expected_schema=expected_schema, max_schema=EXPECTED_SCHEMA,
+        )
         restored = td / "data" / "srw_v1.db"
         actual_schema = _read_schema(restored)
         if actual_schema != expected_schema:
-            raise RuntimeError(f"backup schema mismatch: {actual_schema} != {expected_schema}")
-        if not actual_schema.startswith("v1_") or int(actual_schema[3:]) > int(EXPECTED_SCHEMA[3:]):
-            raise RuntimeError(f"backup schema is newer than this Portable: {actual_schema}")
+            raise RuntimeError("backup schema mismatch; restore aborted")
 
         _pre_restore_backup()
         new_db = DATA / ".srw_v1.db.restore-new"

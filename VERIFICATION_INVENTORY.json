@@ -39,11 +39,15 @@
     "note": "Reference inventory only; these 725 v0.8.12-R2 backend tests are not claimed as executed in Convergence 08."
   },
   "current": {
-    "convergence_test_count": 86,
+    "convergence_test_count": 92,
     "files": [
       {
         "file": "test_assessment.py",
         "test_methods": 7
+      },
+      {
+        "file": "test_backup_integrity.py",
+        "test_methods": 6
       },
       {
         "file": "test_convergence02.py",
@@ -78,14 +82,6 @@
         "test_methods": 9
       },
       {
-        "file": "test_source_gate.py",
-        "test_methods": 8
-      },
-      {
-        "file": "test_source_archive.py",
-        "test_methods": 2
-      },
-      {
         "file": "test_convergence10.py",
         "test_methods": 3
       },
@@ -96,12 +92,20 @@
       {
         "file": "test_portable_input_preflight.py",
         "test_methods": 3
+      },
+      {
+        "file": "test_source_archive.py",
+        "test_methods": 2
+      },
+      {
+        "file": "test_source_gate.py",
+        "test_methods": 8
       }
     ],
     "evidence": "GitHub Actions log/artifact for exact source commit"
   },
   "recovered_gates": [],
   "parity_status": "PARTIAL",
-  "parity_note": "86 current source tests vs 725 historical reference tests; full Windows GUI acceptance and production runtime remain deferred.",
+  "parity_note": "92 current source tests vs 725 historical reference tests; full historical test parity and Windows GUI acceptance remain deferred.",
   "historical_recovered_gates": "verification/history/convergence08/VERIFICATION_INVENTORY.json"
 }
