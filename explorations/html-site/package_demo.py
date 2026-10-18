@@ -53,6 +53,22 @@ call "explorations\html-site\run_e1_demo_windows.cmd" %*
 exit /b %ERRORLEVEL%
 """
 
+START_E2 = r"""@echo off
+setlocal EnableExtensions
+chcp 65001 >nul
+cd /d "%~dp0"
+set "SRW_E1_PACKAGE_ROOT=%~dp0"
+if not exist "explorations\html-site\run_e2_demo.py" (
+    echo E2 synthetic experiment is missing. Re-extract the full artifact ZIP.
+    pause
+    exit /b 2
+)
+echo E2 can modify ONLY disposable synthetic Action Plans.
+echo E2 does NOT connect to any existing SRW EXE or real user database.
+call "explorations\html-site\run_e1_demo_windows.cmd" --e2
+exit /b %ERRORLEVEL%
+"""
+
 START_README = """# SRW E1 Web: runnable Windows source demo (NOT a Windows EXE)
 
 This source package is assembled in GitHub Actions from the isolated
@@ -69,6 +85,16 @@ and synthetic sample generators, but NO real user data and NO embedded Python.
 5. The browser opens LIVE · web · GET-only. Use the sample project/candidates.
 6. Press Ctrl+C in the command window to stop and delete the TEMPORARY
    SQLite/Knowledge sample workspace.
+
+## Optional: E2 two-client write experiment
+
+Double-click START_E2.cmd. This launches another disposable C11 backend and
+opens a Web UI that allows a narrowly scoped Action Plan PATCH for synthetic
+candidate IDs created by that demo. Open E2 in two separate browser tabs and
+test ETag / If-Match conflict handling (412 on stale writes).
+
+E2 does not change production records and is NOT production-grade transactional
+concurrency protection; the official SRW Core still needs its own atomic CAS.
 
 This is a local source demo, NOT a C11 Native EXE, NOT a production runtime
 and NOT a replacement for an existing 0.8.x Portable installation.
@@ -129,6 +155,7 @@ def build(destination: Path) -> None:
             count += 1
 
     (destination / "START_HERE.cmd").write_text(START_HERE, encoding="utf-8", newline="\r\n")
+    (destination / "START_E2.cmd").write_text(START_E2, encoding="utf-8", newline="\r\n")
     (destination / "PACKAGE_README.md").write_text(START_README, encoding="utf-8")
     inventory = {}
     for file in sorted(destination.rglob("*")):
