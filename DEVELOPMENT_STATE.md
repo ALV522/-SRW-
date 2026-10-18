@@ -54,3 +54,7 @@ Integrated the previously isolated backup-integrity implementation into the real
 Native packaging now requires an external audited manifest for every embedded Runtime file, stages only those files, and audits the entire resulting candidate ZIP against source, Runtime, Knowledge, and Host digests. Unexpected members, file tampering, and falsely claimed GUI acceptance block candidate assembly. Synthetic regressions are cross-platform. Real production assets and WPF/WebView2 acceptance remain unavailable in this source checkout.
 
 The assembler now uses PowerShell hash checks to stage an isolated Runtime and reviewed source before launching any embedded Python. The launcher self-check uses temporary data outside the release tree rather than creating staged user data. Tests protect this ordering and launcher import side effects.
+
+## Chromium browser acceptance gate (proposed)
+
+Added a separate Ubuntu real-Chromium/Playwright integration workflow, backed by a disposable local SQLite database and generated synthetic Knowledge fixtures. It exercises UI clicks through project creation, four-step Draft Job Setup, candidate text intake, action plan, interview scheduling and draft Offer, then checks persisted API results. This gate must pass on the exact PR and main commits before a browser-acceptance claim; WPF/WebView2 and real Windows Portable acceptance remain pending. See docs/BROWSER_ACCEPTANCE.md.
