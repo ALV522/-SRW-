@@ -113,7 +113,7 @@ class NativePayloadTests(unittest.TestCase):
         ca_path.write_bytes(b"synthetic public CA certificate bytes")
         with self.runtime_manifest.open("a", encoding="utf-8") as stream:
             stream.write(
-                f"{digest(ca_path.read_bytes())}  Lib/site-packages/certifi/cacert.pem\\n"
+                f"{digest(ca_path.read_bytes())}  Lib/site-packages/certifi/cacert.pem\n"
             )
         target = self.root / "approved" / "runtime"
         stage_runtime(self.runtime, self.runtime_manifest, target)
@@ -123,7 +123,7 @@ class NativePayloadTests(unittest.TestCase):
         )
         with self.runtime_manifest.open("a", encoding="utf-8") as stream:
             stream.write(
-                f"{digest(b'private')}  other/private.pem\\n"
+                f"{digest(b'private')}  other/private.pem\n"
             )
         with self.assertRaises(PayloadError):
             audit_runtime(self.runtime, self.runtime_manifest)
