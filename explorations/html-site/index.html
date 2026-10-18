@@ -1,0 +1,153 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>SRW HTML-first Exploration</title>
+<style>
+:root{--bg:#f5f7fb;--panel:#fff;--line:#e6e9ef;--text:#172033;--muted:#687386;--accent:#315efb;--soft:#eef3ff;--good:#0c8b5f;--warn:#a66600;--bad:#b42318;--shadow:0 10px 30px rgba(20,31,55,.08)}
+*{box-sizing:border-box}body{margin:0;font:14px/1.5 system-ui,-apple-system,"Segoe UI","Microsoft YaHei",sans-serif;color:var(--text);background:var(--bg)}
+button{font:inherit}.app{min-height:100vh;display:grid;grid-template-columns:238px 1fr}
+aside{background:#111827;color:#fff;padding:20px 14px;position:sticky;top:0;height:100vh}
+.brand{padding:6px 10px 20px}.brand strong{font-size:20px;display:block}.brand small{color:#9ca3af}
+.nav button{width:100%;border:0;background:transparent;color:#cbd5e1;text-align:left;padding:11px 12px;border-radius:9px;margin:3px 0;cursor:pointer}.nav button:hover,.nav button.active{background:#263248;color:#fff}
+main{min-width:0}.topbar{height:64px;background:#fff;border-bottom:1px solid var(--line);display:flex;align-items:center;justify-content:space-between;padding:0 28px;position:sticky;top:0;z-index:3}.mode{padding:5px 9px;border-radius:999px;background:#fff5d8;color:#805600;font-size:12px}.content{padding:26px;max-width:1440px;margin:auto}
+.hero{display:flex;justify-content:space-between;gap:20px;align-items:flex-start;margin-bottom:20px}.hero h1{margin:0 0 6px;font-size:27px}.muted{color:var(--muted)}
+.grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:14px}.card,.panel{background:var(--panel);border:1px solid var(--line);border-radius:14px;box-shadow:var(--shadow)}.card{padding:16px}.card small{color:var(--muted)}.card strong{display:block;font-size:26px;margin-top:6px}
+.panel{margin-top:16px}.ph{padding:15px 18px;border-bottom:1px solid var(--line);display:flex;justify-content:space-between;align-items:center;gap:12px}.pb{padding:16px 18px}.ph h2,.ph h3{margin:0}
+.list{display:grid;gap:10px}.item{display:flex;gap:14px;align-items:center;justify-content:space-between;padding:12px;border:1px solid var(--line);border-radius:10px}.item:hover{background:#fafbff}.item-title{font-weight:650}.item-note{color:var(--muted);font-size:12px;margin-top:3px}
+.btn{border:1px solid var(--line);background:#fff;padding:8px 11px;border-radius:8px;cursor:pointer}.btn:hover{background:#f8fafc}.btn.primary{background:var(--accent);color:#fff;border-color:var(--accent)}
+.pills{display:flex;gap:6px;flex-wrap:wrap}.pill{font-size:12px;padding:4px 8px;border-radius:999px;background:#f1f5f9}.pill.good{background:#eaf8f2;color:var(--good)}.pill.warn{background:#fff4df;color:var(--warn)}.pill.bad{background:#fff0ee;color:var(--bad)}
+.flow{display:grid;grid-template-columns:repeat(7,minmax(90px,1fr));gap:8px}.step{padding:12px 8px;text-align:center;border:1px solid var(--line);border-radius:10px;background:#fafbfc}.step strong{font-size:20px;display:block}.step span{color:var(--muted);font-size:12px}
+.two{display:grid;grid-template-columns:1.2fr .8fr;gap:16px}
+table{width:100%;border-collapse:collapse}th,td{text-align:left;padding:11px 8px;border-bottom:1px solid var(--line);vertical-align:top}th{color:var(--muted);font-weight:600}
+.workspace{display:grid;grid-template-columns:290px 1fr;gap:16px}.candidate-side{padding:18px}.candidate-side h2{margin:6px 0}.candidate-main{min-width:0}.tabs{display:flex;gap:6px;border-bottom:1px solid var(--line);padding:0 16px}.tabs button{border:0;background:none;padding:13px 10px;cursor:pointer;color:var(--muted)}.tabs button.active{color:var(--accent);border-bottom:2px solid var(--accent)}
+.source{padding:12px;border:1px solid var(--line);border-radius:10px;margin:10px 0}.claim{padding:10px 12px;border-left:3px solid #f0b429;background:#fffaf0;margin:8px 0}.claim.confirmed{border-color:var(--good);background:#f2fbf7}
+.notice{padding:12px 14px;border:1px dashed #9ab1ff;background:var(--soft);border-radius:10px;color:#2c4bb0;margin-bottom:16px}
+.hidden{display:none!important}
+@media(max-width:1000px){.app{grid-template-columns:78px 1fr}.brand div,.nav span.label{display:none}.grid{grid-template-columns:repeat(2,1fr)}.two,.workspace{grid-template-columns:1fr}.flow{grid-template-columns:repeat(4,1fr)}}
+@media(max-width:640px){.content{padding:14px}.topbar{padding:0 14px}.grid{grid-template-columns:1fr}.flow{grid-template-columns:repeat(2,1fr)}.hero{display:block}}
+</style>
+</head>
+<body>
+<div class="app">
+<aside>
+  <div class="brand"><strong>SRW</strong><div>HTML-first Lab</div><small>isolated exploration</small></div>
+  <div class="nav">
+    <button class="active" data-page="home">⌂ <span class="label">工作台</span></button>
+    <button data-page="projects">▣ <span class="label">招聘项目</span></button>
+    <button data-page="candidates">◉ <span class="label">候选人</span></button>
+    <button data-page="review">✓ <span class="label">复核中心</span></button>
+    <button data-page="knowledge">⌕ <span class="label">知识库</span></button>
+    <button data-page="settings">⚙ <span class="label">设置</span></button>
+  </div>
+</aside>
+<main>
+  <div class="topbar"><strong id="top-title">工作台</strong><div class="pills"><span class="pill" id="api-state">Mock data</span><span class="mode">EXPERIMENT · NOT MAINLINE</span></div></div>
+  <div class="content" id="root"></div>
+</main>
+</div>
+<script>
+const mock={
+  metrics:{projects:4,candidates:37},
+  operational_todos:{overdue_contacts:3,pending_interview_feedback:2,pending_identity_reviews:1,open_judgment_reviews:2},
+  evidence_review_backlog:6,
+  candidates_by_stage:{new:8,screening:7,shortlisted:6,phone_screen:4,interview:5,offer:3,hired:4},
+  decision_workbench:{conflict_count:2,verify_count:4,ready_count:3,total:9,items:[
+    {candidate_name:'林澄',project_title:'产品经理招聘',action_type:'VERIFY_CRITERION',reason:'项目领导经验缺少可定位证据'},
+    {candidate_name:'周言',project_title:'AI 产品招聘',action_type:'RESOLVE_CONFLICT',reason:'两份材料对任职时间描述不一致'},
+    {candidate_name:'陈知夏',project_title:'招聘分析师',action_type:'MAKE_DECISION',reason:'证据闭合，可进入人工决定'}
+  ]},
+  operational_queue:{total:5,items:[
+    {title:'逾期联系',candidate_name:'林澄',project_title:'产品经理招聘',detail:'昨天 16:00'},
+    {title:'今日联系',candidate_name:'赵清',project_title:'AI 产品招聘',detail:'今天 10:30'},
+    {title:'待提交面试反馈',candidate_name:'周言',project_title:'AI 产品招聘',detail:'业务二面'}
+  ]},
+  review_queue:{identity_count:1,judgment_count:2,claim_count:6,total:9,items:[
+    {title:'候选人身份复核',project_title:'招聘分析师',detail:'陈知夏 ↔ 陈知霞 · exact_email'},
+    {title:'判断纠错复核',candidate_name:'周言',project_title:'AI 产品招聘',detail:'leadership · partial → met'},
+    {title:'待确认事实',candidate_name:'林澄',project_title:'产品经理招聘',detail:'负责 8 人跨职能团队并交付推荐系统'}
+  ]}
+};
+const candidates=[
+ {name:'林澄',stage:'筛选',fit:'82%',evidence:'68%',next:'核实领导经验',risk:'1 个阻塞'},
+ {name:'周言',stage:'面试',fit:'88%',evidence:'91%',next:'提交二面反馈',risk:'证据冲突'},
+ {name:'陈知夏',stage:'短名单',fit:'79%',evidence:'86%',next:'人工决定',risk:'无阻塞'},
+ {name:'赵清',stage:'电话筛选',fit:'76%',evidence:'72%',next:'今日 10:30 联系',risk:'待确认电话'}
+];
+let data=mock;
+const titles={home:'工作台',projects:'招聘项目',candidates:'候选人',review:'复核中心',knowledge:'知识库',settings:'设置',workspace:'候选人工作空间'};
+const root=document.querySelector('#root');
+function pill(text,cls=''){return '<span class="pill '+cls+'">'+text+'</span>'}
+function queue(title,note,items){return `<section class="panel"><div class="ph"><div><h2>${title}</h2><div class="muted">${note}</div></div></div><div class="pb"><div class="list">${items.map(x=>`<div class="item"><div><div class="item-title">${x.candidate_name?x.candidate_name+' · ':''}${x.title||x.project_title||''}</div><div class="item-note">${x.project_title||''}${x.reason?' · '+x.reason:''}${x.detail?' · '+x.detail:''}</div></div><button class="btn primary" onclick="showCandidate()">处理</button></div>`).join('')}</div></div></section>`}
+function home(){
+ const s=data.candidates_by_stage||mock.candidates_by_stage,w=data.decision_workbench||mock.decision_workbench,o=data.operational_queue||mock.operational_queue,r=data.review_queue||mock.review_queue,t=data.operational_todos||mock.operational_todos;
+ root.innerHTML=`<div class="hero"><div><h1>今天要处理什么</h1><div class="muted">网站式入口只强调当前招聘动作，不暴露内部模块结构。</div></div><button class="btn primary" onclick="go('projects')">进入招聘项目</button></div>
+ <div class="notice">这是隔离探索原型。直接打开 HTML 时使用 Mock 数据；若由 SRW 本机服务同源托管，会尝试读取真实 Dashboard，但不会调用任何写入 API。</div>
+ <div class="grid">
+  <div class="card"><small>逾期联系</small><strong>${t.overdue_contacts||0}</strong></div>
+  <div class="card"><small>待面试反馈</small><strong>${t.pending_interview_feedback||0}</strong></div>
+  <div class="card"><small>待人工复核</small><strong>${(t.pending_identity_reviews||0)+(t.open_judgment_reviews||0)+(data.evidence_review_backlog||0)}</strong></div>
+  <div class="card"><small>当前候选人</small><strong>${data.metrics?.candidates||37}</strong></div>
+ </div>
+ ${queue('今日业务队列','每位候选人只显示最高优先级判断动作',w.items||[])}
+ ${queue('运营执行队列','联系、面试反馈等实际执行动作',o.items||[])}
+ ${queue('复核中心','身份、判断纠错与待确认事实',(r.items||[]))}
+ <section class="panel"><div class="ph"><h2>招聘漏斗</h2></div><div class="pb"><div class="flow">${[['new','新候选人'],['screening','筛选'],['shortlisted','短名单'],['phone_screen','电话筛选'],['interview','面试'],['offer','Offer'],['hired','录用']].map(([k,l])=>`<div class="step"><strong>${s[k]||0}</strong><span>${l}</span></div>`).join('')}</div></div></section>`;
+}
+function projects(){
+ root.innerHTML=`<div class="hero"><div><h1>招聘项目</h1><div class="muted">项目首页直接回答“现在下一步是什么”。</div></div><button class="btn primary">＋ 新建项目</button></div>
+ <section class="panel"><div class="ph"><h2>进行中</h2></div><div class="pb"><div class="list">
+ ${[
+ ['产品经理招聘','招聘中','处理证据与判断','9 位候选人 · 2 个阻塞'],
+ ['AI 产品招聘','招聘中','提交面试反馈','12 位候选人 · 2 场待反馈'],
+ ['招聘分析师','招聘中','推进电话筛选与面试','8 位候选人 · 3 人短名单'],
+ ['HRBP 校招','草案','完善并发布招聘标准','尚未开始收件']
+ ].map(x=>`<div class="item"><div><div class="item-title">${x[0]} ${pill(x[1],x[1]==='草案'?'warn':'good')}</div><div class="item-note">${x[3]}</div></div><div><div class="item-note">下一步</div><button class="btn primary" onclick="go('candidates')">${x[2]}</button></div></div>`).join('')}
+ </div></div></section>`;
+}
+function candidateTable(){
+ return `<section class="panel"><div class="ph"><h2>候选人 Pipeline</h2><button class="btn primary">＋ 导入候选人</button></div><div class="pb"><table><thead><tr><th>候选人</th><th>阶段</th><th>岗位匹配</th><th>证据覆盖</th><th>下一步</th><th>风险</th><th></th></tr></thead><tbody>${candidates.map(c=>`<tr><td><strong>${c.name}</strong></td><td>${c.stage}</td><td>${c.fit}</td><td>${c.evidence}</td><td>${c.next}</td><td>${c.risk}</td><td><button class="btn primary" onclick="showCandidate('${c.name}')">打开工作空间</button></td></tr>`).join('')}</tbody></table></div></section>`;
+}
+function candidatesPage(){root.innerHTML=`<div class="hero"><div><h1>候选人</h1><div class="muted">候选人是网站中的一级对象，而不是某个项目 Tab 里的弹窗。</div></div></div>${candidateTable()}`}
+function review(){root.innerHTML=`<div class="hero"><div><h1>复核中心</h1><div class="muted">把必须由人做出的确认集中到同一页面。</div></div></div>${queue('待人工复核','身份、证据事实与判断纠错',mock.review_queue.items)}`}
+function knowledge(){root.innerHTML=`<div class="hero"><div><h1>知识库</h1><div class="muted">HTML-first 不改变 Knowledge DB 的本地治理边界。</div></div></div><section class="panel"><div class="pb"><div class="list"><div class="item"><div><div class="item-title">Recruitment Knowledge</div><div class="item-note">生产知识库仍由本地服务校验、切换和回滚。</div></div>${pill('backend-owned','good')}</div><div class="item"><div><div class="item-title">岗位模板与校准案例</div><div class="item-note">网站只负责呈现和发起操作，不在浏览器复制规则引擎。</div></div>${pill('same-origin API')}</div></div></div></section>`}
+function settings(){root.innerHTML=`<div class="hero"><div><h1>设置</h1><div class="muted">Provider secrets、备份和诊断仍留在本地 SRW Service。</div></div></div><section class="panel"><div class="pb"><div class="list"><div class="item"><div><div class="item-title">文本 AI</div><div class="item-note">密钥永不进入静态 HTML</div></div>${pill('本地安全存储','good')}</div><div class="item"><div><div class="item-title">OCR / ASR</div><div class="item-note">后台任务由本地 worker 执行</div></div>${pill('backend worker')}</div><div class="item"><div><div class="item-title">Windows Carrier</div><div class="item-note">浏览器与 WebView2 可以承载同一套 HTML 产品表面</div></div>${pill('future convergence','warn')}</div></div></div></section>`}
+function showCandidate(name='林澄'){
+ document.querySelector('#top-title').textContent=titles.workspace;
+ root.innerHTML=`<div class="hero"><div><button class="btn" onclick="go('candidates')">← 返回候选人</button></div></div>
+ <div class="workspace">
+  <section class="card candidate-side">
+   ${pill('简历筛选','warn')} ${pill('联系方式已确认','good')}
+   <h2>${name}</h2><div class="muted">产品经理招聘</div>
+   <hr style="border:0;border-top:1px solid var(--line);margin:16px 0">
+   <div class="list"><div><small class="muted">当前决定状态</small><div><strong style="font-size:18px">待证据闭合</strong></div></div><div><small class="muted">下一步</small><div>核实项目领导经验</div></div><div><small class="muted">下次联系</small><div>今天 16:30</div></div></div>
+  </section>
+  <section class="panel candidate-main" style="margin:0">
+   <div class="tabs"><button class="active">概览</button><button>来源与证据</button><button>标准与核实</button><button>面试</button><button>决定</button><button>Offer 与跟进</button><button>历史</button></div>
+   <div class="pb">
+    <div class="two"><div><h3>材料与证据</h3><div class="source"><strong>resume.pdf</strong><div class="item-note">PDF · 当前材料版本 · 可定位原文</div></div><div class="claim confirmed">负责推荐系统项目从 0 到 1 交付 · <strong>已确认</strong></div><div class="claim">负责 8 人跨职能团队 · <strong>待确认</strong></div></div>
+    <div><h3>评价标准</h3><div class="list"><div class="item"><div><div class="item-title">产品交付经验</div><div class="item-note">证据充分</div></div>${pill('满足','good')}</div><div class="item"><div><div class="item-title">团队领导经验</div><div class="item-note">需要核实人数与角色</div></div>${pill('待核实','warn')}</div><div class="item"><div><div class="item-title">行业经验</div><div class="item-note">已有明确证据</div></div>${pill('满足','good')}</div></div></div></div>
+    <div style="margin-top:16px" class="notice"><strong>设计假设：</strong> Candidate Workspace 是网站产品的核心。用户不需要在“材料、Claim、Criterion、面试、Offer”等内部模块之间迷路，而是在同一候选人上下文中连续完成动作。</div>
+   </div>
+  </section>
+ </div>`;
+}
+function go(page){
+ document.querySelectorAll('.nav button').forEach(b=>b.classList.toggle('active',b.dataset.page===page));
+ document.querySelector('#top-title').textContent=titles[page]||page;
+ ({home,projects,candidates:candidatesPage,review,knowledge,settings}[page]||home)();
+}
+document.querySelectorAll('.nav button').forEach(b=>b.addEventListener('click',()=>go(b.dataset.page)));
+(async()=>{
+ if(location.protocol!=='file:'){
+   try{
+    const r=await fetch('/api/v1/dashboard',{headers:{Accept:'application/json'}});
+    if(r.ok){data=await r.json();document.querySelector('#api-state').textContent='Live read-only dashboard';document.querySelector('#api-state').classList.add('good')}
+   }catch(e){}
+ }
+ home();
+})();
+</script>
+</body>
+</html>
