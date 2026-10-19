@@ -135,17 +135,17 @@
       }
     ],
     "evidence": "GitHub Actions log/artifact for exact source commit",
-    "browser_e2e_scenarios": 7,
+    "browser_e2e_scenarios": 8,
     "browser_e2e_files": [
       {
         "file": "browser_acceptance/test_flows.py",
-        "scenarios": 7,
+        "scenarios": 8,
         "requires_real_chromium_http_sqlite": true
       }
     ]
   },
   "recovered_gates": [],
   "parity_status": "PARTIAL",
-  "parity_note": "146 C11 source regressions, 7 Chromium synthetic business E2E cases pending exact-commit verification; original Windows GUI baseline verified but complete Windows recruiting/AI/OCR/ASR acceptance remains open.",
+  "parity_note": "146 C11 source regressions, 8 Chromium synthetic business E2E cases pending exact-commit verification; original Windows GUI baseline verified but complete Windows recruiting/AI/OCR/ASR acceptance remains open.",
   "historical_recovered_gates": "verification/history/convergence08/VERIFICATION_INVENTORY.json"
 }
