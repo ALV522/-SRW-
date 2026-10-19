@@ -85,6 +85,22 @@ call "explorations\html-site\run_e1_demo_windows.cmd" --e3 %*
 exit /b %ERRORLEVEL%
 """
 
+START_E4 = r"""@echo off
+setlocal EnableExtensions
+chcp 65001 >nul
+cd /d "%~dp0"
+set "SRW_E1_PACKAGE_ROOT=%~dp0"
+if not exist "explorations\html-site\run_e4_demo.py" (
+    echo E4 shared-Core laboratory is missing. Re-extract the full ZIP.
+    pause
+    exit /b 2
+)
+echo E4 launches ONE disposable C11 Core and TWO browser carrier surfaces.
+echo The desktop surrogate is NOT a real Windows EXE.
+call "explorations\html-site\run_e1_demo_windows.cmd" --e4 %*
+exit /b %ERRORLEVEL%
+"""
+
 START_README = """# SRW E1 Web: runnable Windows source demo (NOT a Windows EXE)
 
 This source package is assembled in GitHub Actions from the isolated
@@ -121,6 +137,17 @@ business audit event and revision update in **one SQLite transaction**.
 E3 is an experimental Core route: no change to official production schema
 or API is made. This proves the transactional approach, but legacy writers
 bypassing E3 are not protected, and real user workspaces remain unsupported.
+
+## Optional: E4 independent Core lifecycle, two browser carrier surfaces
+
+Double-click START_E4.cmd. One disposable C11 Core is started under an
+independent owner, and two browser endpoints both attach to the same Core.
+Closing one UI tab does NOT terminate the backend. The E4 smoke test
+programmatically detaches either carrier and verifies the other can still
+read and write synthetic records, then reattaches to the same Core.
+
+The 'desktop' UI is explicitly a browser/WebView2 **surrogate**. E4 is NOT
+a real WPF/Windows EXE integration test.
 
 This is a local source demo, NOT a C11 Native EXE, NOT a production runtime
 and NOT a replacement for an existing 0.8.x Portable installation.
@@ -183,6 +210,7 @@ def build(destination: Path) -> None:
     (destination / "START_HERE.cmd").write_text(START_HERE, encoding="utf-8", newline="\r\n")
     (destination / "START_E2.cmd").write_text(START_E2, encoding="utf-8", newline="\r\n")
     (destination / "START_E3.cmd").write_text(START_E3, encoding="utf-8", newline="\r\n")
+    (destination / "START_E4.cmd").write_text(START_E4, encoding="utf-8", newline="\r\n")
     (destination / "PACKAGE_README.md").write_text(START_README, encoding="utf-8")
     inventory = {}
     for file in sorted(destination.rglob("*")):
