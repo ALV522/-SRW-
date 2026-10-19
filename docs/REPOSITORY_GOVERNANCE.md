@@ -1,3 +1,5 @@
+> **暂不使用主线保护（2026-10-20）**：负责人决定暂不启用 GitHub Ruleset；以 [无保护期协议](NO_BRANCH_PROTECTION_PROTOCOL.md)、根目录 AGENTS.md、预编辑脚本、PR/CI 和 main 推送事后审计作为临时补偿。**不等于真正的分支权限保护**，不得直接向 main 推送。
+
 > **G1 加强规范（2026-10-20）**：所有 Agent 从仓库根目录 [AGENTS.md](../AGENTS.md) 开始，按序阅读产品/版本/双载体/验收契约。PR 使用 .github/pull_request_template.md，运行 Governance Contract CI；如要防止绕过，仓库管理员必须将合并要求和治理检查设置为 main 的必需规则。原有分支盘点是历史快照，未经逐一审计不得删除分支。\n\n# SRW 仓库治理与分支规则（2026-10-19）
 
 ## 唯一整合主线与版本身份

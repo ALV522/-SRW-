@@ -51,5 +51,6 @@ C11 的目标不是重写为新 UI、全新业务内核、微服务或者 SaaS�
 - docs/ROADMAP.md：既有路线图，遇到顺序冲突以新宪章及双轨计划为准。
 - docs/RELEASE_PROCESS.md：源码/Windows 工件发布和回滚。
 - docs/OWNER_GUIDE.md：产品负责人操作指南。
+- docs/NO_BRANCH_PROTECTION_PROTOCOL.md：暂不启用 main 服务端保护时必须遵守的替代流程。
 
 **事实 ≠ 假设 ≠ 规划 ≠ 验收结果。** 在任何 Agent 或宣传文件中均需明确区分。

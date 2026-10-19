@@ -11,9 +11,22 @@
 5. **docs/VERSION_POLICY.md** and **VERSION_POLICY.json** — runtime/product version, Git SHA, Schema, carrier, release channels, migration procedure.
 6. **docs/DUAL_CARRIER_PLAN.md** — common Core, independent Windows and local HTML/Browser carriers.
 7. **docs/ACCEPTANCE_PLAN.md**, **docs/ROADMAP.md** and **docs/RELEASE_PROCESS.md** — established business acceptance and release gates; compare with the newer plans above.
-8. **docs/OWNER_GUIDE.md** — user-facing owner handoff and decision escalation protocol.
+8. **docs/NO_BRANCH_PROTECTION_PROTOCOL.md** — binding temporary workflow without server-side protection.
+9. **docs/OWNER_GUIDE.md** — user-facing owner handoff and decision escalation protocol.
 
 Read **DEVELOPMENT_STATE.md**, **README.md** and the exact recent CI/artifact evidence for the task's target SHA. For Windows packaging also read **docs/C11_NATIVE_CANDIDATE_UPGRADE.md** and **docs/WINDOWS_GUI_FIRST_ACCEPTANCE.md**. For HTML experiments read the isolated **explore/html-site-prototype** documentation; exploration PASS is not product PASS.
+
+## Temporary enforcement while main has NO GitHub branch protection (ACTIVE)
+
+The product owner explicitly deferred paid/unsupported server-side branch protection. Read **docs/NO_BRANCH_PROTECTION_PROTOCOL.md** now. No coding agent may direct-push main, force-push, self-approve an unverified PR, or merge before **the exact PR HEAD SHA** has passed all applicable CI. GitHub allowing the button does not grant permission.
+
+Create a dedicated task branch from fresh main and run this **read-only** pre-edit policy gate:
+
+```bash
+python scripts/agent_preflight.py --issue 41 --acknowledge-reading
+```
+
+Replace 41 with the relevant existing/new issue. If blocked, do not edit. Do not misrepresent the acknowledgement flag as proof of reading. The post-merge direct-push audit can only **detect after the fact**; it cannot protect main. Recheck PR head/main, CI and exact main SHA before and after merge.
 
 ## Mandatory before-code checklist
 

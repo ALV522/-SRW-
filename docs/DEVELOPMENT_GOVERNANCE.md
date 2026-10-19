@@ -55,11 +55,15 @@ P0：数据、证据、人工决策错误/泄露、无法启动或丢失主线�
 - 软件版号、Schema 和发行状态由 VERSION_POLICY.json 与已有多处 release truth 共同核对。
 - 真正发生问题而无法复现，应标记 UNKNOWN 并保存无隐私泄露的最小证据。
 
-## 8. 可执行约束与局限
+## 8. 暂无分支保护的 G1 强化纪律（当前生效）
+
+产品负责人决定暂不启用 GitHub main 保护，因此全体 Agent 必须先阅读 [临时无保护协议](NO_BRANCH_PROTECTION_PROTOCOL.md)，在新建的干净任务分支执行 `python scripts/agent_preflight.py --issue <对应Issue> --acknowledge-reading`，只能经 PR 合并，须先读取同 PR Head SHA 的治理/源码/浏览器及受影响构建检查结果，**全绿才合并**。合并前二次比较 Head/Main SHA，合并后再次查 main 的 CI 与产物。禁止任何 Agent 直接修改或 push main。不能把这称为平台级强制保护：当前无权限屏障，违规直接 push 只能事后发现与调查。
+
+## 9. 可执行约束与局限
 
 新增 scripts/check_governance_contract.py 与 .github/workflows/governance.yml：检查必读文档、产品/版本机器契约，并要求 PR 描述出现完整阅读与验收声明。**技术上无法证明 AI 真正阅读了文档**；可强制自我声明，并通过审查其结果发现违反条款。要让合并时真正无法绕过，仓库管理员须在 GitHub Settings → Rules → Rulesets 或 Branch protection 为 main 打开 PR 合并要求和 required status checks（至少 governance-contract、源完整性、跨平台源回归以及适用的浏览器检查）。没有仓库规则保护时，任何具有直接写入权限的人仍可能绕过 PR/CI。
 
-## 9. 负责人每轮收到什么报告
+## 10. 负责人每轮收到什么报告
 
 固定格式：
 - 目标和本轮实际闭环（用业务动作描述）；

@@ -1,5 +1,8 @@
 # SRW · 智能招聘工作台
 
+> **Agent 工作安全（当前必读）**：此私有仓库的 `main` 目前不启用 GitHub Branch Protection。任何 AI Agent 均必须遵守 [无保护开发协议](docs/NO_BRANCH_PROTECTION_PROTOCOL.md)，在干净的非 main 工作分支运行 `python scripts/agent_preflight.py --issue <对应Issue号> --acknowledge-reading`，通过 PR 和准确 SHA 的检查合并，不得直接 push main。治理检查无法阻止拥有写权限的人绕过规则。
+
+
 > **G1 产品治理（2026-10-20）**：所有后续开发 Agent 必须先阅读 [AGENTS.md](AGENTS.md) 并依序阅读 [项目总述](docs/PROJECT_OVERVIEW.md)、[产品宪章](docs/PRODUCT_CHARTER.md)、[开发治理](docs/DEVELOPMENT_GOVERNANCE.md)、[版本政策](docs/VERSION_POLICY.md)、[双载体计划](docs/DUAL_CARRIER_PLAN.md)、[负责人手册](docs/OWNER_GUIDE.md)。Windows 与本地 Web/HTML **并行产品化**，共用同一权威 Core；不要按旧路线图的顺序将 Web 延迟到 Windows 正式发行之后。现有 VERSION 仍是历史 C11 标识，下一 SemVer 号只是计划，**尚非发布版本**。以下历史测试数字必须结合准确 SHA/CI 核查，不能被视为最新 HEAD 的自动验收。
 
 **本地优先、证据驱动的招聘业务工作台。** SRW 覆盖建岗、招聘标准、候选人收件、材料与 Claim 证据、人工核实、面试/Scorecard、Decision、Offer、联系运营、Knowledge、AI/OCR/ASR 辅助。AI 建议不等于人工录用决定；缺失证据不按零分处理；材料或招聘标准变化后，旧决策上下文不能自动复用。
