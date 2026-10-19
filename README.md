@@ -80,3 +80,7 @@ python scripts/run_convergence_verification.py
 ### 本轮新增：证据决策链的实际业务验收
 
 [Decision Lineage 验收](docs/BUSINESS_E2E_DECISION_LINEAGE.md)：发布必须核实的岗位标准→录入材料→人工核实生成 Source/Claim/Judgment→显式提交 HumanDecision→新材料使旧决定失效→重新核实→显式重申，新增第六条真实 Chromium/SQLite 测试。UI 的“按当前证据重申”仅在当前服务端行动门槛满足时可用。这是浏览器业务验收，不是 Windows WPF 全流程验收；以同提交 CI 为准。
+
+### 新增 P0 标准版本失效验收（E2E-07）
+
+[招聘标准重新发布的决策失效验收](docs/BUSINESS_E2E_PROTOCOL_REVISION.md)：保留候选人 Source 不变，新发布第二版具有必须核实标准的岗位协议；验证旧 HumanDecision 失效、未核实时直接重申被拒绝、UI 重申按钮禁用。此流程与 E2E-06 的“材料变更→重申”互补。第七条 Chromium 场景以本提交的 CI 实际结果为准。

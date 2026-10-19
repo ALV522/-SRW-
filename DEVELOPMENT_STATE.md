@@ -101,3 +101,7 @@ User-supplied Windows screenshot and complete 45-record Host JSONL establish act
 ## 2026-10-19: Decision Context staleness and guarded manual reaffirmation
 
 Added sixth real Chromium/HTTP/SQLite test of published verification-critical criteria, human verification-generated Source/Claim/Judgment, explicit HumanDecision, material revision staleness, blocked premature reaffirmation, renewed grounded verification and human-authored context-bound reaffirmation lineage. Product bug fixed: `CandidateWorkspace.decision_reaffirmable` now uses the exact action-specific `_action_gate` rather than merely detecting a stale decision, and the UI disables “按当前证据重申” until the current evidence permits the operation. No external AI result mocks. Native WPF GUI acceptance remains distinct. See docs/BUSINESS_E2E_DECISION_LINEAGE.md.
+
+## 2026-10-19: protocol-republication stale HumanDecision acceptance
+
+Added E2E-07 against genuine Chromium/C11 API/disposable SQLite: project ProtocolRevision is newly published with another verification-critical criterion while all candidate Source IDs remain unchanged. The old HumanDecision must become stale, the unverified revised criterion blocks decision readiness, and both API/UI reject premature reaffirmation. This complements the already accepted E2E-06 material-change scenario; it is not a Windows native manual acceptance. Exact-commit CI remains the authority for PASS. See docs/BUSINESS_E2E_PROTOCOL_REVISION.md.
