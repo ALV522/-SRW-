@@ -33,3 +33,7 @@ E4 无持久服务、Windows Service/Tray、生产安装器、真实账号/授�
 6. 通过真实 WPF/WebView2 及浏览器同时使用同一招聘项目的验收。
 
 不应在该流程开始前擅自改变主线 Windows Host 的锁/迁移逻辑。
+
+## Latest verified exploration CI
+
+[Windows + Ubuntu + Chromium full E1–E4 acceptance (all jobs passed)](https://github.com/ALV522/-SRW-/actions/runs/39189966339) · code `2257195887bde102fd3ae77042c0e088cf039ffd`. [Verified source-only ZIP](https://github.com/ALV522/-SRW-/actions/runs/39189966339/artifacts/12160145418). This is not a production Windows executable.
