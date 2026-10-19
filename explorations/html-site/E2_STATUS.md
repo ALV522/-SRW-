@@ -6,7 +6,7 @@ Prove the data-sharing topology for a future SRW Web and Windows EXE edition
 without modifying the existing production backend, schema, releases or any
 real user data.
 
-E2a is an isolated laboratory. It reuses the **real** C11 Action Plan business
+E2a is an isolated laboratory; E3 advances database-level CAS separately (see E3_ATOMIC_CAS.md). It reuses the **real** C11 Action Plan business
 endpoint and its native audit behavior, but runs that Core only against a
 one-time SQLite database containing synthetic candidates.
 
@@ -62,3 +62,7 @@ This distinction is fundamental: **E2a proven** does not imply **E2b done**.
 3. Explore change-notification events/SSE only after conditional writes are sound;
 4. Later attach a real Windows C11 EXE to one SRW Core, checking instance /
    data-scope identity and process lifecycle.
+
+## Progress beyond E2
+
+E3 transactional Action Plan and E4 independent Core ownership have subsequently been implemented in the same isolated exploration, and are documented in [E3_ATOMIC_CAS.md](E3_ATOMIC_CAS.md) and [E4_SHARED_CORE.md](E4_SHARED_CORE.md). E2 remains available strictly as a demonstration of why a proxy-only lock is insufficient for production cross-carrier writes.
