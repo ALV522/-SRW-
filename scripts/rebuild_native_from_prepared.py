@@ -18,6 +18,7 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
+import re
 import shutil
 import stat
 import sys
@@ -32,6 +33,7 @@ from scripts.build_native_from_source_host import (
     _verify_host, assemble, verified_git_sha,
 )
 from scripts.check_embedded_runtime_compatibility import check
+from scripts.check_source_integrity import validate
 from scripts.native_payload import (
     KNOWLEDGE, PayloadError, audit_runtime, read_manifest, safe_path,
     sha256_file,
@@ -157,6 +159,38 @@ def stage_attested_inputs(
     }
 
 
+def _source_sha(root: Path) -> str:
+    if (root / ".git").exists():
+        return verified_git_sha(root)
+    # CI-produced source/Host upgrade kit: no .git or public credentials
+    # are needed to assemble offline. Its provenance must bind the
+    # manifest to the matching source-built Host, but is NOT a signature.
+    truth_file = root / "SOURCE_KIT_PROVENANCE.json"
+    if truth_file.is_symlink() or not truth_file.is_file():
+        raise PayloadError("exact Git checkout or verified CI source kit required")
+    try:
+        truth = json.loads(truth_file.read_text(encoding="utf-8-sig"))
+    except (OSError, ValueError, UnicodeError) as exc:
+        raise PayloadError("invalid source kit provenance") from exc
+    sha = truth.get("git_sha", "")
+    if (
+        truth.get("schema") != "srw.native-upgrade-source-kit.v1"
+        or truth.get("status") != "SOURCE_AND_HOST_ONLY_UNVERIFIED_GUI"
+        or not re.fullmatch(r"[0-9a-f]{40}", sha)
+        or truth.get("source_manifest_sha256") != sha256_file(
+            root / "SOURCE_MANIFEST.sha256"
+        )
+        or truth.get("runtime_included") is not False
+        or truth.get("knowledge_included") is not False
+        or truth.get("gui_accepted") is not False
+    ):
+        raise PayloadError("source kit SHA/manifest/claim-boundary mismatch")
+    failures = validate(root)
+    if failures:
+        raise PayloadError("source kit manifest validation failed: " + "; ".join(failures[:3]))
+    return sha
+
+
 def upgrade(
     root: Path, base_zip: Path, host: Path, out: Path, *,
     verify_only: bool = False,
@@ -168,7 +202,7 @@ def upgrade(
         raise PayloadError("refusing to overwrite an existing candidate output")
     if base_zip.resolve() == out or out.is_relative_to(root):
         raise PayloadError("candidate output must be outside immutable source checkout")
-    sha = verified_git_sha(root)
+    sha = _source_sha(root)
     # A compiled Host from any other commit is not a valid replacement.
     _verify_host(host, sha)
     with tempfile.TemporaryDirectory(prefix="srw-c11-pinned-native-upgrade-") as td:
@@ -213,12 +247,12 @@ def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument(
         "--source", type=Path, default=Path(__file__).resolve().parents[1],
-        help="Complete Git checkout at the SAME SHA as the Host CI artifact"
+        help="Current Git checkout or verified source+Host CI upgrade kit"
     )
     parser.add_argument("--base-zip", type=Path, required=True,
                         help="Exact d8d032d prepared Native ZIP, SHA-256 pinned in code")
-    parser.add_argument("--host", type=Path, required=True,
-                        help="Extracted latest source-built Windows Host CI artifact directory")
+    parser.add_argument("--host", type=Path,
+                        help="Same-SHA Windows Host CI directory (default: source/windows-host)")
     parser.add_argument("--out", type=Path,
                         help="New destination ZIP outside the source checkout; no overwrite")
     parser.add_argument("--verify-only", action="store_true")
@@ -228,7 +262,7 @@ def main() -> int:
     try:
         out = args.out or (Path(tempfile.gettempdir()) / "srw-unused-output.zip")
         result = upgrade(
-            args.source, args.base_zip, args.host, out,
+            args.source, args.base_zip, args.host or (args.source / "windows-host"), out,
             verify_only=args.verify_only,
         )
         print(json.dumps(result, indent=2, sort_keys=True, ensure_ascii=False))
