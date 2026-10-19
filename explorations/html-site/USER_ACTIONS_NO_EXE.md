@@ -4,8 +4,8 @@
 
 ## 获取完整 ZIP
 
-1. 打开 [SRW HTML E1-E4 Sandbox 工作流](https://github.com/ALV522/-SRW-/actions/workflows/html-site-sandbox.yml)，选择全部 Jobs 结果为 **Success** 的最近一次运行。
-2. 在该运行的 **Artifacts** 中下载以 `SRW-HTML-E1-E4-WINDOWS-SOURCE-DEMO-` 开头的 ZIP（需要有私有仓库访问权限的 GitHub 账号）。
+1. 打开[已全部通过的 SRW HTML E1–E4 CI（运行 39189966339）](https://github.com/ALV522/-SRW-/actions/runs/39189966339)，或进入 [Sandbox 工作流](https://github.com/ALV522/-SRW-/actions/workflows/html-site-sandbox.yml)选择更新的 Success 运行。
+2. 在该运行的 **Artifacts** 中[直接打开已验证 ZIP 下载入口](https://github.com/ALV522/-SRW-/actions/runs/39189966339/artifacts/12160145418)，其名称以 `SRW-HTML-E1-E4-WINDOWS-SOURCE-DEMO-` 开头的 ZIP（需要有私有仓库访问权限的 GitHub 账号）。
 3. 解压**整个 ZIP**，不要只下载或复制某个 CMD 文件。文件夹顶层应该有：
 
 ```text
