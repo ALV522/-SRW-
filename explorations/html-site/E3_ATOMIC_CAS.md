@@ -39,3 +39,7 @@ E3 尚未解决正式授权、角色控制、长时间运行的数据库迁移�
 - 对 Claim/Judgment/Decision/Offer 各自设计更严格的业务不变式。
 
 验收只在合成数据中进行；所有实验文件位于独立探索分支，不进入 main。
+
+## Latest verified exploration CI
+
+[Windows + Ubuntu + Chromium full E1–E4 acceptance (all jobs passed)](https://github.com/ALV522/-SRW-/actions/runs/39189966339) · code `2257195887bde102fd3ae77042c0e088cf039ffd`. [Verified source-only ZIP](https://github.com/ALV522/-SRW-/actions/runs/39189966339/artifacts/12160145418). This is not a production Windows executable.
