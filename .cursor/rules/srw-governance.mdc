@@ -4,3 +4,5 @@ alwaysApply: true
 ---
 
 Before any edit: read root AGENTS.md, then every required document in its onboarding order. Read docs/PRODUCT_CHARTER.md, docs/DEVELOPMENT_GOVERNANCE.md, docs/VERSION_POLICY.md, docs/DUAL_CARRIER_PLAN.md. Verify exact commit/version/schema and evidence. Work in PRs, preserve v0.8.x capabilities, never claim source CI equals Windows GUI. Windows EXE and local Web/HTML are parallel product carriers sharing one authoritative SRW Core. No SaaS or full UI/core rewrite. Use synthetic data and strict release evidence.
+
+Current main has no paid/server protection. Read docs/NO_BRANCH_PROTECTION_PROTOCOL.md. NEVER directly edit/push main; first create clean dedicated task branch, run scripts/agent_preflight.py --issue <issue> --acknowledge-reading, then PR, check exact SHA CI, merge only when green, check main after merge.
