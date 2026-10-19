@@ -134,10 +134,18 @@
         "test_methods": 5
       }
     ],
-    "evidence": "GitHub Actions log/artifact for exact source commit"
+    "evidence": "GitHub Actions log/artifact for exact source commit",
+    "browser_e2e_scenarios": 5,
+    "browser_e2e_files": [
+      {
+        "file": "browser_acceptance/test_flows.py",
+        "scenarios": 5,
+        "requires_real_chromium_http_sqlite": true
+      }
+    ]
   },
   "recovered_gates": [],
   "parity_status": "PARTIAL",
-  "parity_note": "146 current source regression cases, 3 Chromium business scenarios, and user-evidenced real Windows GUI baseline (WPF startup/frontend loaded/project create/protocol patch/clean shutdown); historical v0.8.x 725-case parity and full business/OCR/ASR/provider acceptance remain unverified.",
+  "parity_note": "146 C11 source regression tests and 5 actual Chromium business workflow scenarios (when exact main CI passes), plus Windows GUI baseline user evidence. End-to-end Interview Scorecard and Offer state acceptance does not prove the historical 725 test parity or full Windows GUI recruiting/AI/OCR/ASR acceptance.",
   "historical_recovered_gates": "verification/history/convergence08/VERIFICATION_INVENTORY.json"
 }

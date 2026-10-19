@@ -226,5 +226,119 @@ class RecruitmentBrowserAcceptance(unittest.TestCase):
         self.assertFalse(self.console_errors, self.console_errors)
 
 
+    def test_04_independent_interview_scorecards_cannot_be_overwritten(self) -> None:
+        pid = self.new_project("独立面试评价")
+        cid = self.new_candidate(pid, "模拟候选人-双面试官")
+        self.page.locator(".candidate-workspace-tab").filter(has_text="流程与跟进").click()
+        self.page.get_by_role("button", name="＋ 面试排期").click()
+        self.page.locator("#e-title").fill("合成双人结构化面试")
+        self.page.locator("#e-time").fill("2026-11-20T10:00")
+        self.page.locator("#e-interviewer").fill("模拟面试官甲")
+        self.page.locator("#modal-root").get_by_role("button", name="保存", exact=True).click()
+        expect(self.page.locator("#modal-root .modal")).to_have_count(0)
+        events = self.get_json(f"/api/v1/candidates/{cid}/events")["events"]
+        matching = [x for x in events if x["title"] == "合成双人结构化面试"]
+        self.assertEqual(len(matching), 1)
+        eid = matching[0]["event_id"]
+
+        for evaluator, rating, recommendation in (
+            ("模拟面试官甲", "strong", "推进至下一轮"),
+            ("模拟面试官乙", "concern", "需进一步核实"),
+        ):
+            self.page.get_by_role("button", name="独立 Scorecard").click()
+            expect(self.page.locator("#sc-evaluator")).to_be_visible()
+            self.page.locator("#sc-evaluator").fill(evaluator)
+            self.page.locator("#sc-key").fill("research_reasoning")
+            self.page.locator("#sc-rating").select_option(rating)
+            self.page.locator("#sc-rec").fill(recommendation)
+            self.page.locator("#sc-observation").fill("模拟行为观察，纯合成数据")
+            self.page.locator("#sc-support").fill("模拟支持性证据")
+            self.page.locator("#sc-counter").fill("模拟需要复核的内容")
+            self.page.get_by_role("button", name="提交并锁定").click()
+            expect(self.page.locator("#modal-root .modal")).to_have_count(0)
+
+        saved = self.get_json(f"/api/v1/events/{eid}/scorecards")
+        self.assertEqual(len(saved["scorecards"]), 2, saved)
+        self.assertEqual({x["state"] for x in saved["scorecards"]}, {"submitted"})
+        self.assertEqual({x["evaluator"] for x in saved["scorecards"]},
+                         {"模拟面试官甲", "模拟面试官乙"})
+        self.assertTrue(saved["criteria"]["research_reasoning"]["disagreement"])
+        self.assertIn("no automatic average", saved["note"].lower())
+
+        # The real API must refuse mutating already-submitted human evaluations.
+        blocked = self.context.request.post(
+            self.base + f"/api/v1/events/{eid}/scorecards",
+            data=json.dumps({
+                "evaluator": "模拟面试官甲",
+                "feedback": [{"criterion_key": "research_reasoning", "rating": "acceptable"}],
+                "recommendation": "非法重写", "submit": True,
+            }, ensure_ascii=False),
+            headers={"Content-Type": "application/json"},
+        )
+        self.assertTrue(400 <= blocked.status < 500, blocked.text())
+        after = self.get_json(f"/api/v1/events/{eid}/scorecards")
+        self.assertEqual(after["scorecards"], saved["scorecards"])
+        pipeline = self.get_json(f"/api/v1/candidates/{cid}/pipeline")
+        self.assertNotEqual(pipeline["current_stage"], "hired")
+        self.assertFalse(self.console_errors, self.console_errors)
+
+    def test_05_offer_lifecycle_requires_human_transitions_and_never_auto_hires(self) -> None:
+        pid = self.new_project("Offer 状态闭环")
+        cid = self.new_candidate(pid, "模拟候选人-Offer")
+        self.page.locator(".candidate-workspace-tab").filter(has_text="Offer").click()
+        expect(self.page.get_by_role("button", name="创建 Offer")).to_be_disabled()
+        for stage in ("shortlisted", "interview"):
+            self.page.get_by_role("button", name="推进阶段").click()
+            self.page.locator("#stage-next").select_option(stage)
+            self.page.locator("#stage-reason").fill("合成验收人工变更")
+            self.page.locator("#modal-root").get_by_role("button", name="确认推进").click()
+            expect(self.page.locator("#modal-root .modal")).to_have_count(0)
+
+        expect(self.page.get_by_role("button", name="创建 Offer")).to_be_enabled()
+        self.page.get_by_role("button", name="创建 Offer").click()
+        self.page.locator("#offer-title").fill("合成产品分析师 Offer")
+        self.page.locator("#offer-start").fill("2026-12-01")
+        self.page.locator("#offer-comp").fill("仅合成测试，无真实薪酬")
+        self.page.get_by_role("button", name="创建 Offer 草案").click()
+        expect(self.page.locator("#modal-root .modal")).to_have_count(0)
+        offers = self.get_json(f"/api/v1/candidates/{cid}/offers")["offers"]
+        self.assertEqual(len(offers), 1)
+        oid = offers[0]["offer_id"]
+        self.assertEqual(offers[0]["status"], "draft")
+
+        # Unauthorized state-skipping must fail in the API, not merely in the UI.
+        illegal = self.context.request.post(
+            self.base + f"/api/v1/offers/{oid}/status",
+            data=json.dumps({"status": "accepted", "actor": "human",
+                             "reason": "跳过审批的非法状态"}),
+            headers={"Content-Type": "application/json"},
+        )
+        self.assertTrue(400 <= illegal.status < 500, illegal.text())
+        self.assertEqual(self.get_json(f"/api/v1/candidates/{cid}/offers")["offers"][0]["status"], "draft")
+
+        for expected in ("approved", "sent", "accepted"):
+            self.page.get_by_role("button", name="更新状态").click()
+            expect(self.page.locator("#offer-status")).to_be_visible()
+            next_allowed = self.page.locator("#offer-status option")
+            options = next_allowed.evaluate_all("(rows) => rows.map(x => x.value)")
+            self.assertIn(expected, options)
+            self.assertNotIn("draft", options[1:])
+            if expected == "approved":
+                self.assertNotIn("accepted", options)
+                self.assertNotIn("sent", options)
+            self.page.locator("#offer-status").select_option(expected)
+            self.page.locator("#offer-status-reason").fill("合成测试：人工状态批准/发送/接收")
+            self.page.locator("#modal-root").get_by_role("button", name="保存", exact=True).click()
+            expect(self.page.locator("#modal-root .modal")).to_have_count(0)
+            persisted = self.get_json(f"/api/v1/candidates/{cid}/offers")["offers"][0]
+            self.assertEqual(persisted["status"], expected)
+
+        expect(self.page.get_by_role("button", name="更新状态")).to_be_disabled()
+        pipeline = self.get_json(f"/api/v1/candidates/{cid}/pipeline")
+        self.assertEqual(pipeline["current_stage"], "interview")
+        history = self.get_json(f"/api/v1/candidates/{cid}/decision-history")
+        self.assertEqual(history["decisions"], [])
+        self.assertFalse(self.console_errors, self.console_errors)
+
 if __name__ == "__main__":
     unittest.main()
