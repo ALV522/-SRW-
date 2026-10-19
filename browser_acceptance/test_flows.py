@@ -41,8 +41,9 @@ class RecruitmentBrowserAcceptance(unittest.TestCase):
         cls.server_log = (EVIDENCE / "synthetic-server.log").open("w", encoding="utf-8")
         env = {**os.environ, "SRW_SYNTHETIC_BROWSER_ACCEPTANCE": "1"}
         cls.server = subprocess.Popen(
-            [sys.executable, "-u", str(ROOT / "browser_acceptance" / "serve.py"),
-             "--workspace", cls.tmp.name, "--port", str(cls.port)],
+            [sys.executable, "-u", str(ROOT / "scripts" / "start_local_web.py"),
+             "--workspace", cls.tmp.name, "--port", str(cls.port),
+             "--synthetic", "--no-browser"],
             cwd=ROOT, env=env, stdout=cls.server_log,
             stderr=subprocess.STDOUT,
         )
