@@ -18,6 +18,11 @@ on:
       - explorations/html-site/e2-live.html
       - explorations/html-site/run_e2_demo.py
       - explorations/html-site/test_e2_synthetic.py
+      - explorations/html-site/e3_core_server.py
+      - explorations/html-site/e3_atomic_action_plan.py
+      - explorations/html-site/e3_web_bridge.py
+      - explorations/html-site/e3-live.html
+      - explorations/html-site/run_e3_demo.py
       - .github/workflows/html-site-sandbox.yml
 
 concurrency:
@@ -62,6 +67,11 @@ jobs:
         env:
           PYTHONUNBUFFERED: '1'
         run: python explorations/html-site/run_e2_demo.py --smoke
+      - name: Smoke-test E3 transactional SQLite CAS Core on Windows
+        if: matrix.os == 'windows-latest'
+        env:
+          PYTHONUNBUFFERED: '1'
+        run: python explorations/html-site/run_e3_demo.py --smoke
       - name: Validate assembled Windows source package and START_HERE preflight
         if: matrix.os == 'windows-latest'
         shell: cmd
@@ -74,8 +84,11 @@ jobs:
           if errorlevel 1 exit /b 1
           call dist\srw-e1-source-demo\START_E2.cmd --smoke
           if errorlevel 1 exit /b 1
+          call dist\srw-e1-source-demo\START_E3.cmd --smoke
+          if errorlevel 1 exit /b 1
           python dist\srw-e1-source-demo\explorations\html-site\run_e1_demo.py --smoke
           python dist\srw-e1-source-demo\explorations\html-site\run_e2_demo.py --smoke
+          python dist\srw-e1-source-demo\explorations\html-site\run_e3_demo.py --smoke
 
   real-browser-e1:
     name: E1 real backend + Chromium (Ubuntu)
@@ -111,6 +124,11 @@ jobs:
           PYTHONPATH: backend
           PYTHONUNBUFFERED: '1'
         run: python explorations/html-site/run_e2_demo.py --smoke
+      - name: Smoke-test E3 disposable C11 SQLite transactional CAS
+        env:
+          PYTHONPATH: backend
+          PYTHONUNBUFFERED: '1'
+        run: python explorations/html-site/run_e3_demo.py --smoke
       - name: Upload synthetic browser failure evidence
         if: always()
         uses: actions/upload-artifact@v4
@@ -145,6 +163,10 @@ jobs:
         env:
           PYTHONUNBUFFERED: '1'
         run: python dist/srw-e1-source-demo/explorations/html-site/run_e2_demo.py --smoke
+      - name: Smoke-test E3 from assembled source bundle
+        env:
+          PYTHONUNBUFFERED: '1'
+        run: python dist/srw-e1-source-demo/explorations/html-site/run_e3_demo.py --smoke
       - name: Upload ready-to-extract demo folder
         uses: actions/upload-artifact@v4
         with:
