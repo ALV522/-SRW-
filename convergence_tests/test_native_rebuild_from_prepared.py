@@ -7,7 +7,7 @@ any release status can be claimed.
 from __future__ import annotations
 
 import hashlib
-import os
+from contextlib import closing
 import sqlite3
 import stat
 import tempfile
@@ -41,8 +41,9 @@ class NativeCandidateUpgradeTests(unittest.TestCase):
             files["runtime/" + name] = blob
         for name in KNOWLEDGE:
             db = self.root / (name + ".db")
-            with sqlite3.connect(db) as conn:
+            with closing(sqlite3.connect(db)) as conn:
                 conn.execute(f"CREATE TABLE {DB_TABLES[name]} (name TEXT)")
+                conn.commit()
             files[f"knowledge/active/{name}/knowledge.db"] = db.read_bytes()
         runtime_manifest = "".join(
             f"{hashlib.sha256(blob).hexdigest()}  {name}\n"
@@ -122,7 +123,7 @@ class NativeCandidateUpgradeTests(unittest.TestCase):
         import sys
         original = sys.argv
         try:
-            sys.argv = ["upgrade", "--expected-sha", "0" * 64]
+            sys.argv = ["upgrade", "--base-zip", "synthetic.zip", "--verify-only", "--expected-sha", "0" * 64]
             with self.assertRaises(SystemExit) as thrown:
                 main()
             self.assertEqual(thrown.exception.code, 2)
