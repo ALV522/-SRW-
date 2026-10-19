@@ -1,5 +1,7 @@
 # SRW · 智能招聘工作台
 
+> **G1 产品治理（2026-10-20）**：所有后续开发 Agent 必须先阅读 [AGENTS.md](AGENTS.md) 并依序阅读 [项目总述](docs/PROJECT_OVERVIEW.md)、[产品宪章](docs/PRODUCT_CHARTER.md)、[开发治理](docs/DEVELOPMENT_GOVERNANCE.md)、[版本政策](docs/VERSION_POLICY.md)、[双载体计划](docs/DUAL_CARRIER_PLAN.md)、[负责人手册](docs/OWNER_GUIDE.md)。Windows 与本地 Web/HTML **并行产品化**，共用同一权威 Core；不要按旧路线图的顺序将 Web 延迟到 Windows 正式发行之后。现有 VERSION 仍是历史 C11 标识，下一 SemVer 号只是计划，**尚非发布版本**。以下历史测试数字必须结合准确 SHA/CI 核查，不能被视为最新 HEAD 的自动验收。
+
 **本地优先、证据驱动的招聘业务工作台。** SRW 覆盖建岗、招聘标准、候选人收件、材料与 Claim 证据、人工核实、面试/Scorecard、Decision、Offer、联系运营、Knowledge、AI/OCR/ASR 辅助。AI 建议不等于人工录用决定；缺失证据不按零分处理；材料或招聘标准变化后，旧决策上下文不能自动复用。
 
 > **项目状态（2026-10-19）**：当前唯一整合研发主线是 `main`，C11 版本 `1.0.0-alpha10-convergence11`、Schema `v1_0014`。此前 **`d8d032d` 的 Windows Native 候选包**在真实 Windows 上通过 WPF/WebView2 基础启动、后端就绪、项目创建、招聘标准草案修改和退出验证。这是**特定旧工件的基础 GUI 验收**，不是最新 `main` 已发布正式 Portable/RC/GA。

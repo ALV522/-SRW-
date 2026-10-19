@@ -1,0 +1,25 @@
+name: SRW Governance Contract
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  governance-contract:
+    name: governance-contract
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Verify version and mandatory governance contract
+        run: python scripts/check_governance_contract.py
+      - name: Require PR reading and acceptance attestation
+        if: github.event_name == 'pull_request'
+        env:
+          PR_BODY: ${{ github.event.pull_request.body }}
+        run: python scripts/check_governance_contract.py --check-pr-body

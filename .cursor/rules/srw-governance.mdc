@@ -1,0 +1,6 @@
+---
+description: Required governance for every SRW coding and documentation task
+alwaysApply: true
+---
+
+Before any edit: read root AGENTS.md, then every required document in its onboarding order. Read docs/PRODUCT_CHARTER.md, docs/DEVELOPMENT_GOVERNANCE.md, docs/VERSION_POLICY.md, docs/DUAL_CARRIER_PLAN.md. Verify exact commit/version/schema and evidence. Work in PRs, preserve v0.8.x capabilities, never claim source CI equals Windows GUI. Windows EXE and local Web/HTML are parallel product carriers sharing one authoritative SRW Core. No SaaS or full UI/core rewrite. Use synthetic data and strict release evidence.

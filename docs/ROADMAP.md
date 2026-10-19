@@ -1,4 +1,4 @@
-# SRW 产品路线图（2026-10-19）
+> **G1 战略更新（2026-10-20）**：本文件下方 P0→P3 仍保留为原始工程清单，但其先后顺序已由 [产品宪章](PRODUCT_CHARTER.md)、[双载体并行计划](DUAL_CARRIER_PLAN.md)、[开发治理](DEVELOPMENT_GOVERNANCE.md) 更新。Windows Native 产品化与本地 Browser/HTML **从现在起并行推进**、共用一个权威 C11 Core；各自验收、争取同期交付。实际产品版号/渠道遵守 [版本政策](VERSION_POLICY.md)。历史测试统计不是当前提交的自动 PASS。\n\n# SRW 产品路线图（2026-10-19）
 
 这是一份**待执行计划**，不是把未完成事项声明为 PASS。当前唯一产品开发源码主线为 `main` / C11；历史 `v0.8.12-R2` 是成熟业务完整性对照；HTML E1–E5 和 Native SOURCE Lab 属于独立探索。
 

@@ -1,0 +1,15 @@
+{
+  "schema": "srw.version-policy.v1",
+  "governance_revision": "G1",
+  "current_runtime_version": "1.0.0-alpha10-convergence11",
+  "current_version_format": "legacy-pre-migration",
+  "next_product_version": "1.0.0-alpha.11",
+  "next_version_status": "proposed-not-effective",
+  "schema_revision": "v1_0014",
+  "release_channel": "development",
+  "production_release": false,
+  "release_identity_rule": "source-sha-plus-carrier-plus-artifact-sha256",
+  "historical_convergence": "C11",
+  "dual_carrier_target": ["windows-native", "local-web"],
+  "governance_policy": "docs/VERSION_POLICY.md"
+}

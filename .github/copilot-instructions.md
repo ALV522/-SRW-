@@ -1,0 +1,3 @@
+# Mandatory SRW instructions for GitHub Copilot and VS Code coding assistants
+
+Before editing ANY source, tests, release metadata or docs, open /AGENTS.md and READ every document in its ordered onboarding list. In the first response, state SHA/version/schema, evidence boundaries and chosen acceptance-first tasks. Enforce docs/PRODUCT_CHARTER.md, docs/DEVELOPMENT_GOVERNANCE.md, docs/VERSION_POLICY.md and docs/DUAL_CARRIER_PLAN.md. Never claim a product release from source/Chromium CI. Windows and local Browser are parallel carriers sharing a single C11 Core. No new UI framework, wholesale core rewrite or cloud SaaS. Use PR template + review + governance CI, and keep SOURCE_MANIFEST.sha256 accurate. Do not expose candidate data or keys.
