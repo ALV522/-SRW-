@@ -115,7 +115,10 @@ class NativeSourceKitTests(unittest.TestCase):
 
     def test_rejects_malicious_host_symlink(self):
         dest=self.base/"bad.zip"
-        (self.host/"other.dll").symlink_to(self.host/"SmartRecruitmentWorkbench.exe")
+        try:
+            (self.host/"other.dll").symlink_to(self.host/"SmartRecruitmentWorkbench.exe")
+        except (OSError, NotImplementedError):
+            self.skipTest("runner cannot create symlinks (common on Windows)")
         with self.assertRaisesRegex(PayloadError,"symlink"):
             package(self.source,self.host,dest,self.COMMIT,enforce_git=False)
 
