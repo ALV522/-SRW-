@@ -178,8 +178,8 @@ def smoke_windows(root: Path, *, startup_timeout: int = 45) -> dict:
                 else:
                     raise PayloadError("Windows backend did not become ready: " + str(last_error))
                 info = _probe(f"http://127.0.0.1:{port}/api/v1/runtime/info", 3)
-                if (info.get("instance_id") != instance or
-                    info.get("session_id") != session or
+                if (info.get("instanceId") != instance or
+                    info.get("sessionId") != session or
                     info.get("edition") != "windows" or
                     info.get("runtime") != "desktop"):
                     raise PayloadError("embedded backend Host ABI identity mismatch")
