@@ -82,6 +82,24 @@ def inspect_prepared(root: Path) -> dict:
         host_truth.get("source_git_sha") != git_sha or
         (host_truth.get("outputs") or {}).get("executable_sha256") != expected_host_sha):
         raise PayloadError("Host build identity mismatch")
+    # Reject unknown extra files in the extracted payload, including local
+    # secrets, candidate data and unreviewed backup directories.
+    expected_paths = (
+        set(source) |
+        {"SOURCE_MANIFEST.sha256", "PRODUCTION_RUNTIME.sha256",
+         "PRODUCTION_KNOWLEDGE.sha256", PROVENANCE} |
+        {"runtime/" + rel for rel in read_manifest(root / "PRODUCTION_RUNTIME.sha256", runtime=True)} |
+        {"knowledge/active/" + rel for rel in read_manifest(root / "PRODUCTION_KNOWLEDGE.sha256")} |
+        set(host_files)
+    )
+    actual_paths = set()
+    for candidate in root.rglob("*"):
+        if candidate.is_symlink():
+            raise PayloadError("symlink in extracted Native package")
+        if candidate.is_file():
+            actual_paths.add(candidate.relative_to(root).as_posix())
+    if actual_paths != expected_paths:
+        raise PayloadError("extracted Native candidate contains missing or unreviewed files")
     if (context.get("artifact_status") != "UNVERIFIED_GUI" or
         context.get("prepared_status") != "OFFLINE_WHEELS_STAGED_NEEDS_WINDOWS_EMBEDDED_SMOKE" or
         context.get("embedded_python_windows_smoke_passed") is not False or
