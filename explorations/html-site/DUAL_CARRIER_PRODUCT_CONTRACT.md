@@ -64,8 +64,11 @@ scheduler and one Knowledge runtime.
 Cons: requires process supervision, authenticated attach protocol, orphan
 cleanup, upgrades, lock ownership and carefully bounded idle shutdown.
 
-Do not start building this service until current Windows native packaging and
-source-run API/GUI acceptance are dependable.
+E4 has now proved a **synthetic independent-Core owner** with two detachable
+browser origins and one SQLite store. This is not a production background
+service, an accepted Windows Native Host or an authenticated attach protocol.
+Do not promote the E4 controller to production before native packaging,
+workspace lock supervision, API authorization and real GUI acceptance.
 
 ## Local service identity and trust
 
@@ -122,8 +125,16 @@ Action Plan mutations. It serializes writes made *through the single E2
 facade instance*. It does not protect against a direct backend writer
 interleaving between E2 read and write.
 
-Production must move the precondition **inside the same database transaction
-as the business mutation**, with an additive model/API revision contract:
+E3 now separately demonstrates the next step **in a disposable real C11 Core**:
+a synthetic Action Plan route uses SQLite `BEGIN IMMEDIATE` to verify a
+persistent version, execute the existing business mutation and append its audit
+record, then advance revision in **one transaction**. Two independent
+SQLite Engine connections compete for the same version; one succeeds and the
+other fails without a successful audit. It is not merged into the mainline
+or exposed for real production data.
+
+Production still must move the precondition into the **official** Core schema
+and every business mutation path, with an additive model/API revision contract:
 
 ```
 GET /api/v1/candidates/{id}/action-plan
@@ -159,7 +170,9 @@ broadcast channel.
 | Mode | Web | EXE | State authority |
 |---|---|---|---|
 | E1 isolated demo | read-only | no | disposable local Core |
-| E2 isolated lab | synthetic Action Plan | no | disposable local Core |
+| E2 isolated lab | synthetic Action Plan with proxy ETag | no | disposable local Core |
+| E3 isolated lab | synthetic Action Plan with SQLite CAS | no | disposable local Core |
+| E4 lifecycle lab | browser carrier | browser surrogate (not EXE) | one independent disposable Core |
 | Desktop-owned Core | secondary | primary | EXE-owned local Core |
 | Detached local Core | independent client | independent client | supervised local Core |
 | Private server | authenticated network client | optional client | authenticated server Core |
@@ -177,8 +190,10 @@ Future artifacts should have separate, precise names:
 - SRW Windows Edition (WebView2 EXE + Core/runtime);
 - SRW Synthetic Demo Source Bundle (experiment only).
 
-The successful E1/E2 CI package is **not** a Windows Native release, even
-though its source demo starts on Windows.
+The successful E1–E4 CI source package is **not** a Windows Native release,
+even though its launchers run on Windows. E3/E4 prove SQLite transactional
+concurrency and independent process ownership in disposable sandboxes, not
+Windows WPF/WebView2 integration.
 
 ## Exit criteria for genuine dual-carrier acceptance
 
@@ -196,3 +211,11 @@ though its source demo starts on Windows.
 Until all relevant items are evidenced, describe the current result as
 HTML-first exploration / source-based browser acceptance rather than a
 completed dual-carrier product.
+
+## Evidence and remaining integration boundary
+
+- [E3 experimental SQLite transaction](E3_ATOMIC_CAS.md)
+- [E4 independent Core/dual browser carrier lifecycle](E4_SHARED_CORE.md)
+- [Independent source CI and browser screenshots](https://github.com/ALV522/-SRW-/actions/runs/39189540086)
+
+**Design progression:** E1 tests read API sharing; E2 tests conditional writes at the proxy; E3 moves conditional revision + C11 business/audit into a real SQLite transaction under a synthetic route; E4 proves UI processes can attach to one independently-owned Core and detach separately. None of these substitutes for accepted WPF Windows Native packaging, production Knowledge DBs, full 0.8.x feature coverage or production data migration.
