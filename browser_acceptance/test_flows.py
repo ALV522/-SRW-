@@ -416,6 +416,8 @@ class RecruitmentBrowserAcceptance(unittest.TestCase):
         stale = self.get_json(f"/api/v1/candidates/{cid}/workspace")
         self.assertNotEqual(stale["decision_context_hash"], verified["decision_context_hash"])
         self.assertTrue(stale["stale_decision_id"])
+        self.assertFalse(stale["decision_reaffirmable"])
+        expect(self.page.get_by_role("button", name="按当前证据重申")).to_be_disabled()
         self.assertNotEqual(stale["decision_label"], "继续推进")
         history = self.get_json(f"/api/v1/candidates/{cid}/decision-history")["decisions"]
         self.assertTrue(history[0]["stale"])
@@ -437,6 +439,8 @@ class RecruitmentBrowserAcceptance(unittest.TestCase):
         renewed = self.get_json(f"/api/v1/candidates/{cid}/workspace")
         self.assertTrue(renewed["decision_ready"])
         self.assertTrue(renewed["stale_decision_id"])
+        self.assertTrue(renewed["decision_reaffirmable"])
+        expect(self.page.get_by_role("button", name="按当前证据重申")).to_be_enabled()
         self.page.once("dialog", lambda dialog: dialog.accept("已复核新增材料，保留原人工决定"))
         self.page.get_by_role("button", name="按当前证据重申").click()
         final = self.get_json(f"/api/v1/candidates/{cid}/decision-history")["decisions"]
