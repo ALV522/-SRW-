@@ -52,3 +52,30 @@ and run Windows **native GUI smoke** plus EXE/browser coexistence.
 
 This must occur through an explicit product-development/review process after
 the experimental evidence is solid; the source-only WPF build is not a product.
+
+
+## Next step: Native SOURCE Lab integration attempt
+
+A **separate** experimental assembly path has been added:
+
+- `assemble_native_lab.py` copies explicitly allowlisted C11 source,
+  previously compiled hash-attested WPF host files, and a Python launcher;
+- `run_native_lab.py` creates a local Python 3.12 venv, generates **only
+  synthetic** Knowledge fixtures and gives WPF a new temporary data root;
+- `START_NATIVE_LAB.cmd` (when the build succeeds) starts the real WPF host
+  rather than a browser-only desktop surrogate;
+- the script checks `app.lock/instance.json`, desktop runtime identity,
+  backend readiness, same-Core E1 browser read-only project access, and
+  the `frontend_loaded` Host log event when `--strict-gui` is specified.
+
+GitHub Actions Windows runs the source lab as a **separate job** after the
+source compile. Its status must be independently inspected. If the synthetic
+GUI readiness test fails, the WPF host-only build remains a valid compile
+result; no Native source preview is promoted or published.
+
+The Native SOURCE Lab is **not** a standalone Windows Portable even if its
+GUI starts: it needs system Python 3.12 and .NET 10 Desktop/WebView2 Runtime,
+uses test Knowledge and test database, and excludes real AI/OCR/ASR acceptance.
+
+No approved historical 0.8.x carrier, official resource manifests or
+production releases are modified to make this experiment run.
