@@ -40,6 +40,11 @@ class E5ProtectedAttachBrowserTests(unittest.TestCase):
     def setUp(self):
         self.contexts=[]
         self.errors=[]
+        # A bootstrap capability is consumed once. Give each independent
+        # browser test freshly issued carrier capabilities (same durable Core).
+        for name in ("web","desktop_surrogate"):
+            self.owner.detach(name)
+            self.owner.attach(name)
 
     def tearDown(self):
         for ctx in self.contexts:
@@ -94,6 +99,13 @@ class E5ProtectedAttachBrowserTests(unittest.TestCase):
         self.assertTrue(attached[0]["httpOnly"])
         self.assertEqual(attached[0]["sameSite"],"Strict")
         self.assertEqual(page.evaluate("document.cookie"),"")
+        # Replaying the redeemed bootstrap URL must not grant a new session,
+        # while the already attached tab remains functional.
+        replay=request_client(client_with_cookies(),web,
+                              "/attach/"+self.owner.attach_url("web").split("/attach/")[1])
+        self.assertEqual(replay[0],403)
+        page.reload()
+        expect(page.locator("#api-state")).to_have_text("LIVE · web · E5 attached synthetic")
         self.assertFalse(self.errors,self.errors)
 
     def test_02_two_authorized_browsers_share_core_and_revoke_on_detach(self):
