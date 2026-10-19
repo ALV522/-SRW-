@@ -7,6 +7,7 @@ Use --synthetic only for isolated CI/browser acceptance.
 from __future__ import annotations
 
 import argparse
+from contextlib import closing
 import json
 import os
 import sqlite3
@@ -65,7 +66,7 @@ def workspace_errors(path: Path, *, reuse: bool, synthetic: bool,
                             raise ValueError("invalid SQLite header")
                     # Open read-only. Never create or migrate a database just
                     # to decide whether it is safe to reuse.
-                    with sqlite3.connect(db.as_uri() + "?mode=ro", uri=True) as connection:
+                    with closing(sqlite3.connect(db.as_uri() + "?mode=ro", uri=True)) as connection:
                         result = connection.execute("PRAGMA quick_check").fetchone()
                         revision = connection.execute(
                             "SELECT schema_revision FROM v1_schema_meta LIMIT 1"
