@@ -58,8 +58,9 @@ def validate_rebuild_truth(provenance: dict, *, source_sha: str,
 
 def inspect_rebuilt(root: Path, *, archive: Path | None = None,
                     expected_archive_sha256: str | None = None) -> dict:
+    was_symlink = root.is_symlink()
     root = root.resolve(strict=True)
-    if not root.is_dir() or root.is_symlink():
+    if was_symlink or not root.is_dir() or root.is_symlink():
         raise PayloadError("rebuilt Native application root must be a directory, not a symlink")
     src_manifest = root / "SOURCE_MANIFEST.sha256"
     runtime_manifest = root / "PRODUCTION_RUNTIME.sha256"
@@ -120,6 +121,8 @@ def inspect_rebuilt(root: Path, *, archive: Path | None = None,
         )
     zip_sha = None
     if archive is not None:
+        if archive.is_symlink():
+            raise PayloadError("candidate ZIP must not be a symbolic link")
         archive = archive.resolve(strict=True)
         if expected_archive_sha256 is not None:
             if not re.fullmatch(r"[0-9a-f]{64}", expected_archive_sha256):
