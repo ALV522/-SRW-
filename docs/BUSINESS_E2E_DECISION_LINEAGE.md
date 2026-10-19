@@ -10,7 +10,7 @@
 4. UI 记录 `advance` HumanDecision。真实决策历史须存在一条对应当前上下文的人工决定。
 5. UI 追加第二份虚构文本材料。由于材料版本与 Decision Context 已变化，旧决定必须标记 `stale=true`；不能继续作为当前决定。
 6. 未对新增证据重新核实的状态下，直接请求 `decisions/reaffirm` 必须被服务器拒绝，且不会产生额外决定行。
-7. UI 再次执行人工核实，然后显式输入新的“重申理由”。核对新 Decision 属于当前上下文、`reaffirmed_from_decision_id` 指向此前的人工决定，原始决定保留但处于历史状态。
+7. UI 的“按当前证据重申”必须在实际证据门槛未满足时禁用，而非只要有旧决定就显示为可点击；UI 再次执行人工核实后按钮才能启用。操作者显式输入新的“重申理由”，核对新 Decision 属于当前上下文、`reaffirmed_from_decision_id` 指向此前的人工决定，原始决定保留但处于历史状态。
 
 这个流程同时检验：`Source/Claim` 有明确人工来源、`Judgment` 按上下文有效、`HumanDecision` 不由 AI 或材料更新自动生成、证据变化不隐式继承旧决定，以及重申必须重新通过当前证据门槛。
 
