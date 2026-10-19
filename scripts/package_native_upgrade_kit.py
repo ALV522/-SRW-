@@ -128,7 +128,7 @@ def package(
             payload["windows-host/" + rel] = file.read_bytes()
     if {"BUILD_C11_CANDIDATE.cmd", "SOURCE_KIT_PROVENANCE.json"} & set(payload):
         raise PayloadError("upgrade kit file name already reserved")
-    payload["BUILD_C11_CANDIDATE.cmd"] = CMD.replace("\\n", "\\r\\n").encode("utf-8")
+    payload["BUILD_C11_CANDIDATE.cmd"] = CMD.replace("\n", "\r\n").encode("utf-8")
     payload["SOURCE_KIT_README.md"] = README.encode("utf-8")
     payload[TRUTH_NAME] = (json.dumps({
         "schema": "srw.native-upgrade-source-kit.v1",
