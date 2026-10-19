@@ -1,5 +1,10 @@
 # SRW Development State — Convergence 11
 
+> **最新项目状态（2026-10-19；main `c9d70cd48d03`）**：Ubuntu/Windows 各 146 项源码测试、5 项真实 Chromium 业务场景、280 项仓库完整性校验 PASS。旧 `d8d032d` Windows Native 候选包已在真实电脑上通过 WPF/WebView2 基础启动、项目创建、标准草案更新和正常退出验证，仍非正式 RC/GA。本文其余“138/121/109 项”和“GUI 待验收”等内容属于不同开发阶段**历史追加记录**，不得取代最新身份与证据。请优先查看 [README](README.md)、[Windows GUI 实机报告](docs/WINDOWS_GUI_FIRST_ACCEPTANCE.md)、[路线图](docs/ROADMAP.md)。
+
+
+> **最新业务增量**：`c9d70cd` 还新增两条真实 Chromium E2E：独立面试 Scorecard 分歧保留与 Offer Draft→Approved→Sent→Accepted 人工状态流；主线 Chromium 总量现为 **5** 项。该增量保留旧决定必须由人类确认的约束。参见 [验收记录](docs/BUSINESS_E2E_SCORECARD_OFFER.md)。
+
 Version: `1.0.0-alpha10-convergence11`; schema `v1_0014`; capability reference `v0.8.12-R2`.
 
 ## Integrated capabilities
@@ -92,7 +97,3 @@ On an actual user Windows x64 machine, the pinned d8d032d prepared package passe
 ## 2026-10-19: verified Windows GUI startup, business writes and graceful shutdown
 
 User-supplied Windows screenshot and complete 45-record Host JSONL establish actual WPF window display/WebView2 initialization/frontend_loaded, runtime health endpoints HTTP 200, successful POST /api/v1/projects (200), successful PATCH /api/v1/protocol-revisions/<id> (200), and clean shutdown_requested/backend_stopped/workspace_released/host_closed. Timing for that single machine/session: ~3.03 s Host->backend_ready; ~4.92 s Host->frontend_loaded. One harmless /favicon.ico HTTP 404. No recorded backend crash, retry or HTTP 5xx. User additionally showed runtime/Lib/c11-overlay/**/__pycache__/*.pyc files, confirming these generated cache files are present after first smoke and likely account for immutable-member check failures. Original artifact remains d8d032d, not silently mutated or re-labelled. New read-only scripts/audit_windows_host_gui_log.py produces scrubbed GUI lifecycle/business HTTP evidence, tests block cross-session aggregation and errors. **Windows GUI baseline PASS; full recruitment, OCR/ASR, Provider, Knowledge governance and restore acceptance remain OPEN**, so not RC/GA. Total current source regressions: 146. Full scope at docs/WINDOWS_GUI_FIRST_ACCEPTANCE.md.
-
-## 2026-10-19: Browser-verified Interview Scorecard and Offer business state gates
-
-Expanded the real Chromium + HTTP + SQLite workflow suite from 3 to 5 scenarios without altering existing source regression count (146). Browser test 04 creates a true interview event via UI, submits two independent evaluator Scorecards with conflicting criterion ratings, verifies both are submitted/locked and disagreement is recorded without averaging, and asserts a duplicate evaluator overwrite is blocked by the backend. Browser test 05 exercises human Pipeline stage advancement, Offer creation, a rejected illegal draft->accepted skip, legal draft->approved->sent->accepted UI updates, terminal state UI disablement and persistence, and verifies the Candidate remains interview-stage with no automatically generated HumanDecision. The Offer UI now only proposes states permitted by the server's state-transition graph. Exact-commit Chromium CI must PASS before acceptance is claimed. Windows WPF GUI lifecycle has passed user machine smoke; these added business operations have not yet been manually replayed on that Windows Host. See docs/BUSINESS_E2E_SCORECARD_OFFER.md.
