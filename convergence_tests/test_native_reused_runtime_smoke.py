@@ -123,6 +123,43 @@ class ReusedRuntimeSmokeTests(unittest.TestCase):
         with self.assertRaisesRegex(PayloadError, "requires Windows"):
             _resmoke_embedded_python(self.root, self.req)
 
+    def test_windows_reuse_smoke_calls_exact_embedded_exe_without_bytecode(self):
+        import os
+        import subprocess
+        from unittest.mock import patch
+        if os.name != "nt":
+            self.skipTest("real Windows runner verifies CLI execution arguments")
+        exe = self.runtime / "python.exe"
+        exe.write_bytes(b"SYNTHETIC EXE - NEVER EXECUTED")
+        self.manifest.write_text(
+            hashlib.sha256(exe.read_bytes()).hexdigest() + "  python.exe\\n",
+            encoding="utf-8",
+        )
+        paths = {}
+        for name in REQUIRED_IMPORTS:
+            item = self.runtime / (name + ".py")
+            item.write_text("# synthetic\\n", encoding="utf-8")
+            paths[name] = str(item)
+            with self.manifest.open("a", encoding="utf-8") as fp:
+                fp.write(hashlib.sha256(item.read_bytes()).hexdigest() + "  " + item.name + "\\n")
+        result = subprocess.CompletedProcess(
+            [str(exe)], 0, json.dumps({"python": "3.12.10", "paths": paths}), ""
+        )
+        with patch(
+            "scripts.rebuild_native_from_prepared.subprocess.run", return_value=result
+        ) as call:
+            output = _resmoke_embedded_python(self.root, self.req)
+        args, kwargs = call.call_args
+        self.assertEqual(args[0][0], str(exe))
+        self.assertEqual(args[0][1:3], ["-I", "-B"])
+        self.assertEqual(kwargs["env"]["PYTHONDONTWRITEBYTECODE"], "1")
+        self.assertEqual(output["status"], "C11_REUSED_RUNTIME_SMOKE_PASS")
+        self.assertEqual(output["imported_module_count"], 13)
+        self.assertFalse(output["gui_accepted"])
+        _validate_embedded_smoke_audit(
+            output, runtime_manifest=self.manifest, requirements=self.req
+        )
+
 
 if __name__ == "__main__":
     unittest.main()
