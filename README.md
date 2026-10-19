@@ -84,3 +84,7 @@ python scripts/run_convergence_verification.py
 ### 新增 P0 标准版本失效验收（E2E-07）
 
 [招聘标准重新发布的决策失效验收](docs/BUSINESS_E2E_PROTOCOL_REVISION.md)：保留候选人 Source 不变，新发布第二版具有必须核实标准的岗位协议；验证旧 HumanDecision 失效、未核实时直接重申被拒绝、UI 重申按钮禁用。此流程与 E2E-06 的“材料变更→重申”互补。第七条 Chromium 场景以本提交的 CI 实际结果为准。
+
+### Windows 产品候选装配：一个工具包 + 已核验的旧 Runtime/Knowledge
+
+现在已有 [C11 Native 候选升级装配路径](docs/C11_NATIVE_CANDIDATE_UPGRADE.md)：最新 Windows Host CI 会同时发布**完整同 SHA 源码 + WPF Host** 升级工具包。用户提供精确的历史 `d8d032d` Prepared Native ZIP，就可用 `BUILD_C11_CANDIDATE.cmd` 在本机生成新源码版本的 **`UNVERIFIED_GUI` Native 候选 ZIP**；旧包与现存数据不会被覆盖。该路径已严格限制旧 ZIP SHA、Runtime/Knowledge 完整性、当前 Python 依赖与 Host 来源，**但候选包仍需实际 Windows GUI 和全业务验收，绝非自动发行**。
