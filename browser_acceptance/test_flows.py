@@ -407,8 +407,12 @@ class RecruitmentBrowserAcceptance(unittest.TestCase):
         self.assertEqual(len(made), 1)
         self.assertTrue(made[0]["is_current_context"])
         self.assertEqual(made[0]["decision"], "advance")
+        # saveDecision triggers an async full candidateDrawer render. Wait for
+        # the new decision to appear before interacting with the replacement DOM.
+        expect(self.page.locator(".kpi-value").first).to_contain_text("已决定")
 
         self.page.locator("#paste-material").fill("新增合成材料：一份待重新核实的项目反馈。")
+        expect(self.page.locator("#paste-material")).to_have_value("新增合成材料：一份待重新核实的项目反馈。")
         # Observe the real request completion, instead of treating a stale UI
         # render as persistence failure.
         with self.page.expect_response(
@@ -444,13 +448,19 @@ class RecruitmentBrowserAcceptance(unittest.TestCase):
         self.page.locator("#v-evidence").select_option("strong")
         self.page.locator("#v-reason").fill("人工重查新增材料：研究职责得到确认")
         self.page.get_by_role("button", name="保存人工核实").click()
+        expect(self.page.locator(".source-card")).to_have_count(4)
         renewed = self.get_json(f"/api/v1/candidates/{cid}/workspace")
         self.assertTrue(renewed["decision_ready"])
         self.assertTrue(renewed["stale_decision_id"])
         self.assertTrue(renewed["decision_reaffirmable"])
         expect(self.page.get_by_role("button", name="按当前证据重申")).to_be_enabled()
         self.page.once("dialog", lambda dialog: dialog.accept("已复核新增材料，保留原人工决定"))
-        self.page.get_by_role("button", name="按当前证据重申").click()
+        with self.page.expect_response(
+            lambda response: response.url.endswith(f"/api/v1/candidates/{cid}/decisions/reaffirm")
+            and response.request.method == "POST"
+        ) as capture:
+            self.page.get_by_role("button", name="按当前证据重申").click()
+        self.assertEqual(capture.value.status, 200, capture.value.text())
         final = self.get_json(f"/api/v1/candidates/{cid}/decision-history")["decisions"]
         self.assertEqual(len(final), 2)
         self.assertEqual(final[0]["decision"], "advance")
