@@ -27,6 +27,8 @@ import webbrowser
 from http.server import ThreadingHTTPServer
 from pathlib import Path
 
+from synthetic_workspace import synthetic_temporary_directory
+
 from serve_e1 import ReadOnlyBridge, select_upstream
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -129,7 +131,7 @@ def main() -> int:
 
     print("SRW HTML E1 · Source-based synthetic demo", flush=True)
     print("No EXE is required. Your production database and credentials are never opened.", flush=True)
-    with tempfile.TemporaryDirectory(prefix="srw-e1-demo-synthetic-") as workspace:
+    with synthetic_temporary_directory(prefix="srw-e1-demo-synthetic-") as workspace:
         api_log = Path(workspace) / "synthetic-backend.log"
         log_handle = api_log.open("w", encoding="utf-8")
         try:
