@@ -11,7 +11,11 @@ from __future__ import annotations
 import argparse
 import re
 import subprocess
+import sys
 from pathlib import Path
+
+if __package__ in (None, ""):
+    sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from scripts.check_governance_contract import validate as governance_validate
 from scripts.check_release_truth import validate as release_validate
