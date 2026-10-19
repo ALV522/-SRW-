@@ -55,3 +55,7 @@ Browser acceptance additionally checks that Offer creation is disabled before th
 ## 2026-10-19 additional real browser scenarios
 
 Two business workflow E2E tests are added: (04) independent immutable Interview Scorecards for two evaluators with preserved conflicting ratings, and (05) human Offer approval/send/accept transitions with illegal state skip rejected and no automatic hired/human decision. They use real Chromium UI interactions plus persisted C11 SQLite/API state, never fake API responses. Refer to [business scorecard/offer acceptance](BUSINESS_E2E_SCORECARD_OFFER.md). Five scenarios are **pending same-commit CI** until the new PR/main browser workflow is verified; the pre-existing three remain historical verified evidence. Desktop WPF/WebView2 business acceptance is separate.
+
+## Protocol republish and stale human decision (E2E-07)
+
+The additional Chromium acceptance creates a human-grounded Decision on a published project protocol, then **changes only the published protocol**, adding a mandatory verification-critical Criterion without changing candidate Source IDs. The prior Decision must become stale, the new criterion must block `advance` reaffirmation through both server API and UI until it is verified. This complements E2E-06 material-revision staleness. [Full test contract](BUSINESS_E2E_PROTOCOL_REVISION.md). It only counts as PASS after the corresponding exact-commit CI succeeds.
