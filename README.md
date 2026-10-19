@@ -46,6 +46,10 @@
 
 不要把源码 ZIP、Host-only EXE 或临时 SOURCE Lab 预览包说成用户可以正式部署的完整 Windows 产品。任何测试不应向 GitHub 上传真实简历、SQLite、密钥、完整工作区锁及私人日志。
 
+## 本地 HTML/Browser C11 源码预览（非正式发行）
+
+新的 [Local Web source preview](docs/LOCAL_WEB_SOURCE_PREVIEW.md) 允许以`scripts/start_local_web.py`在独立工作区启动**现有** C11 Core/API/HTML 前端，并使用真实浏览器访问。合成数据预览模式与正式 Knowledge 模式严格区分。它不等于 Windows+Web 同 Core 生产并发、正式 Portable、RC 或 GA；不允许把它指向正在使用的 Windows 工作区。实际是否通过浏览器 E2E，请查本次源码 SHA 对应的 GitHub Actions。
+
 ## 开发者验证
 
 ```bash
