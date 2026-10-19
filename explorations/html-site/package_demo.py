@@ -69,6 +69,22 @@ call "explorations\html-site\run_e1_demo_windows.cmd" --e2 %*
 exit /b %ERRORLEVEL%
 """
 
+START_E3 = r"""@echo off
+setlocal EnableExtensions
+chcp 65001 >nul
+cd /d "%~dp0"
+set "SRW_E1_PACKAGE_ROOT=%~dp0"
+if not exist "explorations\html-site\run_e3_demo.py" (
+    echo E3 disposable transactional experiment is missing.
+    pause
+    exit /b 2
+)
+echo E3 launches ONE temporary C11 Core with SQLite atomic CAS.
+echo It NEVER attaches to a real EXE or an existing data directory.
+call "explorations\html-site\run_e1_demo_windows.cmd" --e3 %*
+exit /b %ERRORLEVEL%
+"""
+
 START_README = """# SRW E1 Web: runnable Windows source demo (NOT a Windows EXE)
 
 This source package is assembled in GitHub Actions from the isolated
@@ -95,6 +111,16 @@ test ETag / If-Match conflict handling (412 on stale writes).
 
 E2 does not change production records and is NOT production-grade transactional
 concurrency protection; the official SRW Core still needs its own atomic CAS.
+
+## Optional: E3 atomic SQLite transaction laboratory
+
+Double-click START_E3.cmd. Like E2 it creates a **brand-new temporary**
+real C11 backend and synthetic data, but it installs a synthetic-only
+Starlette Action Plan route that performs the ETag check, business change,
+business audit event and revision update in **one SQLite transaction**.
+E3 is an experimental Core route: no change to official production schema
+or API is made. This proves the transactional approach, but legacy writers
+bypassing E3 are not protected, and real user workspaces remain unsupported.
 
 This is a local source demo, NOT a C11 Native EXE, NOT a production runtime
 and NOT a replacement for an existing 0.8.x Portable installation.
@@ -156,6 +182,7 @@ def build(destination: Path) -> None:
 
     (destination / "START_HERE.cmd").write_text(START_HERE, encoding="utf-8", newline="\r\n")
     (destination / "START_E2.cmd").write_text(START_E2, encoding="utf-8", newline="\r\n")
+    (destination / "START_E3.cmd").write_text(START_E3, encoding="utf-8", newline="\r\n")
     (destination / "PACKAGE_README.md").write_text(START_README, encoding="utf-8")
     inventory = {}
     for file in sorted(destination.rglob("*")):
