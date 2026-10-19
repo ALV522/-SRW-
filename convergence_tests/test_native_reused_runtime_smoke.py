@@ -132,16 +132,16 @@ class ReusedRuntimeSmokeTests(unittest.TestCase):
         exe = self.runtime / "python.exe"
         exe.write_bytes(b"SYNTHETIC EXE - NEVER EXECUTED")
         self.manifest.write_text(
-            hashlib.sha256(exe.read_bytes()).hexdigest() + "  python.exe\\n",
+            hashlib.sha256(exe.read_bytes()).hexdigest() + "  python.exe\n",
             encoding="utf-8",
         )
         paths = {}
         for name in REQUIRED_IMPORTS:
             item = self.runtime / (name + ".py")
-            item.write_text("# synthetic\\n", encoding="utf-8")
+            item.write_text("# synthetic\n", encoding="utf-8")
             paths[name] = str(item)
             with self.manifest.open("a", encoding="utf-8") as fp:
-                fp.write(hashlib.sha256(item.read_bytes()).hexdigest() + "  " + item.name + "\\n")
+                fp.write(hashlib.sha256(item.read_bytes()).hexdigest() + "  " + item.name + "\n")
         result = subprocess.CompletedProcess(
             [str(exe)], 0, json.dumps({"python": "3.12.10", "paths": paths}), ""
         )
