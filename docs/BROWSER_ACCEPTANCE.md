@@ -1,3 +1,5 @@
+> **G1 Local Web Core 路径（2026-10-20）**：浏览器验收使用 `scripts/start_local_web.py --synthetic --no-browser`，通过**真实 C11 Core** 和独立合成 SQLite/Knowledge 启动当前 UI；这同时覆盖本地浏览器入口的基本启动路径。仅在对应 PR 当前源码 SHA 的 GitHub Actions 成功后才能声明 PASS，且不等于正式本地 Web Portable、双端 WPF 并发、真实 Provider 或 RC。
+
 # SRW Chromium business acceptance
 
 This is a separate real-browser gate (three scenarios passed on main commit 69f60b9). It runs Chromium against the actual
