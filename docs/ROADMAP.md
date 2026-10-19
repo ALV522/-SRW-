@@ -51,3 +51,7 @@
 ## 2026-10-19 业务增量
 
 `main` 的 [PR #32](https://github.com/ALV522/-SRW-/pull/32) 已让真实 Chromium 从 3 增至 **5 个**场景：独立 Scorecard 两个评价者分歧不可覆盖、Offer 的人工合法状态更新（不自动录用）。下一轮 P0 应聚焦 **Claim→核实→判断→HumanDecision→材料或标准改变后的上下文失效**，不应重复开发已经通过的 Scorecard/Offer 案例。[验收证据](BUSINESS_E2E_SCORECARD_OFFER.md)。
+
+## 2026-10-19 Windows 候选交付路径
+
+新增 [Native 候选升级工具包](C11_NATIVE_CANDIDATE_UPGRADE.md)：CI 在同一源码 SHA 下编译 WPF Host，并将完整源码与 Host 组成一个受源 SHA 清单约束的 ZIP；Windows 本机只能从精确 `d8d032d` Prepared ZIP 获取旧的已核验 Runtime/Knowledge，并执行严格装配与完整 ZIP 成员校验。**这补足候选打包的工程环节，不提升 Windows GUI 验收等级**；必须在新准确 SHA 上重跑实际 WPF 和业务链，方可进入 RC 门槛。
