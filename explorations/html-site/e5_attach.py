@@ -16,6 +16,7 @@ import secrets
 import threading
 from http.cookies import SimpleCookie
 from http.server import ThreadingHTTPServer
+from pathlib import Path
 from urllib.parse import urlsplit
 
 from e3_web_bridge import SyntheticE3Bridge
@@ -85,6 +86,22 @@ class E5ProtectedBridge(SyntheticE3Bridge):
         parsed=urlsplit(self.path)
         if parsed.path == "/attach" and not parsed.query:
             self._deny(404, "E5 attach token is required")
+            return
+        if parsed.path in {"/","/e3-live.html","/e5-live.html"} and not parsed.query:
+            if not self._valid_browser_request():
+                return
+            page=Path(__file__).resolve().parent/"e3-live.html"
+            if not page.is_file():
+                self._deny(500,"Synthetic E5 HTML is missing")
+                return
+            # Reuse E3's tested UI without introducing another 40KB fork.
+            # Only copy/caption text changes; no auth token enters HTML/JS.
+            raw=page.read_text(encoding="utf-8")
+            raw=raw.replace("SRW E3 · Atomic SQLite Write (Synthetic Only)",
+                            "SRW E5 · Protected Shared Core (Synthetic Only)")
+            raw=raw.replace("E3 atomic synthetic","E5 attached synthetic")
+            raw=raw.replace("E3 真实数据库事务实验","E5 附着与事务实验")
+            self._reply(200,raw.encode("utf-8"),"text/html; charset=utf-8")
             return
         if parsed.path.startswith("/attach/"):
             if not super()._valid_browser_request():
