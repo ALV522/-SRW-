@@ -101,9 +101,9 @@ call "explorations\html-site\run_e1_demo_windows.cmd" --e4 %*
 exit /b %ERRORLEVEL%
 """
 
-START_README = """# SRW E1 Web: runnable Windows source demo (NOT a Windows EXE)
+START_README = """# SRW HTML E1–E4: real C11 source demo (NOT a Windows EXE)
 
-This source package is assembled in GitHub Actions from the isolated
+This E1–E4 source package is assembled in GitHub Actions from the isolated
 HTML exploration branch. It contains a real C11 backend + browser frontend
 and synthetic sample generators, but NO real user data and NO embedded Python.
 
@@ -149,7 +149,7 @@ read and write synthetic records, then reattaches to the same Core.
 The 'desktop' UI is explicitly a browser/WebView2 **surrogate**. E4 is NOT
 a real WPF/Windows EXE integration test.
 
-This is a local source demo, NOT a C11 Native EXE, NOT a production runtime
+This is a local E1–E4 source demo, NOT a C11 Native EXE, NOT a production runtime
 and NOT a replacement for an existing 0.8.x Portable installation.
 
 If the batch script reports a missing repository root, the source package was
