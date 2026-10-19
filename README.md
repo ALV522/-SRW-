@@ -88,3 +88,7 @@ python scripts/run_convergence_verification.py
 ### Windows 产品候选装配：一个工具包 + 已核验的旧 Runtime/Knowledge
 
 现在已有 [C11 Native 候选升级装配路径](docs/C11_NATIVE_CANDIDATE_UPGRADE.md)：最新 Windows Host CI 会同时发布**完整同 SHA 源码 + WPF Host** 升级工具包。用户提供精确的历史 `d8d032d` Prepared Native ZIP，就可用 `BUILD_C11_CANDIDATE.cmd` 在本机生成新源码版本的 **`UNVERIFIED_GUI` Native 候选 ZIP**；旧包与现存数据不会被覆盖。该路径已严格限制旧 ZIP SHA、Runtime/Knowledge 完整性、当前 Python 依赖与 Host 来源，**但候选包仍需实际 Windows GUI 和全业务验收，绝非自动发行**。
+
+### Windows c8431ca7 实机反馈与 P0 首次使用修复（2026-10-19）
+
+已取得 [脱敏实机验收报告](docs/WINDOWS_C8431CA7_REAL_DEVICE_ACCEPTANCE.md)：真实 WPF/WebView2、Core Ready、工作台、项目创建、标准发布、候选人创建及优雅退出通过。诊断日志还揭示顶部/侧栏就绪状态不一致、新候选人的非必要 Assessment 409 和原始 API 路径写入 Host 日志的问题。当前修复工作专注**首次使用可靠性和招聘数据隐私**：UI 状态同步、在无决策上下文时跳过可选 Assessment、后端输出日志结构化脱敏。修复后新的 Native 工件仍需独立实机验收。
