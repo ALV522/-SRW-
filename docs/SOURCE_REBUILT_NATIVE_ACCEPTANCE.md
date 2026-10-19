@@ -64,3 +64,20 @@ py -3.12 .\scripts\verify_rebuilt_native.py `
 - 报告必须放在程序目录外，且不能覆盖已经存在的报告文件。
 
 下一道验收：真实 WPF GUI 的 Source/Claim/Decision/Scorecard/Offer 纵向操作、备份恢复、后台任务稳定性、OCR/ASR/AI、重启/升级回滚，最后才能考虑 RC。
+
+## 首次使用：真正启动 Windows WPF/WebView2 并核验清理
+
+新增 `scripts/accept_rebuilt_native_gui.py`。要求 Windows 10/11 的**交互式桌面会话**（不能以无桌面、无 WebView2 的 CI 后台任务冒充 GUI）。严格静态验证包后，在操作系统临时目录自动生成**全新且独立**的合成 SRW 数据工作区，启动包中的真正 `SmartRecruitmentWorkbench.exe`。操作者看到工作台后，用窗口右上角 **X 正常关闭**，测试器读取完整生命周期、进程退出与 `app.lock` 删除结果；默认 180 秒内完成。
+
+```powershell
+# 在含 scripts/accept_rebuilt_native_gui.py 的新版工具包/源码目录下：
+py -3.12 .\scripts\accept_rebuilt_native_gui.py `
+    --root 'D:\SRW\candidate-c8431ca7-clean' `
+    --cycles 2 `
+    --timeout 240 `
+    --evidence 'D:\SRW\c8431ca7-wpf-two-cycles-new.json'
+```
+
+`--cycles 2` 会依次打开两次 WPF，需要你每次都在确认界面显示后正常关闭窗口。第二轮使用同一个**临时**工作区以验证重启、锁释放；脚本只接受本轮日志新增的事件，不会拿第一次结果冒充第二次成功。测试期间不会导入真实简历或 Provider Key，测试结束自动清理临时数据。仅保留脱敏事件名称、来源 SHA、成功/失败状态于新 JSON 报告。
+
+**成功声明的边界**：这项烟测只能证明被测 SHA 的 WPF 窗口加载、Core Ready、WebView2 `frontend_loaded`、正常退出和锁释放，**不代表**完整业务、OCR/ASR、AI 或长期稳定性通过。如超时退出，进程会被清理但该轮明确标为 BLOCKED，不能声称优雅退出。已有的 `c8431ca7` 截图依旧是真实历史证据，但不是本脚本的新验收结果。
