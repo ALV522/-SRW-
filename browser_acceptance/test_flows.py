@@ -413,6 +413,10 @@ class RecruitmentBrowserAcceptance(unittest.TestCase):
 
         self.page.locator("#paste-material").fill("新增合成材料：一份待重新核实的项目反馈。")
         expect(self.page.locator("#paste-material")).to_have_value("新增合成材料：一份待重新核实的项目反馈。")
+        # Re-render while the operator is typing: unsent material must
+        # remain in this candidate's editor and not become an empty POST.
+        self.page.evaluate("(candidateId) => candidateDrawer(candidateId)", cid)
+        expect(self.page.locator("#paste-material")).to_have_value("新增合成材料：一份待重新核实的项目反馈。")
         # Observe the real request completion, instead of treating a stale UI
         # render as persistence failure.
         with self.page.expect_response(
