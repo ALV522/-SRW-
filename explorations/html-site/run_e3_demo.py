@@ -24,6 +24,8 @@ import webbrowser
 from http.server import ThreadingHTTPServer
 from pathlib import Path
 
+from synthetic_workspace import synthetic_temporary_directory
+
 from run_e1_demo import ROOT, BACKEND_STARTER, call_json, free_loopback_port, wait_for_backend, create_sample_data
 from serve_e1 import select_upstream
 from e3_web_bridge import make_synthetic_e3_server
@@ -97,7 +99,7 @@ def main() -> int:
     server:ThreadingHTTPServer|None=None
     thread:threading.Thread|None=None
     print("SRW E3 synthetic-only conditional-write lab; no EXE or user database",flush=True)
-    with tempfile.TemporaryDirectory(prefix="srw-e2-synthetic-") as td:
+    with synthetic_temporary_directory(prefix="srw-e3-synthetic-") as td:
         # Only this freshly created directory is eligible for E3 Core startup.
         (Path(td)/'.srw-e3-throwaway-only').write_text('synthetic-only',encoding='utf-8')
         logpath=Path(td)/"synthetic-backend.log"
