@@ -202,6 +202,69 @@ def _source_sha(root: Path) -> str:
     return sha
 
 
+
+def _validate_embedded_import_output(stdout: str, runtime: Path) -> dict:
+    """Reject metadata-only, unexpected modules or imports outside staged Runtime."""
+    try:
+        report = json.loads(stdout.strip())
+    except (ValueError, UnicodeError) as exc:
+        raise PayloadError("reused embedded Python smoke returned invalid JSON") from exc
+    if not isinstance(report, dict):
+        raise PayloadError("embedded Python smoke result must be an object")
+    paths = report.get("paths")
+    if (
+        not isinstance(paths, dict)
+        or set(paths) != set(REQUIRED_IMPORTS)
+        or not isinstance(report.get("python"), str)
+        or not report["python"].startswith("3.12.")
+    ):
+        raise PayloadError("embedded Python version or imported module set mismatch")
+    root = runtime.resolve(strict=True)
+    for name, value in paths.items():
+        if not isinstance(value, str) or not value or not Path(value).is_absolute():
+            raise PayloadError(f"embedded Python import path invalid for {name}")
+        if not Path(value).resolve().is_relative_to(root):
+            raise PayloadError(f"embedded Python imported {name} outside staged Runtime")
+    return {"python": report["python"], "modules": len(paths)}
+
+
+def _resmoke_embedded_python(inputs: Path, requirements: Path) -> dict:
+    """Build fresh Windows smoke evidence; old Native ZIP omitted upgrade audit."""
+    if os.name != "nt":
+        raise PayloadError("reused embedded Python executable smoke requires Windows")
+    runtime = inputs / "runtime"
+    python = runtime / "python.exe"
+    if python.is_symlink() or not python.is_file():
+        raise PayloadError("attested embedded Python executable missing")
+    result = subprocess.run(
+        [str(python), "-I", "-B", "-c", IMPORT_SMOKE],
+        cwd=runtime, capture_output=True, text=True, timeout=100, check=False,
+        env={**os.environ, "PYTHONDONTWRITEBYTECODE": "1"},
+    )
+    if result.returncode:
+        raise PayloadError(
+            f"reused embedded Python smoke failed (exit {result.returncode}): "
+            + result.stderr[-700:]
+        )
+    identity = _validate_embedded_import_output(result.stdout, runtime)
+    # Fail if the executable modified any inventoried Runtime bytes.
+    audit_runtime(runtime, inputs / "PRODUCTION_RUNTIME.sha256")
+    return {
+        "schema": "srw.c11-runtime-reuse-smoke.v1",
+        "status": "C11_REUSED_RUNTIME_SMOKE_PASS",
+        "requirements_sha256": sha256_file(requirements),
+        "runtime_manifest_sha256": sha256_file(inputs / "PRODUCTION_RUNTIME.sha256"),
+        "base_prepared_sha256": BASE_PREPARED_ZIP_SHA256,
+        "python": identity["python"],
+        "imported_module_count": identity["modules"],
+        "bytecode_disabled": True,
+        "embedded_python_smoke": True,
+        "source_runtime_unmodified": True,
+        "gui_accepted": False,
+    }
+
+
+
 def upgrade(
     root: Path, base_zip: Path, host: Path, out: Path, *,
     verify_only: bool = False,
@@ -222,25 +285,22 @@ def upgrade(
         dependency = check(inputs / "runtime", root / "requirements-ci.txt")
         if dependency.get("status") != "PINNED_METADATA_MATCH":
             raise PayloadError("historical runtime does not match current dependency lock")
-        if dependency.get("c11_overlay_on_path"):
-            # The overlay provenance is tied to the *historical* Runtime
-            # from a verified prepared ZIP. Its archived executable smoke is
-            # not proof the new binary / current source has passed Windows.
-            # Preserve the historical upgrade audit, without re-signing it.
-            with zipfile.ZipFile(base_zip) as archive:
-                try:
-                    historic = archive.read("RUNTIME_UPGRADE_AUDIT.json")
-                except KeyError as exc:
-                    raise PayloadError("historical runtime overlay audit missing") from exc
-            (inputs / "RUNTIME_UPGRADE_AUDIT.json").write_bytes(historic)
         if verify_only:
             return {
                 "status": "INPUTS_VERIFIED_ONLY",
                 "source_git_sha": sha,
                 "assembled": False,
+                "embedded_python_smoke": False,
                 "windows_gui_accepted": False,
                 "inputs": recovery,
             }
+        if dependency.get("c11_overlay_on_path"):
+            print("[SRW] Performing REAL embedded Python -I -B smoke in isolated Runtime...", file=sys.stderr, flush=True)
+            evidence = _resmoke_embedded_python(inputs, root / "requirements-ci.txt")
+            (inputs / "RUNTIME_UPGRADE_AUDIT.json").write_text(
+                json.dumps(evidence, sort_keys=True, indent=2) + "\n",
+                encoding="utf-8",
+            )
         result = assemble(root, inputs, host, out, expected_git_sha=sha)
         if result.get("status") != "CANDIDATE_UNVERIFIED_GUI":
             raise PayloadError("Native assembler returned non-candidate status")
@@ -278,7 +338,7 @@ def main() -> int:
         )
         print(json.dumps(result, indent=2, sort_keys=True, ensure_ascii=False))
         return 0
-    except (PayloadError, OSError, ValueError, RuntimeError, zipfile.BadZipFile) as exc:
+    except (PayloadError, OSError, ValueError, RuntimeError, zipfile.BadZipFile, subprocess.TimeoutExpired) as exc:
         print(json.dumps({
             "status": "BLOCKED", "error_type": type(exc).__name__,
             "reason": str(exc), "windows_gui_accepted": False,
