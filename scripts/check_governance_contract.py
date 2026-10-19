@@ -18,6 +18,7 @@ REQUIRED = (
     "AGENTS.md",
     "docs/PROJECT_OVERVIEW.md",
     "docs/PRODUCT_CHARTER.md",
+    "docs/CAPABILITY_MATRIX.md",
     "docs/DEVELOPMENT_GOVERNANCE.md",
     "docs/VERSION_POLICY.md",
     "VERSION_POLICY.json",
