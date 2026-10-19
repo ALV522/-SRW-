@@ -102,3 +102,40 @@ py -3.12 scripts\rebuild_native_from_prepared.py --source . --host windows-host 
 ## 后续演进
 
 本次是用户可实际执行的 **Native 升级和候选交付链**。下一步是让合成 Windows GUI 业务验收脚本跑完整 C11 七大动作，并逐步将 CI 装配器引入正式带签名的产品发布流程。等正式主线 Native 候选业务稳定，才将 E3/E4/E5 探索中的 Core CAS/独立进程/受保护附着迁移到正式 Web+EXE 双载体。
+
+## Windows 日志故障修复：缺少旧审计文件、旧 ZIP 哈希变化（2026-10-19）
+
+旧版升级装配器在已通过旧 ZIP SHA 校验后，错误地尝试从压缩包直接读取 `RUNTIME_UPGRADE_AUDIT.json`，而原版 Native ZIP 的严格成员白名单**并不包含该文件**，因此返回 `historical runtime overlay audit missing`。修复后的正式路径不会伪造或关闭审计：在 Windows 本机从**已核验完整旧 ZIP** 提取 Runtime/Knowledge 后执行嵌入式 `runtime/python.exe -I -B` 的 13 模块导入测试，检查全部包的实际路径都属于提取的 Runtime，再次验证 Runtime 文件 SHA，生成新的 `srw.c11-runtime-reuse-smoke.v1` 审计记录用于此次新版封包。静态 `--verify-only` 不执行 Windows 导入测试，也不宣称已完整封包。
+
+### 先检查旧 ZIP 的实际字节身份
+
+在 PowerShell 运行以下只读命令：
+
+```powershell
+$old = 'D:\SRW\SRW_C11_Windows_Native_PREPARED_UNVERIFIED_GUI_d8d032d.zip'
+Get-Item -LiteralPath $old | Select-Object FullName,Length,LastWriteTime
+(Get-FileHash -LiteralPath $old -Algorithm SHA256).Hash.ToLowerInvariant()
+```
+
+必须匹配原始 **101617623 字节**及 SHA-256：
+
+`27ae4765c035d7855ef69829256eaf33038362e0b28354b6af372c6d2304b2cb`
+
+**只要实际哈希不匹配，就必须停止。** 不能重算“新预期哈希”来绕过，更不能把已运行过、生成缓存的解压目录重新压成 ZIP。请从可信原始备份恢复原 ZIP；若无法恢复，需要另行审计来源与提取文件，不能沿用本装配流程原有的安全声称。
+
+### PowerShell 正确执行方式
+
+进入**新工具包**第二层 ZIP 的解压根目录（存在 `BUILD_C11_CANDIDATE.cmd`），执行时必须使用相对路径前缀 `.\`：
+
+```powershell
+Set-Location 'D:\SRW\upgrade-kit\<实际的新工具包目录>'
+.\BUILD_C11_CANDIDATE.cmd 'D:\SRW\SRW_C11_Windows_Native_PREPARED_UNVERIFIED_GUI_d8d032d.zip' 'D:\SRW\SRW_C11_new_UNVERIFIED_GUI.zip'
+```
+
+或者直接：
+
+```powershell
+py -3.12 .\scripts\rebuild_native_from_prepared.py --source . --host .\windows-host --base-zip 'D:\SRW\SRW_C11_Windows_Native_PREPARED_UNVERIFIED_GUI_d8d032d.zip' --out 'D:\SRW\SRW_C11_new_UNVERIFIED_GUI.zip'
+```
+
+使用包含**此次修复**的全新 GitHub Actions 工具包，不建议改写旧已解压工具包中的脚本及其 `SOURCE_MANIFEST.sha256`。旧包缺审计的缺陷属于交付问题，而不是用户需要自行制造审核 JSON 才能继续。大量 Runtime ZIP 文件解压可能需要数分钟；新版提供进度，不应仅因较长等待就推断死锁。中断产生 `KeyboardInterrupt`，本身不能证明原始 ZIP 已损坏。
