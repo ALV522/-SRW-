@@ -55,3 +55,7 @@
 ## 2026-10-19 Windows 候选交付路径
 
 新增 [Native 候选升级工具包](C11_NATIVE_CANDIDATE_UPGRADE.md)：CI 在同一源码 SHA 下编译 WPF Host，并将完整源码与 Host 组成一个受源 SHA 清单约束的 ZIP；Windows 本机只能从精确 `d8d032d` Prepared ZIP 获取旧的已核验 Runtime/Knowledge，并执行严格装配与完整 ZIP 成员校验。**这补足候选打包的工程环节，不提升 Windows GUI 验收等级**；必须在新准确 SHA 上重跑实际 WPF 和业务链，方可进入 RC 门槛。
+
+## 源码重建 Windows Candidate 验证器（2026-10-20）
+
+新 [验收程序](SOURCE_REBUILT_NATIVE_ACCEPTANCE.md) 将 `source_rebuild` 产物的源码、Host 身份、Runtime、五套知识库、完整 ZIP 与独立来源 SHA 串成单一严格验收入口，可在 Windows 用一次性 SQLite 追加嵌入式 Python/Core 烟测；不再错误使用原始 Prepared 专用脚本。当前用户上传的 `c8431ca7` 真正 Native ZIP 已通过 Linux 静态/完整 ZIP 验证：290 Source、2332 Runtime、5 Knowledge、15 Host 文件通过；**Windows 嵌入式后端烟测与新版真实 GUI 还需分别验收**。下一步补真正 Windows WPF 自动化与纵向招聘业务操作验收。
