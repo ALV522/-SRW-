@@ -76,3 +76,7 @@ python scripts/run_convergence_verification.py
 ### 最近的业务验收进展
 
 当前 `c9d70cd` 已追加两条 Chromium 端到端业务场景：**两名面试官独立 Scorecard 与评分分歧保留**，以及 **Offer 从 Draft→Approved→Sent→Accepted 的合法人工状态流**（接受 Offer 不自动录用）。见 [Scorecard/Offer 浏览器闭环](docs/BUSINESS_E2E_SCORECARD_OFFER.md)；下一步重点仍是 Claim 核实→Decision Context→人工决定及上下文变化后的失效。
+
+### 本轮新增：证据决策链的实际业务验收
+
+[Decision Lineage 验收](docs/BUSINESS_E2E_DECISION_LINEAGE.md)：发布必须核实的岗位标准→录入材料→人工核实生成 Source/Claim/Judgment→显式提交 HumanDecision→新材料使旧决定失效→重新核实→显式重申，新增第六条真实 Chromium/SQLite 测试。UI 的“按当前证据重申”仅在当前服务端行动门槛满足时可用。这是浏览器业务验收，不是 Windows WPF 全流程验收；以同提交 CI 为准。
