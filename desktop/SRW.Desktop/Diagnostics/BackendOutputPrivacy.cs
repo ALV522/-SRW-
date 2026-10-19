@@ -13,7 +13,7 @@ public static partial class BackendOutputPrivacy
     public readonly record struct Entry(string EventName, object Details);
 
     [GeneratedRegex(
-        "\"" + @"(?<method>GET|POST|PUT|PATCH|DELETE|HEAD|OPTIONS)\s+(?<target>\S+)\s+HTTP/\d+(?:\.\d+)?\"" + @"\s+(?<status>\d{3})\b",
+        @"""(?<method>GET|POST|PUT|PATCH|DELETE|HEAD|OPTIONS)\s+(?<target>\S+)\s+HTTP/\d+(?:\.\d+)?""\s+(?<status>\d{3})\b",
         RegexOptions.CultureInvariant | RegexOptions.IgnoreCase)]
     private static partial Regex HttpAccessLine();
 
