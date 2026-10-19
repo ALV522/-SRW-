@@ -1,172 +1,74 @@
-# SRW HTML Site Exploration
+# SRW HTML / Web + Windows 探索（E0–E5 & Native SOURCE Lab）
 
-This directory is an isolated product experiment. It is intentionally **not part of the SRW release source, build, verification truth, portable assembly, or mainline delivery**.
+本目录属于**隔离技术探索分支** `explore/html-site-prototype`。目标是让 SRW 保留本地 SQLite、Blob/Source、Knowledge、OCR/ASR/AI、证据/审计与成熟招聘业务能力，同时以浏览器和 Windows WebView2 作为两种 UI 载体。
 
-Branch: `explore/html-site-prototype`
+**原则：一个权威 SRW Core + 一个数据工作区 + 可拆卸的多个 UI。** 不能把“HTML 网站形式”误理解为一个无后端的纯静态 HTML 文件，也不要新建两套 SQLite 再做脆弱的同步。
 
-## Why this experiment exists
+## 当前实验的事实边界
 
-SRW already has a browser-rendered frontend, but the current product is still structured around the historical local application architecture: Python backend, static frontend assets, Windows host, and several generations of convergence code.
-
-This experiment asks a narrower product question:
-
-> Can SRW be presented and operated primarily as an HTML website-style application, while preserving the local-first database, OCR/ASR, AI provider, evidence provenance, audit and Windows portable capabilities?
-
-The answer appears to be **yes, with an important qualification**: HTML can become the primary product surface, but a pure static HTML file cannot replace the local SRW service for SQLite, files, OCR/ASR, background jobs, provider secrets, Knowledge DBs and evidence provenance.
-
-## Isolation contract
-
-Nothing in this directory may be imported by production code.
-
-This branch will not be merged into `main` as-is. Any idea that proves useful must later be reimplemented or selectively ported through an ordinary reviewed product branch.
-
-No release identity files, source manifests, schemas, backend routes, portable manifests or current frontend files are modified by this exploration.
-
-The current GitHub Source Gate is configured for pushes to `main` and pull requests targeting `main`. This branch therefore does not consume normal mainline CI unless a PR is deliberately opened.
-
-## Prototype
-
-Open `index.html` directly in a browser.
-
-When opened from `file://`, it uses built-in mock data and behaves as a product concept prototype.
-
-When served from the SRW application's own origin, it attempts to read `/api/v1/dashboard`. This is deliberately read-only in the experiment. No production mutation API is invoked.
-
-## Questions being tested
-
-1. Can the whole product feel like a coherent website instead of a desktop program with embedded pages?
-2. Can navigation be simplified around recruiter jobs rather than internal modules?
-3. Can Candidate Workspace become the central full-page object in the product?
-4. Can local-first operation remain invisible to the user while the UI behaves like a modern web application?
-5. Can we eventually make the same frontend usable in three carriers:
-   - local browser,
-   - Windows WebView2 shell,
-   - optional remote/private deployment?
-6. Which current capabilities are coupled to the Windows host and therefore cannot be moved into browser code?
-
-## Preliminary conclusion
-
-The technically sound direction is **not** "convert SRW into one giant standalone HTML file."
-
-The strongest architecture is:
-
-```
-Browser / WebView2
-       |
-       | HTTP on loopback / same origin
-       v
-Static HTML + CSS + JavaScript
-       |
-       v
-SRW Local Application Service
-       |
-       +-- SQLite
-       +-- source/blob storage
-       +-- OCR / ASR workers
-       +-- AI providers and secrets
-       +-- Knowledge databases
-       +-- evidence / decision / audit services
-```
-
-This keeps the usability and portability advantages of a website while preserving the capabilities that made the 0.8.x line valuable.
-
-## E1–E5 experiment: executable source-backed HTML site
-
-All work is on the **isolated** `explore/html-site-prototype` branch.
-
-| Experiment | Implementation | Verification boundary |
+| 实验 | 已实现的主要能力 | 验收与限制 |
 |---|---|---|
-| E0 | Static single-file HTML Mock | Visual exploration, no real API |
-| E1 | Real C11 + SQLite, GET-only Web UI | Identity, projects, candidates, Claim/Source read flows, mobile, browser history |
-| E2 | Browser-only Action Plan PATCH via proxy lock | Synthetic two-client ETag conflict, **not transactional Core CAS** |
-| E3 | Experimental C11 Core Action Plan route with SQLite `BEGIN IMMEDIATE` | Revision + business mutation + audit in one transaction, synthetic only |
-| E4 | Independently-owned single Core with two detachable browser carrier origins | Same Core identity and SQLite across both UIs; detaching one doesn't stop the other |
-| E5 | Protected per-carrier attach and identity pinning | Unattached requests denied, wrong-carrier and replayed grants denied, Core identity drift fails closed |
+| E0 | `index.html` 单文件产品外观与 Mock 数据 | 只用于产品体验，不是真实后端 |
+| E1 | `e1-live.html` + GET-only 同源 Bridge | 真正 C11 API + 临时 SQLite + 候选人/Source/工作台读取 |
+| E2 | 仅合成 Candidate Action Plan PATCH，ETag/If-Match | **代理层**版本协调，不能当作正式数据库事务 |
+| E3 | SQLite `BEGIN IMMEDIATE`、版本比较、业务写入、审计同事务 | 实验性临时 Core 路由，不是 main Schema 迁移 |
+| E4 | 独立控制器持有一个 Core、两浏览器载体可 detach/reattach | “桌面载体”是浏览器替身，不是真实 WPF EXE |
+| E5 | 一次性附着能力、HttpOnly SameSite Cookie、Core 身份固定、会话失效 | 本地合成身份协议，**不是正式用户认证/授权** |
+| Native SOURCE Lab | Windows CI 编译**真实 WPF/WebView2 Host**，从外部 Python 3.12 虚拟环境启动临时 C11 Core；浏览器 E1 附着**同一个 Host-owned Core/SQLite**，检测 `frontend_loaded` | 已跑通真实 WPF/浏览器只读共用后端，但不同于 E4 的 detached Core，且**不是独立 Windows Portable** |
 
-E5 wraps the same disposable Core with a per-carrier one-use 120-second attach credential and an HttpOnly SameSite=Strict session cookie, pinning instance, session, version and data scope on every request. This remains a synthetic local attach experiment, **not full production authentication**.
+**通过的确切运行记录**：
 
-The optional **Desktop surrogate** used by E4/E5 is a second browser endpoint,
-**not** Windows WPF/WebView2 Native. There is no accepted C11 EXE and
-no production data migration.
+- [E1–E5 真实 C11/Chromium/Windows 合成验收](https://github.com/ALV522/-SRW-/actions/runs/39193776226) — PASS。
+- [WPF Source + Native SOURCE Lab](https://github.com/ALV522/-SRW-/actions/runs/39196390613) — Windows 两个 Job PASS：真实 WPF Host 启动、WebView2 `frontend_loaded`、浏览器 E1 读取同一个临时 Core。
+- [Native SOURCE Lab 技术/工件说明](NATIVE_SOURCE_LAB.md) 与 [Native Host 构建门禁](NATIVE_HOST_BUILD_GATE.md)。
+- 真正用户电脑上的 **`d8d032d` Native 候选包已经完成基础 GUI 验收**，但属于 [主线工件证据](https://github.com/ALV522/-SRW-/blob/main/docs/WINDOWS_GUI_FIRST_ACCEPTANCE.md)，不等于本分支 E1–E5 或 Native Lab 已正式发布。
 
-### Download and run the complete Windows source demo ZIP
+## 推荐下载和试用
 
-Open the [isolated E1–E5 GitHub Actions workflow](https://github.com/ALV522/-SRW-/actions/workflows/html-site-sandbox.yml).
-Choose the **latest successful** run and download its artifact named
-`SRW-HTML-E1-E5-WINDOWS-SOURCE-DEMO-<commit>`.
+**E1–E5 HTML 演示**：在 [E1–E5 工作流](https://github.com/ALV522/-SRW-/actions/workflows/html-site-sandbox.yml) 找最近一次成功运行的 `SRW-HTML-E1-E5-WINDOWS-SOURCE-DEMO-` Artifact。完整解压，需 Python 3.12，首次联网安装隔离虚拟环境依赖；顶层入口为：
 
-Extract the whole ZIP and run one of:
-
-- `START_HERE.cmd`: E1 real-core read-only HTML site.
-- `START_E2.cmd`: E2 synthetic proxy-level concurrent Action Plan editing.
-- `START_E3.cmd`: E3 synthetic **atomic SQLite transaction** CAS.
-- `START_E4.cmd`: E4 one independent Core + two browser carrier surfaces.
-- `START_E5.cmd`: E5 per-carrier protected attach on one independent Core.
-
-All four use disposable synthetic projects/candidates, Python 3.12,
-an isolated virtual environment and pinned dependencies. First start
-requires internet access; stopping the controller removes the temporary
-workspace (with bounded retry for transient Windows file locks).
-
-**The package is source code, not a Windows EXE or production Portable.**
-The user does not need to upload a real database or launch any old EXE.
-
-- [Windows instructions](USER_ACTIONS_NO_EXE.md)
-- [E1 browser acceptance](E1_STATUS.md)
-- [E2 proxy CAS limitations](E2_STATUS.md)
-- [E3 SQL transaction proof](E3_ATOMIC_CAS.md)
-- [E4 independent shared Core](E4_SHARED_CORE.md)
-- [E5 protected attach experiment](E5_ATTACH_CONTRACT.md)
-- [Target Web + EXE product contract](DUAL_CARRIER_PRODUCT_CONTRACT.md)
-
-### Current acceptance evidence
-
-The last accepted E1–E4 snapshot was `2257195887bde102fd3ae77042c0e088cf039ffd`; E5 is under separate CI validation. Prior acceptance:
-[GitHub Actions run 39189966339](https://github.com/ALV522/-SRW-/actions/runs/39189966339)
-passed all jobs on Ubuntu/Windows and genuine Chromium.
-It exercised 16 real Chromium tests, the Windows batch launchers,
-independent SQLite connections, synthetic cross-carrier writes and
-E4 Core detach/reattach lifecycle.
-
-The [verified E1–E4 source ZIP](https://github.com/ALV522/-SRW-/actions/runs/39189966339/artifacts/12160145418) has now been published and its SHA-256 file inventory validated (184 files). Passing exploration tests does **not** certify
-a Windows Native Host, full v0.8.x parity or real-corpus/provider quality.
-
-## Run E1 on Windows (same EXE, same database)
-
-The EXE uses a **dynamically allocated loopback port**, recorded in the live
-`data/app.lock/instance.json` lease. Do not assume port 8765.
-
-1. Download the exploration branch into a directory **separate from your EXE/Portable installation**.
-2. Keep a compatible SRW Windows EXE running.
-3. Drag its `data` folder onto `run_e1_windows.cmd`, or double-click the BAT and provide that directory.
-4. The bridge validates the EXE lease's port, version, instance ID, session ID and data-root identity against the running backend.
-5. Only after validation, a browser opens with `LIVE · windows · GET-only`.
-
-Or run it manually:
-
-```powershell
-py -3 serve_e1.py --data-root "C:\\Path\\To\\SRW\\data" --port 0 --open-browser
+```text
+START_HERE.cmd   # E1：只读真实 C11/临时合成数据
+START_E2.cmd     # E2：代理锁/ETag 写入实验
+START_E3.cmd     # E3：SQLite 事务 CAS
+START_E4.cmd     # E4：独立 Core + 两个浏览器代理
+START_E5.cmd     # E5：受保护的本机载体附着
 ```
 
-For a running non-EXE SRW local service, specify its actual port:
+不要下载单独的 `run_e1_demo_windows.cmd` 或把它移出文件夹：它需要完整后端源码，早期因此出现“full exploration branch source checkout is required”。
 
-```powershell
-py -3 serve_e1.py --upstream http://127.0.0.1:8000 --port 0 --open-browser
+**Native SOURCE Lab**：在 [Windows Native Host Sandbox](https://github.com/ALV522/-SRW-/actions/workflows/native-host-sandbox.yml) 的成功运行中下载 `SRW-C11-WPF-SOURCE-SYNTHETIC-PREVIEW-NOT-PORTABLE-` 工件，完整解压并按 [说明](NATIVE_SOURCE_LAB.md) 使用。它需要系统 Python 3.12 和 .NET Desktop/WebView2 Runtime，Knowledge 与工作区均为临时合成数据。
+
+**不要将任意实验连接到真实招聘数据库，也不要上传简历、Provider Key、Session Token 或本机工作区锁。** 退出后测试脚本会结束临时服务并清理一次性 SQLite/Knowledge；Windows 文件锁有有界重试。
+
+## 架构核心
+
+```text
+                一个 SRW Core（唯一权威）
+            /             |             \
+       Windows WPF      Browser       Future private client
+        WebView2         HTML
+            \             |             /
+            同一 Project / Candidate / Source / Claim / Audit
+                      SQLite + Blob + Knowledge
+                           OCR / ASR / AI Jobs
 ```
 
-That last mode tests the Web surface but does **not** prove an EXE connection.
+E4 展示了**独立 Core Owner**；Native SOURCE Lab 则确认**真正 WPF EXE 与浏览器共享同一个 Host-owned Core**。二者尚未统一：现有真实 Windows Host 关闭时仍会终止它拥有的后端，距离独立网页长期运行还有进程监督/授权/退出策略的集成工作。
 
-All bridge routes are GET/HEAD-only, explicitly allowlisted and served on loopback.
-It cannot create a second SRW process or change the existing SQLite/Blob store.
+E3 的事务要推广到正式产品，必须为所有 Action Plan 和其它敏感业务写入建立正式 revision/If-Match/审计的数据库事务，不允许旧写入口绕过。E5 的 localhost 能力协议要正式化，须包括 Windows 用户/进程身份、权限与会话撤销、CSRF/Origin 以及对远程模式的 TLS/租户隔离审计。
 
-Read **[USER_ACTIONS_WINDOWS.md](USER_ACTIONS_WINDOWS.md)** for the minimal steps
-and what to report afterward. Do not share `instance.json` or real candidate data.
+## 仓库位置与文档
 
-## Automated synthetic checks
+- [E1 状态](E1_STATUS.md) · [E2 条件写入](E2_CONTROLLED_WRITE_GATE.md) · [E3 SQLite 原子事务](E3_ATOMIC_CAS.md) · [E4 独立 Core](E4_SHARED_CORE.md) · [E5 受保护附着](E5_ATTACH_CONTRACT.md)
+- [双载体产品契约](DUAL_CARRIER_PRODUCT_CONTRACT.md) · [双载体验收方案](DUAL_CARRIER_TEST.md) · [完整实验计划](EXPERIMENT_PLAN.md)
+- [Windows 无 EXE 源码试用](USER_ACTIONS_NO_EXE.md) · [Windows EXE 附着测试](USER_ACTIONS_WINDOWS.md) · [Native SOURCE Lab](NATIVE_SOURCE_LAB.md)
 
-An exploration-only workflow at `.github/workflows/html-site-sandbox.yml` runs
-`python -m unittest discover -s explorations/html-site -p "test_e1*.py" -v`
-on Ubuntu and Windows, using an entirely synthetic SRW-like HTTP fixture.
-It never reads production data and is separate from mainline CI.
+## 向正式主线发展的顺序
 
-Passing synthetic tests is **not** a Windows EXE acceptance result.
+1. 完成 C11 招聘核心纵向业务和目标 Windows GUI/Portable 可重复验收；**不为 Web 牺牲历史 v0.8.x 业务能力**。
+2. 将 E3 的事务 CAS、E4 的单 Core 进程所有权和 E5 的附着保护**逐项重做为可审查的产品实现**，确保 Schema/业务不变量/权限/安全/审计不被绕过。
+3. 使用真正 WPF/浏览器对同一个受信任 Core 同时读写候选人和证据，验证互斥、冲突、退出/重启和后台任务不重复；然后才讨论 Web 与 EXE 同步发版。
+4. 未来远程 Web 需要独立身份认证、TLS、安全运营与数据治理，不能直接将 loopback 服务监听到 LAN。
+
+**当前实验是证据和设计输入，不是第二套生产产品。** 当前产品主线与下一步业务计划以 [main README](https://github.com/ALV522/-SRW-/blob/main/README.md) 和 [ROADMAP PR](https://github.com/ALV522/-SRW-/pull/33) 为准。
