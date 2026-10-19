@@ -340,5 +340,111 @@ class RecruitmentBrowserAcceptance(unittest.TestCase):
         self.assertEqual(history["decisions"], [])
         self.assertFalse(self.console_errors, self.console_errors)
 
+    def test_06_human_verification_decision_stale_and_explicit_reaffirmation(self) -> None:
+        pid = self.new_project("人工证据决策")
+        self.page.locator(".tabs").get_by_role("button", name="建岗与标准").click()
+        expect(self.page.get_by_role("button", name="＋ 添加标准")).to_be_visible()
+        self.page.get_by_role("button", name="＋ 添加标准").click()
+        expect(self.page.locator(".criterion-row")).to_have_count(1)
+        self.page.locator(".criterion-row .c-name").fill("合成研究经验")
+        self.page.locator(".criterion-row .c-definition").fill("仅依据明确的人工核实记录确认")
+        self.page.locator(".criterion-row .c-critical").check()
+        self.page.locator(".criterion-row .c-verify").check()
+        self.page.locator(".criterion-row .c-probe").fill("请说明项目与个人职责")
+        key = self.page.locator(".criterion-row").get_attribute("data-criterion-key")
+        self.page.get_by_role("button", name="保存草案").click()
+        expect(self.page.get_by_role("button", name="发布当前标准")).to_be_visible()
+        protocol = self.get_json(f"/api/v1/projects/{pid}/protocol-workspace")
+        criterion = (protocol.get("draft") or {})["criteria"][0]
+        key = criterion["criterion_key"]
+        self.page.once("dialog", lambda dialog: dialog.accept())
+        self.page.get_by_role("button", name="发布当前标准").click()
+        expect(self.page.locator(".tabs").get_by_role("button", name="候选人收件")).to_be_visible()
+        self.assertEqual(
+            self.get_json(f"/api/v1/projects/{pid}/protocol-workspace")["current"]["criteria"][0]["criterion_key"],
+            key,
+        )
+
+        cid = self.new_candidate(pid, "模拟证据候选人")
+        self.page.locator("#paste-material").fill("原始模拟履历：完成过产品用户研究项目。")
+        self.page.get_by_role("button", name="保存并发布材料版本").click()
+        before = self.get_json(f"/api/v1/candidates/{cid}/workspace")
+        self.assertTrue(before["decision_context_hash"])
+        self.assertFalse(before["decision_ready"])
+        self.assertFalse(before["claims"])
+        self.assertEqual(before["blocking_count"], 1)
+
+        # Server must not allow advancing without a grounded judgment,
+        # even when a client bypasses the UI.
+        blocked = self.context.request.post(
+            self.base + f"/api/v1/candidates/{cid}/decision",
+            data=json.dumps({"decision": "advance", "reason": "不核实直接推进", "actor": "human"},
+                            ensure_ascii=False),
+            headers={"Content-Type": "application/json"},
+        )
+        self.assertTrue(400 <= blocked.status < 500, blocked.text())
+        self.assertEqual(self.get_json(f"/api/v1/candidates/{cid}/decision-history")["decisions"], [])
+
+        self.page.get_by_role("button", name="人工核实").click()
+        self.page.locator("#v-status").select_option("met")
+        self.page.locator("#v-evidence").select_option("strong")
+        self.page.locator("#v-reason").fill("模拟面试人工核实：明确说明研究过程与职责")
+        self.page.get_by_role("button", name="保存人工核实").click()
+        verified = self.get_json(f"/api/v1/candidates/{cid}/workspace")
+        self.assertNotEqual(before["decision_context_hash"], verified["decision_context_hash"])
+        self.assertTrue(verified["decision_ready"])
+        self.assertEqual(len(verified["criteria"]), 1)
+        self.assertTrue(any(c["authority"] == "human" for c in verified["claims"]))
+        self.assertTrue(any(s["source_kind"] == "verification_note" for s in verified["sources"]))
+        self.assertEqual(verified["criteria"][0]["criterion_key"], key)
+        self.assertNotEqual(verified["criteria"][0]["status_label"], "仍需核实")
+
+        self.page.get_by_role("button", name="记录人工决定").click()
+        self.page.locator("#d-decision").select_option("advance")
+        self.page.locator("#d-reason").fill("模拟人工最终决定：可以推进")
+        self.page.get_by_role("button", name="提交人工决定").click()
+        made = self.get_json(f"/api/v1/candidates/{cid}/decision-history")["decisions"]
+        self.assertEqual(len(made), 1)
+        self.assertTrue(made[0]["is_current_context"])
+        self.assertEqual(made[0]["decision"], "advance")
+
+        self.page.locator("#paste-material").fill("新增合成材料：一份待重新核实的项目反馈。")
+        self.page.get_by_role("button", name="保存并发布材料版本").click()
+        stale = self.get_json(f"/api/v1/candidates/{cid}/workspace")
+        self.assertNotEqual(stale["decision_context_hash"], verified["decision_context_hash"])
+        self.assertTrue(stale["stale_decision_id"])
+        self.assertNotEqual(stale["decision_label"], "继续推进")
+        history = self.get_json(f"/api/v1/candidates/{cid}/decision-history")["decisions"]
+        self.assertTrue(history[0]["stale"])
+        self.assertFalse(history[0]["is_current_context"])
+
+        rejected = self.context.request.post(
+            self.base + f"/api/v1/candidates/{cid}/decisions/reaffirm",
+            data=json.dumps({"actor": "human", "reason": "跳过新增证据复核"}, ensure_ascii=False),
+            headers={"Content-Type": "application/json"},
+        )
+        self.assertTrue(400 <= rejected.status < 500, rejected.text())
+        self.assertEqual(len(self.get_json(f"/api/v1/candidates/{cid}/decision-history")["decisions"]), 1)
+
+        self.page.get_by_role("button", name="人工核实").click()
+        self.page.locator("#v-status").select_option("met")
+        self.page.locator("#v-evidence").select_option("strong")
+        self.page.locator("#v-reason").fill("人工重查新增材料：研究职责得到确认")
+        self.page.get_by_role("button", name="保存人工核实").click()
+        renewed = self.get_json(f"/api/v1/candidates/{cid}/workspace")
+        self.assertTrue(renewed["decision_ready"])
+        self.assertTrue(renewed["stale_decision_id"])
+        self.page.once("dialog", lambda dialog: dialog.accept("已复核新增材料，保留原人工决定"))
+        self.page.get_by_role("button", name="按当前证据重申").click()
+        final = self.get_json(f"/api/v1/candidates/{cid}/decision-history")["decisions"]
+        self.assertEqual(len(final), 2)
+        self.assertEqual(final[0]["decision"], "advance")
+        self.assertTrue(final[0]["is_current_context"])
+        self.assertEqual(final[0]["reaffirmed_from_decision_id"], made[0]["decision_id"])
+        self.assertTrue(final[1]["stale"])
+        self.assertEqual(final[1]["decision_id"], made[0]["decision_id"])
+        self.assertFalse(self.console_errors, self.console_errors)
+
+
 if __name__ == "__main__":
     unittest.main()
