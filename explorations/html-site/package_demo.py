@@ -101,7 +101,23 @@ call "explorations\html-site\run_e1_demo_windows.cmd" --e4 %*
 exit /b %ERRORLEVEL%
 """
 
-START_README = """# SRW HTML E1–E4: real C11 source demo (NOT a Windows EXE)
+START_E5 = r"""@echo off
+setlocal EnableExtensions
+chcp 65001 >nul
+cd /d "%~dp0"
+set "SRW_E1_PACKAGE_ROOT=%~dp0"
+if not exist "explorations\html-site\run_e5_demo.py" (
+    echo E5 attached Core demo missing. Re-extract the complete source artifact.
+    pause
+    exit /b 2
+)
+echo E5 starts one temporary Core and requires a unique capability per carrier.
+echo These are synthetic-only local lab credentials, NOT production authentication.
+call "explorations\html-site\run_e1_demo_windows.cmd" --e5 %*
+exit /b %ERRORLEVEL%
+"""
+
+START_README = """# SRW HTML E1–E5: real C11 source demo (NOT a Windows EXE)
 
 This E1–E4 source package is assembled in GitHub Actions from the isolated
 HTML exploration branch. It contains a real C11 backend + browser frontend
@@ -148,6 +164,18 @@ read and write synthetic records, then reattaches to the same Core.
 
 The 'desktop' UI is explicitly a browser/WebView2 **surrogate**. E4 is NOT
 a real WPF/Windows EXE integration test.
+
+## Optional: E5 capability-bound Core attachment
+
+Double-click START_E5.cmd. The same single disposable C11 Core is shared by
+two browser clients. Each is offered a distinct short-lived attach capability;
+without it all Web/API reads or writes fail, even on loopback. The browser
+redeems the bootstrap URL for a Strict HttpOnly cookie, while the proxy pins
+Core instance, session, data-scope and release identity.
+
+E5 is a security experiment, NOT official Windows authorization, native
+WebView2 acceptance, secure multi-user remote hosting or TLS. Never share
+attach capability URLs. Stopping the controller destroys temporary records.
 
 This is a local E1–E4 source demo, NOT a C11 Native EXE, NOT a production runtime
 and NOT a replacement for an existing 0.8.x Portable installation.
@@ -211,6 +239,7 @@ def build(destination: Path) -> None:
     (destination / "START_E2.cmd").write_text(START_E2, encoding="utf-8", newline="\r\n")
     (destination / "START_E3.cmd").write_text(START_E3, encoding="utf-8", newline="\r\n")
     (destination / "START_E4.cmd").write_text(START_E4, encoding="utf-8", newline="\r\n")
+    (destination / "START_E5.cmd").write_text(START_E5, encoding="utf-8", newline="\r\n")
     (destination / "PACKAGE_README.md").write_text(START_README, encoding="utf-8")
     inventory = {}
     for file in sorted(destination.rglob("*")):
