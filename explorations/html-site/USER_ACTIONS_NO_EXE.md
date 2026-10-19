@@ -1,19 +1,18 @@
-# SRW Web / EXE 双载体探索：没有 EXE 时如何试用
+# SRW HTML 网站探索 — E1/E2/E3/E4 Windows 演示说明
 
-**优先下载 Actions 的完整、自动验收过的演示 ZIP。不要单独下载某个 .cmd 文件。**
+这些都是 **真实 C11 后端 + 一次性合成数据** 的源码演示，不需要已有 C11 Windows EXE；也不是 Windows Native Portable 正式包。
 
-## 现在应当下载哪个文件
+## 获取完整 ZIP
 
-1. 打开探索分支的最新成功运行：
-   https://github.com/ALV522/-SRW-/actions/workflows/html-site-sandbox.yml
-2. 选择结论为 **Success** 且含有 `Publish verified E1 source demo` 任务的运行。
-3. 在运行页面最下方的 **Artifacts** 下载名称以
-   `SRW-E1-REAL-CORE-WINDOWS-SOURCE-DEMO-` 开头的 ZIP。
-4. **解压整个 ZIP** 到新目录，目录顶层应当存在：
+1. 打开 [SRW HTML E1-E4 Sandbox 工作流](https://github.com/ALV522/-SRW-/actions/workflows/html-site-sandbox.yml)，选择全部 Jobs 结果为 **Success** 的最近一次运行。
+2. 在该运行的 **Artifacts** 中下载以 `SRW-HTML-E1-E4-WINDOWS-SOURCE-DEMO-` 开头的 ZIP（需要有私有仓库访问权限的 GitHub 账号）。
+3. 解压**整个 ZIP**，不要只下载或复制某个 CMD 文件。文件夹顶层应该有：
 
 ```text
-START_HERE.cmd
-START_E2.cmd
+START_HERE.cmd       # E1：真实 API，只读网页
+START_E2.cmd         # E2：合成数据，代理层乐观并发实验
+START_E3.cmd         # E3：合成数据，SQLite 原子事务实验
+START_E4.cmd         # E4：一个 Core，两个浏览器载体实验
 PACKAGE_README.md
 PACKAGE_MANIFEST.sha256.json
 requirements-ci.txt
@@ -24,60 +23,41 @@ convergence_tests/
 explorations/
 ```
 
-如果没有这些文件，说明下载或解压不完整。不要只下载
-`run_e1_demo_windows.cmd`，它不是独立的启动程序。
+4. 本机需要 **Python 3.12**，第一次启动需联网安装指定依赖到当前演示文件夹的 `.e1-demo-venv`，不会安装到正式 SRW，也不会打开实际招聘数据库。无需当前的 C11 Windows EXE。
 
-## E1：真实后端，只读 Web 演示
+## 四个可运行入口
 
-双击顶层的 **START_HERE.cmd**。
+| 入口 | 允许写入什么 | 主要验证 |
+|---|---|---|
+| `START_HERE.cmd` | Web 只读 | 真实 C11 API、项目、候选人、材料、工作空间 |
+| `START_E2.cmd` | 仅本次合成候选人的跟进计划 | 代理层 ETag、过期写入返回 412 |
+| `START_E3.cmd` | 仅本次合成候选人的跟进计划 | ETag 比较、业务修改和审计同一 SQLite 事务 |
+| `START_E4.cmd` | 仅本次合成候选人的跟进计划 | 独立 Core + 两个浏览器入口，关闭其中一个不影响另一端 |
 
-- 本机需要 Python 3.12（`py -3.12` 或 `python`）。
-- 首次运行需要联网下载锁定的 Python 依赖；
-- 依赖安装在解压目录自己的 `explorations/html-site/.e1-demo-venv`；
-- 会启动真实 C11 SRW 后端及浏览器 HTML UI；
-- **全部招聘项目、候选人、简历文本都是合成数据**，在系统临时目录中保存；
-- E1 Browser 对后台只有 GET 权限，不能修改数据；
-- 命令行窗口中按 Ctrl+C 退出，并终止临时服务和删除测试数据。
+**E4 所谓的 Desktop surrogate 只是第二个浏览器服务入口，并非 WPF/WinUI/Native EXE。**
 
-浏览器右上角成功标志是：
+双击对应的顶层 CMD。E1 页面顶部应显示 `LIVE · web · GET-only`；E3/E4 的网页顶部应显示 `LIVE · web · E3 atomic synthetic`。如果只显示 MOCK，不算真实 API 验收成功。
 
-```text
-LIVE · web · GET-only
-```
+## 推荐体验顺序
 
-这说明 E1 使用真实 SRW API，而不是网页内置的 Mock。
+先打开 E1，依次查看工作台、项目列表、候选人目录、独立候选人工作空间。E2 可用两个浏览器标签验证第一个写入成功、第二个旧版本写入被拒绝。E3 同样可以验证冲突，但版本比较与审计在实验 Core 的 SQLite 事务中完成。E4 启动后会显示两个不同的本机 URL，两者共享同一临时 C11 Core；在其中一个界面保存合成 Action Plan，然后在另一个界面点击刷新，应能看见同样的状态。
 
-## E2：真实后端、两个浏览器的受控写入实验（可选）
+关闭某个浏览器标签不应立即关闭另一个；**Core 由 CMD 中的临时控制器持有**。停止演示时在 CMD 窗口按 `Ctrl+C`，它会停止后端并尝试清除一次性 SQLite 和 Knowledge 文件。
 
-双击顶层的 **START_E2.cmd**。
+Windows 上 SQLite 文件有时会短暂被系统进程占用；演示启动器现在会有界重试清理。如果最终仍报告清理失败，先确保相关演示 Python 进程已经退出，再按报错指向的**临时目录**清理。不要清理或重命名正式 SRW 的 `data` 目录。
 
-E2 同样使用单独的一次性 SQLite 数据库。打开网站左侧的
-`E2 受控写入`，选择合成候选人并加载其跟进计划：
+## 当前不包含的能力
 
-1. 在浏览器里复制一个标签页，确保两个标签页都读取了初始版本；
-2. 第一个标签页编辑负责人，点击“条件保存（If-Match）”；
-3. 第二个标签页在不刷新的情况下编辑负责人并保存；
-4. 第二个标签页应收到 `412 STALE_ACTION_PLAN`；
-5. 重新读取最新版本以后，第二个标签页才可以再次保存。
+- 尚无通过 Native WPF/WebView2 实机验收的 C11 EXE；
+- E3 的事务代码和版本表仍为独立实验，未迁移到正式主线；
+- E4 并非 Windows Service、系统托盘或正式进程主管理程序；
+- 没有正式生产 Knowledge DB、真实候选人、实时 AI/OCR/ASR Provider 验收；
+- 未实现跨电脑同步与远程授权，也不对局域网开放端口。
 
-E2 **只允许写入演示程序本轮创建的合成候选人 Action Plan**。
-其它业务 API 仍只读；它不连接真实 EXE，也不接触任何正式招聘数据。
-当前版本冲突检查位于独立探索代理层，**不等同于正式后端的数据库级原子并发控制**。
+未来 Web + EXE 的目标仍是**一个 Core / 同一业务权威状态 / 两种 UI 载体**，而不是两个 SQLite 数据库之间的自动双向同步。
 
-## 与正式 Windows EXE 的关系
+## 如果出现错误
 
-这两个入口都**不需要**已有 C11 Windows EXE，不应被当作已经发布的
-Windows Portable / WPF Native 产品。未来真正的 Web/EXE 双载体会连接一个
-共同的 SRW Core，保留 OCR、ASR、Knowledge、Evidence、Audit 和人工决策边界。
+请反馈 `START_HERE/E2/E3/E4` 中哪个入口失败，以及报错信息（隐藏个人目录、用户名及敏感信息）。无需上传真实简历、数据库、API Key、锁文件或完整候选人日志。
 
-## 如果启动失败
-
-- `ERROR: INCOMPLETE SRW E1 SOURCE PACKAGE`：ZIP 没有完整解压，
-  或从目录中单独搬走了 CMD。应从完整的顶层 `START_HERE.cmd` 启动。
-- `Python 3.12 is required`：安装 Python 3.12 或使用支持的版本命令；
-  脚本不会修改系统 Python。
-- 依赖安装失败：检查联网情况，不要自行混装其它 Python 库。
-- `LIVE` 未显示：查看窗口内错误，告诉我脱敏后的错误文字。
-
-你只需反馈 E1/E2 是否能启动、网页是否显示 `LIVE`、是否存在按钮或业务交互故障。
-**不要发送真实简历、SQLite 数据库、Key、完整锁文件或包含个人数据的日志。**
+除非你希望亲自评估 UI，当前继续开发和 CI 验收都不要求你进行操作。
