@@ -70,7 +70,7 @@ SRW Local Application Service
 
 This keeps the usability and portability advantages of a website while preserving the capabilities that made the 0.8.x line valuable.
 
-## E1–E4 experiment: executable source-backed HTML site
+## E1–E5 experiment: executable source-backed HTML site
 
 All work is on the **isolated** `explore/html-site-prototype` branch.
 
@@ -81,16 +81,19 @@ All work is on the **isolated** `explore/html-site-prototype` branch.
 | E2 | Browser-only Action Plan PATCH via proxy lock | Synthetic two-client ETag conflict, **not transactional Core CAS** |
 | E3 | Experimental C11 Core Action Plan route with SQLite `BEGIN IMMEDIATE` | Revision + business mutation + audit in one transaction, synthetic only |
 | E4 | Independently-owned single Core with two detachable browser carrier origins | Same Core identity and SQLite across both UIs; detaching one doesn't stop the other |
+| E5 | Protected per-carrier attach and identity pinning | Unattached requests denied, wrong-carrier and replayed grants denied, Core identity drift fails closed |
 
-The optional **Desktop surrogate** used by E4 is a second browser endpoint,
+E5 wraps the same disposable Core with a per-carrier one-use 120-second attach credential and an HttpOnly SameSite=Strict session cookie, pinning instance, session, version and data scope on every request. This remains a synthetic local attach experiment, **not full production authentication**.
+
+The optional **Desktop surrogate** used by E4/E5 is a second browser endpoint,
 **not** Windows WPF/WebView2 Native. There is no accepted C11 EXE and
 no production data migration.
 
 ### Download and run the complete Windows source demo ZIP
 
-Open the [isolated E1–E4 GitHub Actions workflow](https://github.com/ALV522/-SRW-/actions/workflows/html-site-sandbox.yml).
+Open the [isolated E1–E5 GitHub Actions workflow](https://github.com/ALV522/-SRW-/actions/workflows/html-site-sandbox.yml).
 Choose the **latest successful** run and download its artifact named
-`SRW-HTML-E1-E4-WINDOWS-SOURCE-DEMO-<commit>`.
+`SRW-HTML-E1-E5-WINDOWS-SOURCE-DEMO-<commit>`.
 
 Extract the whole ZIP and run one of:
 
@@ -98,6 +101,7 @@ Extract the whole ZIP and run one of:
 - `START_E2.cmd`: E2 synthetic proxy-level concurrent Action Plan editing.
 - `START_E3.cmd`: E3 synthetic **atomic SQLite transaction** CAS.
 - `START_E4.cmd`: E4 one independent Core + two browser carrier surfaces.
+- `START_E5.cmd`: E5 per-carrier protected attach on one independent Core.
 
 All four use disposable synthetic projects/candidates, Python 3.12,
 an isolated virtual environment and pinned dependencies. First start
@@ -112,11 +116,12 @@ The user does not need to upload a real database or launch any old EXE.
 - [E2 proxy CAS limitations](E2_STATUS.md)
 - [E3 SQL transaction proof](E3_ATOMIC_CAS.md)
 - [E4 independent shared Core](E4_SHARED_CORE.md)
+- [E5 protected attach experiment](E5_ATTACH_CONTRACT.md)
 - [Target Web + EXE product contract](DUAL_CARRIER_PRODUCT_CONTRACT.md)
 
 ### Current acceptance evidence
 
-At accepted code snapshot `2257195887bde102fd3ae77042c0e088cf039ffd`,
+The last accepted E1–E4 snapshot was `2257195887bde102fd3ae77042c0e088cf039ffd`; E5 is under separate CI validation. Prior acceptance:
 [GitHub Actions run 39189966339](https://github.com/ALV522/-SRW-/actions/runs/39189966339)
 passed all jobs on Ubuntu/Windows and genuine Chromium.
 It exercised 16 real Chromium tests, the Windows batch launchers,
