@@ -97,3 +97,7 @@ A Windows/.NET 10 CI workflow now produces digest-bound, unsigned WPF Host candi
 ## 招聘业务浏览器验收扩展（2026-10-19）
 
 目前正在将 C11 的招聘业务主线从“创建项目、录入候选人”推进到更严格的人工评价和状态治理：新增两条真实 Chromium 端到端测试，分别覆盖 **两位面试官独立 Scorecard 的锁定/分歧保留**，以及 **Offer 的 draft→approved→sent→accepted 人工状态流转和不得自动录用**。Offer 界面现只呈现合法的下一状态，服务器校验保持不变。详见 [面试评价与 Offer 业务验收](docs/BUSINESS_E2E_SCORECARD_OFFER.md)。是否通过以此变更对应 GitHub Actions 的精确提交为准；Windows Native 全链路仍需额外实机验证。
+
+## 证据决策链的真实浏览器回归（2026-10-19）
+
+在原有项目创建、Offer 状态和独立面试评分五条真实 Chromium 流程之上，新增第六条 **Source → 人工 Verification Claim → Criterion Judgment → HumanDecision → 材料变更后旧决定失效 → 重新核实并人工重申** 的全链验收。不配置外部 AI 或读取真实候选人数据；所有操作使用临时 SQLite，且直接跳过人工核实或重申证据条件时由真实后端拒绝。范围及证明边界见 [Decision Lineage 浏览器验收](docs/BUSINESS_E2E_DECISION_LINEAGE.md)。

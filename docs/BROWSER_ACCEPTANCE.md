@@ -55,3 +55,7 @@ Browser acceptance additionally checks that Offer creation is disabled before th
 ## 2026-10-19 additional real browser scenarios
 
 Two business workflow E2E tests are added: (04) independent immutable Interview Scorecards for two evaluators with preserved conflicting ratings, and (05) human Offer approval/send/accept transitions with illegal state skip rejected and no automatic hired/human decision. They use real Chromium UI interactions plus persisted C11 SQLite/API state, never fake API responses. Refer to [business scorecard/offer acceptance](BUSINESS_E2E_SCORECARD_OFFER.md). Five scenarios are **pending same-commit CI** until the new PR/main browser workflow is verified; the pre-existing three remain historical verified evidence. Desktop WPF/WebView2 business acceptance is separate.
+
+## Evidence/Decision lineage E2E-06
+
+The sixth true-browser test validates a published verification-required criterion, current material source, initial blocked decision, human-generated verification Source/Claim/Judgment, explicitly submitted HumanDecision, material-change staleness, blocked premature reaffirmation, and reverified explicit lineage-bound new decision. Real Chromium/HTTP/SQLite, no provider/mock AI output. See [Decision Lineage Browser E2E](BUSINESS_E2E_DECISION_LINEAGE.md). Do not claim accepted until GitHub CI for exact commit passes.

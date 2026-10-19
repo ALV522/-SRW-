@@ -52,3 +52,7 @@ A user-supplied screenshot and a 45-record Host JSONL log prove actual Windows W
 ## Added independent evaluator and Offer state business acceptance
 
 Real browser tests `test_04_independent_interview_scorecards_cannot_be_overwritten` and `test_05_offer_lifecycle_requires_human_transitions_and_never_auto_hires` now exercise independent interviewer judgments and legitimate Offer state transitions end to end. A submitted scorecard cannot be overwritten, disagreement is not automatically averaged, an Offer may not skip approval, and accepted Offer must not autonomously mark the candidate hired or create a HumanDecision. Five Chromium scenarios should be reflected in CI evidence only after the exact head and merged main checks pass. The Windows WPF frontend and full evidence->HumanDecision workflow remain distinct acceptance requirements.
+
+## Chromium E2E-06: material revision forces human decision reconsideration
+
+A complete browser-level Source + human verification Claim + Criterion Judgment + HumanDecision evidence lineage test was added. It verifies protocol publish, missing-evidence server gate, context hash changes, explicit human advance, stale classification after material revision, blocked replay without renewed verification, and re-verified human reaffirmation with an immutable ancestry link. It is a synthetic browser workflow only, separate from Windows Native WPF acceptance and from live AI/OCR/ASR. See [BUSINESS_E2E_DECISION_LINEAGE.md](BUSINESS_E2E_DECISION_LINEAGE.md).
