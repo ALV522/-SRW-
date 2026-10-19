@@ -8,6 +8,10 @@ on:
       - 'global.json'
       - '.github/workflows/windows-host-candidate.yml'
       - 'scripts/check_embedded_runtime_compatibility.py'
+      - 'scripts/rebuild_native_from_prepared.py'
+      - 'scripts/package_native_upgrade_kit.py'
+      - 'convergence_tests/test_native_rebuild_from_prepared.py'
+      - 'convergence_tests/test_native_upgrade_kit.py'
   push:
     branches: [main]
   workflow_dispatch:
@@ -63,6 +67,24 @@ jobs:
           }
           $dotnetTruth | ConvertTo-Json -Depth 6 | Set-Content -Encoding UTF8 'artifacts/windows-host/DOTNET_BUILD_TRUTH.json'
           Write-Output ('Host EXE SHA256: ' + $sha)
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Package same-commit C11 source and WPF Host into a single upgrade kit
+        shell: pwsh
+        run: |
+          $kit = Join-Path $env:RUNNER_TEMP ('SRW_C11_NATIVE_UPGRADE_KIT_' + $env:GITHUB_SHA + '_NO_RUNTIME.zip')
+          python scripts/package_native_upgrade_kit.py --root . --host artifacts/windows-host --out "$kit" --commit "$env:GITHUB_SHA"
+          if ($LASTEXITCODE -ne 0) { throw 'Exact-source Windows Host upgrade kit failed strict SHA/source audit' }
+          if (!(Test-Path -LiteralPath $kit)) { throw 'Upgrade kit output missing' }
+          Write-Output ('Upgrade kit SHA256: ' + (Get-FileHash -Algorithm SHA256 -LiteralPath $kit).Hash.ToLowerInvariant())
+      - name: Publish source+Host upgrade kit (still requires pinned prior Runtime/Knowledge)
+        uses: actions/upload-artifact@v4
+        with:
+          name: srw-c11-native-upgrade-kit-${{ github.sha }}-NO-RUNTIME-NOT-RELEASE
+          path: ${{ runner.temp }}/SRW_C11_NATIVE_UPGRADE_KIT_*-NO_RUNTIME.zip
+          if-no-files-found: error
+          retention-days: 30
       - name: Publish source-built Host as CI evidence only
         if: always()
         uses: actions/upload-artifact@v4
