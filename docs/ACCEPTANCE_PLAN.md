@@ -44,3 +44,7 @@ See [Chromium acceptance](BROWSER_ACCEPTANCE.md). This separate CI gate executes
 ## 2026-10-18 acceptance evidence update
 
 Completed on main commit `69f60b9` (Chromium only): four-step Job Setup draft, candidate Source text intake and operator follow-up, candidate interview scheduling, human pipeline transitions into eligible Offer Draft stage, and confirmation that Offer Draft does not auto-hire. The new browser CI is separate from the 109-test source baseline; 4 extra archive-management regression tests are being added in the present PR. Uncovered workflows in the table above remain requirements, **not** completed browser or Windows Native acceptance. Exact new-commit evidence must be linked before claiming this PR verified.
+
+## 2026-10-19 real Windows GUI smoke evidence
+
+A user-supplied screenshot and a 45-record Host JSONL log prove actual Windows WPF/WebView2 startup, dashboard loaded, backend ready/runtime identity, real project creation and protocol revision update HTTP 200, and clean backend/workspace shutdown; no fatal backend or GUI startup error was logged. Basic Native GUI lifecycle and these two business writes are accepted **on the d8d032d candidate only**, but candidate intake, OCR/ASR, AI Provider, backups, recruiting Decision/Offer remain acceptance gaps. The read-only log auditor and detailed evidence boundaries are documented in [WINDOWS_GUI_FIRST_ACCEPTANCE.md](WINDOWS_GUI_FIRST_ACCEPTANCE.md). No actual user log/session identifiers are checked into Git.
