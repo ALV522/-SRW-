@@ -24,6 +24,8 @@ class E1PackageTests(unittest.TestCase):
             self.assertTrue((dest / "START_E2.cmd").is_file())
             self.assertTrue((dest / "START_E3.cmd").is_file())
             self.assertTrue((dest / "START_E4.cmd").is_file())
+            self.assertTrue((dest / "START_E5.cmd").is_file())
+            self.assertTrue((dest / "explorations/html-site/e5_attach.py").is_file())
             self.assertTrue((dest / "explorations/html-site/e3_atomic_action_plan.py").is_file())
             self.assertTrue((dest / "explorations/html-site/e4_shared_core.py").is_file())
             self.assertTrue((dest / "backend/srw/runtime/db/session.py").is_file())
