@@ -89,7 +89,7 @@ def build(output:Path,host_dir:Path) -> None:
     shutil.copyfile(truth_file,host_output/truth_file.name)
     # Required backend modules must never be accidentally filtered out.
     for key in ("backend/srw/runtime/db/session.py",
-                "backend/srw/knowledge/__init__.py"):
+                "backend/srw/api/app.py"):
         if not (app/key).is_file():
             raise FileNotFoundError("Native Source Lab missing required C11 module: "+key)
     shutil.copyfile(HERE/"run_native_lab.py",out/"run_native_lab.py")
