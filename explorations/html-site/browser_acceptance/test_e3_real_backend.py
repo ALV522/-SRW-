@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import json
 import os
+from concurrent.futures import ThreadPoolExecutor
 import subprocess
 import sys
 import tempfile
@@ -158,6 +159,61 @@ class E3TwoBrowserContexts(unittest.TestCase):
         self.assertGreaterEqual(len(events),2)
         self.assertFalse(self.errors,self.errors)
         a.screenshot(path=str(EVIDENCE/"e3-two-client-conditional-write.png"),full_page=True)
+
+    def test_04_two_independent_sqlite_connections_enforce_atomic_cas(self):
+        from sqlalchemy import select,func
+        from sqlalchemy.orm import Session
+        from srw.modules.audit.models import AuditEvent
+        from srw.runtime.db.session import create_v1_engine
+        from e3_atomic_action_plan import AtomicActionPlan,RevisionConflict
+
+        url="sqlite+pysqlite:///"+str(Path(self.temp.name)/"data"/"srw_v1.db").replace("\\\\","/")
+        left_engine=create_v1_engine(url)
+        right_engine=create_v1_engine(url)
+        try:
+            left=AtomicActionPlan(left_engine)
+            right=AtomicActionPlan(right_engine)
+            _,revision=left.read(self.cid)
+            self.assertEqual(right.read(self.cid)[1],revision)
+            def audit_count():
+                with Session(left_engine) as session:
+                    return session.scalar(select(func.count(AuditEvent.id)).where(
+                        AuditEvent.event_type=="CANDIDATE_ACTION_PLAN_UPDATED",
+                        AuditEvent.entity_id==self.cid
+                    )) or 0
+            initial_audits=audit_count()
+
+            def writer(store,owner):
+                try:
+                    plan,next_rev=store.update(
+                        self.cid,revision,{"owner":owner,"reason":"isolated transactional collision"}
+                    )
+                    return ("won",owner,next_rev)
+                except RevisionConflict as exc:
+                    return ("stale",owner,exc.revision)
+
+            with ThreadPoolExecutor(max_workers=2) as pool:
+                futures=[pool.submit(writer,left,"SQLite writer A"),
+                         pool.submit(writer,right,"SQLite writer B")]
+                results=[future.result(timeout=20) for future in futures]
+            self.assertEqual(sorted(x[0] for x in results),["stale","won"],results)
+            self.assertEqual(audit_count(),initial_audits+1)
+            current,new_rev=left.read(self.cid)
+            self.assertEqual(new_rev,revision+1)
+            self.assertIn(current["owner"],["SQLite writer A","SQLite writer B"])
+
+            with self.assertRaises(ValueError):
+                right.update(self.cid,new_rev,{"priority":"invalid"})
+            self.assertEqual(audit_count(),initial_audits+1)
+            self.assertEqual(left.read(self.cid)[1],new_rev)
+            # The Core API sees the same committed state from another engine.
+            self.assertEqual(
+                request_json(self.api,f"/api/v1/candidates/{self.cid}/action-plan")["owner"],
+                current["owner"]
+            )
+        finally:
+            left_engine.dispose()
+            right_engine.dispose()
 
     def test_03_mobile_e3_editor_does_not_overflow(self):
         context=self.browser.new_context(locale="zh-CN",viewport={"width":390,"height":844})
