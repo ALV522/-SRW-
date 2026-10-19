@@ -80,6 +80,36 @@ def _verify_host(host: Path, expected_sha: str) -> dict:
     return provenance
 
 
+
+def _validate_embedded_smoke_audit(
+    evidence: dict, *, runtime_manifest: Path, requirements: Path,
+) -> None:
+    """Accept only an actual embedded Python smoke, not version metadata."""
+    if not isinstance(evidence, dict):
+        raise PayloadError("invalid C11 embedded Python smoke audit")
+    base = (
+        evidence.get("embedded_python_smoke") is True
+        and evidence.get("source_runtime_unmodified") is True
+        and evidence.get("requirements_sha256") == sha256_file(requirements)
+        and evidence.get("gui_accepted") is False
+    )
+    historical = (
+        evidence.get("schema") == "srw.c11-runtime-overlay-build.v1"
+        and evidence.get("status") == "C11_RUNTIME_SMOKE_PASS"
+    )
+    reused = (
+        evidence.get("schema") == "srw.c11-runtime-reuse-smoke.v1"
+        and evidence.get("status") == "C11_REUSED_RUNTIME_SMOKE_PASS"
+        and evidence.get("runtime_manifest_sha256") == sha256_file(runtime_manifest)
+        and evidence.get("base_prepared_sha256")
+        == "27ae4765c035d7855ef69829256eaf33038362e0b28354b6af372c6d2304b2cb"
+        and evidence.get("imported_module_count") == 13
+        and str(evidence.get("python", "")).startswith("3.12.")
+        and evidence.get("bytecode_disabled") is True
+    )
+    if not base or not (historical or reused):
+        raise PayloadError("embedded Python smoke audit or C11 dependency identity mismatch")
+
 def assemble(root: Path, inputs: Path, host: Path, out: Path, *,
              expected_git_sha: str | None = None,
              requirements: Path | None = None) -> dict:
@@ -112,12 +142,10 @@ def assemble(root: Path, inputs: Path, host: Path, out: Path, *,
             upgrade_truth = json.loads(report_path.read_text(encoding="utf-8-sig"))
         except (ValueError, OSError, UnicodeError) as exc:
             raise PayloadError("invalid C11 embedded Python smoke audit") from exc
-        if (upgrade_truth.get("schema") != "srw.c11-runtime-overlay-build.v1" or
-            upgrade_truth.get("status") != "C11_RUNTIME_SMOKE_PASS" or
-            upgrade_truth.get("embedded_python_smoke") is not True or
-            upgrade_truth.get("source_runtime_unmodified") is not True or
-            upgrade_truth.get("requirements_sha256") != sha256_file(requirements)):
-            raise PayloadError("embedded Python smoke audit or C11 dependency identity mismatch")
+        _validate_embedded_smoke_audit(
+            upgrade_truth, runtime_manifest=runtime_manifest,
+            requirements=requirements,
+        )
     knowledge_dir = inputs / "knowledge" / "active"
     knowledge_manifest = inputs / "PRODUCTION_KNOWLEDGE.sha256"
     checked = knowledge_checks(knowledge_dir, knowledge_manifest)
