@@ -17,6 +17,8 @@ from __future__ import annotations
 
 import argparse
 import hashlib
+import os
+import subprocess
 import json
 import re
 import shutil
@@ -39,6 +41,7 @@ from scripts.native_payload import (
     sha256_file,
 )
 from scripts.portable_input_preflight import knowledge_checks
+from scripts.verify_prepared_native import IMPORT_SMOKE, REQUIRED_IMPORTS
 
 # Historical file identity is fixed by the prior full ZIP's verified delivery
 # evidence; accepting an arbitrary --expected-hash would defeat this gate.
@@ -107,8 +110,13 @@ def stage_attested_inputs(
         raise PayloadError("refusing to overwrite staging input root")
     if base_zip.is_symlink() or not base_zip.is_file():
         raise PayloadError("pinned prepared ZIP missing or symbolic link")
-    if sha256_file(base_zip) != required_sha256:
-        raise PayloadError("prepared d8d032d ZIP SHA-256 mismatch; no fallback")
+    actual_hash = sha256_file(base_zip)
+    if actual_hash != required_sha256:
+        raise PayloadError(
+            "prepared d8d032d ZIP SHA-256 mismatch; no fallback. "
+            f"expected={required_sha256} actual={actual_hash} "
+            f"bytes={base_zip.stat().st_size}; restore the exact original archive"
+        )
     with zipfile.ZipFile(base_zip) as zipped:
         members = _members(zipped)
         manifests = ("PRODUCTION_RUNTIME.sha256", "PRODUCTION_KNOWLEDGE.sha256")
@@ -135,12 +143,15 @@ def stage_attested_inputs(
         if not set(selection).issubset(members):
             raise PayloadError("historical ZIP missing attested Runtime/Knowledge members")
         bytes_written = 0
-        for relative, digest in sorted(selection.items()):
+        print(f"[SRW] Verified original ZIP. Extracting {len(selection)} attested files; this may take several minutes.", file=sys.stderr, flush=True)
+        for index, (relative, digest) in enumerate(sorted(selection.items()), 1):
             info = members[relative]
             bytes_written += info.file_size
             if bytes_written > MAX_SELECTED_BYTES:
                 raise PayloadError("selected Runtime/Knowledge data exceeds extraction bound")
             _checked_extract(zipped, info, target.joinpath(*safe_path(relative)), digest)
+            if index % 250 == 0 or index == len(selection):
+                print(f"[SRW] Extracted {index}/{len(selection)} verified files", file=sys.stderr, flush=True)
     runtime_check = audit_runtime(target / "runtime", target / manifests[0])
     knowledge_check = knowledge_checks(
         target / "knowledge" / "active", target / manifests[1]
