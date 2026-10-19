@@ -139,3 +139,7 @@ py -3.12 .\scripts\rebuild_native_from_prepared.py --source . --host .\windows-h
 ```
 
 使用包含**此次修复**的全新 GitHub Actions 工具包，不建议改写旧已解压工具包中的脚本及其 `SOURCE_MANIFEST.sha256`。旧包缺审计的缺陷属于交付问题，而不是用户需要自行制造审核 JSON 才能继续。大量 Runtime ZIP 文件解压可能需要数分钟；新版提供进度，不应仅因较长等待就推断死锁。中断产生 `KeyboardInterrupt`，本身不能证明原始 ZIP 已损坏。
+
+## 装配完成后的正式 `source_rebuild` 校验
+
+请使用 [Source Rebuilt Native 验收说明](SOURCE_REBUILT_NATIVE_ACCEPTANCE.md) 和 `scripts/verify_rebuilt_native.py`。旧 `scripts/verify_prepared_native.py` 是原 Prepared 来源专用，不适用于此处新的 `source_rebuild_not_legacy_carrier` 元数据。新的入口可验证原始 ZIP SHA、全部清单、Host 与五套数据库，并选择在 Windows 上运行隔离的嵌入式 Python/Core；不声明 GUI 正式通过。
