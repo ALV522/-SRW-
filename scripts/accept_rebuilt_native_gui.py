@@ -40,7 +40,9 @@ def safe_host_events(path: Path, *, offset: int = 0) -> list[str]:
         raise PayloadError("WPF Host log exceeded safe parse size")
     with path.open("rb") as stream:
         stream.seek(offset)
-        lines = stream.read(MAX_LOG_SIZE + 1).decode("utf-8-sig").splitlines()
+        # The Host may still be appending a multibyte JSONL line; incomplete
+        # UTF-8 is ignored until a later poll, never mistaken for GUI failure.
+        lines = stream.read(MAX_LOG_SIZE + 1).decode("utf-8-sig", errors="replace").splitlines()
     events = []
     for line in lines:
         try:
