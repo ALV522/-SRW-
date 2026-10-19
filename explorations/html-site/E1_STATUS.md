@@ -5,9 +5,9 @@ This page tracks *exploration evidence*, not a Windows Native product release.
 ## Last fully verified source snapshot
 
 - Branch: `explore/html-site-prototype`
-- Passed code commit: `c3b3be139a595ac6497bed70c6c35997f0a534a8`
-- [Independent GitHub CI, all jobs passed](https://github.com/ALV522/-SRW-/actions/runs/39189540086)
-- Artifact for that tested commit: [complete E1–E4 source ZIP](https://github.com/ALV522/-SRW-/actions/runs/39189540086/artifacts/12159124090) (older artifact naming retains E1)
+- Passed code commit: `2257195887bde102fd3ae77042c0e088cf039ffd`
+- [Independent GitHub CI, all jobs passed](https://github.com/ALV522/-SRW-/actions/runs/39189966339)
+- Artifact for that tested commit: [complete E1–E4 source ZIP](https://github.com/ALV522/-SRW-/actions/runs/39189966339/artifacts/12160145418) (named SRW-HTML-E1-E4-WINDOWS-SOURCE-DEMO)
 - Test data: **fully synthetic**, real C11 Starlette API and one disposable SQLite database per scenario
 
 ### Automated outcomes
@@ -24,7 +24,7 @@ This page tracks *exploration evidence*, not a Windows Native product release.
 | Windows `START_HERE/E2/E3/E4.cmd --smoke` | all PASS |
 | E3 direct independent-SQLite-engine race | exactly one writer commits, stale writer rejects |
 | E4 dual origins/one Core identity/independent detach/reattach | PASS |
-| SHA-256-verified packaged source demo | PASS |
+| SHA-256-verified source demo (184 files) | PASS |
 
 CI browser artifact includes synthetic-data screenshots.
 
