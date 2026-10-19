@@ -475,5 +475,131 @@ class RecruitmentBrowserAcceptance(unittest.TestCase):
         self.assertFalse(self.console_errors, self.console_errors)
 
 
+    def test_07_published_protocol_change_invalidates_previous_human_decision(self) -> None:
+        """New verification-critical hiring standard invalidates old approval."""
+        pid = self.new_project("标准版本失效")
+        self.page.locator(".tabs").get_by_role("button", name="建岗与标准").click()
+        self.page.get_by_role("button", name="＋ 添加标准").click()
+        expect(self.page.locator(".criterion-row")).to_have_count(1)
+        first = self.page.locator(".criterion-row").first
+        first.locator(".c-name").fill("模拟分析项目经验")
+        first.locator(".c-definition").fill("人工证据核实为准")
+        first.locator(".c-critical").check()
+        first.locator(".c-verify").check()
+        first.locator(".c-probe").fill("请说明项目交付")
+        self.page.get_by_role("button", name="保存草案").click()
+        expect(self.page.get_by_role("button", name="发布当前标准")).to_be_visible()
+        self.page.once("dialog", lambda dialog: dialog.accept())
+        with self.page.expect_response(
+            lambda response: "/api/v1/protocol-revisions/" in response.url
+            and response.url.endswith("/publish")
+            and response.request.method == "POST"
+        ) as first_publish:
+            self.page.get_by_role("button", name="发布当前标准").click()
+        self.assertEqual(first_publish.value.status, 200, first_publish.value.text())
+        protocol_v1 = self.get_json(f"/api/v1/projects/{pid}/protocol-workspace")
+        key = protocol_v1["current"]["criteria"][0]["criterion_key"]
+
+        cid = self.new_candidate(pid, "标准变更测试候选人")
+        self.page.locator("#paste-material").fill("合成简历：产品分析与研究项目。")
+        with self.page.expect_response(
+            lambda response: response.url.endswith(f"/api/v1/candidates/{cid}/sources/text")
+            and response.request.method == "POST"
+        ) as published_material:
+            self.page.get_by_role("button", name="保存并发布材料版本").click()
+        self.assertEqual(published_material.value.status, 200)
+        expect(self.page.locator(".source-card")).to_have_count(1)
+        self.page.get_by_role("button", name="人工核实").click()
+        self.page.locator("#v-status").select_option("met")
+        self.page.locator("#v-evidence").select_option("strong")
+        self.page.locator("#v-reason").fill("人工核实模拟研究记录")
+        self.page.get_by_role("button", name="保存人工核实").click()
+        expect(self.page.locator(".source-card")).to_have_count(2)
+        current = self.get_json(f"/api/v1/candidates/{cid}/workspace")
+        self.assertTrue(current["decision_ready"])
+        self.assertEqual(current["criteria"][0]["criterion_key"], key)
+        self.page.get_by_role("button", name="记录人工决定").click()
+        self.page.locator("#d-decision").select_option("advance")
+        self.page.locator("#d-reason").fill("人工确认旧标准已经满足")
+        self.page.get_by_role("button", name="提交人工决定").click()
+        expect(self.page.locator(".candidate-summary-strip")).to_contain_text("继续推进")
+        original_history = self.get_json(
+            f"/api/v1/candidates/{cid}/decision-history"
+        )["decisions"]
+        self.assertEqual(len(original_history), 1)
+        self.assertTrue(original_history[0]["is_current_context"])
+        before = self.get_json(f"/api/v1/candidates/{cid}/workspace")
+        old_context = before["decision_context_hash"]
+        old_sources = {x["source_id"] for x in before["sources"]}
+
+        # Return to the project standards UI and create a new Draft from
+        # the published protocol. An unchanged document/material version
+        # must not allow the old decision to survive a new critical criterion.
+        self.page.evaluate("() => window.closeCandidateWorkspace()")
+        self.page.locator(".tabs").get_by_role("button", name="建岗与标准").click()
+        expect(self.page.get_by_role(
+            "button", name="基于当前版本创建新草案"
+        )).to_be_visible()
+        self.page.get_by_role("button", name="基于当前版本创建新草案").click()
+        expect(self.page.locator(".criterion-row")).to_have_count(1)
+        self.page.get_by_role("button", name="＋ 添加标准").click()
+        expect(self.page.locator(".criterion-row")).to_have_count(2)
+        second = self.page.locator(".criterion-row").last
+        second.locator(".c-name").fill("新增合成合规标准")
+        second.locator(".c-definition").fill("新标准必须重新核验，不继承旧决定")
+        second.locator(".c-critical").check()
+        second.locator(".c-verify").check()
+        second.locator(".c-probe").fill("新增人工核实要求")
+        self.page.get_by_role("button", name="保存草案").click()
+        expect(self.page.get_by_role("button", name="发布当前标准")).to_be_visible()
+        second_protocol = self.get_json(f"/api/v1/projects/{pid}/protocol-workspace")
+        self.assertEqual(len(second_protocol["draft"]["criteria"]), 2)
+        self.page.once("dialog", lambda dialog: dialog.accept())
+        with self.page.expect_response(
+            lambda response: "/api/v1/protocol-revisions/" in response.url
+            and response.url.endswith("/publish")
+            and response.request.method == "POST"
+        ) as second_publish:
+            self.page.get_by_role("button", name="发布当前标准").click()
+        self.assertEqual(second_publish.value.status, 200, second_publish.value.text())
+
+        protocol_v2 = self.get_json(f"/api/v1/projects/{pid}/protocol-workspace")
+        self.assertEqual(len(protocol_v2["current"]["criteria"]), 2)
+        self.assertNotEqual(
+            protocol_v1["current_revision_id"],
+            protocol_v2["current_revision_id"],
+        )
+        changed = self.get_json(f"/api/v1/candidates/{cid}/workspace")
+        self.assertEqual({x["source_id"] for x in changed["sources"]}, old_sources)
+        self.assertNotEqual(changed["decision_context_hash"], old_context)
+        self.assertFalse(changed["decision_ready"])
+        self.assertGreaterEqual(changed["blocking_count"], 1)
+        self.assertTrue(changed["stale_decision_id"])
+        self.assertFalse(changed["decision_reaffirmable"])
+        decision_history = self.get_json(
+            f"/api/v1/candidates/{cid}/decision-history"
+        )["decisions"]
+        self.assertEqual(len(decision_history), 1)
+        self.assertTrue(decision_history[0]["stale"])
+        self.assertFalse(decision_history[0]["is_current_context"])
+
+        # No client may bypass the new critical hiring standard.
+        rejected = self.context.request.post(
+            self.base + f"/api/v1/candidates/{cid}/decisions/reaffirm",
+            data=json.dumps(
+                {"actor": "human", "reason": "未按新增标准核实就重申"}, ensure_ascii=False
+            ),
+            headers={"Content-Type": "application/json"},
+        )
+        self.assertTrue(400 <= rejected.status < 500, rejected.text())
+        self.assertEqual(
+            len(self.get_json(f"/api/v1/candidates/{cid}/decision-history")["decisions"]),
+            1,
+        )
+        self.page.evaluate("(candidateId) => window.openCandidate(candidateId)", cid)
+        expect(self.page.get_by_role("button", name="按当前证据重申")).to_be_disabled()
+        self.assertFalse(self.console_errors, self.console_errors)
+
+
 if __name__ == "__main__":
     unittest.main()
