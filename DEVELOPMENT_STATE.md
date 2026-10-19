@@ -8,7 +8,7 @@ C08 business capabilities are retained. C09 supplies local-only Host and browser
 
 Integration separates immutable C08 source history from the current complete source hash inventory. Windows file-handle checks now enumerate real process handles through psutil instead of returning an empty Linux-only /proc result. A real SQLite open/close test runs on each OS. Probe errors fail the run rather than manufacturing PASS.
 
-The current suite contains 132 tests. Runtime counts and results are emitted by CI for the exact commit. This document does not substitute for that evidence. Release identity is C11 throughout; historical C08 metadata is preserved under verification/history/convergence08.
+The current suite contains 138 tests. Runtime counts and results are emitted by CI for the exact commit. This document does not substitute for that evidence. Release identity is C11 throughout; historical C08 metadata is preserved under verification/history/convergence08.
 
 ## Delivery
 
@@ -80,3 +80,7 @@ A second, separate Windows Native assembly path has been implemented using the d
 ## Offline Windows Python wheel overlay (pending exact-commit acceptance)
 
 Created an independently checksum-bound Windows/Python 3.12 wheelhouse CI and a fail-closed offline Runtime upgrade utility. Original alpha10 Runtime and five historical Knowledge databases remain untouched. Upgraded packages reside under `Lib/c11-overlay`, which is inserted before legacy `Lib/site-packages` in `python312._pth`. The utility requires all C11 pinned metadata versions and executes actual isolated `python.exe` imports before emitting a new runtime SHA inventory and `RUNTIME_UPGRADE_AUDIT.json`. The alternate Native assembler now refuses an overlay with no matching C11 runtime smoke audit. Added 7 source regressions (125 -> 132). Wheelhouse CI smoke cannot validate a private recovered old Runtime until the same user recovery inputs are present on an authorized Windows execution environment; WPF/WebView2 GUI and provider-live acceptance remain pending.
+
+## 2026-10-19: Actual assembled C11 Native candidate, static-verified and GUI-unverified
+
+Using actual same-source d8d032d Actions source, Windows WPF Host, 13 locked Windows wheels and the user's uploaded historical Runtime/five Knowledge DBs, assembled `SRW_C11_Windows_Native_PREPARED_UNVERIFIED_GUI_d8d032d.zip` (101617623 bytes; SHA-256 27ae4765c035d7855ef69829256eaf33038362e0b28354b6af372c6d2304b2cb). Legacy Runtime bytes remain preserved; offline target win_amd64 wheel overlay was installed separately, 13/13 pinned metadata matches, 2332 Runtime hashes and five SQLite DBs pass; audited final ZIP has exactly 2629 expected SHA-bound members. No Windows embedded interpreter or WPF GUI was executed in the Linux staging environment. New `scripts/verify_prepared_native.py` provides immutable on-target source+runtime+Host+Knowledge verification, actual Windows Python import smoke and synthetic backend Host ABI/loopback readiness, with evidence outside candidate root; GUI manual acceptance remains mandatory. Added 6 synthetic regressions (132 -> 138). See `docs/PREPARED_NATIVE_WINDOWS_ACCEPTANCE.md`.
