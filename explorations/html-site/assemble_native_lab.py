@@ -1,8 +1,6 @@
 """Assemble experimental *source-backed* Windows WPF demo, never Portable.
 
-Consumes the already compiled host-only output plus a reviewed, narrowly scoped
-C11 source list. The executable is the existing unmodified C# WPF host compiled
-with .NET 10.0.302. Python 3.12 and .NET 10 Desktop Runtime remain EXTERNAL
+Consumes a distinctly labeled SOURCE-LAB WPF output plus reviewed C11 source.\nThe experimental host is compiled from an isolated C# source copy containing\nonly an explicitly documented venv Python-path substitution. Python 3.12 and .NET 10 Desktop Runtime remain EXTERNAL
 requirements; all Knowledge and candidate data are synthetic only.
 """
 from __future__ import annotations
@@ -72,8 +70,18 @@ def build(output:Path,host_dir:Path) -> None:
     if not truth_file.is_file():
         raise FileNotFoundError("Pinned host-only provenance missing")
     truth=json.loads(truth_file.read_text(encoding="utf-8-sig"))
-    if truth.get("artifact_kind")!="HOST_BINARY_ONLY" or truth.get("native_gui_accepted") is not False:
-        raise ValueError("Invalid or overstated host provenance")
+    if (truth.get("artifact_kind")!="SOURCE_LAB_HOST_MODIFIED"
+        or truth.get("native_gui_accepted") is not False
+        or truth.get("release_approved") is not False):
+        raise ValueError("Native Lab requires isolated patched-host provenance")
+    patch_file=host/"NATIVE_LAB_CSHARP_PATCH.json"
+    if not patch_file.is_file():
+        raise ValueError("Native Lab WPF source patch provenance missing")
+    patch=json.loads(patch_file.read_text(encoding="utf-8-sig"))
+    if (patch.get("source_modified") is not True
+        or patch.get("release_approved") is not False
+        or not patch.get("patched_sha256")):
+        raise ValueError("Native Lab WPF host patch provenance invalid")
     host_output=app/"windows-host"
     host_output.mkdir(parents=True,exist_ok=True)
     source_paths={entry["file"]:entry["sha256"] for entry in truth["outputs"]}
@@ -87,6 +95,7 @@ def build(output:Path,host_dir:Path) -> None:
             raise ValueError(f"Untrusted/missing compiled host binary: {name}")
         shutil.copyfile(src,host_output/name)
     shutil.copyfile(truth_file,host_output/truth_file.name)
+    shutil.copyfile(patch_file,host_output/patch_file.name)
     # Required backend modules must never be accidentally filtered out.
     for key in ("backend/srw/runtime/db/session.py",
                 "backend/srw/api/app.py"):
@@ -121,8 +130,10 @@ exit /b 3
     (out/"START_NATIVE_LAB.cmd").write_text(starter,encoding="utf-8",newline="\r\n")
     readme="""# SRW C11 Windows WPF Native SOURCE Lab — NOT Portable
 
-This experimental Windows app uses the existing C11 WPF/WebView2 host compiled
-from locked C# source, and the actual C11 Python API from source.
+This experimental Windows app uses an **isolated patched source copy** of
+the existing C11 WPF/WebView2 host, with one explicit virtualenv Python-path
+adaptation. The official host source and its separately compiled binary are
+unchanged. The demo runs actual C11 Python API source.
 
 - Windows x64, locally installed Python 3.12 and .NET 10 Desktop Runtime
   plus Microsoft Edge WebView2 Runtime are required.
@@ -132,6 +143,8 @@ from locked C# source, and the actual C11 Python API from source.
 - WPF and Web share one host-owned Core. A read-only E1 Web bridge is also
   checked during --smoke, without opening any real user records.
 - The app never attaches existing SRW 0.8.x data, migration state or secrets.
+- The WPF host inside this ZIP is explicitly a SOURCE-LAB-ADAPTED host,
+  not a verified canonical Native release executable.
 - A successful host-source build does not establish all GUI functionality
   or release-grade packaging. This is a development preview only.
 
