@@ -5,6 +5,8 @@ on:
     branches: [explore/html-site-prototype]
     paths:
       - .github/workflows/native-host-sandbox.yml
+      - explorations/html-site/assemble_native_lab.py
+      - explorations/html-site/run_native_lab.py
       - desktop/**
       - global.json
   workflow_dispatch:
@@ -74,5 +76,43 @@ jobs:
         with:
           name: SRW-C11-WPF-HOST-ONLY-NOT-PORTABLE-${{ github.sha }}
           path: artifacts/wpf-host-only/
+          if-no-files-found: error
+          retention-days: 14
+
+  native-source-lab:
+    name: C11 WPF + temporary Python + shared Web E1 (synthetic only)
+    needs: wpf-source-only
+    runs-on: windows-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Download verified C11 WPF host-only output
+        uses: actions/download-artifact@v4
+        with:
+          name: SRW-C11-WPF-HOST-ONLY-NOT-PORTABLE-${{ github.sha }}
+          path: artifacts/wpf-host-only
+      - name: Assemble Native SOURCE preview and verify every staged file
+        shell: pwsh
+        run: |
+          python explorations/html-site/assemble_native_lab.py --output artifacts/native-source-lab --host-dir artifacts/wpf-host-only
+          if ($LASTEXITCODE -ne 0) { throw "Native lab assembly failed" }
+          python explorations/html-site/assemble_native_lab.py --verify artifacts/native-source-lab
+          if ($LASTEXITCODE -ne 0) { throw "Native lab file hash audit failed" }
+      - name: Exercise real WPF host + C11 backend + E1 read-only Web
+        shell: pwsh
+        env:
+          PYTHONUTF8: '1'
+          PYTHONDONTWRITEBYTECODE: '1'
+        run: |
+          python artifacts/native-source-lab/run_native_lab.py --smoke --strict-gui
+          if ($LASTEXITCODE -ne 0) { throw "Windows Native GUI/real backend acceptance did not pass" }
+      - name: Publish explicitly synthetic Native SOURCE preview
+        uses: actions/upload-artifact@v4
+        with:
+          name: SRW-C11-WPF-SOURCE-SYNTHETIC-PREVIEW-NOT-PORTABLE-${{ github.sha }}
+          path: artifacts/native-source-lab/
           if-no-files-found: error
           retention-days: 14
