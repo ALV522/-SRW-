@@ -24,6 +24,8 @@ import webbrowser
 from http.server import ThreadingHTTPServer
 from pathlib import Path
 
+from synthetic_workspace import synthetic_temporary_directory
+
 from run_e1_demo import ROOT, BACKEND_STARTER, call_json, free_loopback_port, wait_for_backend, create_sample_data
 from serve_e1 import select_upstream
 from e2_synthetic_bridge import make_synthetic_e2_server
@@ -95,7 +97,7 @@ def main() -> int:
     server:ThreadingHTTPServer|None=None
     thread:threading.Thread|None=None
     print("SRW E2 synthetic-only conditional-write lab; no EXE or user database",flush=True)
-    with tempfile.TemporaryDirectory(prefix="srw-e2-synthetic-") as td:
+    with synthetic_temporary_directory(prefix="srw-e2-synthetic-") as td:
         logpath=Path(td)/"synthetic-backend.log"
         with logpath.open("w",encoding="utf-8") as logfile:
             try:
