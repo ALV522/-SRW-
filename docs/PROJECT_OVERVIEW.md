@@ -44,6 +44,7 @@ C11 的目标不是重写为新 UI、全新业务内核、微服务或者 SaaS�
 - README.md：项目概览、历史精确证据导航。
 - AGENTS.md：AI/协作者必读入口。
 - docs/PRODUCT_CHARTER.md：产品边界与变更授权。
+- docs/CAPABILITY_MATRIX.md：业务模块、现有测试与 Windows/Web 的明确证据边界。
 - docs/DEVELOPMENT_GOVERNANCE.md：开发流程和强制检查。
 - docs/VERSION_POLICY.md + VERSION_POLICY.json：版本、Schema、SHA、渠道、工件身份。
 - docs/DUAL_CARRIER_PLAN.md：Windows/HTML 并行计划和集成门禁。
