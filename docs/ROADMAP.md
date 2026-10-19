@@ -55,3 +55,7 @@
 ## 2026-10-19 Windows 候选交付路径
 
 新增 [Native 候选升级工具包](C11_NATIVE_CANDIDATE_UPGRADE.md)：CI 在同一源码 SHA 下编译 WPF Host，并将完整源码与 Host 组成一个受源 SHA 清单约束的 ZIP；Windows 本机只能从精确 `d8d032d` Prepared ZIP 获取旧的已核验 Runtime/Knowledge，并执行严格装配与完整 ZIP 成员校验。**这补足候选打包的工程环节，不提升 Windows GUI 验收等级**；必须在新准确 SHA 上重跑实际 WPF 和业务链，方可进入 RC 门槛。
+
+## Windows 首次实机使用与隐私修复验收（2026-10-19）
+
+[本次真实设备记录](WINDOWS_C8431CA7_REAL_DEVICE_ACCEPTANCE.md) 已进一步证实：`c8431ca7` Native 候选在 Windows 上完成工作台载入、实际项目建立、标准发布、候选人收件入口及工作区正常释放。日志发现一个顶部服务状态过时的 UI 缺陷、一个无材料候选人多余的 Assessment 409 和 HTTP 请求原始路径进入 Host 日志的隐私风险；优先在正式主线修复并加入 Windows 原生 C# 与真实 Chromium 回归。下一轮 P1 不应只复测启动，应实测人工核实→Decision→Scorecard→Offer→备份恢复的**完整 WPF 用户操作**，再升级可用性结论。
