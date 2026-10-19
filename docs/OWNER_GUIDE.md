@@ -2,6 +2,12 @@
 
 > 本文写给 SRW 项目负责人。目标是让你不需要亲自逐行编码，也能够稳定推进开发、看懂进展、发现伪验收，并在必须做决定时给出明确答复。它不是给 Agent 绕过验收的授权。
 
+## 当前特别规定：不启用 GitHub 主线保护
+
+请先读 [暂时不启用主线保护时的开发制度](NO_BRANCH_PROTECTION_PROTOCOL.md)。新 Agent 必须在**非 main 的干净任务分支**运行 `python scripts/agent_preflight.py --issue 41 --acknowledge-reading`（41 改成真实 Issue 号）。必须走 PR，等所有相关检查完成且成功后才能合并；合并后确认 main SHA 和 CI。没有主线保护时，Github UI 仍可能允许不安全操作，本制度降低风险但不能彻底防止绕过。
+
+以后发给 Agent 的开头可以是：“主线暂不设置保护。严格执行 AGENTS.md 与无保护协议：绝不直接 push main，先读文件和运行预编辑检查，按 Issue 做 PR，核实相同 SHA 的所有 CI 才合并，合并后核对 main 和测试状态。”
+
 ## 一、每次启动一个新 Agent
 
 先告诉它仓库和默认开发方式，不要第一句话只写“继续开发”。推荐直接发送：
