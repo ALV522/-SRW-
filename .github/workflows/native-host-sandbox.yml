@@ -1,0 +1,78 @@
+name: SRW Windows Native Host Source Sandbox
+
+on:
+  push:
+    branches: [explore/html-site-prototype]
+    paths:
+      - .github/workflows/native-host-sandbox.yml
+      - desktop/**
+      - global.json
+  workflow_dispatch:
+
+concurrency:
+  group: srw-wpf-source-only-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  wpf-source-only:
+    name: WPF/WebView2 C11 host source build (NOT Portable)
+    runs-on: windows-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install exact reviewed .NET SDK
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.302'
+      - name: Verify exact .NET version
+        shell: pwsh
+        run: |
+          $sdk = (dotnet --version).Trim()
+          if ($sdk -ne '10.0.302') { throw "Exact reviewed .NET SDK not installed: $sdk" }
+          dotnet --info
+      - name: Restore NuGet dependencies from existing locked graph
+        shell: pwsh
+        run: |
+          dotnet restore desktop/SRW.Desktop/SRW.Desktop.csproj --locked-mode -r win-x64
+          if ($LASTEXITCODE -ne 0) { throw 'Locked WPF NuGet restore failed' }
+      - name: Build current C11 Windows host source
+        shell: pwsh
+        run: |
+          dotnet build desktop/SRW.Desktop/SRW.Desktop.csproj -c Release -r win-x64 --no-restore --nologo -p:ContinuousIntegrationBuild=true -p:SelfContained=false -o artifacts/wpf-host-only
+          if ($LASTEXITCODE -ne 0) { throw 'WPF host source compile failed' }
+      - name: Verify host-only outputs and record provenance
+        shell: pwsh
+        run: |
+          $target = 'artifacts/wpf-host-only/SmartRecruitmentWorkbench.exe'
+          if (!(Test-Path -LiteralPath $target -PathType Leaf)) { throw "WPF executable missing after build" }
+          $version = (Get-Content -Raw -LiteralPath VERSION).Trim()
+          $items = @(Get-ChildItem -LiteralPath artifacts/wpf-host-only -File | ForEach-Object {
+            [ordered]@{ file = $_.Name; bytes = $_.Length; sha256 = (Get-FileHash -Algorithm SHA256 -LiteralPath $_.FullName).Hash.ToLowerInvariant() }
+          })
+          $truth = [ordered]@{
+            schema = 'srw.exploration.wpf-host-only.v1'
+            source_sha = $env:GITHUB_SHA
+            source_branch = $env:GITHUB_REF_NAME
+            version = $version
+            sdk = (dotnet --version).Trim()
+            target = 'net10.0-windows/win-x64'
+            artifact_kind = 'HOST_BINARY_ONLY'
+            portable = $false
+            native_gui_accepted = $false
+            runtime_included = $false
+            production_knowledge_included = $false
+            claim_boundary = 'WPF/WebView2 source compilation only. No embedded Python, SRW Core/Knowledge, GUI smoke or portable release verification.'
+            outputs = $items
+          }
+          $truth | ConvertTo-Json -Depth 8 | Set-Content -LiteralPath artifacts/wpf-host-only/WPF_HOST_SOURCE_BUILD_TRUTH.json -Encoding UTF8
+          Write-Host "SOURCE HOST COMPILE PASS; not a runnable SRW Portable product"
+      - name: Upload isolated host-only source build
+        uses: actions/upload-artifact@v4
+        with:
+          name: SRW-C11-WPF-HOST-ONLY-NOT-PORTABLE-${{ github.sha }}
+          path: artifacts/wpf-host-only/
+          if-no-files-found: error
+          retention-days: 14
