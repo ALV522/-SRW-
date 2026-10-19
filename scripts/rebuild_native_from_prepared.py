@@ -3,7 +3,7 @@
 This reduces the practical gap between source-built WPF Host and the existing
 verified Runtime/Knowledge. It NEVER makes a release/GUI acceptance claim,
 never upgrades an existing user-data workspace, never trusts an arbitrary ZIP
-manifest, and never executes extracted Python until a separate acceptance step.
+manifest, and runs the extracted embedded Python only for a fresh, isolated Windows\nimport smoke AFTER exact ZIP/Runtime/Knowledge verification; GUI acceptance is separate.
 
 Inputs:
  - complete current *Git checkout* on the exact Host build commit;
@@ -247,8 +247,13 @@ def _resmoke_embedded_python(inputs: Path, requirements: Path) -> dict:
             + result.stderr[-700:]
         )
     identity = _validate_embedded_import_output(result.stdout, runtime)
-    # Fail if the executable modified any inventoried Runtime bytes.
+    # Verify all original bytes are unchanged AND no new Runtime files were
+    # created during the executable smoke. -B must prevent bytecode pollution.
+    manifest = read_manifest(inputs / "PRODUCTION_RUNTIME.sha256", runtime=True)
     audit_runtime(runtime, inputs / "PRODUCTION_RUNTIME.sha256")
+    observed = {p.relative_to(runtime).as_posix() for p in runtime.rglob("*") if p.is_file()}
+    if observed != set(manifest):
+        raise PayloadError("embedded Python smoke contaminated staged Runtime with extra or missing files")
     return {
         "schema": "srw.c11-runtime-reuse-smoke.v1",
         "status": "C11_REUSED_RUNTIME_SMOKE_PASS",
@@ -310,6 +315,7 @@ def upgrade(
             "base_zip_sha256": BASE_PREPARED_ZIP_SHA256,
             "runtime_files": recovery["runtime_files"],
             "knowledge_databases": recovery["knowledge_databases"],
+            "embedded_python_smoke_passed": bool(dependency.get("c11_overlay_on_path")),
             "actual_windows_gui_acceptance": "PENDING",
         }
 
