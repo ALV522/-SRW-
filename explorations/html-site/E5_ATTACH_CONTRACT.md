@@ -29,12 +29,12 @@ production API, migrations, Windows Host and main branch untouched.
 1. The temporary Core supervisor creates a separate 256-bit random
    capability for each browser-facing carrier.
 2. A specific browser opens the guarded bootstrap URL.
-3. On a valid capability and matching live Core identity, the server issues
+3. On a valid, not-yet-redeemed, unexpired capability and matching live Core identity, the server atomically consumes that capability and issues
    an HttpOnly, SameSite=Strict cookie and HTTP 303 redirect to `/`.
 4. UI code receives **no capability in its DOM, JavaScript state or API JSON**.
 5. Other requests require the matching cookie and must pass same-origin,
    Host and core-identity checks.
-6. The owner invalidates the prior capability when a carrier detaches;
+6. Already redeemed bootstrap URLs are rejected even if replayed within 120 seconds. The owner also invalidates the previous session when a carrier detaches;
    its reattachment creates a new server and token.
 
 The cookie name is distinct per carrier because browser cookies are scoped by
@@ -72,7 +72,7 @@ Core over a LAN or internet.
 A successful E5 CI run must show:
 
 1. Unattached browser/API requests get 403.
-2. Wrong-carrier capability cannot attach to another carrier.
+2. Wrong-carrier capability cannot attach to another carrier; a valid capability cannot be replayed after redemption.
 3. Successful attach leads to the correct HTML/UI via 303, with Strict
    HttpOnly cookie and no visible token in JavaScript.
 4. Two independently attached browser contexts read/write the same real
