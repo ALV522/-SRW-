@@ -55,6 +55,12 @@ class SharedCoreSession:
         self._threads[carrier]=thread
         return f"http://127.0.0.1:{server.server_address[1]}"
 
+    def url(self, carrier: str) -> str:
+        if carrier not in self._servers:
+            raise ValueError("Carrier is detached")
+        port=self._servers[carrier].server_address[1]
+        return f"http://127.0.0.1:{port}"
+
     def detach(self, carrier: str) -> None:
         server=self._servers.pop(carrier,None)
         thread=self._threads.pop(carrier,None)
