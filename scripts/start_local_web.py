@@ -61,7 +61,7 @@ def workspace_errors(path: Path, *, reuse: bool, synthetic: bool,
             else:
                 try:
                     with db.open("rb") as stream:
-                        if stream.read(16) != b"SQLite format 3\\x00":
+                        if stream.read(16) != b"SQLite format 3" + bytes([0]):
                             raise ValueError("invalid SQLite header")
                     # Open read-only. Never create or migrate a database just
                     # to decide whether it is safe to reuse.
@@ -91,7 +91,7 @@ def production_knowledge_errors(root: Path) -> list[str]:
             errors.append(f"Knowledge database missing: {name}")
             continue
         with path.open("rb") as stream:
-            if stream.read(16) != b"SQLite format 3\x00":
+                        if stream.read(16) != b"SQLite format 3" + bytes([0]):
                 errors.append(f"Knowledge database invalid SQLite header: {name}")
     return errors
 
