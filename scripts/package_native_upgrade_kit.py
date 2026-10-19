@@ -76,7 +76,7 @@ To build a NEW candidate on a Windows x64 machine:
    BUILD_C11_CANDIDATE.cmd "D:\\SRW\\prepared-d8d032d.zip" "D:\\SRW\\SRW_C11_new_UNVERIFIED_GUI.zip"
 4. The utility verifies the exact old ZIP hash, Runtime + five Knowledge
    manifests and SQLite integrity, current dependency compatibility, source
-   hashes, rebuilt Host git SHA and SHA, and all final ZIP members.
+   hashes, rebuilt Host git SHA and SHA, and all final ZIP members.\n   On Windows it independently executes extracted embedded Python -I -B\n   and checks 13 imports from this Runtime before writing a candidate.\n   The old ZIP does NOT contain RUNTIME_UPGRADE_AUDIT.json.
 5. Unzip the resulting CANDIDATE into a NEW folder. Run separate static,
    embedded-Python, backend and WPF/WebView2 acceptance. Do not use it against
    your existing v0.8.x data or claim RC/GA until these passes are recorded.
