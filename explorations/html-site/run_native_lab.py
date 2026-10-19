@@ -41,7 +41,7 @@ def setup_runtime():
     if sys.version_info[:2]!=(3,12):
         raise RuntimeError("Native WPF source preview requires Python 3.12")
     runtime=APP/"runtime"
-    native_python=runtime/"python.exe"
+    native_python=runtime/"Scripts"/"python.exe"
     if not (runtime/"Scripts"/"python.exe").is_file():
         if runtime.exists():
             raise RuntimeError("Existing incomplete runtime directory; do not overwrite manually")
@@ -54,21 +54,19 @@ def setup_runtime():
         subprocess.run([str(script),"-m","pip","install","--disable-pip-version-check",
                         "-r",str(APP/"requirements-ci.txt")],check=True)
         sentinel.write_text("verified pinned CI requirements",encoding="utf-8")
-    if not native_python.is_file():
-        # A venv's Scripts/python.exe is a small Python launcher; its copied
-        # image at runtime/python.exe discovers the same root pyvenv.cfg and
-        # site-packages. This remains dependent on installed Python 3.12.
-        shutil.copyfile(script,native_python)
+    # The isolated lab Host uses an explicitly SOURCE-LAB-patched AppPaths:
+    # it launches runtime/Scripts/python.exe directly, preserving pyvenv.cfg.
+    # Never copy the redirector to runtime/python.exe: that loses venv context.
     check=subprocess.run(
         [str(native_python),"-c",
          "import sys,uvicorn,sqlalchemy,starlette; print(sys.prefix)"],
         text=True,capture_output=True,timeout=12
     )
     if check.returncode!=0:
-        raise RuntimeError("runtime/python.exe cannot access venv packages; "+
+        raise RuntimeError("runtime/Scripts/python.exe cannot access venv packages; "+
                            (check.stderr or check.stdout)[-600:])
     if Path(check.stdout.strip()).resolve()!=runtime.resolve():
-        raise RuntimeError("runtime/python.exe escaped its isolated venv")
+        raise RuntimeError("runtime/Scripts/python.exe escaped its isolated venv")
     return native_python
 
 
