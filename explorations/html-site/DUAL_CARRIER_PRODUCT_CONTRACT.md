@@ -219,3 +219,7 @@ completed dual-carrier product.
 - [Independent source CI and browser screenshots](https://github.com/ALV522/-SRW-/actions/runs/39189540086)
 
 **Design progression:** E1 tests read API sharing; E2 tests conditional writes at the proxy; E3 moves conditional revision + C11 business/audit into a real SQLite transaction under a synthetic route; E4 proves UI processes can attach to one independently-owned Core and detach separately. None of these substitutes for accepted WPF Windows Native packaging, production Knowledge DBs, full 0.8.x feature coverage or production data migration.
+
+## Latest verified exploration CI
+
+[Windows + Ubuntu + Chromium full E1–E4 acceptance (all jobs passed)](https://github.com/ALV522/-SRW-/actions/runs/39189966339) · code `2257195887bde102fd3ae77042c0e088cf039ffd`. [Verified source-only ZIP](https://github.com/ALV522/-SRW-/actions/runs/39189966339/artifacts/12160145418). This is not a production Windows executable.
