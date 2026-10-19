@@ -61,3 +61,7 @@ py -3.12 "D:\\SRW\\source\\scripts\\verify_prepared_native.py" `
 ## 首次 Windows 实机结果与重跑修复（2026-10-19）
 
 2026-10-19 用户实际执行 `verify_prepared_native.py` 于 Windows：embedded Python 3.12.10、13/13 依赖、隔离 loopback backend readiness、Windows Host ABI 均 PASS。首次 JSON 仍保持 `gui_accepted=false`；后续同一目录重复检查提示未知额外/缺失文件，怀疑 Python 导入时自动写入 `__pycache__`。已通过新版源码将 import/后端 Python 启动改为 `-B`，WPF 新 Host 使用同样选项，增加具体文件差异和重复证据文件名拒绝。请保留首次 JSON，继续进行 GUI 验收并提供 Host 日志。详细见 [WINDOWS_FIRST_SMOKE_RESULTS](WINDOWS_FIRST_SMOKE_RESULTS.md)。
+
+## 2026-10-19 更新：真实 WPF GUI 基础验收通过
+
+用户后续截图与 45 条 `host.log` 实际记录证明了 WPF/WebView2 主界面加载、后端与 Dashboard API 就绪、招聘项目创建和招聘标准草案修改 HTTP 200、退出时释放工作区锁。先前标记“GUI 尚未在目标 Windows 上执行”是**2026-10-19 之前的历史状态**。候选包本身依然保持 `d8d032d` 身份，后续 Native 资源和完整业务验收未因此自动通过。详见 [Windows 首次 GUI 真实验收与独立日志审计](WINDOWS_GUI_FIRST_ACCEPTANCE.md)。

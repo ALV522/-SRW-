@@ -1,5 +1,7 @@
 # SRW · 智能招聘工作台
 
+> **实机里程碑（2026-10-19）**：用户已在真实 Windows 成功启动 C11 WPF/WebView2 桌面程序，Host 日志显示后端就绪、前端加载、招聘项目创建 HTTP 200、招聘标准草案修改 HTTP 200，以及正常退出/释放工作区锁。**Windows Native GUI 基础验收通过；完整招聘业务/OCR/ASR/AI Provider/备份恢复尚未验收，不能称为正式发行版。** 证据与自动化核验入口见 [Windows GUI 实机验收](docs/WINDOWS_GUI_FIRST_ACCEPTANCE.md)。
+
 **本地优先的招聘业务执行与证据化决策工作台**。SRW 连接建岗、招聘标准、候选人收件、材料证据、核实/复核、面试、人工决策、Offer、联系运营及 Knowledge 治理。AI 仅提供可追溯的辅助建议，不自动作出录用决定。
 
 > **仓库状态（2026-10-18）**：Git 主线是 `main`，版本 `1.0.0-alpha10-convergence11`，数据库结构 `v1_0014`。它是**持续开发中的源码与回归验证基线**，不是已通过 WPF 实机验收的 Windows Native 正式版。历史 `v0.8.12-R2` 是功能完整性参考，而非当前可直接运行的主线发行包。
@@ -33,7 +35,7 @@
 
 ## 当前测试与交付真相
 
-当前源代码测试总数为 **141 项**（GitHub CI 才能证明实际 PASS），外加独立的 **3 条 Chromium 真实浏览器业务验收场景**。原 `v0.8.12-R2` 的 **725 项测试**是历史版本库存参考，不能推导出当前版本达到相同的业务覆盖率。
+当前源代码测试总数为 **146 项**（GitHub CI 才能证明实际 PASS），外加独立的 **3 条 Chromium 真实浏览器业务验收场景**。原 `v0.8.12-R2` 的 **725 项测试**是历史版本库存参考，不能推导出当前版本达到相同的业务覆盖率。
 
 2026-10-18 最近已确认的整合基线 `69f60b9`：
 - [Source Gate：Ubuntu + Windows](https://github.com/ALV522/-SRW-/actions/runs/39134969100) — PASS（当时 109 项源回归）。
@@ -90,4 +92,4 @@ A Windows/.NET 10 CI workflow now produces digest-bound, unsigned WPF Host candi
 
 ### Windows C11 实机反馈：嵌入式 Python 和本地后端已成功启动（2026-10-19）
 
-用户在真实 Windows 上运行 prepared Native d8d032d 候选包：273 源文件、2332 Runtime、5 Knowledge、13 Python 依赖通过，`python.exe 3.12.10` 的导入、loopback 后端 readiness 与 Host ABI 验收返回 `WINDOWS_BACKEND_SMOKE_PASS_GUI_PENDING`；证据位于用户本地 `D:\SRW\evidence\C11-Windows-smoke.json`，GUI 仍未验收。第二次验收因额外/缺失文件报错，新修复默认禁止生成 `.pyc`、给出文件差异，并防止覆盖旧验收 JSON。见 [首次 Windows 实测及 GUI 下一步](docs/WINDOWS_FIRST_SMOKE_RESULTS.md)。
+用户在真实 Windows 上运行 prepared Native d8d032d 候选包：273 源文件、2332 Runtime、5 Knowledge、13 Python 依赖通过，`python.exe 3.12.10` 的导入、loopback 后端 readiness 与 Host ABI 验收返回 `WINDOWS_BACKEND_SMOKE_PASS_GUI_PENDING`；证据位于用户本地 `D:\SRW\evidence\C11-Windows-smoke.json`，GUI 当时仍未验收，之后已通过真实桌面启动与前端加载基础验收。第二次验收因额外/缺失文件报错，新修复默认禁止生成 `.pyc`、给出文件差异，并防止覆盖旧验收 JSON。见 [首次 Windows 实测及 GUI 下一步](docs/WINDOWS_FIRST_SMOKE_RESULTS.md)。
