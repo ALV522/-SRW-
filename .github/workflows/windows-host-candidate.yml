@@ -34,6 +34,11 @@ jobs:
         run: |
           dotnet --info
           dotnet --version
+      - name: Verify native Host diagnostic privacy against real C# output classifier
+        shell: pwsh
+        run: |
+          dotnet run --project desktop/SRW.HostDiagnostics.Tests/SRW.HostDiagnostics.Tests.csproj -c Release
+          if ($LASTEXITCODE -ne 0) { throw 'Native Host log privacy regression failed' }
       - name: Build Windows Host using locked NuGet dependency versions
         shell: pwsh
         run: |
