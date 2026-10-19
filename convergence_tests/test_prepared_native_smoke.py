@@ -111,6 +111,13 @@ class PreparedNativeSmokeGateTests(unittest.TestCase):
         with self.assertRaises(PayloadError):
             inspect_prepared(self.root)
 
+    def test_unreviewed_private_file_is_rejected(self):
+        private = self.root / "data"
+        private.mkdir()
+        (private / "applicants.db").write_bytes(b"synthetic private")
+        with self.assertRaisesRegex(PayloadError, "unreviewed files"):
+            inspect_prepared(self.root)
+
     def _rewrite_runtime_manifest(self):
         (self.root / "PRODUCTION_RUNTIME.sha256").write_text(
             "".join(f"{sha(p)}  {p.relative_to(self.runtime).as_posix()}\n"
