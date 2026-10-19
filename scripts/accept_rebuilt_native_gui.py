@@ -29,14 +29,20 @@ REQUIRED = ("host_started", "backend_ready", "webview_initialized",
 MAX_LOG_SIZE = 10_000_000
 
 
-def safe_host_events(path: Path) -> list[str]:
+def safe_host_events(path: Path, *, offset: int = 0) -> list[str]:
     """Read only recognized event *names*; do not copy raw log lines or IDs."""
     if not path.is_file() or path.is_symlink():
         return []
-    if path.stat().st_size > MAX_LOG_SIZE:
+    size = path.stat().st_size
+    if size < offset:
+        raise PayloadError("WPF Host log truncated between launch cycles")
+    if size - offset > MAX_LOG_SIZE:
         raise PayloadError("WPF Host log exceeded safe parse size")
+    with path.open("rb") as stream:
+        stream.seek(offset)
+        lines = stream.read(MAX_LOG_SIZE + 1).decode("utf-8-sig").splitlines()
     events = []
-    for line in path.read_text(encoding="utf-8-sig").splitlines():
+    for line in lines:
         try:
             record = json.loads(line)
         except (ValueError, UnicodeError):
@@ -76,13 +82,14 @@ def run_gui(root: Path, *, timeout_seconds: int = 180, cycles: int = 1) -> list[
     with tempfile.TemporaryDirectory(prefix="srw-c11-wpf-gui-acceptance-") as directory:
         data = Path(directory) / "data"
         for index in range(cycles):
+            log = data / "logs" / "host.log"
+            baseline = log.stat().st_size if log.exists() else 0
             print(f"[SRW GUI] Cycle {index + 1}/{cycles}: opening REAL WPF with disposable synthetic workspace.", flush=True)
             process = subprocess.Popen(
                 [str(executable), "--application-root", str(root), "--data-root", str(data)],
                 cwd=root, stdin=subprocess.DEVNULL,
                 stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
             )
-            log = data / "logs" / "host.log"
             start = time.monotonic()
             saw_frontend = False
             timed_out = False
@@ -90,7 +97,7 @@ def run_gui(root: Path, *, timeout_seconds: int = 180, cycles: int = 1) -> list[
                 while time.monotonic() - start < timeout_seconds:
                     if process.poll() is not None:
                         break
-                    events = safe_host_events(log)
+                    events = safe_host_events(log, offset=baseline)
                     if "frontend_loaded" in events and not saw_frontend:
                         saw_frontend = True
                         print("[SRW GUI] WebView2 loaded. Inspect UI, then CLOSE WPF normally with X.", flush=True)
@@ -98,7 +105,7 @@ def run_gui(root: Path, *, timeout_seconds: int = 180, cycles: int = 1) -> list[
                 if process.poll() is None:
                     timed_out = True
                     raise PayloadError("GUI smoke timed out: close WPF normally before deadline")
-                events = safe_host_events(log)
+                events = safe_host_events(log, offset=baseline)
                 report = verify_gui_event_sequence(events, lock_exists=(data / "app.lock").exists())
                 report["cycle"] = index + 1
                 report["normal_process_exit"] = process.returncode == 0
