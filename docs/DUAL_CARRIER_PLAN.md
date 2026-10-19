@@ -9,6 +9,10 @@
 - HTML 是展示载体，不意味着双击无后端 index.html 就有 OCR/SQLite/AI 全功能。
 - 暂不做远程公网部署、云端登录、多租户和不同数据库双向同步。
 
+## G1 新增 Local Web source preview（非发行）
+
+正式主线新增 `scripts/start_local_web.py`，在独立明确的数据目录通过已有 C11 app/API/frontend 开启本地 Browser，不复制业务内核。支持明确的合成测试模式、真实五库存在性检查、阻止默认复用已有工作区与简单 Host lock 冲突。开发细节及局限参见 [本地浏览器源码预览](LOCAL_WEB_SOURCE_PREVIEW.md)。**它不是**双端同时写入/独立 Supervisor/已验收 Portable；M3 仍需正式 Core 所有权和 CAS 权限契约。必须以确切 Git SHA 的源/浏览器测试结果判断当前状态。
+
 ## 现有基础及不可过度外推的证据
 
 隔离分支 explore/html-site-prototype 已有 E0 静态展示、E1 真实只读 API、E2 代理条件写入、E3 SQLite 事务级 CAS、E4 独立 Core owner、E5 本地受保护附着。Native SOURCE Lab 真实 WPF EXE + 浏览器读同一个合成 Core/SQLite，但 Core 仍由 WPF Host 拥有、外部 Python Runtime、合成 Knowledge，尚非 Portable/生产写入。
