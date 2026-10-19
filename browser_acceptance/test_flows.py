@@ -410,6 +410,9 @@ class RecruitmentBrowserAcceptance(unittest.TestCase):
 
         self.page.locator("#paste-material").fill("新增合成材料：一份待重新核实的项目反馈。")
         self.page.get_by_role("button", name="保存并发布材料版本").click()
+        # Await the real async POST and subsequent candidateDrawer refresh; the
+        # old panel remains rendered until the server commits its new revision.
+        expect(self.page.locator(".source-card")).to_have_count(3)
         stale = self.get_json(f"/api/v1/candidates/{cid}/workspace")
         self.assertNotEqual(stale["decision_context_hash"], verified["decision_context_hash"])
         self.assertTrue(stale["stale_decision_id"])
