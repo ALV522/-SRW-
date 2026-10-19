@@ -88,3 +88,7 @@ python scripts/run_convergence_verification.py
 ### Windows 产品候选装配：一个工具包 + 已核验的旧 Runtime/Knowledge
 
 现在已有 [C11 Native 候选升级装配路径](docs/C11_NATIVE_CANDIDATE_UPGRADE.md)：最新 Windows Host CI 会同时发布**完整同 SHA 源码 + WPF Host** 升级工具包。用户提供精确的历史 `d8d032d` Prepared Native ZIP，就可用 `BUILD_C11_CANDIDATE.cmd` 在本机生成新源码版本的 **`UNVERIFIED_GUI` Native 候选 ZIP**；旧包与现存数据不会被覆盖。该路径已严格限制旧 ZIP SHA、Runtime/Knowledge 完整性、当前 Python 依赖与 Host 来源，**但候选包仍需实际 Windows GUI 和全业务验收，绝非自动发行**。
+
+### 源码重建 Windows Native 的正式校验入口
+
+[独立静态/嵌入式后端验收](docs/SOURCE_REBUILT_NATIVE_ACCEPTANCE.md)：新增 `scripts/verify_rebuilt_native.py`，专门核验 C11 `source_rebuild` 包，避免旧 `verify_prepared_native.py` 的历史 Prepared 来源字段误报。验证精确源码、Runtime、五库 SQLite、WPF Host、完整 ZIP 成员及独立记录的全包 SHA；可选在 Windows 上使用**一次性临时工作区**启动真实嵌入式 Python / 回环 Core。静态/后端 PASS 不表示 WebView2 GUI 或完整业务验收通过。
