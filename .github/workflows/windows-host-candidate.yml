@@ -82,7 +82,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: srw-c11-native-upgrade-kit-${{ github.sha }}-NO-RUNTIME-NOT-RELEASE
-          path: ${{ runner.temp }}/SRW_C11_NATIVE_UPGRADE_KIT_*-NO_RUNTIME.zip
+          path: ${{ runner.temp }}/SRW_C11_NATIVE_UPGRADE_KIT_*_NO_RUNTIME.zip
           if-no-files-found: error
           retention-days: 30
       - name: Publish source-built Host as CI evidence only
