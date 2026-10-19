@@ -22,6 +22,10 @@ class E1PackageTests(unittest.TestCase):
             pack.build(dest)
             self.assertTrue((dest / "START_HERE.cmd").is_file())
             self.assertTrue((dest / "START_E2.cmd").is_file())
+            self.assertTrue((dest / "START_E3.cmd").is_file())
+            self.assertTrue((dest / "START_E4.cmd").is_file())
+            self.assertTrue((dest / "explorations/html-site/e3_atomic_action_plan.py").is_file())
+            self.assertTrue((dest / "explorations/html-site/e4_shared_core.py").is_file())
             self.assertTrue((dest / "backend/srw/runtime/db/session.py").is_file())
             self.assertTrue((dest / "explorations/html-site/e2_synthetic_bridge.py").is_file())
             for item in pack.COPY_DIRS + pack.COPY_FILES:
