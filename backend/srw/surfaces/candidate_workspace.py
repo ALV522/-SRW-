@@ -256,6 +256,15 @@ def get_candidate_workspace(
         )
 
     stale_decision = latest_stale_decision(session, candidate.id, current_context_hash=context_hash) if current_decision is None else None
+    # "A stale decision exists" is not the same as "it may be reaffirmed".
+    # Respect the exact action-specific server gate before offering that action.
+    decision_reaffirmable = False
+    if stale_decision is not None:
+        from srw.modules.decision.human_decision import _action_gate
+        decision_reaffirmable, _ = _action_gate(
+            session, candidate.id, stale_decision.decision,
+            evaluation_policy_revision=evaluation_policy_revision,
+        )
 
     decision_ready = blocking_count == 0
     action_items = list(work_items)
@@ -304,7 +313,7 @@ def get_candidate_workspace(
         stale_decision_label=_DECISION_LABEL.get(stale_decision.decision, stale_decision.decision) if stale_decision else "",
         stale_decision_reason=stale_decision.reason if stale_decision else "",
         stale_decision_context_hash=stale_decision.decision_context_hash if stale_decision else "",
-        decision_reaffirmable=bool(stale_decision is not None and current_decision is None),
+        decision_reaffirmable=decision_reaffirmable,
         criteria=tuple(rows),
         sources=tuple(source_views.values()),
         claims=tuple(claim_views),
