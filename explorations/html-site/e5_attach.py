@@ -14,6 +14,7 @@ from __future__ import annotations
 import hmac
 import secrets
 import threading
+import time
 from http.cookies import SimpleCookie
 from http.server import ThreadingHTTPServer
 from pathlib import Path
@@ -31,6 +32,9 @@ class E5ProtectedBridge(SyntheticE3Bridge):
     _cookie_name: str = ""
     _identity: dict = {}
     _active: bool = True
+    _bootstrap_lock = threading.Lock()
+    _bootstrap_used: bool = False
+    _bootstrap_deadline: float = 0.0
 
     def _redirect_after_attach(self) -> None:
         """Redeem bootstrap capability without leaving the token in the URL."""
@@ -82,6 +86,15 @@ class E5ProtectedBridge(SyntheticE3Bridge):
             return False
         return True
 
+    def _claim_bootstrap(self) -> bool:
+        # Atomic one-use capability. The resulting cookie is a separate,
+        # revocable session credential and stays valid until carrier detach.
+        with self._bootstrap_lock:
+            if self._bootstrap_used or time.monotonic() > self._bootstrap_deadline:
+                return False
+            type(self)._bootstrap_used=True
+            return True
+
     def do_GET(self):
         parsed=urlsplit(self.path)
         if parsed.path == "/attach" and not parsed.query:
@@ -114,6 +127,9 @@ class E5ProtectedBridge(SyntheticE3Bridge):
             if not self._identity_ok():
                 self._deny(503, "Pinned SRW Core is unavailable or its identity changed")
                 return
+            if not self._claim_bootstrap():
+                self._deny(403, "E5 bootstrap capability is expired or already redeemed")
+                return
             self._redirect_after_attach()
             return
         super().do_GET()
@@ -139,6 +155,9 @@ def make_e5_carrier_server(
         "_token":token,
         "_cookie_name":cookie_name,
         "_active":True,
+        "_bootstrap_used":False,
+        "_bootstrap_deadline":time.monotonic()+120,
+        "_bootstrap_lock":threading.Lock(),
         "_write_lock":threading.RLock(),
     })
     server=ThreadingHTTPServer(("127.0.0.1",port),cls)
