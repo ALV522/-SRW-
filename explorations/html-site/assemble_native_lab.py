@@ -24,8 +24,11 @@ SOURCE_FILES=(
     "explorations/html-site/serve_e1.py",
     "explorations/html-site/synthetic_workspace.py",
 )
-BLOCKED={"data","knowledge","runtime",".venv",".git","__pycache__",
-         ".e1-demo-venv","node_modules","logs","backups"}
+# Do not exclude Python package segments named runtime or knowledge:
+# backend/srw/runtime and backend/srw/knowledge are REQUIRED C11 code.
+# SOURCE_DIRS is itself a strict allowlist; no app-root runtime/knowledge
+# data directories are selected in the first place.
+BLOCKED={".venv",".git","__pycache__",".e1-demo-venv","node_modules"}
 BLOCKED_SUFFIXES={".db",".sqlite",".sqlite3",".pyc",".pyo",".log"}
 MAX_BYTES=80*1024*1024
 
@@ -84,6 +87,11 @@ def build(output:Path,host_dir:Path) -> None:
             raise ValueError(f"Untrusted/missing compiled host binary: {name}")
         shutil.copyfile(src,host_output/name)
     shutil.copyfile(truth_file,host_output/truth_file.name)
+    # Required backend modules must never be accidentally filtered out.
+    for key in ("backend/srw/runtime/db/session.py",
+                "backend/srw/knowledge/__init__.py"):
+        if not (app/key).is_file():
+            raise FileNotFoundError("Native Source Lab missing required C11 module: "+key)
     shutil.copyfile(HERE/"run_native_lab.py",out/"run_native_lab.py")
     starter=r"""@echo off
 setlocal EnableExtensions DisableDelayedExpansion
