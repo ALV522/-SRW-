@@ -20,6 +20,7 @@ SOURCE_FILES=(
     "convergence_tests/knowledge_fixture.py",
     "requirements-ci.txt","VERSION","BUILD_INFO.json",
     "explorations/html-site/serve_e1.py",
+    "explorations/html-site/e1-live.html",
     "explorations/html-site/synthetic_workspace.py",
 )
 # Do not exclude Python package segments named runtime or knowledge:
@@ -98,7 +99,8 @@ def build(output:Path,host_dir:Path) -> None:
     shutil.copyfile(patch_file,host_output/patch_file.name)
     # Required backend modules must never be accidentally filtered out.
     for key in ("backend/srw/runtime/db/session.py",
-                "backend/srw/api/app.py"):
+                "backend/srw/api/app.py",
+                "explorations/html-site/e1-live.html"):
         if not (app/key).is_file():
             raise FileNotFoundError("Native Source Lab missing required C11 module: "+key)
     shutil.copyfile(HERE/"run_native_lab.py",out/"run_native_lab.py")
