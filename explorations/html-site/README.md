@@ -70,42 +70,62 @@ SRW Local Application Service
 
 This keeps the usability and portability advantages of a website while preserving the capabilities that made the 0.8.x line valuable.
 
-## Current experiment status — E1 + E2 synthetic lab
+## E1–E4 experiment: executable source-backed HTML site
 
-**Verified** at exploration commit `481162b65ffb612fd4509a76647c0b0e50302c6a`:
-[isolated E1/E2 GitHub Actions](https://github.com/ALV522/-SRW-/actions/runs/39152520579).
+All work is on the **isolated** `explore/html-site-prototype` branch.
 
-- Ubuntu and Windows: **15 E1/package tests + 4 E2 guard tests** per OS, PASS.
-- Real Chromium + C11 API + disposable SQLite: **10 tests**, PASS.
-- Windows: actual `START_HERE.cmd --smoke` and `START_E2.cmd --smoke` executed successfully end to end, including E1's independent Python virtual environment.
-- Published a SHA-256-inventoried complete source demo artifact with both launchers.
-- E1 browser: cross-project candidates, candidate workspaces, mobile layout and direct URL history.
-- E2: two real Chromium client contexts, one actual C11 Action Plan business write, second stale write rejected as HTTP 412, then refreshed second write succeeds; C11 audit events present.
-- No official Native WPF/WebView2 C11 EXE, real Windows host acceptance or full 0.8.x parity is claimed.
+| Experiment | Implementation | Verification boundary |
+|---|---|---|
+| E0 | Static single-file HTML Mock | Visual exploration, no real API |
+| E1 | Real C11 + SQLite, GET-only Web UI | Identity, projects, candidates, Claim/Source read flows, mobile, browser history |
+| E2 | Browser-only Action Plan PATCH via proxy lock | Synthetic two-client ETag conflict, **not transactional Core CAS** |
+| E3 | Experimental C11 Core Action Plan route with SQLite `BEGIN IMMEDIATE` | Revision + business mutation + audit in one transaction, synthetic only |
+| E4 | Independently-owned single Core with two detachable browser carrier origins | Same Core identity and SQLite across both UIs; detaching one doesn't stop the other |
 
-## **Download the complete Windows demo ZIP (recommended)**
+The optional **Desktop surrogate** used by E4 is a second browser endpoint,
+**not** Windows WPF/WebView2 Native. There is no accepted C11 EXE and
+no production data migration.
 
-[Download the verified E1/E2 source demo artifact from GitHub Actions](https://github.com/ALV522/-SRW-/actions/runs/39152520579/artifacts/12145448946).
+### Download and run the complete Windows source demo ZIP
 
-You need a logged-in GitHub account with access to this private repository.
+Open the [isolated E1–E4 GitHub Actions workflow](https://github.com/ALV522/-SRW-/actions/workflows/html-site-sandbox.yml).
+Choose the **latest successful** run and download its artifact named
+`SRW-HTML-E1-E4-WINDOWS-SOURCE-DEMO-<commit>`.
 
-1. Download the Actions artifact ZIP.
-2. Extract the **whole ZIP** to its own folder.
-3. Run **`START_HERE.cmd`** for E1 read-only real-core Web.
-4. Optionally run **`START_E2.cmd`** for E2 **synthetic-only** Action Plan write-conflict lab.
+Extract the whole ZIP and run one of:
 
-Python 3.12 and internet for first-time pinned-dependency installation are required;
-both launchers create a separate environment. No real user data is opened and
-all sample SQLite/Knowledge records are disposable.
+- `START_HERE.cmd`: E1 real-core read-only HTML site.
+- `START_E2.cmd`: E2 synthetic proxy-level concurrent Action Plan editing.
+- `START_E3.cmd`: E3 synthetic **atomic SQLite transaction** CAS.
+- `START_E4.cmd`: E4 one independent Core + two browser carrier surfaces.
 
-**Do not download only the nested launcher CMD.** The original user-reported
-failure was reproduced in Windows CI and required both canonical source
-packaging and Windows batch path fixes.
+All four use disposable synthetic projects/candidates, Python 3.12,
+an isolated virtual environment and pinned dependencies. First start
+requires internet access; stopping the controller removes the temporary
+workspace (with bounded retry for transient Windows file locks).
 
-Instructions: [USER_ACTIONS_NO_EXE.md](USER_ACTIONS_NO_EXE.md).
-Evidence: [E1_STATUS.md](E1_STATUS.md).
-Synthetic E2 scope: [E2_STATUS.md](E2_STATUS.md).
-Architecture: [DUAL_CARRIER_PRODUCT_CONTRACT.md](DUAL_CARRIER_PRODUCT_CONTRACT.md).
+**The package is source code, not a Windows EXE or production Portable.**
+The user does not need to upload a real database or launch any old EXE.
+
+- [Windows instructions](USER_ACTIONS_NO_EXE.md)
+- [E1 browser acceptance](E1_STATUS.md)
+- [E2 proxy CAS limitations](E2_STATUS.md)
+- [E3 SQL transaction proof](E3_ATOMIC_CAS.md)
+- [E4 independent shared Core](E4_SHARED_CORE.md)
+- [Target Web + EXE product contract](DUAL_CARRIER_PRODUCT_CONTRACT.md)
+
+### Current acceptance evidence
+
+At code snapshot `c3b3be139a595ac6497bed70c6c35997f0a534a8`,
+[GitHub Actions run 39189540086](https://github.com/ALV522/-SRW-/actions/runs/39189540086)
+passed all jobs on Ubuntu/Windows and genuine Chromium.
+It exercised 16 real Chromium tests, the Windows batch launchers,
+independent SQLite connections, synthetic cross-carrier writes and
+E4 Core detach/reattach lifecycle.
+
+A subsequent CI run will republish the artifact under the clearer
+E1–E4 name above. Passing exploration tests does **not** certify
+a Windows Native Host, full v0.8.x parity or real-corpus/provider quality.
 
 ## Run E1 on Windows (same EXE, same database)
 
