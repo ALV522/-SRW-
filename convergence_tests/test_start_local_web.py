@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import sqlite3
+from contextlib import closing
 import tempfile
 import unittest
 from pathlib import Path
@@ -36,7 +37,7 @@ class LocalWebLauncherTests(unittest.TestCase):
 
     def test_blocks_implicit_access_to_existing_user_data(self):
         (self.workspace / "data").mkdir(parents=True)
-        with sqlite3.connect(self.workspace / "data" / "srw_v1.db") as conn:
+        with closing(sqlite3.connect(self.workspace / "data" / "srw_v1.db")) as conn:
             conn.execute("CREATE TABLE v1_schema_meta (schema_revision TEXT)")
             conn.execute("INSERT INTO v1_schema_meta VALUES ('v1_0014')")
         self.assertTrue(self.check())
@@ -59,7 +60,7 @@ class LocalWebLauncherTests(unittest.TestCase):
         db.write_bytes(b"NOT A SQLITE DB")
         self.assertTrue(any("integrity/schema" in e for e in self.check(reuse=True)))
         db.unlink()
-        with sqlite3.connect(db) as conn:
+        with closing(sqlite3.connect(db)) as conn:
             conn.execute("CREATE TABLE v1_schema_meta (schema_revision TEXT)")
             conn.execute("INSERT INTO v1_schema_meta VALUES ('v1_9999')")
         self.assertTrue(any("integrity/schema" in e for e in self.check(reuse=True)))
