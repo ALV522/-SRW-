@@ -27,7 +27,7 @@ public sealed class BackendProcess : IDisposable
         int port,
         HostLog log)
     {
-        var arguments = $"\"scripts/run_local.py\" --host 127.0.0.1 --port {port} --edition windows --workspace-lock host";
+        var arguments = $"-B \"scripts/run_local.py\" --host 127.0.0.1 --port {port} --edition windows --workspace-lock host";
         var start = new ProcessStartInfo
         {
             FileName = paths.PythonExe,
@@ -47,6 +47,8 @@ public sealed class BackendProcess : IDisposable
         start.Environment["RECRUITMENT_SESSION_ID"] = identity.SessionId;
         start.Environment["RECRUITMENT_SESSION_TOKEN"] = identity.SessionToken;
         start.Environment["RECRUITMENT_RELEASE_ID"] = releaseId;
+        // Keep the installed application root immutable after first launch.
+        start.Environment["PYTHONDONTWRITEBYTECODE"] = "1";
 
         var process = new Process { StartInfo = start, EnableRaisingEvents = true };
         process.OutputDataReceived += (_, e) => { if (!string.IsNullOrWhiteSpace(e.Data)) log.Write("backend_stdout", new { line = e.Data }); };
