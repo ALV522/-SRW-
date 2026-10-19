@@ -7,7 +7,9 @@ Use --synthetic only for isolated CI/browser acceptance.
 from __future__ import annotations
 
 import argparse
+import json
 import os
+import sqlite3
 import socket
 import sys
 import threading
@@ -22,6 +24,7 @@ for entry in (str(ROOT), str(ROOT / "backend"), str(ROOT / "convergence_tests"))
     if entry not in sys.path:
         sys.path.insert(0, entry)
 
+CURRENT_SCHEMA = json.loads((ROOT / "VERSION_POLICY.json").read_text(encoding="utf-8"))["schema_revision"]
 KNOWLEDGE_NAMES = ("taxonomy", "job_info", "competency", "market_reference", "reference")
 
 
@@ -39,6 +42,8 @@ def workspace_errors(path: Path, *, reuse: bool, synthetic: bool,
     root = source_root.resolve()
     if candidate == root or candidate.is_relative_to(root) or root.is_relative_to(candidate):
         problems.append("workspace must be separate from source/application directory")
+    if (candidate / "data").is_symlink() or (candidate / "data" / "srw_v1.db").is_symlink():
+        problems.append("workspace data/database must not be symbolic links")
     if (candidate / "data" / "app.lock").exists():
         problems.append("Windows Host app.lock exists: do not attach a separate writer")
     if (candidate / "data" / ".srw-instance.lock").is_symlink():
@@ -49,8 +54,26 @@ def workspace_errors(path: Path, *, reuse: bool, synthetic: bool,
             problems.append("synthetic workspace must be empty")
         if not synthetic and not reuse and children:
             problems.append("existing workspace requires --reuse-workspace")
-        if not synthetic and reuse and not (candidate / "data" / "srw_v1.db").is_file():
-            problems.append("--reuse-workspace requires an existing SRW database")
+        if not synthetic and reuse:
+            db = candidate / "data" / "srw_v1.db"
+            if not db.is_file() or db.is_symlink():
+                problems.append("--reuse-workspace requires an existing non-symlink SRW database")
+            else:
+                try:
+                    with db.open("rb") as stream:
+                        if stream.read(16) != b"SQLite format 3\\x00":
+                            raise ValueError("invalid SQLite header")
+                    # Open read-only. Never create or migrate a database just
+                    # to decide whether it is safe to reuse.
+                    with sqlite3.connect(db.as_uri() + "?mode=ro", uri=True) as connection:
+                        result = connection.execute("PRAGMA quick_check").fetchone()
+                        revision = connection.execute(
+                            "SELECT schema_revision FROM v1_schema_meta LIMIT 1"
+                        ).fetchone()
+                    if result != ("ok",) or not revision or revision[0] != CURRENT_SCHEMA:
+                        raise ValueError("SQLite integrity/schema mismatch")
+                except (OSError, sqlite3.Error, ValueError) as exc:
+                    problems.append(f"existing SRW workspace integrity/schema rejected: {exc}")
     elif reuse:
         problems.append("--reuse-workspace cannot create a missing workspace")
     if reuse and synthetic:
