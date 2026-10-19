@@ -116,15 +116,14 @@ The user does not need to upload a real database or launch any old EXE.
 
 ### Current acceptance evidence
 
-At code snapshot `c3b3be139a595ac6497bed70c6c35997f0a534a8`,
-[GitHub Actions run 39189540086](https://github.com/ALV522/-SRW-/actions/runs/39189540086)
+At accepted code snapshot `2257195887bde102fd3ae77042c0e088cf039ffd`,
+[GitHub Actions run 39189966339](https://github.com/ALV522/-SRW-/actions/runs/39189966339)
 passed all jobs on Ubuntu/Windows and genuine Chromium.
 It exercised 16 real Chromium tests, the Windows batch launchers,
 independent SQLite connections, synthetic cross-carrier writes and
 E4 Core detach/reattach lifecycle.
 
-A subsequent CI run will republish the artifact under the clearer
-E1–E4 name above. Passing exploration tests does **not** certify
+The [verified E1–E4 source ZIP](https://github.com/ALV522/-SRW-/actions/runs/39189966339/artifacts/12160145418) has now been published and its SHA-256 file inventory validated (184 files). Passing exploration tests does **not** certify
 a Windows Native Host, full v0.8.x parity or real-corpus/provider quality.
 
 ## Run E1 on Windows (same EXE, same database)
