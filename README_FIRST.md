@@ -13,3 +13,5 @@
 旧 ZIP 中已恢复 Runtime 与五套 Knowledge，详见 [资源恢复文档](docs/LEGACY_RESOURCE_RECOVERY.md)。原始 Python 包版本尚有 8 项不符合当前锁文件；Windows Host 实机运行仍需验收。
 
 C11 Runtime 兼容层：下载 GitHub Windows Wheelhouse 并在独立目录执行升级与实际 embedded Python smoke，步骤见 [RUNTIME_UPGRADE.md](docs/RUNTIME_UPGRADE.md)。
+
+完整待验收 Native ZIP 已由 d8d032d 同源工件实际组装，取得 2629 文件 SHA 审计，但尚未进行 Windows embedded Python 与 WPF GUI 实机验收。[Windows 实机验收说明](docs/PREPARED_NATIVE_WINDOWS_ACCEPTANCE.md)。

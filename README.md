@@ -33,7 +33,7 @@
 
 ## 当前测试与交付真相
 
-当前源代码测试总数为 **132 项**（GitHub CI 才能证明实际 PASS），外加独立的 **3 条 Chromium 真实浏览器业务验收场景**。原 `v0.8.12-R2` 的 **725 项测试**是历史版本库存参考，不能推导出当前版本达到相同的业务覆盖率。
+当前源代码测试总数为 **138 项**（GitHub CI 才能证明实际 PASS），外加独立的 **3 条 Chromium 真实浏览器业务验收场景**。原 `v0.8.12-R2` 的 **725 项测试**是历史版本库存参考，不能推导出当前版本达到相同的业务覆盖率。
 
 2026-10-18 最近已确认的整合基线 `69f60b9`：
 - [Source Gate：Ubuntu + Windows](https://github.com/ALV522/-SRW-/actions/runs/39134969100) — PASS（当时 109 项源回归）。
@@ -83,3 +83,7 @@ A Windows/.NET 10 CI workflow now produces digest-bound, unsigned WPF Host candi
 ### C11 Windows Python 离线兼容升级
 
 新增 [Windows Runtime 隔离升级流程](docs/RUNTIME_UPGRADE.md)：从 GitHub Windows CI 下载同一源码提交的带 SHA-256 清单的依赖 Wheelhouse；对已经恢复的 alpha10 Python 3.12 进行全新目录的 `Lib/c11-overlay` 安装，严格校验 `python312._pth` 的加载优先级，**实际运行嵌入式 Python 导入验证**，保留五个 Knowledge DB 不变。未通过嵌入式运行测试时禁止 Native 封包。旧输入文件绝不原地覆盖；Windows Host 与 WebView2 GUI 实机验收仍属于独立阶段。
+
+### C11 完整 Windows Native 候选包（Prepared，未 GUI 验收）
+
+已使用同一 Git SHA `d8d032d` 的 GitHub Source ZIP、Windows Host 和 Wheelhouse，结合历史 Runtime / 五套 Knowledge，实际装配出 **101,617,623 B** 的 `SRW_C11_Windows_Native_PREPARED_UNVERIFIED_GUI_d8d032d.zip`。源码、2332 项 Runtime、五库 SQLite、Host provenance 及最终 ZIP **2629 个文件**的 SHA 白名单审计通过。嵌入式 Windows Python 与 WPF GUI **尚未在目标 Windows 执行**。验收命令、SHA 与边界见 [完整候选包与 Windows 实机验收](docs/PREPARED_NATIVE_WINDOWS_ACCEPTANCE.md)。
