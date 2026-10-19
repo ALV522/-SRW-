@@ -40,6 +40,7 @@ class LocalWebLauncherTests(unittest.TestCase):
         with closing(sqlite3.connect(self.workspace / "data" / "srw_v1.db")) as conn:
             conn.execute("CREATE TABLE v1_schema_meta (schema_revision TEXT)")
             conn.execute("INSERT INTO v1_schema_meta VALUES ('v1_0014')")
+            conn.commit()
         self.assertTrue(self.check())
         self.assertEqual(self.check(reuse=True), [])
         self.assertTrue(self.check(synthetic=True))
@@ -63,6 +64,7 @@ class LocalWebLauncherTests(unittest.TestCase):
         with closing(sqlite3.connect(db)) as conn:
             conn.execute("CREATE TABLE v1_schema_meta (schema_revision TEXT)")
             conn.execute("INSERT INTO v1_schema_meta VALUES ('v1_9999')")
+            conn.commit()
         self.assertTrue(any("integrity/schema" in e for e in self.check(reuse=True)))
 
     def test_rejects_symlink_database(self):
