@@ -7,6 +7,7 @@ on:
       - .github/workflows/native-host-sandbox.yml
       - explorations/html-site/assemble_native_lab.py
       - explorations/html-site/run_native_lab.py
+      - explorations/html-site/prepare_native_host_lab.py
       - desktop/**
       - global.json
   workflow_dispatch:
@@ -89,15 +90,51 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
-      - name: Download verified C11 WPF host-only output
-        uses: actions/download-artifact@v4
+      - name: Use exact pinned .NET 10 SDK for independent Source Lab adaptation
+        uses: actions/setup-dotnet@v4
         with:
-          name: SRW-C11-WPF-HOST-ONLY-NOT-PORTABLE-${{ github.sha }}
-          path: artifacts/wpf-host-only
+          dotnet-version: '10.0.302'
+      - name: Copy and strictly adapt WPF host sources for an external venv Python
+        shell: pwsh
+        run: |
+          python explorations/html-site/prepare_native_host_lab.py --output artifacts/native-lab-desktop-src
+          if ($LASTEXITCODE -ne 0) { throw "Strict isolated C# patch failed" }
+      - name: Compile distinctly labeled LAB host (production C# source remains unchanged)
+        shell: pwsh
+        run: |
+          dotnet restore artifacts/native-lab-desktop-src/SRW.Desktop.csproj --locked-mode -r win-x64
+          if ($LASTEXITCODE -ne 0) { throw "Lab host locked restore failed" }
+          dotnet build artifacts/native-lab-desktop-src/SRW.Desktop.csproj -c Release -r win-x64 --no-restore --nologo -p:ContinuousIntegrationBuild=true -p:SelfContained=false -o artifacts/native-lab-host-only
+          if ($LASTEXITCODE -ne 0) { throw "LAB host compile failed" }
+          $exe = 'artifacts/native-lab-host-only/SmartRecruitmentWorkbench.exe'
+          if (!(Test-Path -LiteralPath $exe -PathType Leaf)) { throw 'Lab WPF executable missing' }
+          $patch = 'artifacts/native-lab-desktop-src/NATIVE_LAB_CSHARP_PATCH.json'
+          Copy-Item -LiteralPath $patch -Destination artifacts/native-lab-host-only/NATIVE_LAB_CSHARP_PATCH.json
+          $outputs = @(Get-ChildItem -LiteralPath artifacts/native-lab-host-only -File |
+            Where-Object { $_.Name -ne 'NATIVE_LAB_CSHARP_PATCH.json' } |
+            ForEach-Object {
+              [ordered]@{
+                file = $_.Name
+                sha256 = (Get-FileHash -Algorithm SHA256 -LiteralPath $_.FullName).Hash.ToLowerInvariant()
+              }
+            })
+          $truth = [ordered]@{
+            artifact_kind = 'SOURCE_LAB_HOST_MODIFIED'
+            source_sha = $env:GITHUB_SHA
+            source_modified = $true
+            production_source_modified = $false
+            release_approved = $false
+            native_gui_accepted = $false
+            python_executable = 'runtime/Scripts/python.exe'
+            source_patch_sha256 = (Get-FileHash -Algorithm SHA256 -LiteralPath $patch).Hash.ToLowerInvariant()
+            outputs = $outputs
+            claim_boundary = 'Experimental WPF host built from an isolated copied source with explicit virtualenv Python path adaptation; not canonical Native.'
+          }
+          $truth | ConvertTo-Json -Depth 8 | Set-Content -LiteralPath artifacts/native-lab-host-only/WPF_HOST_SOURCE_BUILD_TRUTH.json -Encoding UTF8
       - name: Assemble Native SOURCE preview and verify every staged file
         shell: pwsh
         run: |
-          python explorations/html-site/assemble_native_lab.py --output artifacts/native-source-lab --host-dir artifacts/wpf-host-only
+          python explorations/html-site/assemble_native_lab.py --output artifacts/native-source-lab --host-dir artifacts/native-lab-host-only
           if ($LASTEXITCODE -ne 0) { throw "Native lab assembly failed" }
           python explorations/html-site/assemble_native_lab.py --verify artifacts/native-source-lab
           if ($LASTEXITCODE -ne 0) { throw "Native lab file hash audit failed" }
