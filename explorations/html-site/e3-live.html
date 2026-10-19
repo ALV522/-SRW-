@@ -17,7 +17,7 @@ main{min-width:0}.topbar{height:64px;background:#fff;border-bottom:1px solid var
 .badge,.pill{display:inline-flex;align-items:center;padding:4px 8px;border-radius:999px;font-size:12px;background:#f1f4f8;color:#526072;white-space:nowrap}.pill.good,.badge.good{background:var(--goodbg);color:var(--good)}.pill.warn,.badge.warn{background:var(--warnbg);color:var(--warn)}.pill.bad,.badge.bad{background:var(--badbg);color:var(--bad)}.badge.live{background:#eaf8f2;color:#087a53}
 .btn{border:1px solid var(--line);background:#fff;padding:8px 11px;border-radius:8px;cursor:pointer;color:var(--text)}.btn:hover{background:#f8fafc}.btn.primary{background:var(--accent);border-color:var(--accent);color:#fff}.btn.primary:hover{background:var(--accent2)}.btn.small{padding:6px 9px;font-size:12px}
 .notice{padding:12px 14px;border:1px solid #aebfff;background:var(--soft);border-radius:10px;color:#2a47a8;margin-bottom:16px}.notice.warn{border-color:#e5c26c;background:#fff8e9;color:#805600}
-.grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:14px}.e2-meta-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.e2-meta-grid strong{overflow-wrap:anywhere}#e2-candidate{width:100%;max-width:100%;min-width:0;text-overflow:ellipsis}#e2-editor{min-width:0;overflow-wrap:anywhere}.e2-meta-grid .card{min-width:0}.card,.panel{background:#fff;border:1px solid var(--line);border-radius:14px;box-shadow:var(--shadow)}.card{padding:16px}.card small{color:var(--muted)}.card strong{display:block;font-size:26px;margin-top:6px}.panel{margin-top:16px}.ph{padding:15px 18px;border-bottom:1px solid var(--line);display:flex;align-items:center;justify-content:space-between;gap:12px}.ph h2,.ph h3{margin:0}.pb{padding:16px 18px}
+.grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:14px}.e3-meta-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.e3-meta-grid strong{overflow-wrap:anywhere}#e3-candidate{width:100%;max-width:100%;min-width:0;text-overflow:ellipsis}#e3-editor{min-width:0;overflow-wrap:anywhere}.e3-meta-grid .card{min-width:0}.card,.panel{background:#fff;border:1px solid var(--line);border-radius:14px;box-shadow:var(--shadow)}.card{padding:16px}.card small{color:var(--muted)}.card strong{display:block;font-size:26px;margin-top:6px}.panel{margin-top:16px}.ph{padding:15px 18px;border-bottom:1px solid var(--line);display:flex;align-items:center;justify-content:space-between;gap:12px}.ph h2,.ph h3{margin:0}.pb{padding:16px 18px}
 .list{display:grid;gap:9px}.item{display:flex;align-items:center;justify-content:space-between;gap:15px;padding:12px;border:1px solid var(--line);border-radius:10px}.item-title{font-weight:650}.item-note{font-size:12px;color:var(--muted);margin-top:3px}.actions{display:flex;gap:7px;flex-wrap:wrap;align-items:center}
 .flow{display:grid;grid-template-columns:repeat(7,minmax(90px,1fr));gap:8px}.step{padding:12px 8px;text-align:center;border:1px solid var(--line);background:#fafbfc;border-radius:10px}.step strong{display:block;font-size:20px}.step span{font-size:12px;color:var(--muted)}
 .two{display:grid;grid-template-columns:1.2fr .8fr;gap:16px}.three{display:grid;grid-template-columns:repeat(3,1fr);gap:12px}
@@ -28,20 +28,20 @@ table{width:100%;border-collapse:collapse}th,td{text-align:left;padding:10px 8px
 .source,.criterion,.claim{border:1px solid var(--line);border-radius:10px;padding:12px;margin:9px 0}.source.current{border-color:#9ab1ff;background:#f9fbff}.claim.unreviewed{border-left:3px solid #e9aa21}.claim.confirmed{border-left:3px solid var(--good)}.claim.rejected{border-left:3px solid #a5adba;opacity:.75}.criterion .row{display:flex;justify-content:space-between;gap:10px}.code{font-family:ui-monospace,SFMono-Regular,Consolas,monospace;font-size:12px;white-space:pre-wrap;background:#f8fafc;border:1px solid var(--line);padding:10px;border-radius:8px}
 .empty{padding:28px;text-align:center;color:var(--muted)}.loading{padding:40px;text-align:center;color:var(--muted)}.error{padding:13px;border-radius:9px;background:var(--badbg);color:var(--bad);border:1px solid #f2bbb5}
 @media(max-width:1050px){.app{grid-template-columns:82px 1fr}.brand b,.brand small,.nav .label,.nav-label,.side-note{display:none}.grid{grid-template-columns:repeat(2,1fr)}.two,.workspace{grid-template-columns:minmax(0,1fr)}.candidate-side{position:static}.flow{grid-template-columns:repeat(4,1fr)}}
-@media(max-width:680px){.topbar .right>.badge.warn{display:none}.topbar{gap:8px}.topbar #top-title{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.topbar .right{min-width:0;flex-shrink:1}.topbar .right .badge{max-width:170px;overflow:hidden;text-overflow:ellipsis}.e2-meta-grid{grid-template-columns:minmax(0,1fr)}.topbar{padding:0 14px}.content{padding:14px}.grid,.three{grid-template-columns:1fr}.flow{grid-template-columns:repeat(2,1fr)}.hero,.project-head{display:block}.actions{margin-top:10px}}
+@media(max-width:680px){.topbar .right>.badge.warn{display:none}.topbar{gap:8px}.topbar #top-title{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.topbar .right{min-width:0;flex-shrink:1}.topbar .right .badge{max-width:170px;overflow:hidden;text-overflow:ellipsis}.e3-meta-grid{grid-template-columns:minmax(0,1fr)}.topbar{padding:0 14px}.content{padding:14px}.grid,.three{grid-template-columns:1fr}.flow{grid-template-columns:repeat(2,1fr)}.hero,.project-head{display:block}.actions{margin-top:10px}}
 </style>
 </head>
 <body>
 <div class="app">
 <aside>
- <div class="brand"><strong>SRW</strong><b>Web Exploration E2</b><small>synthetic-only conditional Action Plan</small></div>
+ <div class="brand"><strong>SRW</strong><b>Web Exploration E3</b><small>synthetic-only conditional Action Plan</small></div>
  <div class="nav-label">Recruitment</div>
  <div class="nav">
   <button class="active" data-page="home">⌂ <span class="label">工作台</span></button>
   <button data-page="projects">▣ <span class="label">招聘项目</span></button>
   <button data-page="candidates">◉ <span class="label">候选人</span></button>
   <button data-page="review">✓ <span class="label">复核中心</span></button>
-  <button data-page="e2">⇄ <span class="label">E3 原子事务</span></button>
+  <button data-page="e3">⇄ <span class="label">E3 原子事务</span></button>
  </div>
  <div class="nav-label">System</div>
  <div class="nav">
@@ -52,7 +52,7 @@ table{width:100%;border-collapse:collapse}th,td{text-align:left;padding:10px 8px
 <main>
  <div class="topbar">
   <strong id="top-title">工作台</strong>
-  <div class="right"><span class="badge" id="api-state">初始化</span><span class="badge warn">E2 SYNTHETIC ONLY</span></div>
+  <div class="right"><span class="badge" id="api-state">初始化</span><span class="badge warn">E3 SYNTHETIC ONLY</span></div>
  </div>
  <div class="content" id="root"><div class="loading">正在初始化探索版…</div></div>
 </main>
@@ -71,9 +71,9 @@ const state={
  currentCandidate:null,
  currentWorkspace:null,
  currentBrief:null,
- e2Plan:null,
- e2CandidateId:"",
- e2Etag:"",
+ e3Plan:null,
+ e3CandidateId:"",
+ e3Etag:"",
  candidateDirectory:null,
  serviceInfo:null,
  runtimeInfo:null,
@@ -208,7 +208,7 @@ function home(){
  const d=state.dashboard||mock.dashboard;
  const todos=d.operational_todos||{},st=d.candidates_by_stage||{},wb=d.decision_workbench||{items:[]},oq=d.operational_queue||{items:[]},rq=d.review_queue||{items:[]};
  root.innerHTML=
- '<div class="hero"><div><h1>今天要处理什么</h1><div class="muted">E2 使用真实 C11 后端；仅合成候选人的跟进计划可进行条件写入，其它招聘数据保持只读。</div></div><button class="btn primary" onclick="projectsPage()">进入招聘项目</button></div>'+
+ '<div class="hero"><div><h1>今天要处理什么</h1><div class="muted">E3 使用真实 C11 后端；仅合成候选人的跟进计划可进行条件写入，其它招聘数据保持只读。</div></div><button class="btn primary" onclick="projectsPage()">进入招聘项目</button></div>'+
  '<div class="notice '+(state.mode==='mock'?'warn':'')+'">'+(state.mode==='live'?'当前是 <strong>Live read-only</strong>：页面来自实验 HTML，数据直接读取本机 SRW 后端。Web 与 EXE 因此可以天然看到同一份权威数据。':'当前是 <strong>Mock 模式，不是真实招聘数据</strong>。'+esc(state.liveError||'没有检测到 SRW 后端。')+' 请启动正式 SRW 服务并使用 E1 Bridge。')+'</div>'+
  '<div class="grid">'+[
   ['逾期联系',todos.overdue_contacts||0],
@@ -402,7 +402,7 @@ function renderCandidate(){
  '<div class="stat"><small>Offer</small><strong>'+esc(s.offer_status||'尚无')+'</strong></div>'+
  '<div class="stat"><small>下次联系</small><strong>'+esc(plan.next_contact_at||'未安排')+'</strong></div>'+
  '<div class="stat"><small>联系方式</small><div>'+esc(contact.phone||'未录电话')+'</div><div>'+esc(contact.email||'未录邮箱')+'</div></div></section>'+
- '<section class="panel candidate-main" style="margin:0"><div class="tabs"><button class="active">证据与判断</button><button disabled>面试（E2）</button><button disabled>决定（E2）</button><button disabled>Offer（E2）</button></div><div class="pb">'+
+ '<section class="panel candidate-main" style="margin:0"><div class="tabs"><button class="active">证据与判断</button><button disabled>面试（E3）</button><button disabled>决定（E3）</button><button disabled>Offer（E3）</button></div><div class="pb">'+
  '<div class="two"><div><h3>来源材料</h3>'+(sources.length?sources.map(src=>'<div class="source '+(src.in_current_material?'current':'')+'"><div class="actions">'+pill(src.source_kind||'source')+(src.in_current_material?pill('当前材料','good'):'')+'</div><strong>'+esc(src.filename||src.media_type||src.source_id)+'</strong><div class="item-note">'+esc(src.text_preview||(!src.has_text?'二进制材料':'无预览'))+'</div></div>').join(''):'<div class="empty">暂无材料</div>')+'</div>'+
  '<div><h3>Claims</h3>'+(claims.length?claims.map(cl=>'<div class="claim '+esc(cl.confirmation_state)+'"><div class="actions">'+pill(cl.confirmation_state,cl.confirmation_state==='confirmed'?'good':cl.confirmation_state==='unreviewed'?'warn':'')+'</div><div>'+esc(cl.normalized_text)+'</div><div class="item-note">Source '+esc(cl.source_id)+' · '+esc(cl.authority||'')+'</div></div>').join(''):'<div class="empty">暂无 Claim</div>')+'</div></div>'+
  '<div style="margin-top:18px"><h3>评价标准与核实</h3>'+(criteria.length?criteria.map(cr=>'<div class="criterion"><div class="row"><strong>'+esc(cr.name||cr.criterion_key)+'</strong><div class="actions">'+pill(cr.status_label||'—',String(cr.status_label).includes('矛盾')?'bad':String(cr.status_label).includes('核实')?'warn':'good')+pill('证据 '+(cr.evidence_label||'—'))+'</div></div><div class="item-note">'+esc(cr.reason||cr.gap||cr.probe||'—')+'</div></div>').join(''):'<div class="empty">暂无评价标准或尚未发布</div>')+'</div>'+
@@ -435,10 +435,10 @@ function architecturePage(){
 }
 
 
-async function e2Page(){
+async function e3Page(){
  setTitle('E3 原子事务');
- rememberRoute('e2');
- activate('e2');
+ rememberRoute('e3');
+ activate('e3');
  root.innerHTML='<div class="loading">正在读取合成候选人目录…</div>';
  try{
   if(!state.candidateDirectory){
@@ -448,62 +448,62 @@ async function e2Page(){
   root.innerHTML='<div class="hero"><div><h1>E3 真实数据库事务实验</h1><div class="muted">仅连接本工具创建的一次性合成候选人，不用于正式 SRW 数据。</div></div></div>'+
    '<div class="notice warn"><strong>实验性事务边界：</strong>本界面允许修改合成候选人的 Contact Action Plan。必须携带 If-Match；过期版本返回 412。当前 ETag 版本检查、业务写入与审计记录在实验性 C11 Core 的同一个 SQLite 事务内执行；旧版 C11 直写接口不会维护 E3 版本，因此仍不能用于正式数据。</div>'+
    '<section class="panel"><div class="ph"><h2>选择合成候选人</h2><span class="badge warn">SYNTHETIC ONLY</span></div>'+
-   '<div class="pb"><div class="actions"><select id="e2-candidate" class="btn"><option value="">选择候选人</option>'+
+   '<div class="pb"><div class="actions"><select id="e3-candidate" class="btn"><option value="">选择候选人</option>'+
     rows.map(x=>'<option value="'+esc(x.candidate_id)+'">'+esc(x.display_name)+' · '+esc(x.project_title||'')+'</option>').join('')+
-   '</select><button class="btn" id="e2-load">读取最新版本</button></div><div id="e2-editor" class="muted" style="margin-top:18px">先选取候选人读取 Action Plan。</div></div></section>';
-  document.querySelector('#e2-load').onclick=()=>loadE2Plan(document.querySelector('#e2-candidate').value);
-  document.querySelector('#e2-candidate').onchange=()=>loadE2Plan(document.querySelector('#e2-candidate').value);
-  if(state.e2CandidateId&&rows.some(x=>x.candidate_id===state.e2CandidateId)){
-   document.querySelector('#e2-candidate').value=state.e2CandidateId;
-   await loadE2Plan(state.e2CandidateId);
+   '</select><button class="btn" id="e3-load">读取最新版本</button></div><div id="e3-editor" class="muted" style="margin-top:18px">先选取候选人读取 Action Plan。</div></div></section>';
+  document.querySelector('#e3-load').onclick=()=>loadE3Plan(document.querySelector('#e3-candidate').value);
+  document.querySelector('#e3-candidate').onchange=()=>loadE3Plan(document.querySelector('#e3-candidate').value);
+  if(state.e3CandidateId&&rows.some(x=>x.candidate_id===state.e3CandidateId)){
+   document.querySelector('#e3-candidate').value=state.e3CandidateId;
+   await loadE3Plan(state.e3CandidateId);
   }
  }catch(err){
   root.innerHTML='<div class="error">E3 页面初始化失败：'+esc(err.message)+'</div>';
  }
 }
 
-async function loadE2Plan(cid){
- const area=document.querySelector('#e2-editor');
+async function loadE3Plan(cid){
+ const area=document.querySelector('#e3-editor');
  if(!area||!cid)return;
  area.textContent='正在加载当前 Action Plan…';
  try{
   const res=await fetch('/api/v1/candidates/'+encodeURIComponent(cid)+'/action-plan',{method:'GET',cache:'no-store',headers:{Accept:'application/json'}});
   const body=await res.json();
   if(!res.ok)throw new Error('GET Action Plan HTTP '+res.status+' — '+String(body.error||'not allowed'));
-  state.e2CandidateId=cid;
-  state.e2Etag=res.headers.get('etag')||'';
-  if(!state.e2Etag)throw new Error('E3 Core response has no ETag; conditional write is disabled');
-  state.e2Plan=body;
-  renderE2Editor();
+  state.e3CandidateId=cid;
+  state.e3Etag=res.headers.get('etag')||'';
+  if(!state.e3Etag)throw new Error('E3 Core response has no ETag; conditional write is disabled');
+  state.e3Plan=body;
+  renderE3Editor();
  }catch(err){area.innerHTML='<div class="error">'+esc(err.message)+'</div>';}
 }
 
-function renderE2Editor(message='',conflict=false){
- const p=state.e2Plan||{},area=document.querySelector('#e2-editor');
+function renderE3Editor(message='',conflict=false){
+ const p=state.e3Plan||{},area=document.querySelector('#e3-editor');
  if(!area)return;
- area.innerHTML='<div class="grid e2-meta-grid" style="margin-bottom:14px">'+
+ area.innerHTML='<div class="grid e3-meta-grid" style="margin-bottom:14px">'+
   '<div class="card"><small>当前候选人</small><strong style="font-size:16px">'+esc(p.candidate_id||'')+'</strong></div>'+
-  '<div class="card"><small>当前版本标识（截断展示）</small><strong style="font-size:14px">'+esc((state.e2Etag||'').slice(0,18))+'…</strong></div></div>'+
-  '<label>跟进负责人<input class="btn" id="e2-owner" style="display:block;width:100%;margin:5px 0 12px" maxlength="180" value="'+esc(p.owner||'')+'"></label>'+
-  '<label>联系优先级<select class="btn" id="e2-priority" style="display:block;margin:5px 0 12px">'+
+  '<div class="card"><small>当前版本标识（截断展示）</small><strong style="font-size:14px">'+esc((state.e3Etag||'').slice(0,18))+'…</strong></div></div>'+
+  '<label>跟进负责人<input class="btn" id="e3-owner" style="display:block;width:100%;margin:5px 0 12px" maxlength="180" value="'+esc(p.owner||'')+'"></label>'+
+  '<label>联系优先级<select class="btn" id="e3-priority" style="display:block;margin:5px 0 12px">'+
    [['normal','正常'],['today','今天'],['high','高'],['low','低']].map(([k,v])=>'<option value="'+k+'" '+(p.priority===k?'selected':'')+'>'+v+'</option>').join('')+'</select></label>'+
-  '<label>跟进说明<input class="btn" id="e2-reason" style="display:block;width:100%;margin:5px 0 12px" maxlength="1000" value="'+esc(p.reason||'')+'"></label>'+
-  '<div class="actions"><button class="btn primary" id="e2-save">条件保存（If-Match）</button><button class="btn" id="e2-reload">重新读取最新版本</button></div>'+
+  '<label>跟进说明<input class="btn" id="e3-reason" style="display:block;width:100%;margin:5px 0 12px" maxlength="1000" value="'+esc(p.reason||'')+'"></label>'+
+  '<div class="actions"><button class="btn primary" id="e3-save">条件保存（If-Match）</button><button class="btn" id="e3-reload">重新读取最新版本</button></div>'+
   (message?'<div class="'+(conflict?'error':'notice')+'" style="margin-top:12px">'+esc(message)+'</div>':'');
- document.querySelector('#e2-save').onclick=saveE2Plan;
- document.querySelector('#e2-reload').onclick=()=>loadE2Plan(state.e2CandidateId);
+ document.querySelector('#e3-save').onclick=saveE3Plan;
+ document.querySelector('#e3-reload').onclick=()=>loadE3Plan(state.e3CandidateId);
 }
 
-async function saveE2Plan(){
- const cid=state.e2CandidateId;
- const tag=state.e2Etag;
+async function saveE3Plan(){
+ const cid=state.e3CandidateId;
+ const tag=state.e3Etag;
  if(!cid||!tag)return;
  const payload={
-  owner:document.querySelector('#e2-owner').value.trim(),
-  priority:document.querySelector('#e2-priority').value,
-  reason:document.querySelector('#e2-reason').value.trim()
+  owner:document.querySelector('#e3-owner').value.trim(),
+  priority:document.querySelector('#e3-priority').value,
+  reason:document.querySelector('#e3-reason').value.trim()
  };
- document.querySelector('#e2-save').disabled=true;
+ document.querySelector('#e3-save').disabled=true;
  try{
   const res=await fetch('/api/v1/candidates/'+encodeURIComponent(cid)+'/action-plan',{
    method:'PATCH',
@@ -512,22 +512,22 @@ async function saveE2Plan(){
   });
   const data=await res.json();
   if(res.status===412){
-   document.querySelector('#e2-save').disabled=false;
+   document.querySelector('#e3-save').disabled=false;
    const msg='检测到 412 STALE_ACTION_PLAN：另一个界面已更新。旧值不会覆盖新值；请手动重新读取后决定是否修改。';
    const note=document.createElement('div');note.className='error';note.textContent=msg;
-   document.querySelector('#e2-editor').appendChild(note);
+   document.querySelector('#e3-editor').appendChild(note);
    return;
   }
   if(!res.ok)throw new Error('PATCH HTTP '+res.status+' — '+String(data.error||'rejected'));
   const fresh=res.headers.get('etag');
   if(!fresh)throw new Error('E3 Core mutation response has no ETag');
-  state.e2Plan=data;
-  state.e2Etag=fresh;
-  renderE2Editor('条件写入成功，数据已由真正的 SRW Action Plan API 持久化，并产生正常业务审计。');
+  state.e3Plan=data;
+  state.e3Etag=fresh;
+  renderE3Editor('条件写入成功，数据已由真正的 SRW Action Plan API 持久化，并产生正常业务审计。');
  }catch(err){
-  document.querySelector('#e2-save').disabled=false;
+  document.querySelector('#e3-save').disabled=false;
   const note=document.createElement('div');note.className='error';note.textContent='受控写入失败：'+String(err.message||err);
-  document.querySelector('#e2-editor').appendChild(note);
+  document.querySelector('#e3-editor').appendChild(note);
  }
 }
 
@@ -552,8 +552,8 @@ async function restoreRouteFromHash(){
    reviewPage();
   }else if(route[0]==='architecture'){
    architecturePage();
-  }else if(route[0]==='e2'&&typeof e2Page==='function'){
-   await e2Page();
+  }else if(route[0]==='e3'&&typeof e3Page==='function'){
+   await e3Page();
   }else if(route[0]==='projects'){
    projectsPage();
   }else{
@@ -571,7 +571,7 @@ function activate(page){
  document.querySelectorAll('.nav button').forEach(b=>b.classList.toggle('active',b.dataset.page===page));
 }
 function route(page){
- ({home,projects:projectsPage,candidates:candidatesPage,review:reviewPage,architecture:architecturePage,e2:e2Page}[page]||home)();
+ ({home,projects:projectsPage,candidates:candidatesPage,review:reviewPage,architecture:architecturePage,e3:e3Page}[page]||home)();
 }
 document.querySelectorAll('.nav button').forEach(b=>b.addEventListener('click',()=>route(b.dataset.page)));
 
