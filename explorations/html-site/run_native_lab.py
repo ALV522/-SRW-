@@ -195,7 +195,7 @@ def main():
     web_server=None
     web_thread=None
     print("SRW Native SOURCE lab: Windows EXE + C11 backend, all recruitment data synthetic.",flush=True)
-    with synthetic_temporary_directory("srw-native-lab-") as td:
+    with synthetic_temporary_directory("srw-e-native-lab-") as td:
         data=Path(td)
         try:
             proc=subprocess.Popen([
