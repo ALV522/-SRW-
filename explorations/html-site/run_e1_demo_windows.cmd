@@ -79,6 +79,7 @@ set "E1_DEMO_SCRIPT=run_e1_demo.py"
 set "E1_DEMO_ARGS=--open-browser"
 if /i "%~1"=="--e2" set "E1_DEMO_SCRIPT=run_e2_demo.py"
 if /i "%~1"=="--e3" set "E1_DEMO_SCRIPT=run_e3_demo.py"
+if /i "%~1"=="--e4" set "E1_DEMO_SCRIPT=run_e4_demo.py"
 if /i "%~1"=="--smoke" set "E1_DEMO_ARGS=--smoke"
 if /i "%~2"=="--smoke" set "E1_DEMO_ARGS=--smoke"
 
