@@ -1,66 +1,49 @@
-# SRW 仓库治理与主线规则（2026-10-18）
+# SRW 仓库治理与分支规则（2026-10-19）
 
-## 1. 唯一研发主线
+## 唯一整合主线与版本身份
 
-**GitHub `main` 是当前唯一可交付的整合源码主线**。目前主线位于 Convergence 11，产品/源码版本为 `1.0.0-alpha10-convergence11`，数据库 schema 为 `v1_0014`。该版本不是旧 v0.8.x 的简单更名，也不意味着历史 0.8.x 的全部业务能力已有可证明的等价实现。
+**`main` 是唯一经过 PR/CI 约束的产品开发源码整合主线**。当前版本 `1.0.0-alpha10-convergence11`、Schema `v1_0014`。历史 `v0.8.12-R2` 仅作为成熟业务能力的保留/对标对象，不是同一源码身份。
 
-项目的研发策略是“**0.8.x 成熟业务能力作为保留/对标对象，C08–C11 源码作为目前实际可持续开发基线**”。尤其是 `v0.8.12-R2` 代表历史能力完整性参考，并非目前打包发布的 Windows 原生可执行版本。任何以 UI 改造为由删除成熟证据链、隐私、知识治理、招聘运营、提供商、OCR/ASR 等能力的做法，都需要经实际业务回归审查。
+真实 Windows 的 `d8d032d` WPF GUI 基础验收已通过，但不表示更新的 `main` 已经发布正式 Native/Portable。E1–E5/Native SOURCE Lab 成果属于独立 `explore/`，不能无审计地整体合并或访问真实用户数据。
 
-## 2. 分支如何使用
+## 分支管理
 
-本次审计在仓库中观察到 **26 条分支（含 main）**。大量旧 `dev/`、`fix/`、`integration/` 和 `repair/` 分支是已合并 PR 的工作保留现场，并不是并行维护的产品发行版。不要因分支存在就认定相关功能仍在维护，更不能从历史分支直接形成当前发布包。
+本次 GitHub API 盘点前有 **35** 条分支；创建本次 `docs/repository-status-readme-20261019` 文档 PR 分支后，快照为 **36 条（含 main）**。详细 SHA 见 [分支盘点](BRANCH_INVENTORY.md)。数量是随分支变动的快照，不是固定项目版本数。
 
-- `main`：PR 审核、验证完成后的唯一集成主线；**禁止强制重写历史**。
-- `dev/`：较完整的业务功能或开发任务分支；每项任务从当时最新 `main` 分出。
-- `fix/`：可定位缺陷及其回归测试；通过 PR 合并。
-- `docs/`：文档、历史证据、版本治理以及相关验证脚本；照常要求 CI。
-- `integration/`、`repair/`：历史集成/恢复记录；不作为当前发行主线。
+| 前缀 | 角色与合并规则 |
+|---|---|
+| `main` | 唯一可作为正式整合源码的主线，不允许 force-push |
+| `dev/`、`fix/` | 垂直业务开发、缺陷修复与回归；从最新 main 分出，经 PR 合并 |
+| `docs/` | 文档、历史证据和版本治理；同样必须更新源码 SHA 清单并通过 CI |
+| `explore/` | HTML E1–E5、Native SOURCE Lab 等技术实验；单独验收，不直接提升为正式产品 |
+| `integration/`、`repair/` | 旧整合/源恢复记录；保留溯源，不能当作发行分支 |
 
-旧分支不能仅凭“名称过时”就删除。先核对 PR 是否合并、当前分支是否比 `main` 有未合并提交，以及是否包含唯一审计/恢复材料，再考虑清理。本轮不批量删除历史分支，以免破坏溯源。
+**不自动清理任何旧分支**。逐项 compare `main...branch`、查看 PR 合并、唯一修改和工件来源，确认可复原后再讨论归档或删除；不要根据名称或时间直接删掉研发证据。
 
-## 3. 仓库结构
+## 源码与 CI
 
-| 位置 | 责任 | 维护要求 |
-|---|---|---|
-| `backend/srw/kernel/` | 哈希、时钟、业务不变量 | 维持确定性语义 |
-| `backend/srw/modules/` | 招聘项目、候选人、Evidence/Decision、面试、Offer、治理、任务 | 优先恢复和保护业务完整性 |
-| `backend/srw/surfaces/` | 候选人、项目、业务队列的读模型 | 不将读模型误当自动人事决定 |
-| `backend/srw/api/` | HTTP 路由、本地安全边界 | 新路由优先拆分小模块，避免继续扩大 `fullworkbench.py` |
-| `backend/srw/runtime/` | 本地数据库、任务、运行时、设置与备份 | 强化断点恢复、资源释放与数据安全 |
-| `frontend/dist/` | 当前浏览器/WebView2 功能界面 | 未有行为等价测试前不得以换框架删除功能 |
-| `desktop/SRW.Desktop/` | WPF/WebView2 Host 源码 | 与最终 Windows Native 二进制验收分开 |
-| `convergence_tests/` | Python 源码与业务回归 | 合成数据，严格隔离生产数据 |
-| `browser_acceptance/` | 真 Chromium 浏览器操作 + API + SQLite 验收 | 不等于 WPF 实机验收 |
-| `scripts/` | 源码/发布完整性、封包与恢复校验 | SHA 严格 fail-closed |
-| `verification/` | 核验材料，包括明确标注的历史记录 | 旧记录不能冒充新跑的 CI |
-| `docs/history/` | Pre-Git 历史与原始 ZIP 的目录索引 | 大包独立存储，不能导入主线 |
-| `.github/workflows/` | 源码回归、仓库完整性及 Chromium 业务验收 | PR 与 main 的通过记录都应保留 |
+| 目录 | 当前职责 |
+|---|---|
+| `backend/srw/kernel/`、`modules/`、`surfaces/` | 业务不变量、领域模型及读模型 |
+| `backend/srw/api/`、`runtime/` | HTTP Core、本地数据库、任务、身份、备份恢复 |
+| `frontend/dist/`、`desktop/SRW.Desktop/` | 保留业务前端、WPF/WebView2 Host 源码 |
+| `convergence_tests/`、`browser_acceptance/` | Python 业务回归、Chromium 真浏览器集成 |
+| `scripts/`、`build-lock/`、`verification/` | 源码 SHA、封包与供应链证据 |
+| `docs/history/` | Pre-Git 和历史 ZIP 溯源 |
+| `.github/workflows/` | 源回归、Repository Integrity、Chromium、Windows Host/Wheelhouse；探索分支另有隔离工作流 |
 
-## 4. 统一交付与证据
+按当前 `main` `c9d70cd48d03` 的正式 CI： [Ubuntu/Windows 146 项 Source Gate](https://github.com/ALV522/-SRW-/actions/runs/39227251473)、[5 项 Chromium](https://github.com/ALV522/-SRW-/actions/runs/39227251414)、[280 项 Source Integrity](https://github.com/ALV522/-SRW-/actions/runs/39227251510)，均 PASS。Windows [Host Candidate](https://github.com/ALV522/-SRW-/actions/runs/39227251307) 和 [Offline Wheelhouse](https://github.com/ALV522/-SRW-/actions/runs/39227251286) 是各自构建门禁，不能替代实际目标机的完整 GUI/业务验收。
 
-三条正式 CI：`SRW Source Gate`（Ubuntu/Windows）、`SRW Repository Integrity`（main）和 `SRW Chromium Business Acceptance`（Ubuntu）。2026-10-18 基线 `69f60b9` 已通过三类检查；当前源回归用例 109 项，Chromium 端到端场景 3 项。历史 `v0.8.12-R2` 的 725 条 backend 测试仅作为历史覆盖参考，不是当前版本 725/725 通过。
+探索实证：[E1–E5 CI](https://github.com/ALV522/-SRW-/actions/runs/39193776226)、[Native SOURCE Lab](https://github.com/ALV522/-SRW-/actions/runs/39196390613)。后者确实在 Windows CI 启动了真实 WPF EXE，浏览器 E1 与它读取相同合成 Core/SQLite；但使用临时 Python/Knowledge，没有认证为正式 Portable。
 
-`VERSION`、`BUILD_INFO.json`、`PORTABLE_MANIFEST.json`、`backend/srw/release_state.json`、`VERIFICATION_INVENTORY.json` 和 `SOURCE_MANIFEST.sha256` 承担不同职责，不能用 README 中的一句“完成”替代受约束的构建证据。
+## 每次提交、发布应执行的门禁
 
-交付分为 **source ZIP → Web Portable → Windows Native candidate → 实机验收的正式版** 四种状态；每次应记录 SHA、工件类型、是否包含 Runtime/五套 Knowledge DB、使用何种 Host，以及未完成的验证。源码 CI 通过只证明源码/回归能力，不证明存在 Windows 可启动安装包。
+1. 从最新 `main` 开分支，确定业务问题、用户操作与验收用例；小范围 PR 优于一次合并多个实验体系。
+2. 修改任何受跟踪文件（包含 README/文档）时更新 `SOURCE_MANIFEST.sha256`；`SOURCE_RECOVERY_MANIFEST.sha256` 是历史记录，**不能重建来掩盖修改**。
+3. 正式源码 PR 跑完所需 Ubuntu/Windows、Repository Integrity、Chromium/Native 回归；只以**同一提交的 SHA** 为依据合并。合并后再次核对 main 的 CI。
+4. Windows 发布物逐一标识 Source ZIP、Host-only、实验 Preview、Prepared Native、Native Candidate、Portable、RC/GA；保留准确源码 SHA、Host、Runtime、五库 Knowledge、输入哈希、工件哈希和机器验收结果。
+5. 禁止将真实简历、候选人 SQLite、Provider 密钥、私人路径/会话令牌、工作区锁或原始隐私日志上传仓库、CI 或公共 Releases。
+6. 历史 ZIP（[档案清单](history/ARCHIVE_CATALOG.md)）仅经过来源/隐私/完整性审查后才能作为独立 Historical/Unverified assets 发布。旧 `v0.8` Release 的 Web ZIP 不是 Windows Native。
+7. 不为 UI 美化牺牲 0.8.x 成熟 Evidence、Decision、Offer、AI/OCR/ASR、Knowledge、Backup 能力；优先用业务验收来确认保真。
 
-## 5. 原始历史开发包
-
-用户提供四份历史 ZIP，已读取目录和计算完整 SHA-256，详见 [原始 ZIP 清单](history/LEGACY_ARCHIVES.json) 与 [历史包说明](history/ARCHIVE_CATALOG.md)。**这些 ZIP 的二进制字节没有提交到 GitHub**。它们包含大型 Knowledge DB 和／或可执行 Runtime，未经来源认证、隐私内容和供应链检查，不得直接当成安全发布物或当前 release。
-
-GitHub 存储建议：建立清楚标识为 `Historical / Unverified` 的独立 Release，并在完成隐私/来源/完整性复核后将 ZIP 添加为 **Release assets**（不要提交进普通 Git 历史、主目录或 Git LFS 主线）。本次所用 GitHub 连接只提供文字源码写入、PR 和合并等操作，未提供 Release asset 二进制上传能力，因此仅留存可验证目录，**不虚构上传成功**。
-
-旧 `v0.8` Release 内已存在的 `SRW_v0.8.8_Web_Portable.zip` 是历史 Web 包，不能误当成需要的 `SRW_v0.8.8_Windows_Portable.zip`，更不能用它绕过 Windows Host 的精确哈希门槛。
-
-## 6. 代码更新规程
-
-从 `main` 分支，先明确具体业务缺陷或验收能力；保留 0.8.x 成熟能力，附加真实业务测试；修改 `SOURCE_MANIFEST.sha256`；通过 PR 的 CI；使用精确 head SHA 合并；最后再次确认合并后 main 的三条适用工作流均 PASS。
-
-发布版、历史 ZIP 和候选人数据不得直接加入 `main`；遇到来源不明的生产 Knowledge / Python Runtime，只允许清单和哈希比对，不能直接以“可启动”为由提升可信级别。
-
-## 7. 后续顺序
-
-1. **业务覆盖**：招聘标准发布、Claim 人工确认、Scorecard、Decision、Offer 流转、项目交接各建 Chromium 端到端验收；避免仅靠接口测试称作 UI 产品完成。
-2. **业务架构**：沿完整招聘场景拆分庞大的 `fullworkbench.py` 与 `frontend/dist/app.js`，必须先有回归测试。
-3. **Windows 工件**：取得独立审计的 Runtime、五套生产 Knowledge DB、精确的历史 Windows Host，建立 SHA 证据再试真实装配。
-4. **最终验收**：在目标 Windows 上运行 WPF/WebView2，执行完整招聘场景、备份恢复、OCR/ASR/AI Provider 和数据迁移。没有实机证据不升级状态到 RC。
+详细开发顺序见 [ROADMAP](ROADMAP.md)，当前事实以 [README](../README.md) 和 [WINDOWS_GUI_FIRST_ACCEPTANCE](WINDOWS_GUI_FIRST_ACCEPTANCE.md) 为准。
