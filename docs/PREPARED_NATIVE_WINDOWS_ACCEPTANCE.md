@@ -57,3 +57,7 @@ py -3.12 "D:\\SRW\\source\\scripts\\verify_prepared_native.py" `
 - [当前浏览器业务验收](https://github.com/ALV522/-SRW-/actions/runs/39148139326)
 
 这是过渡性的**完整待验收候选包**，并非可公开宣传的稳定 Windows Portable。GitHub 的源码回归、Windows Host 编译及 Wheelhouse 导入通过均是必要证据，但它们不能替代目标机的真实 WPF/WebView2 验收。
+
+## 首次 Windows 实机结果与重跑修复（2026-10-19）
+
+2026-10-19 用户实际执行 `verify_prepared_native.py` 于 Windows：embedded Python 3.12.10、13/13 依赖、隔离 loopback backend readiness、Windows Host ABI 均 PASS。首次 JSON 仍保持 `gui_accepted=false`；后续同一目录重复检查提示未知额外/缺失文件，怀疑 Python 导入时自动写入 `__pycache__`。已通过新版源码将 import/后端 Python 启动改为 `-B`，WPF 新 Host 使用同样选项，增加具体文件差异和重复证据文件名拒绝。请保留首次 JSON，继续进行 GUI 验收并提供 Host 日志。详细见 [WINDOWS_FIRST_SMOKE_RESULTS](WINDOWS_FIRST_SMOKE_RESULTS.md)。

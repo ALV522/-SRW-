@@ -33,7 +33,7 @@
 
 ## 当前测试与交付真相
 
-当前源代码测试总数为 **138 项**（GitHub CI 才能证明实际 PASS），外加独立的 **3 条 Chromium 真实浏览器业务验收场景**。原 `v0.8.12-R2` 的 **725 项测试**是历史版本库存参考，不能推导出当前版本达到相同的业务覆盖率。
+当前源代码测试总数为 **141 项**（GitHub CI 才能证明实际 PASS），外加独立的 **3 条 Chromium 真实浏览器业务验收场景**。原 `v0.8.12-R2` 的 **725 项测试**是历史版本库存参考，不能推导出当前版本达到相同的业务覆盖率。
 
 2026-10-18 最近已确认的整合基线 `69f60b9`：
 - [Source Gate：Ubuntu + Windows](https://github.com/ALV522/-SRW-/actions/runs/39134969100) — PASS（当时 109 项源回归）。
@@ -87,3 +87,7 @@ A Windows/.NET 10 CI workflow now produces digest-bound, unsigned WPF Host candi
 ### C11 完整 Windows Native 候选包（Prepared，未 GUI 验收）
 
 已使用同一 Git SHA `d8d032d` 的 GitHub Source ZIP、Windows Host 和 Wheelhouse，结合历史 Runtime / 五套 Knowledge，实际装配出 **101,617,623 B** 的 `SRW_C11_Windows_Native_PREPARED_UNVERIFIED_GUI_d8d032d.zip`。源码、2332 项 Runtime、五库 SQLite、Host provenance 及最终 ZIP **2629 个文件**的 SHA 白名单审计通过。嵌入式 Windows Python 与 WPF GUI **尚未在目标 Windows 执行**。验收命令、SHA 与边界见 [完整候选包与 Windows 实机验收](docs/PREPARED_NATIVE_WINDOWS_ACCEPTANCE.md)。
+
+### Windows C11 实机反馈：嵌入式 Python 和本地后端已成功启动（2026-10-19）
+
+用户在真实 Windows 上运行 prepared Native d8d032d 候选包：273 源文件、2332 Runtime、5 Knowledge、13 Python 依赖通过，`python.exe 3.12.10` 的导入、loopback 后端 readiness 与 Host ABI 验收返回 `WINDOWS_BACKEND_SMOKE_PASS_GUI_PENDING`；证据位于用户本地 `D:\SRW\evidence\C11-Windows-smoke.json`，GUI 仍未验收。第二次验收因额外/缺失文件报错，新修复默认禁止生成 `.pyc`、给出文件差异，并防止覆盖旧验收 JSON。见 [首次 Windows 实测及 GUI 下一步](docs/WINDOWS_FIRST_SMOKE_RESULTS.md)。

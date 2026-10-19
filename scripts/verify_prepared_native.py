@@ -99,7 +99,15 @@ def inspect_prepared(root: Path) -> dict:
         if candidate.is_file():
             actual_paths.add(candidate.relative_to(root).as_posix())
     if actual_paths != expected_paths:
-        raise PayloadError("extracted Native candidate contains missing or unreviewed files")
+        # Show only names/counts, never disclose file contents. Unknown inputs
+        # remain blocked; Python-created .pyc cannot silently change release truth.
+        extra = sorted(actual_paths - expected_paths)
+        missing = sorted(expected_paths - actual_paths)
+        raise PayloadError(
+            "extracted Native candidate contains missing or unreviewed files "
+            f"(unexpected_count={len(extra)}, missing_count={len(missing)}, "
+            f"unexpected_sample={extra[:12]!r}, missing_sample={missing[:12]!r})"
+        )
     if (context.get("artifact_status") != "UNVERIFIED_GUI" or
         context.get("prepared_status") != "OFFLINE_WHEELS_STAGED_NEEDS_WINDOWS_EMBEDDED_SMOKE" or
         context.get("embedded_python_windows_smoke_passed") is not False or
@@ -137,7 +145,7 @@ def smoke_windows(root: Path, *, startup_timeout: int = 45) -> dict:
         raise PayloadError("Windows embedded Python and WPF Host require a real Windows x64 runner")
     python = root / "runtime" / "python.exe"
     imports = subprocess.run(
-        [str(python), "-I", "-c", IMPORT_SMOKE],
+        [str(python), "-I", "-B", "-c", IMPORT_SMOKE],
         cwd=root, capture_output=True, text=True, timeout=90, check=False,
     )
     if imports.returncode:
@@ -173,7 +181,7 @@ def smoke_windows(root: Path, *, startup_timeout: int = 45) -> dict:
             "PYTHONDONTWRITEBYTECODE": "1",
         })
         # The backend is started precisely as the native Host starts it.
-        command = [str(python), str(root / "scripts" / "run_local.py"),
+        command = [str(python), "-B", str(root / "scripts" / "run_local.py"),
                    "--host", "127.0.0.1", "--port", str(port),
                    "--edition", "windows", "--workspace-lock", "host"]
         with subprocess.Popen(command, cwd=root, env=env,
@@ -240,14 +248,16 @@ def main() -> int:
     if evidence.is_relative_to(root):
         raise SystemExit("evidence must be outside the immutable application payload")
     try:
+        # Fail before any process launch if a previous evidence file exists.
+        # A new run must use a unique evidence path to preserve earlier results.
+        if evidence.exists():
+            raise PayloadError("evidence file already exists; provide a new --evidence path")
         report = inspect_prepared(root)
         if not args.static_only:
             report["windows_runtime_smoke"] = smoke_windows(root)
         report["gui_accepted"] = False
         report["status"] = "STATIC_PASS_WINDOWS_SMOKE_PENDING" if args.static_only else "WINDOWS_BACKEND_SMOKE_PASS_GUI_PENDING"
         evidence.parent.mkdir(parents=True, exist_ok=True)
-        if evidence.exists():
-            raise PayloadError("refusing to overwrite an earlier smoke evidence file")
         evidence.write_text(json.dumps(report, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
         print(json.dumps(report, ensure_ascii=False, indent=2))
         return 0
