@@ -46,6 +46,11 @@
 
 不要把源码 ZIP、Host-only EXE 或临时 SOURCE Lab 预览包说成用户可以正式部署的完整 Windows 产品。任何测试不应向 GitHub 上传真实简历、SQLite、密钥、完整工作区锁及私人日志。
 
+
+## 本地 HTML/Browser 真实 Core 源码预览（非发行）
+
+`python scripts/start_local_web.py --workspace <绝对的独立工作区>` 可以启动现有 C11 API 与 HTML/Browser 前端。详见 [Local Web Source Preview](docs/LOCAL_WEB_SOURCE_PREVIEW.md)。合成验收与正式 Knowledge 模式分离，不得与 Windows EXE 对同一工作区各自启动写入 Core。此入口并非独立 Portable、正式双端并发、RC 或 GA；请以准确 SHA 的 Chromium 验收为准。
+
 ## 开发者验证
 
 ```bash
