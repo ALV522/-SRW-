@@ -1,65 +1,183 @@
-> **G1 战略更新（2026-10-20）**：本文件下方 P0→P3 仍保留为原始工程清单，但其先后顺序已由 [产品宪章](PRODUCT_CHARTER.md)、[双载体并行计划](DUAL_CARRIER_PLAN.md)、[开发治理](DEVELOPMENT_GOVERNANCE.md) 更新。Windows Native 产品化与本地 Browser/HTML **从现在起并行推进**、共用一个权威 C11 Core；各自验收、争取同期交付。实际产品版号/渠道遵守 [版本政策](VERSION_POLICY.md)。历史测试统计不是当前提交的自动 PASS。\n\n# SRW 产品路线图（2026-10-19）
+# SRW 产品与架构总路线图
 
-这是一份**待执行计划**，不是把未完成事项声明为 PASS。当前唯一产品开发源码主线为 `main` / C11；历史 `v0.8.12-R2` 是成熟业务完整性对照；HTML E1–E5 和 Native SOURCE Lab 属于独立探索。
+状态：ACTIVE · 2026-10-21
 
-## 判定标准
+本路线图以 [PRODUCT_CHARTER](PRODUCT_CHARTER.md)、[ADR-0001](decisions/ADR-0001-single-authoritative-core.md) 和 [ADR-0002](decisions/ADR-0002-api-first-modular-monolith.md) 为约束。当前开发主线是 `main`；历史 v0.8.12-R2 是功能保真对照，不是当前源码身份。
 
-- 源码存在、源回归通过、Chromium 通过、WPF GUI 实机通过、完整 Native/Portable 构建、RC/GA **是六类不同结论**，每一步均须精确 Git SHA 与工件证据。
-- 保留 Source/Claim、Criterion/Decision、人工核实、面试、Offer、AI/OCR/ASR、五库 Knowledge、备份/恢复。未经行为等价测试，不得为了换框架缩减功能。
-- 近期 Web/EXE 目标是**一个权威 Core + SQLite/Blob/Job Engine，两套 UI**，不是两个数据库间的简单双向同步。
+## 1. 总目标
 
-## P0 · 业务完整性与质量基线
+把 SRW 从功能丰富但入口层逐渐臃肿的 C11 原型，演进为一个可以真实交付、可恢复、可验证、可长期扩展的本地招聘产品：
 
-1. 制作 `v0.8.12-R2` → C11 能力对照矩阵：源码已实现、浏览器可操作、Windows 可操作、缺失、替代设计及测试覆盖分别列明。
-2. 建立纵向业务验收：**岗位/标准 Draft 与发布 → 候选人导入与当前材料 → Claim 核实 → 面试/独立 Scorecard → 人工 Decision → Offer → 联系计划/项目交接**。
-3. 对每个阻断项附用户操作步骤、业务影响、根本原因、修复 PR、回归测试与确切运行证据；优先处理损坏证据/决策可信性的缺陷。
-4. `DEVELOPMENT_STATE.md` 的历史 138/121/109 项测试统计保留其时间含义；当前通过的主线 `c9d70cd` 是 Ubuntu/Windows 各 **146 项**、Chromium **5 项**、SHA 清单 **280 项**。
+- 一个权威 SRW Core；
+- Windows WPF/WebView2 与 Local Browser 两个正式入口；
+- API-first 的模块化单体；
+- 完整招聘业务闭环和证据/人工决策保真；
+- 可重复 Windows/Browser/双端验收；
+- 清楚的版本、Schema、源码和工件身份；
+- 不通过大重写牺牲 v0.8.x 已成熟能力。
 
-**退出条件**：完整能力对照矩阵存在；所有 P0 业务环节有可执行验收脚本和明确 PASS/FAIL/BLOCKED，未用按钮或抽象模块数量代替业务覆盖。
+## 2. 当前基线与证据边界
 
-## P1 · Windows Native 的可重复产品验收
+基线 `c0bc192e346ab16aeb6fa63e60a40c617274a188`：
 
-1. 利用 `d8d032d` 的真实 WPF/WebView2 基础 GUI 证据，但不要把它视为当前 `main` 的完整验收。新 Native 候选必须重新绑定准确源码、Host、Runtime、五套**生产** Knowledge DB 哈希。
-2. 在目标 Windows 上重复验证：冷启动/重启、窗口与 WebView2、后端就绪、锁释放、Python 缓存不污染、长时运行、崩溃/恢复、备份/恢复与数据升级/回滚。
-3. 用合成或经授权脱敏的招聘样本验证 PDF/OCR、ASR、Provider 超时降级、材料版本、AI 建议/人工判定边界、项目/候选人完整流程。
-4. 维护唯一可复现工件清单：版本、源码 SHA、构建依赖、Host 与 Runtime 身份、Knowledge 来源、实际测试设备、剩余缺陷。
+- VERSION `1.0.0-alpha10-convergence11`；Schema `v1_0014`；development；
+- Ubuntu/Windows Source Gate：各 241 tests，2 skipped，PASS；
+- Chromium：10 个真实浏览器业务场景 PASS；
+- Source integrity：329 SHA-256 entries PASS；
+- 当前 SHA 的 Windows Host rebuild / wheelhouse 构建成功；
+- 当前 SHA 的完整 Native GUI、完整招聘纵向流程、Provider/生产 Knowledge、EXE+Browser 同 Core 并发仍不能据此标为 PASS。
 
-**退出条件**：一个具体 Native/Portable 候选在目标 Windows 的基础运行与完整招聘纵向业务都能重复通过，正式人工复核后才能讨论 RC。
+旧工件/旧 SHA 的 Windows GUI 证据保留为历史事实，不向当前 SHA 外推。
 
-## P2 · Web + EXE 共用 Core
+## 3. 不再采用“P0 做完后才重构”的顺序
 
-1. 以 E1/E2 的读写 API 原型、E3 的 SQLite **事务级** If-Match CAS、E4 的独立 Core 进程所有权、E5 的单次附着凭据/身份固定，以及 Native SOURCE Lab 真正 WPF + 浏览器读同一合成 Core 为可行性证据。
-2. 将 E3 的 revision 与审计纳入**正式 Schema 和全部 Action Plan 写入口**；条件校验、更新、审计在一次数据库事务内完成，过期写入返回 412，错误和重试不生成假成功审计。
-3. 从 EXE 拆分 Core Supervisor 的工作区锁、停机/重启和多载体附着生命周期。EXE 关闭不应无意让独立 Web 失效；OCR/ASR/AI Job Engine 只能有一个权威调度器。
-4. E5 的 localhost 能力仅是探索。正式服务须身份验证、授权、会话吊销、CSRF/Origin、防伪附着及数据域隔离；远程访问需要另行 TLS 和安全评审。
-5. 在**同一真实 Windows Core**上实测 WPF/WebView2 + 浏览器同时读写相同 Candidate/Source/Claim/Decision Context，校验冲突拒绝与业务审计。
+旧路线把大型 workbench/frontend 拆分放在较晚阶段。现在改为：**业务闭环、Windows 产品化、双载体和 API-first 边界收口并行推进。**
 
-**退出条件**：实际 Windows EXE 与 Browser 使用同一受信任 Core 运行完整合成招聘流程、不会双重启动后台任务或数据库，并通过重启/关闭任一界面的真实联调测试。
+原因是新增功能如果继续进入巨型 route/frontend 聚合层，会不断增加之后的迁移成本；但反过来，也不能为了重构暂停业务验收。因此采用“小 PR、行为保真、边开发边收口”的方式。
 
-## P3 · 发行、维护与规模化
+## 4. Track 0 · 产品不变量与业务完整性（#41，最高优先级）
 
-1. 严格区分 Source ZIP、Host-only、实验包、Prepared Native、Portable Candidate、RC、GA，工件与哈希可独立验证；GitHub 旧 `v0.8` Release 不代替新产品。
-2. 以测试保障为前提拆分 `fullworkbench.py` 和大型前端模块，增加安全、可访问性、性能/资源、兼容性与故障注入。
-3. 抽检真实匿名招聘样本，建立人工反馈的证据/评价一致性、Provider 故障处理、迁移与备份回滚手册。
+持续验证并关闭：
 
-**退出条件**：官方 Release 指向**唯一通过验收的具体工件**，其功能、隐私、安装、升级及已知限制均可复核。
+- Job/Criteria Draft 与显式发布；
+- Candidate Intake、MaterialRevision、Source provenance；
+- Claim review、criterion verification、冲突/缺失证据；
+- Interview、独立 Scorecard、面试证据修订；
+- HumanDecision、Decision Context、stale/reaffirm；
+- Offer 合法状态迁移且不自动 hired；
+- 联系、Action Plan、handoff；
+- Archive/restore、Backup/restore；
+- Knowledge、Provider、OCR/ASR 的真实降级和边界。
 
-## 核查依据
+退出条件不是“API 已存在”，而是 Capability Matrix 对核心流程具备可复现 Source/API、Browser 和需要的 Windows 证据；未实测保持 NOT VERIFIED/BLOCKED。
 
-[开发状态](../DEVELOPMENT_STATE.md) · [业务验收计划](ACCEPTANCE_PLAN.md) · [Windows GUI 首次证据](WINDOWS_GUI_FIRST_ACCEPTANCE.md) · [仓库治理](REPOSITORY_GOVERNANCE.md) · [发布规程](RELEASE_PROCESS.md) · [E1–E5 实验](https://github.com/ALV522/-SRW-/tree/explore/html-site-prototype/explorations/html-site) · [Native SOURCE Lab](https://github.com/ALV522/-SRW-/blob/explore/html-site-prototype/explorations/html-site/NATIVE_SOURCE_LAB.md)。
+## 5. Track A · API-first 模块化 Core（#63，从现在开始）
 
-## 2026-10-19 业务增量
+这是横向工程约束，不是另起一个版本。
 
-`main` 的 [PR #32](https://github.com/ALV522/-SRW-/pull/32) 已让真实 Chromium 从 3 增至 **5 个**场景：独立 Scorecard 两个评价者分歧不可覆盖、Offer 的人工合法状态更新（不自动录用）。下一轮 P0 应聚焦 **Claim→核实→判断→HumanDecision→材料或标准改变后的上下文失效**，不应重复开发已经通过的 Scorecard/Offer 案例。[验收证据](BUSINESS_E2E_SCORECARD_OFFER.md)。
+### A0 架构治理
 
-## 2026-10-19 Windows 候选交付路径
+ADR-0002、专项路线图、README/ROADMAP/ARCHITECTURE 对齐。
 
-新增 [Native 候选升级工具包](C11_NATIVE_CANDIDATE_UPGRADE.md)：CI 在同一源码 SHA 下编译 WPF Host，并将完整源码与 Host 组成一个受源 SHA 清单约束的 ZIP；Windows 本机只能从精确 `d8d032d` Prepared ZIP 获取旧的已核验 Runtime/Knowledge，并执行严格装配与完整 ZIP 成员校验。**这补足候选打包的工程环节，不提升 Windows GUI 验收等级**；必须在新准确 SHA 上重跑实际 WPF 和业务链，方可进入 RC 门槛。
+### A1 API inventory / contract safety net
 
-## #42 Windows Native 的客观验收工具
+建立 method/path/owner/use-case 清单；对关键 mutation 明确 request、response、errors、revision/CAS、human boundary、audit 和 side effects。
 
-新增 [source-rebuilt Native 静态完整性与 WPF 生命周期验收](SOURCE_REBUILT_NATIVE_ACCEPTANCE.md)；验证器必须拒绝错误的 Host、Runtime、Knowledge、工件来源、附加文件及伪造 GUI 接受声明。真实 WPF 验收只在目标 Windows 机器、一次性工作区中执行，Source CI 不构成 GUI PASS。后续完整面试、Decision、Offer 与备份恢复仍须单独实机验收。
+### A2 后端 route decomposition
 
-## Windows Native 首次使用与日志隐私修复
+按业务域渐进拆 `backend/srw/api/fullworkbench.py`，默认保留 URL/方法/错误语义；`app.py` 收敛为 composition root。禁止复制 service/repository 逻辑到新 route。
 
-[旧 c8431ca7 工件的真实设备摘要](WINDOWS_C8431CA7_REAL_DEVICE_ACCEPTANCE.md) 对照本轮 WPF Host 日志安全分类器与浏览器第 9 条首次使用场景；保护候选人隐私、确保顶部健康状态及时刷新，并跳过无当前 Decision Context 的无效 Assessment 请求。修复后的新 Windows Native 仍为 UNVERIFIED_GUI，不能使用旧截图代替新工件实际测试。
+### A3 Application use cases
+
+为跨模块业务动作建立可直接测试的应用层事务边界，使 route 变薄；Domain invariant 仍保留在核心模型/服务。
+
+### A4 Frontend decomposition
+
+先统一 API client，再按 dashboard/projects/candidates/evidence/interviews/decision/offers/knowledge/settings 拆 feature。保留当前技术栈，不同时换框架。
+
+### A5 Extensibility
+
+AI/OCR/ASR/Knowledge/Parser/Export 等通过代码级 capability/provider abstraction 扩展。动态第三方插件系统不是当前目标。
+
+完整退出标准见 [API_FIRST_MODULAR_CORE_ROADMAP.md](API_FIRST_MODULAR_CORE_ROADMAP.md)。
+
+## 6. Track B · Windows Native 产品化（#42）
+
+继续独立推进，不等待 Track A 完成：
+
+1. 当前准确源码 SHA 的 Runtime/Knowledge/Host/Source 绑定；
+2. 候选 ZIP 完整成员和 SHA 审计；
+3. 真实 Windows 冷启动、重启、WebView2、后端就绪、关闭/锁释放；
+4. 完整招聘主链点击操作；
+5. PDF/OCR、ASR、Provider 故障/降级；
+6. Backup/restore、升级、回滚和故障恢复；
+7. 工件 SHA、测试机器、日志证据与 known issues 固化。
+
+退出条件：一个**具体准确工件**在目标 Windows 上重复通过规定业务与恢复验收，才进入 RC 讨论。
+
+## 7. Track C · 一个 Core、两个正式载体（#43）
+
+此 Track 与 Track A 的 Application/API 边界直接耦合，但不另建 Web Core。
+
+已经完成/正在形成的基础：共享 workspace lease、Local Web 真实 C11 API、WPF Host、探索 E1–E5 的 CAS/Core owner/session 设计输入。
+
+仍需：
+
+- 独立 Core Supervisor；
+- Windows/Browser attach/revoke；
+- Origin/CSRF/local authorization；
+- 事务 revision/If-Match/CAS；
+- 单一 Job Engine；
+- backup/restore/migration 写入互锁；
+- Core 重启和客户端重连；
+- 同一真实 Windows 机器 EXE + Chromium 交叉读写。
+
+退出条件：DUAL_CARRIER_PLAN T1–T10 真实通过，而不是仅有探索分支 PASS。
+
+## 8. Track D · 版本、发行与维护（#44 + Release）
+
+- 当前旧格式 VERSION 不因文档/架构重构自动升级；
+- 产品 SemVer、Git SHA、Schema、carrier、artifact SHA、release channel 独立记录；
+- Source ZIP、Host-only、Prepared Native、Native Candidate、Local Web、RC、GA 分开；
+- 下一产品版本迁移必须原子更新 release truth 文件并重新验收；
+- 正式 RC 要求 P0=0、功能冻结、两载体各自达到规定门禁，负责人明确批准。
+
+## 9. 跨 Track 的工程规则
+
+### 9.1 新功能默认落点
+
+```text
+operator outcome
+→ Domain/Application
+→ API contract
+→ frontend/client
+→ carrier acceptance
+```
+
+不得先把业务规则写死在某一前端。
+
+### 9.2 重构方式
+
+- Strangler Refactoring；
+- 小业务域、小 PR；
+- 先测试再迁移；
+- URL/Schema 默认不变；
+- 新旧代码短期并存可以接受；
+- 行为等价证明后再删除旧聚合代码。
+
+### 9.3 明确禁止
+
+当前不开展：
+
+- `new-core` / `src2` 全面重写；
+- 微服务/消息总线/容器编排；
+- 两套 SQLite 同步；
+- 前端框架大迁移；
+- 多仓库拆分；
+- SaaS、云登录、多租户；
+- 因架构拆分删除成熟 Evidence/Decision/Knowledge/AI/OCR/ASR/Backup 能力。
+
+## 10. 近期建议执行顺序
+
+在现有 P0/P1 不被放弃的前提下，近期最小闭环建议：
+
+1. #63 A1：生成/维护 API inventory + contract regression，先保护现有 129 个路径模板的兼容面；
+2. #63 A2：选择一个边界清楚且已有 Chromium/Source 覆盖的域，从 `fullworkbench.py` 迁出第一个 route module；
+3. #41：继续用真实业务缺陷推动 Domain/Application 边界，而不是新增独立页面逻辑；
+4. #43：在 contract/revision 基础上推进 Supervisor/session/CAS；
+5. #42：持续构建和实机验收最新准确 Native candidate；
+6. 前端在统一 `apiClient` 安全网建立后，开始第一个 feature 拆分。
+
+任何一步若发现业务行为与现有产品不变量冲突，优先保留业务真相，记录 defect/ADR，不为了完成结构指标强行迁移。
+
+## 11. 最终 1.0.0 判定
+
+1.0.0 不是“重构完成”的别名。至少要求：
+
+- 核心招聘业务与关键异常路径真实可完成；
+- Windows 与 Local Web 有各自可发布工件和明确安装/恢复说明；
+- 同一 Core 的双端一致性、安全、并发和任务所有权有实测；
+- Evidence/Decision/Offer/AI/OCR/ASR/Knowledge/Backup 等能力达到已声明范围；
+- API/Schema/版本和工件身份可追溯；
+- P0 为 0，重大 P1 有明确处理或发布阻断；
+- 产品负责人批准 RC/GA。
