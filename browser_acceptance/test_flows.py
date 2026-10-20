@@ -704,9 +704,15 @@ class RecruitmentBrowserAcceptance(unittest.TestCase):
         self.assertNotEqual(latest["source_id"], old_source)
         current = self.get_json(f"/api/v1/candidates/{cid}/workspace")
         sources = current["sources"]
-        self.assertEqual({x["source_id"] for x in sources}, {latest["source_id"]})
-        self.assertIn("更正后的面试记录", sources[0]["text_preview"])
-        self.assertIn("实际为合成回答", sources[0]["text_preview"])
+        # The workspace intentionally lists historical Sources for provenance;
+        # only the replacement may be bound to the *current* material revision.
+        by_id = {source["source_id"]: source for source in sources}
+        self.assertEqual(set(by_id), {old_source, latest["source_id"]})
+        self.assertFalse(by_id[old_source]["in_current_material"])
+        self.assertTrue(by_id[latest["source_id"]]["in_current_material"])
+        self.assertIn("原先面试记录", by_id[old_source]["text_preview"])
+        self.assertIn("更正后的面试记录", by_id[latest["source_id"]]["text_preview"])
+        self.assertIn("实际为合成回答", by_id[latest["source_id"]]["text_preview"])
         self.assertFalse(self.console_errors, self.console_errors)
 
 
