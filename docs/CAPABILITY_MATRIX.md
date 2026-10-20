@@ -75,7 +75,6 @@ P2：真实招聘人员使用反馈，待第一个独立可用产品完成内部
 
 Event creation rejects nonexistent source references (404) and sources owned by another candidate, including within the same project (409), before any event or success audit is written. Valid owned references, source-free scheduling and automatic structured-interview source publication retain their behavior. Five synthetic SQLite/API regression tests cover this shared Core contract in `convergence_tests/test_event_source_ownership.py`. This adds no Schema migration and does not repair historical invalid references. Exact-head source CI is required; these tests are not Windows GUI or full dual-carrier acceptance.
 
-
 ## Issue #41 增量：已完成面试的结构化证据修订
 
 在 `PATCH /api/v1/events/{event_id}` 编辑由该事件自动生成的结构化面试 Source（问题、反馈、备注或结论）时，Event 不得静默覆盖与当前引用 Source 不一致的业务事实。如果文本发生实质变化，必须保留旧 Source 的不可变文本，并发布新 Source 和新的 MaterialRevision；新 Source 元数据标记 `supersedes_source_id`，历史 Source/Claim 不删除。相同文本的幂等更新不发布新材料版本；人工附着的外部 Source 不应被系统改写为面试 Source。
