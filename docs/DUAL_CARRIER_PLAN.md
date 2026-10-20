@@ -20,6 +20,12 @@
 
 证据边界：`convergence_tests/test_workspace_lease.py` 与 `test_start_local_web.py` 为真实文件系统的源码回归；**不构成** WPF+浏览器同时运行的双端验收，Supervisor、事务 CAS、会话附着、任务唯一所有权仍是 M3 的范围。
 
+## D1 单写者合同：独立后台入口不能绕过互斥
+
+除 WPF Host 已持有工作区租约的 `--workspace-lock host` 模式外，直接运行 `scripts/run_local.py --workspace-lock backend` 的 C11 写入者，必须先按 Local Web 的既定顺序取得 legacy `.srw-instance.lock` 文件锁和共享 `data/app.lock` 原子目录租约，**随后**才能执行 pending restore、打开 SQLite 或启动后台任务。租约贯穿 Uvicorn 整个生命周期，异常退出须释放自己的租约；live/foreign/corrupt 锁必须拒绝，不能删除其他写入者锁。Windows Host 负责的 backend 不重复获取其父 Host 已经持有的租约。
+
+这仅补齐此前 #59 中的独立 backend 入口例外，不改变核心身份、SQLite Schema、Host 权威进程或 Legacy 的历史行为。该合同以 `convergence_tests/test_standalone_backend_lease.py` 的纯合成测试验证；并不代表单独 Supervisor、CAS、Origin/CSRF、Web+EXE 同时共用同一 Core 的正式验收，仍需 #43 后续工作。
+
 ## 现有基础及不可过度外推的证据
 
 隔离分支 explore/html-site-prototype 已有 E0 静态展示、E1 真实只读 API、E2 代理条件写入、E3 SQLite 事务级 CAS、E4 独立 Core owner、E5 本地受保护附着。Native SOURCE Lab 真实 WPF EXE + 浏览器读同一个合成 Core/SQLite，但 Core 仍由 WPF Host 拥有、外部 Python Runtime、合成 Knowledge，尚非 Portable/生产写入。

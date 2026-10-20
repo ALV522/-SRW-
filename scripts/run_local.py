@@ -7,6 +7,7 @@ The WPF host owns the workspace lock and provides instance/session identity in e
 """
 
 import argparse
+from contextlib import ExitStack
 import os
 import sys
 from pathlib import Path
@@ -50,32 +51,54 @@ def main() -> int:
     data_dir.mkdir(parents=True, exist_ok=True)
     db = data_dir / "srw_v1.db"
 
-    # Preserve the Convergence backup/restore semantics before SQLite is opened.
-    try:
-        import launch_alpha10 as portable_launcher
-        portable_launcher.DATA = data_dir
-        portable_launcher.DB = db
-        portable_launcher.apply_pending_restore()
-    except FileNotFoundError:
-        pass
+    # A standalone backend is also a workspace writer. It must not bypass the
+    # directory lease shared by the Local Web launcher and WPF Host. Acquire
+    # both locks before pending restore or opening SQLite, then hold them until
+    # Uvicorn has completely stopped. In --workspace-lock host mode, the WPF
+    # process already owns the lease; never try to acquire it a second time.
+    with ExitStack() as stack:
+        if args.workspace_lock == "backend":
+            import launch_alpha10 as portable_launcher
+            from srw.workspace_lease import WorkspaceLease, WorkspaceLeaseError
 
-    os.environ["RECRUITMENT_EDITION"] = args.edition
-    os.environ["RECRUITMENT_RUNTIME_MODE"] = "desktop" if args.edition == "windows" else "browser"
-    os.environ["SRW_BACKGROUND_WORKER"] = "1"
+            # Legacy Portables only know the old advisory file lock. Keep the
+            # acquisition order identical to scripts/start_local_web.py.
+            stack.enter_context(portable_launcher.InstanceLock(data_dir / ".srw-instance.lock"))
+            edition = "windows" if args.edition == "windows" else "local-web"
+            try:
+                stack.enter_context(WorkspaceLease(
+                    data_dir, edition=edition, port=args.port,
+                    version=(ROOT / "VERSION").read_text(encoding="utf-8").strip(),
+                ))
+            except WorkspaceLeaseError as exc:
+                raise SystemExit(f"BLOCKED: {exc}") from None
 
-    import uvicorn
-    from srw.api.app import create_v1_app
+        # Keep restore/SQLite/worker startup *inside* the exclusive lifetime.
+        try:
+            import launch_alpha10 as portable_launcher
+            portable_launcher.DATA = data_dir
+            portable_launcher.DB = db
+            portable_launcher.apply_pending_restore()
+        except FileNotFoundError:
+            pass
 
-    app = create_v1_app(
-        f"sqlite+pysqlite:///{db.as_posix()}",
-        frontend_dist=frontend,
-        data_dir=data_dir,
-        knowledge_dir=knowledge,
-    )
-    config = uvicorn.Config(app, host=args.host, port=args.port, log_level="info")
-    server = uvicorn.Server(config)
-    app.state.shutdown_callback = lambda: setattr(server, "should_exit", True)
-    server.run()
+        os.environ["RECRUITMENT_EDITION"] = args.edition
+        os.environ["RECRUITMENT_RUNTIME_MODE"] = "desktop" if args.edition == "windows" else "browser"
+        os.environ["SRW_BACKGROUND_WORKER"] = "1"
+
+        import uvicorn
+        from srw.api.app import create_v1_app
+
+        app = create_v1_app(
+            f"sqlite+pysqlite:///{db.as_posix()}",
+            frontend_dist=frontend,
+            data_dir=data_dir,
+            knowledge_dir=knowledge,
+        )
+        config = uvicorn.Config(app, host=args.host, port=args.port, log_level="info")
+        server = uvicorn.Server(config)
+        app.state.shutdown_callback = lambda: setattr(server, "should_exit", True)
+        server.run()
     return 0
 
 
