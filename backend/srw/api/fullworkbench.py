@@ -207,7 +207,11 @@ def install_full_workbench_routes(app, factory, registry, secrets, *, data_dir: 
         with factory() as s:
             metrics={
                 "projects":s.scalar(select(func.count(Project.id)).where(Project.status!="archived")) or 0,
-                "candidates":s.scalar(select(func.count(Candidate.id)).where(Candidate.archived.is_(False))) or 0,
+                "candidates":s.scalar(
+                    select(func.count(Candidate.id))
+                    .join(Project,Project.id==Candidate.project_id)
+                    .where(Candidate.archived.is_(False),Project.status!="archived")
+                ) or 0,
                 "open_tasks":s.scalar(select(func.count(TaskRecord.id)).where(TaskRecord.status.in_(("queued","running","waiting_provider","failed")))) or 0,
                 "unreviewed_claims":s.scalar(
                     select(func.count(Claim.id))
@@ -218,14 +222,36 @@ def install_full_workbench_routes(app, factory, registry, secrets, *, data_dir: 
             }
             req_rows=s.execute(select(Project.status,func.count(Project.id)).group_by(Project.status)).all()
             requisitions={str(status):int(count) for status,count in req_rows}
-            stage_rows=s.execute(select(Candidate.pipeline_stage,func.count(Candidate.id)).where(Candidate.archived.is_(False)).group_by(Candidate.pipeline_stage)).all()
+            stage_rows=s.execute(
+                select(Candidate.pipeline_stage,func.count(Candidate.id))
+                .join(Project,Project.id==Candidate.project_id)
+                .where(Candidate.archived.is_(False),Project.status!="archived")
+                .group_by(Candidate.pipeline_stage)
+            ).all()
             candidates_by_stage={stage:0 for stage in PIPELINE_STAGES}
             for stage,count in stage_rows: candidates_by_stage[str(stage or "new")]=int(count)
-            offer_rows=s.execute(select(OfferRecord.status,func.count(OfferRecord.id)).group_by(OfferRecord.status)).all()
+            offer_rows=s.execute(
+                select(OfferRecord.status,func.count(OfferRecord.id))
+                .join(Project,Project.id==OfferRecord.project_id)
+                .join(Candidate,Candidate.id==OfferRecord.candidate_id)
+                .where(Project.status!="archived",Candidate.archived.is_(False))
+                .group_by(OfferRecord.status)
+            ).all()
             offers_by_status={stage:0 for stage in OFFER_STATES}
             for status,count in offer_rows: offers_by_status[str(status)]=int(count)
             now=datetime.now(timezone.utc); horizon=now+timedelta(days=14)
-            upcoming=s.scalar(select(func.count(RecruitmentEvent.id)).where(RecruitmentEvent.event_state=="scheduled",RecruitmentEvent.scheduled_at.is_not(None),RecruitmentEvent.scheduled_at>=now,RecruitmentEvent.scheduled_at<=horizon)) or 0
+            upcoming=s.scalar(
+                select(func.count(RecruitmentEvent.id))
+                .join(Candidate,Candidate.id==RecruitmentEvent.candidate_id)
+                .join(Project,Project.id==Candidate.project_id)
+                .where(
+                    RecruitmentEvent.event_state=="scheduled",
+                    RecruitmentEvent.scheduled_at.is_not(None),
+                    RecruitmentEvent.scheduled_at>=now,
+                    RecruitmentEvent.scheduled_at<=horizon,
+                    Candidate.archived.is_(False),Project.status!="archived",
+                )
+            ) or 0
             recent=[{"event_type":x.event_type,"entity_type":x.entity_type,"entity_id":x.entity_id,"actor":x.actor,"created_at":x.created_at.isoformat()} for x in s.scalars(select(AuditEvent).order_by(AuditEvent.created_at.desc()).limit(12)).all()]
             overdue=s.scalar(
                 select(func.count(CandidateActionPlan.id))
@@ -265,7 +291,12 @@ def install_full_workbench_routes(app, factory, registry, secrets, *, data_dir: 
                     Project.status!="archived",
                 )
             ) or 0
-            stale_reevaluations=s.scalar(select(func.count(ReevaluationDraft.id)).where(ReevaluationDraft.state=="stale")) or 0
+            stale_reevaluations=s.scalar(
+                select(func.count(ReevaluationDraft.id))
+                .join(Candidate,Candidate.id==ReevaluationDraft.candidate_id)
+                .join(Project,Project.id==Candidate.project_id)
+                .where(ReevaluationDraft.state=="stale",Candidate.archived.is_(False),Project.status!="archived")
+            ) or 0
             pending_identity=s.scalar(
                 select(func.count(CandidateIdentityReview.id))
                 .join(Project,Project.id==CandidateIdentityReview.project_id)
