@@ -1,5 +1,8 @@
 # SRW Development State — Convergence 11
 
+> **2026-10-21 架构/事实更新（main `c0bc192e346a`）**：准确 main 的 Ubuntu/Windows Python 3.12 Source Gate 各 **241 tests / 2 skipped / PASS**，真实 Chromium **10** 项 PASS，当前源码 SHA 清单 **329** 项 PASS；Windows Host rebuild/offline wheelhouse 构建门禁成功，但当前 SHA 的完整 Native GUI/完整招聘业务/Provider/生产 Knowledge/EXE+Browser 双端仍未由这些 CI 证明。产品负责人已批准 ADR-0002：SRW 后续采用 **API-first modular monolith**，以现有 C11 Core 为唯一业务权威，Windows/Browser 为客户端；`fullworkbench.py` 与 `app.js` 采用小 PR、行为保真的渐进拆分，禁止 `new-core` 全面重写、微服务化、双数据库同步和同时更换前端框架。详见 [专项路线图](docs/API_FIRST_MODULAR_CORE_ROADMAP.md)。
+
+
 > **最新项目状态（2026-10-19；main `c9d70cd48d03`）**：Ubuntu/Windows 各 146 项源码测试、5 项真实 Chromium 业务场景、280 项仓库完整性校验 PASS。旧 `d8d032d` Windows Native 候选包已在真实电脑上通过 WPF/WebView2 基础启动、项目创建、标准草案更新和正常退出验证，仍非正式 RC/GA。本文其余“138/121/109 项”和“GUI 待验收”等内容属于不同开发阶段**历史追加记录**，不得取代最新身份与证据。请优先查看 [README](README.md)、[Windows GUI 实机报告](docs/WINDOWS_GUI_FIRST_ACCEPTANCE.md)、[路线图](docs/ROADMAP.md)。
 
 
