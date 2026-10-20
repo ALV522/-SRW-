@@ -631,13 +631,20 @@ def install_full_workbench_routes(app, factory, registry, secrets, *, data_dir: 
             x=change_project_status(s,pid,target,actor="human",reason="project restored")
             return JSONResponse({"project_id":pid,"status":x.status})
 
-    def _publish_current(s,cid,new_source_id):
+    def _publish_current(s,cid,new_source_id,*,supersedes_source_id=None):
         cand=s.get(Candidate,cid); ids=[]
         if cand and cand.current_material_revision_id:
             try: ids=get_current_source_ids(s,cid)
             except Exception: ids=[]
+        # A corrected structured interview is a replacement within the *current*
+        # evidence set, not an additional live statement. The superseded Source
+        # and previous MaterialRevision remain immutable historical records.
+        if supersedes_source_id:
+            ids=[source_id for source_id in ids if source_id!=supersedes_source_id]
         if new_source_id not in ids: ids.append(new_source_id)
-        return MaterialRepository(s).publish_revision(cid,ids,{"action":"v1_intake","source_id":new_source_id})
+        provenance={"action":"v1_intake","source_id":new_source_id}
+        if supersedes_source_id: provenance["supersedes_source_id"]=supersedes_source_id
+        return MaterialRepository(s).publish_revision(cid,ids,provenance)
 
     def _queue_media_task(s, *, task_type: str, candidate_id: str, source_id: str, payload: dict[str,Any]) -> TaskRecord:
         task=TaskRecord(task_type=task_type,status="queued",candidate_id=candidate_id,source_id=source_id,payload_json=json.dumps(payload,ensure_ascii=False,separators=(",",":")))
@@ -1190,7 +1197,7 @@ def install_full_workbench_routes(app, factory, registry, secrets, *, data_dir: 
                         source=add_source(s,x.candidate_id,source_kind=f"{x.event_type}_record",
                                           content_hash=content_hash({"event_id":x.id,"text":text}),
                                           text_content=text,media_type="text/plain",metadata=provenance)
-                        _publish_current(s,x.candidate_id,source.id)
+                        _publish_current(s,x.candidate_id,source.id,supersedes_source_id=origin)
                         x.source_id=source.id
             append_audit_event(s,event_type="RECRUITMENT_EVENT_UPDATED",entity_type="recruitment_event",entity_id=x.id,actor=_s(b,"actor",default="human"),payload={"event_state":x.event_state,"outcome":x.outcome,"source_id":x.source_id},project_id=candidate.project_id if candidate else None,candidate_id=x.candidate_id)
             return JSONResponse({"event_id":x.id,"event_state":x.event_state,"outcome":x.outcome,"source_id":x.source_id,"metadata":metadata})
