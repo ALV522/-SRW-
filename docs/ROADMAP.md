@@ -59,3 +59,7 @@
 ## #42 Windows Native 的客观验收工具
 
 新增 [source-rebuilt Native 静态完整性与 WPF 生命周期验收](SOURCE_REBUILT_NATIVE_ACCEPTANCE.md)；验证器必须拒绝错误的 Host、Runtime、Knowledge、工件来源、附加文件及伪造 GUI 接受声明。真实 WPF 验收只在目标 Windows 机器、一次性工作区中执行，Source CI 不构成 GUI PASS。后续完整面试、Decision、Offer 与备份恢复仍须单独实机验收。
+
+## Windows Native 首次使用与日志隐私修复
+
+[旧 c8431ca7 工件的真实设备摘要](WINDOWS_C8431CA7_REAL_DEVICE_ACCEPTANCE.md) 对照本轮 WPF Host 日志安全分类器与浏览器第 9 条首次使用场景；保护候选人隐私、确保顶部健康状态及时刷新，并跳过无当前 Decision Context 的无效 Assessment 请求。修复后的新 Windows Native 仍为 UNVERIFIED_GUI，不能使用旧截图代替新工件实际测试。
