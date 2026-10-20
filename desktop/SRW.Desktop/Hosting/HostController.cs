@@ -40,7 +40,7 @@ public sealed class HostController
     public async Task StartAsync()
     {
         _log.Write("host_started", new { version = _build.Version });
-        _log.Write("paths_resolved", new { application_root = Paths.ApplicationRoot, user_data_root = Paths.UserDataRoot });
+        _log.Write("paths_resolved", new { application_root_present = Directory.Exists(Paths.ApplicationRoot), data_root_configured = !string.IsNullOrWhiteSpace(Paths.UserDataRoot) });
         _lease = WorkspaceLease.Acquire(
             Paths.UserDataRoot,
             port: 0,
@@ -96,7 +96,7 @@ public sealed class HostController
                     attempt,
                     port = _port,
                     error = exc.GetType().Name,
-                    message = exc.Message,
+                    message_redacted = true,
                 });
                 throw;
             }
@@ -113,7 +113,7 @@ public sealed class HostController
                         next_attempt = attempt + 1,
                         port = _port,
                         error = exc.GetType().Name,
-                        message = exc.Message,
+                        message_redacted = true,
                     });
                     await Task.Delay(TimeSpan.FromMilliseconds(150));
                 }
@@ -179,7 +179,7 @@ public sealed class HostController
                 }
                 catch (Exception exc)
                 {
-                    _log.Write("shutdown_request_failed", new { error = exc.GetType().Name, message = exc.Message });
+                    _log.Write("shutdown_request_failed", new { error = exc.GetType().Name, message_redacted = true });
                 }
                 if (!await _backend.WaitForExitAsync(TimeSpan.FromSeconds(12)))
                 {

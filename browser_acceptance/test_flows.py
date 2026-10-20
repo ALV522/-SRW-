@@ -654,5 +654,26 @@ class RecruitmentBrowserAcceptance(unittest.TestCase):
         self.assertFalse(self.console_errors, self.console_errors)
 
 
+    def test_09_windows_first_use_health_and_unmaterialized_candidate(self) -> None:
+        """Real browser: readiness indicator agrees with backend; new intake has no spurious assessment 409."""
+        self.page.goto(self.base + "/v1", wait_until="domcontentloaded")
+        expect(self.page.locator("#service-health-text")).to_have_text("服务正常")
+        expect(self.page.locator("#side-health")).to_contain_text("服务已就绪")
+        icon = self.page.locator("link[rel='icon']").get_attribute("href")
+        self.assertTrue(icon and icon.startswith("data:image/svg+xml,"), icon)
+        assessment_responses = []
+        self.page.on("response", lambda r: assessment_responses.append(r.status)
+                     if "/assessment" in r.url and "/api/v1/candidates/" in r.url else None)
+        pid = self.new_project("Windows首次启动")
+        cid = self.new_candidate(pid, "未收件的模拟候选人")
+        expect(self.page.locator("#paste-material")).to_be_visible()
+        self.assertFalse(assessment_responses,
+                         f"No material/decision context: skip optional Assessment API, got {assessment_responses}")
+        data = self.get_json(f"/api/v1/candidates/{cid}/workspace")
+        self.assertFalse(data["decision_context_hash"])
+        self.assertFalse(data["decision_ready"])
+        self.assertFalse(self.console_errors, self.console_errors)
+
+
 if __name__ == "__main__":
     unittest.main()
