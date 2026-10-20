@@ -14,6 +14,12 @@
 
 `scripts/start_local_web.py` 已以显式独立工作区、真实 C11 API/HTML 前端及受控合成模式实现源码预览；与 Windows WPF 共用源码层面 Core 而不是另建一套业务。已有工作区默认拒绝，禁止复用活跃 Windows 工作区。详见 [LOCAL_WEB_SOURCE_PREVIEW.md](LOCAL_WEB_SOURCE_PREVIEW.md)。当前没有独立 Supervisor、正式 CAS/会话附着与双端并发验收，不应将源码预览标为发行成品。
 
+### M1 增量：D1 单写者由同一租约强制（源码级）
+
+两个载体现在竞争**同一个** `data/app.lock` 目录：浏览器 Core 用 `os.mkdir`，WPF Host 沿用 `CreateDirectoryW`，原子创建失败即拒绝启动。此前浏览器侧只是在校验阶段"看一眼" `app.lock` 是否存在，然后用另一个锁文件保护自己；Host 在浏览器 Core 运行期间仍能取得工作区，形成同一 SQLite 的双写窗口。该缺陷已由 [工作区租约合同](WORKSPACE_LEASE_CONTRACT.md) 关闭。
+
+证据边界：`convergence_tests/test_workspace_lease.py` 与 `test_start_local_web.py` 为真实文件系统的源码回归；**不构成** WPF+浏览器同时运行的双端验收，Supervisor、事务 CAS、会话附着、任务唯一所有权仍是 M3 的范围。
+
 ## 现有基础及不可过度外推的证据
 
 隔离分支 explore/html-site-prototype 已有 E0 静态展示、E1 真实只读 API、E2 代理条件写入、E3 SQLite 事务级 CAS、E4 独立 Core owner、E5 本地受保护附着。Native SOURCE Lab 真实 WPF EXE + 浏览器读同一个合成 Core/SQLite，但 Core 仍由 WPF Host 拥有、外部 Python Runtime、合成 Knowledge，尚非 Portable/生产写入。

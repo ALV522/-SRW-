@@ -45,8 +45,15 @@ def workspace_errors(path: Path, *, reuse: bool, synthetic: bool,
         problems.append("workspace must be separate from source/application directory")
     if (candidate / "data").is_symlink() or (candidate / "data" / "srw_v1.db").is_symlink():
         problems.append("workspace data/database must not be symbolic links")
-    if (candidate / "data" / "app.lock").exists():
-        problems.append("Windows Host app.lock exists: do not attach a separate writer")
+    # Read-only lease inspection: a live/foreign/corrupt lease blocks, a lease
+    # whose owning process is gone is left for WorkspaceLease.acquire() to
+    # recover atomically. Validation must not delete another carrier's lease.
+    from srw.workspace_lease import inspect_lease
+
+    lease = inspect_lease(candidate / "data")
+    if lease.state in ("active", "foreign", "corrupt"):
+        owner = lease.holder.describe() if lease.holder is not None else lease.detail
+        problems.append(f"app.lock already owned: {owner}")
     if (candidate / "data" / ".srw-instance.lock").is_symlink():
         problems.append("workspace lock is a symlink")
     if candidate.exists():
@@ -152,39 +159,56 @@ def run(args: argparse.Namespace) -> int:
     data = workspace / "data"
     data.mkdir(exist_ok=True)
     db = data / "srw_v1.db"
+    version = (ROOT / "VERSION").read_text(encoding="utf-8").strip()
+    try:
+        release_id = json.loads((ROOT / "BUILD_INFO.json").read_text(encoding="utf-8")).get("release_id", version)
+    except (OSError, ValueError):
+        release_id = version
 
     from scripts import launch_alpha10
     from srw.api.app import create_v1_app
+    from srw.workspace_lease import WorkspaceLease, WorkspaceLeaseError
     import uvicorn
 
-    # The local-browser lock is held for the whole Core lifetime.
-    # This is NOT a shared-WPF supervisor: we refuse the desktop app.lock and
-    # must never promise that both independently started Core processes can write.
+    # Two locks, in a fixed order, and both are needed:
+    #  1. .srw-instance.lock keeps older alpha10 Portables (which only know that
+    #     file) from attaching to the same data directory.
+    #  2. data/app.lock is the cross-carrier lease shared with the WPF Host. It is
+    #     created atomically, so a Host starting while this Core runs now fails
+    #     instead of taking a second write handle on the same SQLite database.
+    # This is still NOT a Core supervisor: whichever carrier acquires app.lock
+    # owns the Core, and the two entry points stay independent processes.
     with launch_alpha10.InstanceLock(data / ".srw-instance.lock"):
-        if (data / "app.lock").exists():
-            print("BLOCKED: desktop-owned app.lock appeared", file=sys.stderr)
+        try:
+            lease = WorkspaceLease(
+                data, edition="local-web", port=args.port,
+                version=version, release_id=release_id,
+            ).acquire()
+        except WorkspaceLeaseError as exc:
+            print(f"BLOCKED: {exc}", file=sys.stderr)
             return 2
-        if not args.synthetic:
-            launch_alpha10.DATA, launch_alpha10.DB = data, db
-            launch_alpha10.apply_pending_restore()
-        os.environ["RECRUITMENT_EDITION"] = "web"
-        os.environ["RECRUITMENT_RUNTIME_MODE"] = "browser"
-        os.environ["SRW_BACKGROUND_WORKER"] = "0" if args.synthetic else "1"
-        app = create_v1_app(
-            f"sqlite+pysqlite:///{db.as_posix()}",
-            data_dir=data, knowledge_dir=knowledge, frontend_dist=frontend,
-        )
-        config = uvicorn.Config(
-            app, host="127.0.0.1", port=args.port,
-            log_level="warning" if args.synthetic else "info", access_log=False,
-        )
-        server = uvicorn.Server(config)
-        app.state.shutdown_callback = lambda: setattr(server, "should_exit", True)
-        print(f"SRW C11 Local Web SOURCE PREVIEW: http://127.0.0.1:{args.port}/v1", flush=True)
-        print("This is one real Core and one local Browser. NOT a dual-carrier GA/RC.", flush=True)
-        if not args.no_browser:
-            threading.Thread(target=_open_when_ready, args=(args.port,), daemon=True).start()
-        server.run()
+        with lease:
+            if not args.synthetic:
+                launch_alpha10.DATA, launch_alpha10.DB = data, db
+                launch_alpha10.apply_pending_restore()
+            os.environ["RECRUITMENT_EDITION"] = "web"
+            os.environ["RECRUITMENT_RUNTIME_MODE"] = "browser"
+            os.environ["SRW_BACKGROUND_WORKER"] = "0" if args.synthetic else "1"
+            app = create_v1_app(
+                f"sqlite+pysqlite:///{db.as_posix()}",
+                data_dir=data, knowledge_dir=knowledge, frontend_dist=frontend,
+            )
+            config = uvicorn.Config(
+                app, host="127.0.0.1", port=args.port,
+                log_level="warning" if args.synthetic else "info", access_log=False,
+            )
+            server = uvicorn.Server(config)
+            app.state.shutdown_callback = lambda: setattr(server, "should_exit", True)
+            print(f"SRW C11 Local Web SOURCE PREVIEW: http://127.0.0.1:{args.port}/v1", flush=True)
+            print("This is one real Core and one local Browser. NOT a dual-carrier GA/RC.", flush=True)
+            if not args.no_browser:
+                threading.Thread(target=_open_when_ready, args=(args.port,), daemon=True).start()
+            server.run()
     return 0
 
 

@@ -3,6 +3,8 @@ from __future__ import annotations
 
 import sqlite3
 from contextlib import closing
+import json
+import os
 import tempfile
 import unittest
 from pathlib import Path
@@ -49,6 +51,25 @@ class LocalWebLauncherTests(unittest.TestCase):
         (self.workspace / "data").mkdir(parents=True)
         (self.workspace / "data" / "app.lock").write_bytes(b"HOST OWNS THIS WORKSPACE")
         self.assertTrue(any("app.lock" in e for e in self.check(reuse=True)))
+
+    def test_live_host_lease_blocks_the_browser_core(self):
+        lease_dir = self.workspace / "data" / "app.lock"
+        lease_dir.mkdir(parents=True)
+        (lease_dir / "instance.json").write_text(
+            json.dumps({"schema_version": 2, "pid": os.getpid(), "edition": "windows",
+                        "instance_id": "live-host"}), encoding="utf-8")
+        errors = [e for e in self.check() if "app.lock" in e]
+        self.assertTrue(errors, "a live Windows Host lease must block the browser Core")
+        self.assertIn("windows", errors[0])
+
+    def test_stale_host_lease_does_not_block_a_new_browser_core(self):
+        lease_dir = self.workspace / "data" / "app.lock"
+        lease_dir.mkdir(parents=True)
+        (lease_dir / "instance.json").write_text(
+            json.dumps({"schema_version": 2, "pid": 4_000_000, "edition": "windows",
+                        "instance_id": "crashed-host"}), encoding="utf-8")
+        self.assertFalse([e for e in self.check() if "app.lock" in e],
+                         "a lease whose owner is gone must be recoverable, not a permanent block")
 
     def test_requires_real_existing_database_for_reuse(self):
         self.workspace.mkdir()
