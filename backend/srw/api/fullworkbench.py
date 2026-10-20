@@ -1172,8 +1172,26 @@ def install_full_workbench_routes(app, factory, registry, secrets, *, data_dir: 
                 except (TypeError,ValueError) as exc: raise V1InvariantError("duration_minutes must be an integer") from exc
             if "interviewer" in b: x.interviewer=_s(b,"interviewer")
             if "location" in b: x.location=_s(b,"location")
-            if x.event_state=="completed" and x.event_type in {"phone_screen","interview","feedback"} and (metadata.get("questions") or metadata.get("feedback")) and not x.source_id:
-                text=_event_source_text(x,metadata); source=add_source(s,x.candidate_id,source_kind=f"{x.event_type}_record",content_hash=content_hash({"event_id":x.id,"text":text}),text_content=text,media_type="text/plain",metadata={"event_id":x.id,"event_type":x.event_type,"structured":True}); _publish_current(s,x.candidate_id,source.id); x.source_id=source.id
+            if x.event_state=="completed" and x.event_type in {"phone_screen","interview","feedback"}:
+                # An auto-published structured record is immutable evidence. Editing a
+                # completed interview must publish a new Source/MaterialRevision rather
+                # than leaving its event UI and the cited Source in disagreement.
+                current_source=s.get(Source,x.source_id) if x.source_id else None
+                source_meta=json.loads(current_source.metadata_json or "{}") if current_source else {}
+                generated_here=(current_source is not None and source_meta.get("structured") is True
+                                and source_meta.get("event_id")==x.id and current_source.candidate_id==x.candidate_id)
+                structured=bool(metadata.get("questions") or metadata.get("feedback"))
+                if (not x.source_id and structured) or generated_here:
+                    text=_event_source_text(x,metadata)
+                    if current_source is None or current_source.text_content!=text:
+                        origin=current_source.id if generated_here else None
+                        provenance={"event_id":x.id,"event_type":x.event_type,"structured":True}
+                        if origin: provenance["supersedes_source_id"]=origin
+                        source=add_source(s,x.candidate_id,source_kind=f"{x.event_type}_record",
+                                          content_hash=content_hash({"event_id":x.id,"text":text}),
+                                          text_content=text,media_type="text/plain",metadata=provenance)
+                        _publish_current(s,x.candidate_id,source.id)
+                        x.source_id=source.id
             append_audit_event(s,event_type="RECRUITMENT_EVENT_UPDATED",entity_type="recruitment_event",entity_id=x.id,actor=_s(b,"actor",default="human"),payload={"event_state":x.event_state,"outcome":x.outcome,"source_id":x.source_id},project_id=candidate.project_id if candidate else None,candidate_id=x.candidate_id)
             return JSONResponse({"event_id":x.id,"event_state":x.event_state,"outcome":x.outcome,"source_id":x.source_id,"metadata":metadata})
 
