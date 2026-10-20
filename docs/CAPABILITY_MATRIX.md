@@ -58,3 +58,7 @@ P1：历史版本/正式 SemVer 迁移（#44），不能让 VERSION 与各元数
 P2：真实招聘人员使用反馈，待第一个独立可用产品完成内部验收后开展。
 
 能力对照中任何一项要从 IMPLEMENTED 变为 PASS，必须记录对应源 SHA、测试名称、环境、输入数据性质、工件 SHA（若适用）、实际运行结果及不可覆盖的证据链接。历史 v0.8.12-R2 是否具备细分能力必须由源文件/档案核查，不能靠推测填写“已保留”。
+
+## P0 进行中招聘指标与历史记录隔离（Issue #41 增量）
+
+运营工作台 `GET /api/v1/dashboard` 中的在招候选人数、招聘漏斗各阶段、Offer 状态、近期面试及过期复评待办应当只统计**未归档项目中未归档候选人**。归档项目及单独归档候选人的历史 Offer、面试、复评数据仍保留在 SQLite 与历史业务页面中，不得通过删除记录达到指标一致性。`convergence_tests/test_convergence11.py::test_dashboard_active_funnel_offer_and_upcoming_exclude_archived_work` 使用合成活动/归档项目及候选人，验证这五类聚合与真实 API 返回一致。它属于 API/源回归证据，不代替浏览器交互或当前 Native 工件验收；PASS 状态以相同提交 SHA 的 Source Gate 为准。

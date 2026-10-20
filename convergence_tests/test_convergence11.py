@@ -14,7 +14,8 @@ from srw.kernel.clock import utc_now
 from srw.modules.candidate.models import Candidate, MaterialRevision, Claim, Source
 from srw.modules.protocol.models import Project, ProtocolRevision
 from srw.modules.recruiting.operations_models import CandidateActionPlan
-from srw.modules.fullworkbench import RecruitmentEvent
+from srw.modules.recruiting.models import OfferRecord
+from srw.modules.fullworkbench import RecruitmentEvent, ReevaluationDraft
 from srw.modules.identity.models import CandidateIdentityReview
 from srw.modules.calibration.models import JudgmentReviewItem
 from srw.modules.work.models import WorkItem
@@ -198,6 +199,47 @@ class Convergence11BusinessWorkflowTest(unittest.TestCase):
         self.assertEqual(by_kind["today_contact"]["candidate_id"], today_candidate_id)
         self.assertEqual(by_kind["pending_interview_feedback"]["candidate_id"], feedback_candidate_id)
         self.assertEqual(by_kind["pending_interview_feedback"]["event_id"], event_id)
+
+    def test_dashboard_active_funnel_offer_and_upcoming_exclude_archived_work(self):
+        """Archiving a project must remove its candidates/Offers from active KPIs.
+
+        Historical Offer, event and reevaluation rows remain persisted; only
+        the *active operational* dashboard aggregation changes.  The same
+        filtering applies to an individually archived candidate in an open
+        project.  Avoid silently over-reporting the live recruiting funnel.
+        """
+        engine = create_v1_engine(f"sqlite+pysqlite:///{self.db.as_posix()}")
+        create_v1_schema(engine)
+        factory = create_v1_session_factory(engine)
+        try:
+            with factory.begin() as session:
+                active = Project(title="进行中职位", status="open")
+                archived = Project(title="历史归档职位", status="archived")
+                session.add_all([active, archived])
+                session.flush()
+                current = Candidate(project_id=active.id, display_name="当前候选人", pipeline_stage="interview")
+                historical = Candidate(project_id=archived.id, display_name="历史候选人", pipeline_stage="hired")
+                excluded = Candidate(project_id=active.id, display_name="已归档候选人", archived=True, pipeline_stage="hired")
+                session.add_all([current, historical, excluded])
+                session.flush()
+                for project, candidate in ((active, current), (archived, historical), (active, excluded)):
+                    session.add(OfferRecord(project_id=project.id, candidate_id=candidate.id, status="draft", title="合成 Offer"))
+                    session.add(RecruitmentEvent(candidate_id=candidate.id, event_type="interview", title="待进行面试", event_state="scheduled", scheduled_at=utc_now() + timedelta(days=1)))
+                    session.add(ReevaluationDraft(candidate_id=candidate.id, state="stale", summary="历史复核任务"))
+        finally:
+            engine.dispose()
+
+        with TestClient(self._app()) as client:
+            response = client.get("/api/v1/dashboard")
+        self.assertEqual(response.status_code, 200, response.text)
+        dashboard = response.json()
+        self.assertEqual(dashboard["metrics"]["projects"], 1)
+        self.assertEqual(dashboard["metrics"]["candidates"], 1)
+        self.assertEqual(dashboard["candidates_by_stage"]["interview"], 1)
+        self.assertEqual(dashboard["candidates_by_stage"]["hired"], 0)
+        self.assertEqual(dashboard["offers_by_status"]["draft"], 1)
+        self.assertEqual(dashboard["upcoming_interviews"], 1)
+        self.assertEqual(dashboard["operational_todos"]["stale_reevaluations"], 1)
 
     def test_dashboard_review_center_links_identity_judgment_and_claim_review(self):
         engine = create_v1_engine(f"sqlite+pysqlite:///{self.db.as_posix()}")
