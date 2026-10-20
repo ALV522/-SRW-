@@ -51,8 +51,18 @@ public sealed class BackendProcess : IDisposable
         start.Environment["PYTHONDONTWRITEBYTECODE"] = "1";
 
         var process = new Process { StartInfo = start, EnableRaisingEvents = true };
-        process.OutputDataReceived += (_, e) => { if (!string.IsNullOrWhiteSpace(e.Data)) log.Write("backend_stdout", new { line = e.Data }); };
-        process.ErrorDataReceived += (_, e) => { if (!string.IsNullOrWhiteSpace(e.Data)) log.Write("backend_stderr", new { line = e.Data }); };
+        process.OutputDataReceived += (_, e) =>
+        {
+            if (string.IsNullOrWhiteSpace(e.Data)) return;
+            var safe = BackendOutputPrivacy.Classify(e.Data, isStderr: false);
+            log.Write(safe.EventName, safe.Details);
+        };
+        process.ErrorDataReceived += (_, e) =>
+        {
+            if (string.IsNullOrWhiteSpace(e.Data)) return;
+            var safe = BackendOutputPrivacy.Classify(e.Data, isStderr: true);
+            log.Write(safe.EventName, safe.Details);
+        };
         if (!process.Start())
         {
             throw new InvalidOperationException("Embedded Python backend process did not start.");
