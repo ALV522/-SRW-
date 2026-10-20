@@ -11,9 +11,10 @@
 5. **docs/DEVELOPMENT_GOVERNANCE.md** — issue-to-PR workflow, authority, review and acceptance.
 5. **docs/VERSION_POLICY.md** and **VERSION_POLICY.json** — runtime/product version, Git SHA, Schema, carrier, release channels, migration procedure.
 6. **docs/DUAL_CARRIER_PLAN.md** — common Core, independent Windows and local HTML/Browser carriers.
-7. **docs/ACCEPTANCE_PLAN.md**, **docs/ROADMAP.md** and **docs/RELEASE_PROCESS.md** — established business acceptance and release gates; compare with the newer plans above.
-8. **docs/NO_BRANCH_PROTECTION_PROTOCOL.md** — binding temporary workflow without server-side protection.
-9. **docs/OWNER_GUIDE.md** — user-facing owner handoff and decision escalation protocol.
+7. **docs/decisions/ADR-0001-single-authoritative-core.md**, **docs/decisions/ADR-0002-api-first-modular-monolith.md** and **docs/API_FIRST_MODULAR_CORE_ROADMAP.md** — one authoritative Core, API-first modular-monolith boundaries and the gradual refactor sequence.
+8. **docs/ACCEPTANCE_PLAN.md**, **docs/ROADMAP.md** and **docs/RELEASE_PROCESS.md** — business acceptance, active product/architecture roadmap and release gates.
+9. **docs/NO_BRANCH_PROTECTION_PROTOCOL.md** — binding temporary workflow without server-side protection.
+10. **docs/OWNER_GUIDE.md** — user-facing owner handoff and decision escalation protocol.
 
 Read **DEVELOPMENT_STATE.md**, **README.md** and the exact recent CI/artifact evidence for the task's target SHA. For Windows packaging also read **docs/C11_NATIVE_CANDIDATE_UPGRADE.md** and **docs/WINDOWS_GUI_FIRST_ACCEPTANCE.md**. For HTML experiments read the isolated **explore/html-site-prototype** documentation; exploration PASS is not product PASS.
 
@@ -40,6 +41,8 @@ Replace 41 with the relevant existing/new issue. If blocked, do not edit. Do not
 - NEVER use real resumes, secrets, production DB/Knowledge material, user data, session tokens or raw private logs in Git/CI. Synthetic test data by default.
 - Require actual Windows WPF/WebView2 acceptance for a Windows GUI claim; a Linux build, browser test, or source CI is insufficient.
 - **Web/EXE/HTML are parallel productization workstreams**, not separate authorities: one SRW Core, one workspace, same API and business invariants. HTML-only mock is not a real full product. Local server security is required; SaaS and cloud login are out of scope.
+- **API-first modular-monolith rule (ADR-0002):** new or changed business capability normally lands in Domain/Application, then a stable API contract, then Browser/Windows clients. Do not default new behavior into `fullworkbench.py`, `frontend/dist/app.js` or the WPF Host when an existing Core boundary can own it. Public endpoints represent operator use cases, not arbitrary internal helpers.
+- Structural refactors use small Strangler steps behind behavior/contract tests. Do not create `new-core`/`src2`, microservices, a second database, multi-repo split or a frontend-framework migration as a prerequisite.
 
 ## Work method and evidence
 
@@ -56,6 +59,7 @@ Every PR must include the required reading attestation and acceptance table in .
 
 - **Productization first:** full recruitment workflow with evidence-based human decision, robust recovery, accurate versioned delivery and usable UX.
 - **Parallel dual carrier:** real WPF/WebView2 EXE plus local HTML/Browser surface over the **same** C11 Core; explicit consistency, security and process ownership tests.
+- **API-first modular Core:** Core/Application owns business truth; API is a tested product contract; Windows/Browser are thin clients/carriers. Reduce aggregate hotspots incrementally instead of adding new business rules to them.
 - No new UI framework, wholesale rewrite, enterprise ATS, SaaS, cloud login or broad compliance platform in this phase.
 - Do not claim GA/RC until distinct artifacts and *each* carrier pass exact-gate acceptance.
 

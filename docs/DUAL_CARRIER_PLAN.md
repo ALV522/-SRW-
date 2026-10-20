@@ -32,6 +32,19 @@
 
 不得把 E1–E5 或 Windows Lab 的 PASS 直接升级成当前 main 的正式双端验收。
 
+## API-first 边界（ADR-0002）
+
+双载体不再仅理解为“两个界面连接同一个数据库”，而是两个客户端连接**同一个业务 API / Application / Domain**。从本路线图起，新增业务能力默认先进入 Core，再由 WPF/WebView2 与 Browser 调用。
+
+- Windows Host 不实现 Candidate/Decision/Offer 状态机，只负责 Core lifecycle、workspace/session、WebView2/native integration；
+- Browser UI 不成为唯一业务门禁，所有权威 mutation 必须由 Core 重新验证；
+- API route 按 operator use case 提供稳定 contract；内部 helper/repository 不机械暴露；
+- `fullworkbench.py` 与 `app.js` 的拆分由 [API-first 模块化 Core 路线图](API_FIRST_MODULAR_CORE_ROADMAP.md) 渐进推进，默认保持现有 URL/Schema/业务语义；
+- Supervisor/session/CAS 属于统一 Core 生命周期，不是“Web 专用后端”；
+- 未来 CLI/Agent/Automation 若加入，也必须使用相同 Core contract，不得绕过审计、revision 或人工决定边界。
+
+因此 #43 的最终成功标准不是“Windows 与网页都能打开”，而是两者作为真正客户端，对同一权威 Core 的状态、错误、并发和审计语义一致。
+
 ## 统一核心的强制不变量
 
 D1. 同一个 Workspace 在任意时刻只有一个权威 Core 写入者和一个 Job Engine 权威调度器；不可让两个 UI 分别打开 SQLite 写入。

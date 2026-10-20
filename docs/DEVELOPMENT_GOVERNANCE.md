@@ -12,6 +12,8 @@
 
 在每次业务开发前，先核查 [C11 能力与验收矩阵](CAPABILITY_MATRIX.md) 的相关模块；不可把旧版存在、源码存在、Chromium 测试存在和 Windows 已验收混为一谈。
 
+从 ADR-0002 生效后，所有实现还必须核查 [API-first 模块化 Core 路线图](API_FIRST_MODULAR_CORE_ROADMAP.md)：默认开发顺序是 **operator outcome → Domain/Application → API contract → Browser/Windows client → carrier acceptance**。若工作直接扩大 `fullworkbench.py`、`frontend/dist/app.js` 或 WPF Host 中的业务规则，Issue/PR 必须解释为什么不能落在现有 Core/Application 边界。
+
 ## 3. Issue 任务契约（必备字段）
 
 每个非纯笔误的 Issue/开发请求应具备：
@@ -19,7 +21,7 @@
 - **现状与证据**：现有症状、版本 SHA、日志/测试或可靠复现步骤。
 - **目标行为**：正向场景和最少一个异常或回退场景。
 - **不变量**：相关产品宪章条款；哪些旧功能不可退化。
-- **影响范围**：Core / API / Windows / Web / Schema / Runtime / Knowledge / Packaging。
+- **影响范围**：Core / Application / API contract / Windows / Web / Schema / Runtime / Knowledge / Packaging。
 - **验收证据**：单元/API、真实 Chromium、真实 Windows、故障注入、Provider、工件中需要的部分；不能简单选择全部 PASS。
 - **完成定义**：有代码 PR、准确测试、阻断问题关闭、文档/版本/来源与产物绑定。
 
@@ -36,6 +38,8 @@ P0：数据、证据、人工决策错误/泄露、无法启动或丢失主线�
 - PR 更新 SOURCE_MANIFEST.sha256，先核查未解释的哈希/文件删减，禁止通过重算清单掩盖篡改；SOURCE_RECOVERY_MANIFEST.sha256 不可修改。
 - CI 的 Source Integrity / Release Truth / 跨平台源回归 / Chromium / Windows Host / Governance 分别报告，不用一项代替另一项。
 - 中大型变更要求关联 Issue，业务规则/接口或权威数据变化同时更新契约与测试。
+- API-first 重构 PR 必须说明 operator use case、route/contract before→after、并发/审计/人工边界以及回滚；文件拆分本身不是完成标准。URL/Schema 默认保持，除非另有批准的迁移。
+- 模块拆分采用 Strangler Refactoring：一次一个业务域，先建立 contract/regression safety net，再迁 route/application/frontend；禁止并行建设第二套 Core 或双写数据库。
 - 合并后复验准确 main SHA，不沿用 PR 分支或其他来源的旧工件证据。
 - 正式发布遵守 docs/RELEASE_PROCESS.md；需要产品负责人最终确认。
 

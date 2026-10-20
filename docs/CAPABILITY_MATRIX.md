@@ -53,7 +53,8 @@
 ## 优先级与完成规则
 
 P0：V1/V2 的完整业务和异常路径；精确当前 Windows Native 候选完整 GUI 和数据恢复（#41/#42）。
-P1：Local Web/EXE 共同核心与 V3（#43），不为并行开发引入第二套业务状态。
+P1：API-first 模块化 Core 横向治理与渐进拆分（#63）：先 contract safety net，再逐域 route/application/frontend 拆分；不暂停 P0 产品化，不另起新 Core。
+P1：Local Web/EXE 共同核心与 V3（#43），不为并行开发引入第二套业务状态；Supervisor/session/CAS 与 #63 的 API/Application 边界协同。
 P1：历史版本/正式 SemVer 迁移（#44），不能让 VERSION 与各元数据不一致。
 P2：真实招聘人员使用反馈，待第一个独立可用产品完成内部验收后开展。
 

@@ -2,23 +2,80 @@
 
 ## Product boundary
 
-SRW is a local-first recruitment operations and decision-support workbench. The current architecture treats **v0.8.12-R2 as the capability-completeness reference** and does not use UI simplification as permission to remove mature evidence, lineage, privacy, calibration, governance or release semantics.
+SRW is a local-first recruitment operations and decision-support workbench. `v0.8.12-R2` remains a capability-completeness reference, not the current source identity. UI or architecture simplification never authorizes removal of mature Evidence, Decision, Interview, Offer, Knowledge, AI/OCR/ASR, backup, privacy or provenance semantics.
 
-## Core layers
+The accepted architecture direction is defined by:
+
+- [ADR-0001](docs/decisions/ADR-0001-single-authoritative-core.md): one authoritative Core for Windows and Local Browser;
+- [ADR-0002](docs/decisions/ADR-0002-api-first-modular-monolith.md): API-first modular monolith and thin carriers;
+- [API-first modular Core roadmap](docs/API_FIRST_MODULAR_CORE_ROADMAP.md): staged migration, not a rewrite.
+
+## Architectural rule
+
+**The Core is authoritative; clients consume contracts.**
+
+```text
+Windows WPF/WebView2       Local Browser       future CLI / Agent
+          \                    |                    /
+           +--------------- SRW API ---------------+
+                              |
+                     Application Use Cases
+                              |
+                           Domain
+                              |
+       +----------------------+----------------------+
+       |                      |                      |
+ SQLite / Blob          Jobs / Providers        Knowledge
+       |                      |                      |
+       +-------------- authoritative Workspace -----+
+```
+
+Business capabilities enter Domain/Application first, then receive an API contract, then are exposed by Windows/Browser clients. No carrier may become a second authority for Candidate, Evidence, Decision, Interview or Offer state.
+
+## Logical layers
 
 - `backend/srw/kernel`: IDs, hashing, clock and invariant primitives.
-- `backend/srw/runtime`: database/schema, settings, capability loading, local-boundary and lifecycle infrastructure.
-- `backend/srw/modules`: durable domain capabilities. Candidate material/evidence, protocol, decision, identity, calibration, feedback, operations, planning, intelligence, knowledge governance and project portability live here.
-- `backend/srw/api`: HTTP adapters. New capability work should prefer small dedicated route modules instead of adding more surface area to `fullworkbench.py`.
-- `backend/srw/surfaces`: read-oriented product projections/workspaces.
-- `frontend/dist`: current retained browser/WebView2 surface. It is a product asset in the present source baseline; a future frontend-source rebuild must preserve capability parity before replacing it.
-- `desktop/SRW.Desktop`: inherited WPF/WebView2 Host source. Host ABI is restored; the exact native binary remains carrier-gated.
-- `convergence_tests`: current capability-recovery regression suite. Tests must be self-contained and must not require production candidate data or production Knowledge DB bytes.
-- `verification`: historical/current evidence records. Reference evidence must never be presented as newly executed evidence.
+- `backend/srw/modules`: current domain/service foundation. Candidate, protocol, decision, identity, calibration, feedback, work, planning, knowledge and portability already live here; future changes should strengthen these boundaries instead of rebuilding them.
+- future/gradual Application layer: operator use cases and transaction orchestration. It may be introduced incrementally around existing modules; a mass file move is not required.
+- `backend/srw/api`: HTTP adapter/composition surface. It owns transport contracts, request/response serialization, errors, session/concurrency integration—not domain truth.
+- `backend/srw/surfaces`: read-oriented projections/workspaces.
+- `backend/srw/runtime`, `providers`, `evidence`, `importer`: infrastructure adapters for DB/schema, jobs, local boundary, backup, provider execution, grounding and intake.
+- `frontend/dist`: retained Browser/WebView2 client. It will be decomposed behind a shared API client and feature boundaries without a framework rewrite.
+- `desktop/SRW.Desktop`: Windows carrier. Its target responsibility is lifecycle, workspace/session, WebView2 and native integration, not recruitment rules.
+- `convergence_tests`: source/API regression safety net.
+- `browser_acceptance`: real Chromium operator-path evidence.
+- `verification`: evidence records; historical evidence never becomes newly executed evidence.
+
+## Current structural hotspots
+
+On baseline `c0bc192e346ab16aeb6fa63e60a40c617274a188`:
+
+- `backend/srw/api/fullworkbench.py`: ~126.8 KB / 1723 lines;
+- `backend/srw/api/app.py`: ~38.6 KB / 737 lines;
+- `frontend/dist/app.js`: ~128.8 KB;
+- static scan of `backend/srw/api/*.py`: 141 `Route(...)` declarations / 129 distinct path templates.
+
+These are migration targets, not evidence that the entire Core is unstructured. `backend/srw/modules/` already contains 17 business module directories. The required method is therefore gradual boundary extraction with preserved behavior.
+
+## API contract boundary
+
+Public interfaces correspond to operator/business use cases, not internal helper functions. Important mutations progressively document and test:
+
+- request and response schemas;
+- stable error semantics;
+- resource/revision identity;
+- CAS / If-Match / expected revision behavior;
+- explicit human actor/confirmation requirements;
+- audit and lineage effects;
+- side effects such as Source, MaterialRevision, Job or Backup creation;
+- local session/origin/privacy requirements;
+- compatibility/deprecation policy.
+
+A frontend may proactively disable an invalid action, but the Core must independently enforce the rule.
 
 ## Decision truth
 
-The central semantic chain is:
+The central semantic chain remains:
 
 `Source → Claim → Evidence/Verification → Criterion Judgment → Assessment → Human Decision`
 
@@ -30,26 +87,33 @@ Important invariants:
 4. Operational priority is not candidate ranking.
 5. Market/channel intelligence is planning evidence, not candidate scoring input.
 6. Privacy-safe AI projection is used on the actual remote-provider path.
-7. Source grounding must remain traceable to the original material.
+7. Source grounding remains traceable to original material.
+
+## One-workspace / one-writer authority
+
+One SRW workspace has one authoritative Core writer and one authoritative Job Engine. Windows and Browser do not separately open the same SQLite for writes. Workspace lease, future Supervisor/session attachment, transaction revision/CAS, backup/restore interlocks and task idempotency are Core lifecycle concerns.
 
 ## Local security boundary
 
-The HTTP surface is local-only. Requests with non-local Host headers are rejected. Browser mutations carrying `Origin`/`Referer` must be same-origin. Native Host/API calls may omit `Origin` but still remain restricted by the local Host boundary and, for lifecycle shutdown, the Host session token.
+The HTTP surface remains local-only unless a future product decision explicitly changes scope. Local Host/Origin/session/CSRF protections must be enforced by the Core boundary. A loopback address alone is not an authorization model.
 
-## Knowledge boundary
+## Knowledge and provider boundary
 
-The five active Knowledge databases are governed artifacts, not mutable runtime scratch data. Operational learning follows:
+Knowledge databases are governed artifacts, not UI-owned mutable scratch state. AI/OCR/ASR/embedding/document processing extend through code-level provider/capability contracts and the Job Engine. A dynamic plugin marketplace is not a current requirement, and no provider may bypass privacy projection, audit or HumanDecision boundaries.
 
-`human-confirmed action → feedback draft → curation proposal → governance review → prepared package → semantic diff/digest → explicit activation → rollback history`
+## Refactoring policy
 
-High-risk ontology creation remains export-only until its full validation contract is restored.
+Use Strangler Refactoring:
+
+1. inventory and contract-test current behavior;
+2. migrate one business domain at a time;
+3. keep URLs and Schema stable unless a separately approved migration requires change;
+4. reuse existing domain/service/repository implementations;
+5. run Source/API and applicable Chromium tests on the exact PR Head;
+6. delete legacy aggregate code only after equivalent behavior is proven.
+
+Do not build a parallel `new-core`, microservice set, second database, new frontend framework or separate repositories as prerequisites for this work.
 
 ## Release truth
 
-`VERSION`, `BUILD_INFO.json`, `backend/srw/release_state.json`, `PORTABLE_MANIFEST.json`, `VERIFICATION_TRUTH.json` and the code-level schema revision must agree for a tagged release. `scripts/check_release_truth.py` is the source gate for that binding.
-
-Git history is the development truth from the Convergence 08 baseline onward. Portable/native ZIP files belong in GitHub Releases, not normal Git history.
-
-## Repository governance and historical artifact boundary (2026-10-18)
-
-See [mainline/branch/source governance](docs/REPOSITORY_GOVERNANCE.md). Historical v0.8.10/v0.8.12-R2/alpha10 ZIP files are catalogued by SHA under [docs/history](docs/history/ARCHIVE_CATALOG.md), not committed into Git. Older embedded runtimes and Knowledge DB snapshots are not automatically approved as production payloads. The separate Chromium real-browser CI passed three scripted scenarios on main 69f60b9; it is not a Native WPF Host acceptance test.
+`VERSION`, `BUILD_INFO.json`, `backend/srw/release_state.json`, `PORTABLE_MANIFEST.json`, `VERIFICATION_TRUTH.json` and Schema identity remain separately governed. Architecture changes do not imply a release promotion. Source, Browser, Windows WPF, Native/Portable and dual-carrier acceptance remain different claims.
