@@ -40,8 +40,8 @@ class NativeGuiAcceptanceTests(unittest.TestCase):
             record = {"event": "frontend_loaded", "details": {
                 "url": "/api/v1/candidates/private-candidate-id?token=secret"}}
             log.write_text(json.dumps(record) + "\n", encoding="utf-8")
-            self.assertEqual(safe_host_events(log), ["frontend_loaded"])
-            self.assertNotIn("private-candidate-id", str(safe_host_events(log)))
+            self.assertEqual(safe_host_events(log, strict=False), ["frontend_loaded"])
+            self.assertNotIn("private-candidate-id", str(safe_host_events(log, strict=False)))
 
     def test_restart_must_use_only_current_cycle_log_events(self):
         with tempfile.TemporaryDirectory(prefix="srw-gui-restarts-test-") as td:
@@ -51,9 +51,9 @@ class NativeGuiAcceptanceTests(unittest.TestCase):
             offset = log.stat().st_size
             with log.open("a", encoding="utf-8") as fp:
                 fp.write(json.dumps({"event": "host_started"}) + "\n")
-            self.assertEqual(safe_host_events(log, offset=offset), ["host_started"])
+            self.assertEqual(safe_host_events(log, offset=offset, strict=False), ["host_started"])
             with self.assertRaisesRegex(PayloadError, "backend_ready"):
-                verify_gui_event_sequence(safe_host_events(log, offset=offset), lock_exists=False)
+                verify_gui_event_sequence(safe_host_events(log, offset=offset, strict=False), lock_exists=False)
 
     def test_unknown_or_malformed_log_lines_are_ignored(self):
         with tempfile.TemporaryDirectory(prefix="srw-gui-broken-json-test-") as td:
@@ -61,7 +61,7 @@ class NativeGuiAcceptanceTests(unittest.TestCase):
             log.write_text("broken\n" + json.dumps({"event": "backend_ready"}) + "\n"
                            + json.dumps({"event": "backend_stderr", "details": {
                                "line": "secret"}}) + "\n", encoding="utf-8")
-            self.assertEqual(safe_host_events(log), ["backend_ready"])
+            self.assertEqual(safe_host_events(log, strict=False), ["backend_ready"])
 
     def test_truncated_log_between_cycles_rejected(self):
         with tempfile.TemporaryDirectory(prefix="srw-gui-truncated-test-") as td:

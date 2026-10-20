@@ -81,3 +81,9 @@ py -3.12 .\scripts\accept_rebuilt_native_gui.py `
 `--cycles 2` 会依次打开两次 WPF，需要你每次都在确认界面显示后正常关闭窗口。第二轮使用同一个**临时**工作区以验证重启、锁释放；脚本只接受本轮日志新增的事件，不会拿第一次结果冒充第二次成功。测试期间不会导入真实简历或 Provider Key，测试结束自动清理临时数据。仅保留脱敏事件名称、来源 SHA、成功/失败状态于新 JSON 报告。
 
 **成功声明的边界**：这项烟测只能证明被测 SHA 的 WPF 窗口加载、Core Ready、WebView2 `frontend_loaded`、正常退出和锁释放，**不代表**完整业务、OCR/ASR、AI 或长期稳定性通过。如超时退出，进程会被清理但该轮明确标为 BLOCKED，不能声称优雅退出。已有的 `c8431ca7` 截图依旧是真实历史证据，但不是本脚本的新验收结果。
+
+## #42：最终日志判定不得忽略失败
+
+GUI 运行中的提示轮询可以等待尚未写完的 JSONL；进程退出后的最终判定必须严格解析本轮日志，要求同一非空 Host session，拒绝损坏的 JSON/UTF-8、缺少身份、跨会话拼接、强制终止、启动重试、关闭请求失败、后端异常和 HTTP 5xx。旧原文日志及新 `backend_http` / `backend_exception` 脱敏格式都须识别。只返回固定错误类别，不输出原始日志内容或会话 ID。
+
+`convergence_tests/test_gui_evidence_fail_closed.py` 用合成 JSONL 验证上述拒绝行为与正常日志兼容性；这是验收器回归，**不是 Windows GUI 实机 PASS**。实际 WPF 工件、完整招聘、备份恢复与双端验收仍须分别执行。

@@ -21,6 +21,7 @@ if __package__ in ("", None):
     sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from scripts.native_payload import PayloadError
+from scripts.audit_windows_host_gui_log import record_failure
 from scripts.verify_rebuilt_native import inspect_rebuilt
 
 REQUIRED = ("host_started", "backend_ready", "webview_initialized",
@@ -29,8 +30,11 @@ REQUIRED = ("host_started", "backend_ready", "webview_initialized",
 MAX_LOG_SIZE = 10_000_000
 
 
-def safe_host_events(path: Path, *, offset: int = 0) -> list[str]:
-    """Read only recognized event *names*; do not copy raw log lines or IDs."""
+def safe_host_events(path: Path, *, offset: int = 0, strict: bool = True) -> list[str]:
+    """Final evidence is strict; live polling alone may tolerate partial lines.
+
+    Session IDs are compared in memory and never returned in diagnostics.
+    """
     if not path.is_file() or path.is_symlink():
         return []
     size = path.stat().st_size
@@ -42,13 +46,37 @@ def safe_host_events(path: Path, *, offset: int = 0) -> list[str]:
         stream.seek(offset)
         # The Host may still be appending a multibyte JSONL line; incomplete
         # UTF-8 is ignored until a later poll, never mistaken for GUI failure.
-        lines = stream.read(MAX_LOG_SIZE + 1).decode("utf-8-sig", errors="replace").splitlines()
+        raw = stream.read(MAX_LOG_SIZE + 1)
+    if len(raw) > MAX_LOG_SIZE:
+        raise PayloadError("WPF Host log exceeded safe parse size")
+    try:
+        lines = raw.decode("utf-8-sig", errors="strict" if strict else "replace").splitlines()
+    except UnicodeError:
+        raise PayloadError("invalid UTF-8 in final WPF Host log") from None
     events = []
+    session = None
     for line in lines:
+        if not line.strip():
+            continue
         try:
             record = json.loads(line)
         except (ValueError, UnicodeError):
+            if strict:
+                raise PayloadError("malformed final WPF Host log record") from None
             continue
+        if strict:
+            identity = record.get("identity") if isinstance(record, dict) else None
+            current = identity.get("host_session_id") if isinstance(identity, dict) else None
+            if not isinstance(current, str) or not current:
+                raise PayloadError("final WPF Host log missing session identity")
+            if session is not None and current != session:
+                raise PayloadError("multiple Host sessions in one WPF acceptance cycle")
+            session = current
+            if not isinstance(record.get("event"), str):
+                raise PayloadError("invalid final WPF Host event")
+            failure = record_failure(record)
+            if failure:
+                raise PayloadError(failure)
         event = record.get("event") if isinstance(record, dict) else None
         if event in REQUIRED:
             events.append(event)
@@ -99,7 +127,7 @@ def run_gui(root: Path, *, timeout_seconds: int = 180, cycles: int = 1) -> list[
                 while time.monotonic() - start < timeout_seconds:
                     if process.poll() is not None:
                         break
-                    events = safe_host_events(log, offset=baseline)
+                    events = safe_host_events(log, offset=baseline, strict=False)
                     if "frontend_loaded" in events and not saw_frontend:
                         saw_frontend = True
                         print("[SRW GUI] WebView2 loaded. Inspect UI, then CLOSE WPF normally with X.", flush=True)
