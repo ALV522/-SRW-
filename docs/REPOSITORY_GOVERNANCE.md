@@ -38,6 +38,13 @@
 
 探索实证：[E1–E5 CI](https://github.com/ALV522/-SRW-/actions/runs/39193776226)、[Native SOURCE Lab](https://github.com/ALV522/-SRW-/actions/runs/39196390613)。后者确实在 Windows CI 启动了真实 WPF EXE，浏览器 E1 与它读取相同合成 Core/SQLite；但使用临时 Python/Knowledge，没有认证为正式 Portable。
 
+
+## API-first 模块边界（2026-10-21）
+
+产品负责人已批准 [ADR-0002](decisions/ADR-0002-api-first-modular-monolith.md) 和 [专项重构路线图](API_FIRST_MODULAR_CORE_ROADMAP.md)。仓库仍保持 monorepo 与单一 `main`，但代码边界要逐步强化：Domain/Application/API/Carrier/Frontend 分责，Windows 与 Browser 均通过统一 Core contract 取得业务能力。
+
+当前静态热点是 `backend/srw/api/fullworkbench.py` 与 `frontend/dist/app.js`。后续拆分必须使用小 PR、保持 URL/Schema/业务行为，并用 Source/API/Chromium/需要时 Windows 测试证明等价；不得为了目录整洁建立第二套 Core、第二套 SQLite、微服务或新前端框架。
+
 ## 每次提交、发布应执行的门禁
 
 1. 从最新 `main` 开分支，确定业务问题、用户操作与验收用例；小范围 PR 优于一次合并多个实验体系。
