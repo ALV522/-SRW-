@@ -64,3 +64,9 @@ P2：真实招聘人员使用反馈，待第一个独立可用产品完成内部
 浏览器验收入口 `browser_acceptance/test_flows.py::test_08_archive_restore_preserves_material_and_live_funnel` 通过现有 UI 新建项目、候选人、发布合成文本材料，执行候选人归档、筛选和恢复，再分别取消/确认项目归档。验收检查在库人数和新候选人漏斗、恢复后材料可见且 Source 记录不变，以及项目归档后实际首页漏斗减少。所有业务写入均由 Chromium 点击触发；API 只用于结果复核。它不覆盖 Offer/面试归档、项目恢复、备份恢复、WPF GUI 或正式双端并发。是否 PASS 以该测试所在精确提交的 Chromium CI 为准；不能将本条视为 #41 整体完成。
 
 运营工作台 `GET /api/v1/dashboard` 中的在招候选人数、招聘漏斗各阶段、Offer 状态、近期面试及过期复评待办应当只统计**未归档项目中未归档候选人**。归档项目及单独归档候选人的历史 Offer、面试、复评数据仍保留在 SQLite 与历史业务页面中，不得通过删除记录达到指标一致性。`convergence_tests/test_convergence11.py::test_dashboard_active_funnel_offer_and_upcoming_exclude_archived_work` 使用合成活动/归档项目及候选人，验证这五类聚合与真实 API 返回一致。它属于 API/源回归证据，不代替浏览器交互或当前 Native 工件验收；PASS 状态以相同提交 SHA 的 Source Gate 为准。
+
+## P0 #41 增量：无有效当前上下文时的历史人工决定（2026-10-20）
+
+原先 `get_decision_history` 仅在成功计算当前 `decision_context_hash` 时才把不一致的旧决定标记为 `stale`。当当前发布 Protocol 或当前 MaterialRevision 暂时缺失，旧决定返回 `is_current_context=false, stale=false`，产生具有权威含义的含糊状态。本次在既有 A2 产品不变量下修复为“没有当前有效上下文的历史决定显式 `stale=true`”，不删除决定、不生成新的决定、不修改重申门槛。
+
+`convergence_tests/test_decision_history_context.py` 使用临时 SQLite 与真实 API 验证：正常上下文仍有效、当前 Protocol 缺失时失效、当前 Material 缺失时失效、实际决策历史 HTTP 响应一致。仅为 Source/API 增量；Windows GUI、Browser/双端完整业务不由此自动宣称通过。验收以此 PR 精确 SHA 的 CI 为准。

@@ -59,7 +59,9 @@ def get_decision_history(
             actor=row.actor,
             created_at=row.created_at.isoformat(),
             is_current_context=bool(current_hash and row.decision_context_hash == current_hash),
-            stale=bool(current_hash and row.decision_context_hash != current_hash),
+            # With no current Protocol/Material identity, a prior human decision
+            # is historical but cannot be treated as current.
+            stale=not bool(current_hash and row.decision_context_hash == current_hash),
             reaffirmed_from_decision_id=row.reaffirmed_from_decision_id,
         )
         for row in rows
