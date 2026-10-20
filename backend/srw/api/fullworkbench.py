@@ -1138,8 +1138,13 @@ def install_full_workbench_routes(app, factory, registry, secrets, *, data_dir: 
         with v1_session_scope(factory) as s:
             candidate=s.get(Candidate,cid)
             if not candidate: raise V1NotFoundError(f"candidate not found: {cid}")
+            source_id=_s(b,"source_id") or None
+            if source_id:
+                source=s.get(Source,source_id)
+                if not source: raise V1NotFoundError(f"source not found: {source_id}")
+                if source.candidate_id != cid: raise V1InvariantError("source belongs to another candidate")
             metadata=_event_metadata(s,cid,et,b.get("metadata",{}))
-            x=RecruitmentEvent(candidate_id=cid,event_type=et,title=_s(b,"title"),notes=_s(b,"notes"),source_id=_s(b,"source_id") or None,metadata_json=json.dumps(metadata,ensure_ascii=False,separators=(",",":")),scheduled_at=_parse_iso(_s(b,"scheduled_at")),duration_minutes=duration,interviewer=_s(b,"interviewer"),location=_s(b,"location"),event_state=state,outcome=_s(b,"outcome"))
+            x=RecruitmentEvent(candidate_id=cid,event_type=et,title=_s(b,"title"),notes=_s(b,"notes"),source_id=source_id,metadata_json=json.dumps(metadata,ensure_ascii=False,separators=(",",":")),scheduled_at=_parse_iso(_s(b,"scheduled_at")),duration_minutes=duration,interviewer=_s(b,"interviewer"),location=_s(b,"location"),event_state=state,outcome=_s(b,"outcome"))
             s.add(x);s.flush()
             if state=="completed" and et in {"phone_screen","interview","feedback"} and (metadata.get("questions") or metadata.get("feedback")) and not x.source_id:
                 text=_event_source_text(x,metadata); source=add_source(s,cid,source_kind=f"{et}_record",content_hash=content_hash({"event_id":x.id,"text":text}),text_content=text,media_type="text/plain",metadata={"event_id":x.id,"event_type":et,"structured":True}); _publish_current(s,cid,source.id); x.source_id=source.id

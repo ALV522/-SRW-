@@ -70,3 +70,7 @@ P2：真实招聘人员使用反馈，待第一个独立可用产品完成内部
 原先 `get_decision_history` 仅在成功计算当前 `decision_context_hash` 时才把不一致的旧决定标记为 `stale`。当当前发布 Protocol 或当前 MaterialRevision 暂时缺失，旧决定返回 `is_current_context=false, stale=false`，产生具有权威含义的含糊状态。本次在既有 A2 产品不变量下修复为“没有当前有效上下文的历史决定显式 `stale=true`”，不删除决定、不生成新的决定、不修改重申门槛。
 
 `convergence_tests/test_decision_history_context.py` 使用临时 SQLite 与真实 API 验证：正常上下文仍有效、当前 Protocol 缺失时失效、当前 Material 缺失时失效、实际决策历史 HTTP 响应一致。仅为 Source/API 增量；Windows GUI、Browser/双端完整业务不由此自动宣称通过。验收以此 PR 精确 SHA 的 CI 为准。
+
+### Issue #41: recruitment event source ownership
+
+Event creation rejects nonexistent source references (404) and sources owned by another candidate, including within the same project (409), before any event or success audit is written. Valid owned references, source-free scheduling and automatic structured-interview source publication retain their behavior. Five synthetic SQLite/API regression tests cover this shared Core contract in `convergence_tests/test_event_source_ownership.py`. This adds no Schema migration and does not repair historical invalid references. Exact-head source CI is required; these tests are not Windows GUI or full dual-carrier acceptance.
