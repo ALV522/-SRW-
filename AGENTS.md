@@ -7,7 +7,8 @@
 1. **This AGENTS.md** — operational constraints and required handoff.
 2. **docs/PROJECT_OVERVIEW.md** — what SRW is, evidence-based current state and repository map.
 3. **docs/PRODUCT_CHARTER.md** — immutable product goals, non-goals and A/B/C change classes.
-4. **docs/DEVELOPMENT_GOVERNANCE.md** — issue-to-PR workflow, authority, review and acceptance.
+4. **docs/CAPABILITY_MATRIX.md** — evidence-bounded v0.8.x→C11 business domains and test coverage; NOT a blanket PASS.
+5. **docs/DEVELOPMENT_GOVERNANCE.md** — issue-to-PR workflow, authority, review and acceptance.
 5. **docs/VERSION_POLICY.md** and **VERSION_POLICY.json** — runtime/product version, Git SHA, Schema, carrier, release channels, migration procedure.
 6. **docs/DUAL_CARRIER_PLAN.md** — common Core, independent Windows and local HTML/Browser carriers.
 7. **docs/ACCEPTANCE_PLAN.md**, **docs/ROADMAP.md** and **docs/RELEASE_PROCESS.md** — established business acceptance and release gates; compare with the newer plans above.
