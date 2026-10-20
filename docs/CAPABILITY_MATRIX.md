@@ -61,4 +61,6 @@ P2：真实招聘人员使用反馈，待第一个独立可用产品完成内部
 
 ## P0 进行中招聘指标与历史记录隔离（Issue #41 增量）
 
+浏览器验收入口 `browser_acceptance/test_flows.py::test_08_archive_restore_preserves_material_and_live_funnel` 通过现有 UI 新建项目、候选人、发布合成文本材料，执行候选人归档、筛选和恢复，再分别取消/确认项目归档。验收检查在库人数和新候选人漏斗、恢复后材料可见且 Source 记录不变，以及项目归档后实际首页漏斗减少。所有业务写入均由 Chromium 点击触发；API 只用于结果复核。它不覆盖 Offer/面试归档、项目恢复、备份恢复、WPF GUI 或正式双端并发。是否 PASS 以该测试所在精确提交的 Chromium CI 为准；不能将本条视为 #41 整体完成。
+
 运营工作台 `GET /api/v1/dashboard` 中的在招候选人数、招聘漏斗各阶段、Offer 状态、近期面试及过期复评待办应当只统计**未归档项目中未归档候选人**。归档项目及单独归档候选人的历史 Offer、面试、复评数据仍保留在 SQLite 与历史业务页面中，不得通过删除记录达到指标一致性。`convergence_tests/test_convergence11.py::test_dashboard_active_funnel_offer_and_upcoming_exclude_archived_work` 使用合成活动/归档项目及候选人，验证这五类聚合与真实 API 返回一致。它属于 API/源回归证据，不代替浏览器交互或当前 Native 工件验收；PASS 状态以相同提交 SHA 的 Source Gate 为准。

@@ -210,6 +210,58 @@ class RecruitmentBrowserAcceptance(unittest.TestCase):
         self.assertNotEqual(pipeline["current_stage"], "hired")
         self.assertFalse(self.console_errors, self.console_errors)
 
+    def test_08_archive_restore_preserves_material_and_live_funnel(self) -> None:
+        """Archive through real controls; retain evidence and restore live counts.
+
+        Removing the Core dashboard archive filters makes the final rendered
+        funnel assertion fail. No business writes are seeded through the API.
+        """
+        pid = self.new_project("归档恢复验收")
+        cid = self.new_candidate(pid, "模拟归档候选人")
+        material = "合成归档材料：三年产品分析经验，历史证据必须保留。"
+        self.page.locator("#paste-material").fill(material)
+        self.page.get_by_role("button", name="保存并发布材料版本").click()
+        expect(self.page.locator(".source-card")).to_contain_text(material)
+        before = self.get_json(f"/api/v1/candidates/{cid}/workspace")
+        counts = self.get_json("/api/v1/dashboard")
+        self.page.get_by_role("button", name="← 返回项目工作区").click()
+        self.page.locator(".tabs").get_by_role("button", name="候选人收件").click()
+        row = self.page.locator("tbody tr").filter(has_text=cid)
+        row.get_by_role("button", name="归档", exact=True).click()
+        expect(row).to_have_count(0)
+        archived = self.get_json("/api/v1/dashboard")
+        self.assertEqual(archived["metrics"]["candidates"], counts["metrics"]["candidates"] - 1)
+        self.assertEqual(archived["candidates_by_stage"]["new"], counts["candidates_by_stage"]["new"] - 1)
+
+        self.page.locator("#cand-archive").select_option("archived")
+        self.page.get_by_role("button", name="应用筛选").click()
+        expect(row).to_be_visible()
+        row.get_by_role("button", name="恢复", exact=True).click()
+        expect(row).to_have_count(0)
+        restored = self.get_json("/api/v1/dashboard")
+        self.assertEqual(restored["metrics"]["candidates"], counts["metrics"]["candidates"])
+        self.assertEqual(restored["candidates_by_stage"]["new"], counts["candidates_by_stage"]["new"])
+        self.page.locator("#cand-archive").select_option("active")
+        self.page.get_by_role("button", name="应用筛选").click()
+        row.get_by_role("button", name="工作区", exact=True).click()
+        expect(self.page.locator(".source-card")).to_contain_text(material)
+        self.assertEqual(self.get_json(f"/api/v1/candidates/{cid}/workspace")["sources"], before["sources"])
+
+        self.page.get_by_role("button", name="← 返回项目工作区").click()
+        self.page.once("dialog", lambda dialog: dialog.dismiss())
+        self.page.get_by_role("button", name="归档项目", exact=True).click()
+        self.assertEqual(self.get_json("/api/v1/dashboard")["metrics"]["candidates"], counts["metrics"]["candidates"])
+        self.page.once("dialog", lambda dialog: dialog.accept())
+        with self.page.expect_response(lambda response: response.url.endswith(f"/projects/{pid}/archive") and response.request.method == "POST") as response:
+            self.page.get_by_role("button", name="归档项目", exact=True).click()
+        self.assertEqual(response.value.status, 200)
+        self.page.goto(self.base + "/v1", wait_until="domcontentloaded")
+        expect(self.page.locator("#content h1")).to_have_text("工作台总览")
+        funnel = self.page.locator(".funnel-step").filter(has=self.page.locator("span", has_text="新候选人"))
+        expect(funnel.locator("strong")).to_have_text(str(counts["candidates_by_stage"]["new"] - 1))
+        self.assertEqual(self.get_json(f"/api/v1/candidates/{cid}/workspace")["sources"], before["sources"])
+        self.assertFalse(self.console_errors, self.console_errors)
+
     def test_03_interview_is_a_real_persisted_workflow(self) -> None:
         pid = self.new_project("面试闭环")
         cid = self.new_candidate(pid, "模拟候选人丙")
