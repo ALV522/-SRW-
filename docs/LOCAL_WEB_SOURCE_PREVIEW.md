@@ -35,7 +35,7 @@ py -3.12 scripts\start_local_web.py --workspace "D:\SRW\synthetic-local-web" --s
 ## 核心限制与后续
 
 1. 此预览的 Core 由 Local Web 进程拥有，无法让 Windows WPF 自动接管；关闭 Desktop 后浏览器独立续用、跨端并发 CAS、任务唯一所有权**仍待 Issue #43** 的正式 Supervisor/契约。
-2. 只拒绝 Windows `app.lock` 的明显冲突；正式 Host 与 Web 共用同一权威 Core 仍需进程所有权和权限审计；**绝不通过分别打开同一 SQLite 实现互通**。
+2. 工作区单写者已由 [工作区租约合同](WORKSPACE_LEASE_CONTRACT.md) 保证：本入口与 Windows Host 竞争同一个 `data/app.lock` 目录，用原子创建失败而不是"看一眼文件是否存在"。跨端 Supervisor、事务级 CAS 与任务唯一所有权**仍待 Issue #43**
 3. Windows Host 的最新 Native 完整包仍待 Issue #42 验收；本入口不能为任何 Native 构建背书。
 4. `--reuse-workspace` 是显式授权读取/修改既有 SRW Web workspace 的操作，建议仅用于此前本入口创建的独立目录，并始终先备份。
 5. 浏览器真实业务验收将使用此启动入口的 `--synthetic --no-browser` 模式，经 Playwright/Chromium 操作当前前端和真实 API/SQLite。
