@@ -39,7 +39,7 @@ public partial class MainWindow : Window
         }
         catch (Exception exc)
         {
-            _controller.LogEvent("webview_failed", new { error = exc.GetType().Name, message = exc.Message });
+            _controller.LogEvent("webview_failed", new { error = exc.GetType().Name, message_redacted = true });
             MessageBox.Show(
                 $"WebView2 初始化失败。请确认 Microsoft Edge WebView2 Runtime 可用。\n\n{exc.Message}",
                 "Smart Recruitment Workbench",
