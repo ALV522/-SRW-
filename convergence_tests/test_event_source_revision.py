@@ -13,6 +13,11 @@ from knowledge_fixture import create_minimal_knowledge_tree
 from srw.api.app import create_v1_app
 from srw.modules.audit.models import AuditEvent
 from srw.modules.candidate.models import Candidate, MaterialRevision, Source
+from srw.modules.candidate.repository import get_current_source_ids, get_material_source_ids
+from srw.modules.decision.context import get_current_decision_context
+from srw.modules.decision.lineage import get_decision_history
+from srw.modules.decision.models import HumanDecision
+from srw.modules.protocol.models import ProtocolRevision
 from srw.modules.fullworkbench import RecruitmentEvent
 from srw.modules.protocol.models import Project
 from srw.runtime.db.schema import create_v1_schema
@@ -79,9 +84,71 @@ class EventSourceRevisionTests(unittest.TestCase):
             self.assertIn("Corrected note", new_source.text_content)
             self.assertEqual(event.source_id, new_source_id)
             self.assertNotEqual(candidate.current_material_revision_id, first_revision)
+            self.assertEqual(get_current_source_ids(session, self.cid), [new_source_id])
+            self.assertEqual(get_material_source_ids(session, first_revision), {old_source_id})
             metadata = json.loads(new_source.metadata_json)
             self.assertEqual(metadata["event_id"], event_id)
             self.assertEqual(metadata["supersedes_source_id"], old_source_id)
+
+    def test_repeated_correction_replaces_only_owned_active_interview_source(self):
+        first = self.add_interview()
+        other = self.client.post(f"/api/v1/candidates/{self.cid}/events", json={
+            "event_type": "phone_screen", "event_state": "completed",
+            "metadata": {"questions": [{"question": "Other interview?", "answer": "Unrelated evidence"}]},
+        })
+        self.assertEqual(other.status_code, 200, other.text)
+        other_source = other.json()["source_id"]
+        active = {first["source_id"], other_source}
+        previous = first["source_id"]
+        for answer in ("First correction", "Second correction"):
+            amended = self.client.patch(f"/api/v1/events/{first['event_id']}", json={
+                "metadata": {"questions": [{"question": "Why?", "answer": answer}]},
+            })
+            self.assertEqual(amended.status_code, 200, amended.text)
+            revised = amended.json()["source_id"]
+            active.remove(previous)
+            active.add(revised)
+            with self.factory() as session:
+                self.assertEqual(set(get_current_source_ids(session, self.cid)), active)
+                self.assertIn(answer, session.get(Source, revised).text_content)
+                self.assertIsNotNone(session.get(Source, previous))
+            previous = revised
+
+    def test_correction_stales_human_decision_without_erasing_historical_evidence(self):
+        first = self.add_interview()
+        with self.factory.begin() as session:
+            project = session.get(Project, session.get(Candidate, self.cid).project_id)
+            protocol = ProtocolRevision(
+                project_id=project.id, revision=1, state="published",
+                payload_json=json.dumps({"criteria": [], "assessment_stages": [], "decision_policy": {}}),
+                provenance_json="{}", content_hash="a" * 64,
+            )
+            session.add(protocol)
+            session.flush()
+            project.current_protocol_revision_id = protocol.id
+            old_context = get_current_decision_context(session, self.cid, evaluation_policy_revision="default")
+            old_material_id = old_context.material_revision_id
+            session.add(HumanDecision(
+                project_id=project.id, candidate_id=self.cid,
+                decision_context_hash=old_context.hash, decision="advance",
+                reason="Synthetic human assessment", actor="synthetic-human",
+            ))
+        response = self.client.patch(f"/api/v1/events/{first['event_id']}", json={
+            "notes": "Corrected interview interpretation",
+        })
+        self.assertEqual(response.status_code, 200, response.text)
+        with self.factory() as session:
+            current = get_current_decision_context(session, self.cid, evaluation_policy_revision="default")
+            self.assertNotEqual(current.hash, old_context.hash)
+            history = get_decision_history(session, self.cid, evaluation_policy_revision="default")
+            self.assertEqual(len(history), 1)
+            self.assertTrue(history[0].stale)
+            self.assertFalse(history[0].is_current_context)
+            self.assertEqual(get_material_source_ids(session, old_material_id), {first["source_id"]})
+            self.assertEqual(set(get_current_source_ids(session, self.cid)), {response.json()["source_id"]})
+        history_api = self.client.get(f"/api/v1/candidates/{self.cid}/decision-history")
+        self.assertEqual(history_api.status_code, 200, history_api.text)
+        self.assertTrue(history_api.json()["decisions"][0]["stale"])
 
     def test_noop_update_does_not_mint_evidence_or_revision(self):
         initial = self.add_interview()
