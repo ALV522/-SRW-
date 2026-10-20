@@ -1,3 +1,6 @@
+
+> **G1 Local Web 入口**：本轮 Chromium E2E 使用 `scripts/start_local_web.py --synthetic --no-browser`，对真实 C11 Core+SQLite 操作；只能据准确 SHA 的 CI 判定 PASS。它不是 Windows WPF、正式独立 Web Portable、双端并发或真实 Provider 验收。
+
 # SRW Chromium business acceptance
 
 This is a separate real-browser gate (three scenarios passed on main commit 69f60b9). It runs Chromium against the actual
