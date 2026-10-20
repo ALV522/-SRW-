@@ -39,7 +39,7 @@
     "note": "Reference inventory only; these 725 v0.8.12-R2 backend tests are not claimed as executed in Convergence 08."
   },
   "current": {
-    "convergence_test_count": 146,
+    "convergence_test_count": 178,
     "files": [
       {
         "file": "test_archived_input_recovery.py",
@@ -98,6 +98,10 @@
         "test_methods": 15
       },
       {
+        "file": "test_decision_history_context.py",
+        "test_methods": 4
+      },
+      {
         "file": "test_legacy_archive_audit.py",
         "test_methods": 4
       },
@@ -135,17 +139,17 @@
       }
     ],
     "evidence": "GitHub Actions log/artifact for exact source commit",
-    "browser_e2e_scenarios": 7,
+    "browser_e2e_scenarios": 8,
     "browser_e2e_files": [
       {
         "file": "browser_acceptance/test_flows.py",
-        "scenarios": 7,
+        "scenarios": 8,
         "requires_real_chromium_http_sqlite": true
       }
     ]
   },
   "recovered_gates": [],
   "parity_status": "PARTIAL",
-  "parity_note": "146 C11 source regressions, 7 Chromium synthetic business E2E cases pending exact-commit verification; original Windows GUI baseline verified but complete Windows recruiting/AI/OCR/ASR acceptance remains open.",
+  "parity_note": "Source Gate on base main 54548ee29a78072ff036c5ac19b062e08452ef1e executed 174 tests; prior inventory 146 was stale. Four P0 history regressions target 178 total, pending exact-head CI. Eight Chromium scenarios passed on base main; Windows GUI/full business/dual-carrier parity is separate. Historical v0.8.x 725-suite parity is unverified.",
   "historical_recovered_gates": "verification/history/convergence08/VERIFICATION_INVENTORY.json"
 }
