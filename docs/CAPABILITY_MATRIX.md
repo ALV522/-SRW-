@@ -80,3 +80,9 @@ Event creation rejects nonexistent source references (404) and sources owned by 
 在 `PATCH /api/v1/events/{event_id}` 编辑由该事件自动生成的结构化面试 Source（问题、反馈、备注或结论）时，Event 不得静默覆盖与当前引用 Source 不一致的业务事实。如果文本发生实质变化，必须保留旧 Source 的不可变文本，并发布新 Source 和新的 MaterialRevision；新 Source 元数据标记 `supersedes_source_id`，历史 Source/Claim 不删除。相同文本的幂等更新不发布新材料版本；人工附着的外部 Source 不应被系统改写为面试 Source。
 
 `convergence_tests/test_event_source_revision.py` 使用真实临时 SQLite/C11 API 验证编辑前后 Source、材料版本、来源归属、无变化更新及失败回滚。**该增量仅覆盖 Source/API 行为；具体 SHA 的 CI、真实 Chromium 点击、Windows WPF、双端并发以及既有 HumanDecision 的全部上下文复核仍须分别验收，不因增加测试而自动 PASS。**
+
+## Issue #41：面试修订在当前材料集合中替代旧 Source
+
+已经完成并发布的结构化面试若被人工更正，新的 Source 取代同一事件在**当前 MaterialRevision** 中原先的 Source；旧 Source 与先前 MaterialRevision 继续作为不可变历史保留，其他面试/简历 Source 不受影响。重复修订仅保留该事件最新的有效证据，不把被纠正的答案与新答案同时列作当前事实。HumanDecision 的已有 context hash 因新材料版本而失效，历史决定仍保留。无实质变化不新增材料版本；外部人工附着的 Source 不自动改写。
+
+`convergence_tests/test_event_source_revision.py` 覆盖当前与历史 source-set、两次连续更正、另一独立电话面试来源不丢失、HumanDecision stale 及 API 历史、非法更改回滚和无变化幂等。验收级别仅为 **Source/API + 临时合成 SQLite**，对应准确 SHA 的 CI 结果另见 GitHub Actions；真实 WPF、正式双端并发、完整 0.8.x 功能保真仍未通过。
