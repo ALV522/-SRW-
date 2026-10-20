@@ -19,7 +19,7 @@ REQUIRED = ("host_started", "paths_resolved", "workspace_lock_acquired",
             "frontend_loaded", "shutdown_requested", "backend_stopped",
             "workspace_released", "host_closed")
 FATAL = {"webview_failed", "backend_start_non_retryable", "backend_force_kill",
-         "backend_start_retry"}
+         "backend_start_retry", "shutdown_request_failed", "backend_exception"}
 HTTP = re.compile(r'"(GET|POST|PATCH|PUT|DELETE) (/[^ ]+) HTTP/1\.[01]" (\d{3})')
 RELEASE_EVENTS = ("frontend_loaded", "host_closed")
 
@@ -29,6 +29,33 @@ def _status(line: str):
     if match:
         method, uri, code = match.groups()
         return method, uri.split("?")[0], int(code)
+    return None
+
+
+def record_failure(record: dict) -> str | None:
+    """Return a fixed diagnostic category, never raw messages or identifiers."""
+    event = record.get("event")
+    if not isinstance(event, str):
+        return "invalid Host event"
+    if event in FATAL:
+        return "Host failure or forced shutdown"
+    details = record.get("details")
+    details = details if isinstance(details, dict) else {}
+    if event == "backend_http":
+        status = details.get("status")
+        if type(status) is not int or not 100 <= status <= 599:
+            return "invalid structured HTTP status"
+        if status >= 500:
+            return "HTTP 5xx in Host session"
+    if event in {"backend_stdout", "backend_stderr"}:
+        line = details.get("line")
+        if not isinstance(line, str):
+            return "invalid legacy backend output record"
+        parsed = _status(line)
+        if parsed:
+            return "HTTP 5xx in Host session" if parsed[2] >= 500 else None
+        if re.search(r"^\s*(?:Traceback\b|ERROR\b|CRITICAL\b|(?:[A-Za-z_][\w.]*\.)?(?:[A-Za-z_][\w]*Error|[A-Za-z_][\w]*Exception|Exception)\s*:)", line):
+            return "backend exception or fatal log"
     return None
 
 
@@ -68,11 +95,11 @@ def inspect(log: Path) -> dict:
     issues = set()
     success_requests = Counter()
     for row in latest:
+        failure = record_failure(row)
+        if failure:
+            failures.append(failure)
+            continue
         if row.get("event") != "backend_stdout":
-            if row.get("event") == "backend_stderr":
-                message = str((row.get("details") or {}).get("line", ""))
-                if re.search(r"\b(Traceback|ERROR|CRITICAL|Exception:)\b", message):
-                    failures.append("backend exception or fatal log")
             continue
         raw = str((row.get("details") or {}).get("line", ""))
         parsed = _status(raw)
