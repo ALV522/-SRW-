@@ -675,5 +675,40 @@ class RecruitmentBrowserAcceptance(unittest.TestCase):
         self.assertFalse(self.console_errors, self.console_errors)
 
 
+    def test_10_completed_interview_correction_replaces_current_evidence_via_ui(self) -> None:
+        """Operator revises interview evidence in the real browser without mutating Source history."""
+        pid = self.new_project("面试记录更正")
+        cid = self.new_candidate(pid, "模拟面试记录校正候选人")
+        self.page.locator(".candidate-workspace-tab").filter(has_text="流程与跟进").click()
+        self.page.get_by_role("button", name="＋ 面试排期").click()
+        self.page.locator("#e-state").select_option("completed")
+        self.page.locator("#e-title").fill("模拟已完成面试")
+        self.page.locator("#e-questions").fill(" | 请说明工作经验 | 核对客观情况")
+        self.page.locator("#e-notes").fill("原先面试记录")
+        self.page.locator("#modal-root").get_by_role("button", name="保存", exact=True).click()
+        expect(self.page.locator("#modal-root .modal")).to_have_count(0)
+        original = self.get_json(f"/api/v1/candidates/{cid}/events")["events"]
+        self.assertEqual(len(original), 1)
+        self.assertTrue(original[0]["editable_evidence_source"])
+        old_source = original[0]["source_id"]
+        before = self.get_json(f"/api/v1/candidates/{cid}/workspace")
+        self.assertEqual({x["source_id"] for x in before["sources"]}, {old_source})
+        expect(self.page.get_by_role("button", name="更正证据记录")).to_be_visible()
+        self.page.get_by_role("button", name="更正证据记录").click()
+        expect(self.page.locator("#corr-notes")).to_have_value("原先面试记录")
+        self.page.locator("#corr-notes").fill("更正后的面试记录")
+        self.page.locator("[data-corr-question='0'] .corr-answer").fill("实际为合成回答")
+        self.page.get_by_role("button", name="保存更正并发布新证据").click()
+        expect(self.page.locator("#modal-root .modal")).to_have_count(0)
+        latest = self.get_json(f"/api/v1/candidates/{cid}/events")["events"][0]
+        self.assertNotEqual(latest["source_id"], old_source)
+        current = self.get_json(f"/api/v1/candidates/{cid}/workspace")
+        sources = current["sources"]
+        self.assertEqual({x["source_id"] for x in sources}, {latest["source_id"]})
+        self.assertIn("更正后的面试记录", sources[0]["text_preview"])
+        self.assertIn("实际为合成回答", sources[0]["text_preview"])
+        self.assertFalse(self.console_errors, self.console_errors)
+
+
 if __name__ == "__main__":
     unittest.main()
