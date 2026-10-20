@@ -28,7 +28,7 @@
 | 备份/恢复/迁移 | backup_truth、恢复完整性/验证、project package | 现有 Chromium 业务测试不是升级/崩溃恢复验收 | **NOT VERIFIED** | Windows 当前准确工件的跨根恢复、故障注入 |
 | Windows Native/Portable | WPF/WebView2、Native 源码+Host 升级工具链 | Browser E2E 与 Native 验收不能互推 | **HISTORICAL_WPF_SMOKE** 仅旧工件基础生命周期 | 当前 C11 ZIP 的 Runtime/Knowledge/Host/业务/恢复验收 |
 | Local HTML/Web | C11 Core HTTP/API 与现有 HTML 前端；探索分支 E1–E5 | 受控 Chromium + 临时 SQLite 业务 E2E；正式 Local Web 入口见 #43 | 非 Windows WPF | 独立本地启动包、正式会话安全和生命周期 |
-| EXE/Browser 同源同时运行 | 探索 E3/E4/E5 CAS、Core owner、attach 协议及 Native SOURCE Lab；**D1 单写者已由跨载体 `data/app.lock` 租约强制**（见 [租约合同](WORKSPACE_LEASE_CONTRACT.md)） | **NOT VERIFIED** 为正式并发写入产品 | **NOT VERIFIED** | Core Supervisor、事务写入、会话撤销、跨端冲突、任务唯一所有权 |
+| EXE/Browser 同源同时运行 | 探索 E3/E4/E5 CAS、Core owner、attach 协议及 Native SOURCE Lab | **NOT VERIFIED** 为正式并发写入产品 | **NOT VERIFIED** | 一个权威 Core/Job Engine、事务写入、会话撤销、跨端冲突 |
 
 ## 已知的真实测试入口（代码中存在 ≠ 当前 HEAD 已 PASS）
 
@@ -86,3 +86,9 @@ Event creation rejects nonexistent source references (404) and sources owned by 
 已经完成并发布的结构化面试若被人工更正，新的 Source 取代同一事件在**当前 MaterialRevision** 中原先的 Source；旧 Source 与先前 MaterialRevision 继续作为不可变历史保留，其他面试/简历 Source 不受影响。重复修订仅保留该事件最新的有效证据，不把被纠正的答案与新答案同时列作当前事实。HumanDecision 的已有 context hash 因新材料版本而失效，历史决定仍保留。无实质变化不新增材料版本；外部人工附着的 Source 不自动改写。
 
 `convergence_tests/test_event_source_revision.py` 覆盖当前与历史 source-set、两次连续更正、另一独立电话面试来源不丢失、HumanDecision stale 及 API 历史、非法更改回滚和无变化幂等。验收级别仅为 **Source/API + 临时合成 SQLite**，对应准确 SHA 的 CI 结果另见 GitHub Actions；真实 WPF、正式双端并发、完整 0.8.x 功能保真仍未通过。
+
+## Issue #41：完成的结构化面试在 Browser UI 中人工更正
+
+候选人的「流程与跟进」页及项目招聘流程页，对于当前真正由该 Event 生成的结构化 Source，显示「更正证据记录」按钮；非 Event 原生 Source 不显示更正入口。操作员可查看并修改备注与现有结构化问题的回答。未开放编辑的标准关联、问题、评价字段、Outcome 及总体建议保持原值，不因文本分隔符造成静默丢失。保存调用已有 PATCH Event API；服务端按前述材料版本规则替换当前证据绑定，旧 Source/MaterialRevision、Scorecard/Decision 历史不删除，材料上下文变化使旧人工决定失效。
+
+`browser_acceptance/test_flows.py::test_10_completed_interview_correction_replaces_current_evidence_via_ui` 计划在真实 Chromium + 合成 Core/SQLite 中点击创建完成的面试→打开更正→修改答案与备注→保存→验证当前 Source 被替换和新正文可见。`convergence_tests/test_event_source_revision.py` 分别确认 Event 原生 Source 的 `editable_evidence_source=true` 与人工附着外部来源的 `false`。这些测试是否 PASS 仅以准确 SHA 的 CI 为准；Windows WPF 实机、生产 Knowledge、Provider、恢复和双端并发仍待验收。
