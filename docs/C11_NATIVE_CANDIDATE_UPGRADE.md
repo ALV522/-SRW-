@@ -139,3 +139,7 @@ py -3.12 .\scripts\rebuild_native_from_prepared.py --source . --host .\windows-h
 ```
 
 使用包含**此次修复**的全新 GitHub Actions 工具包，不建议改写旧已解压工具包中的脚本及其 `SOURCE_MANIFEST.sha256`。旧包缺审计的缺陷属于交付问题，而不是用户需要自行制造审核 JSON 才能继续。大量 Runtime ZIP 文件解压可能需要数分钟；新版提供进度，不应仅因较长等待就推断死锁。中断产生 `KeyboardInterrupt`，本身不能证明原始 ZIP 已损坏。
+
+## SOURCE_REBUILD 严格工件验证与真正 WPF 验收入口
+
+现在有独立的 [source-rebuilt Native 验收流程](SOURCE_REBUILT_NATIVE_ACCEPTANCE.md)：`scripts/verify_rebuilt_native.py` 针对完整原始 ZIP/解压目录分别校验准确源码、Host、Runtime、五套 Knowledge 与来源声明；在真实 Windows 还可执行独立嵌入式后端测试。`scripts/accept_rebuilt_native_gui.py` 则以一次性工作区真正启动 WPF/WebView2，并检查同次启动和关闭/释放锁的日志；可要求两次循环。验收程序通过只表示该准确工件的有限 GUI 生命周期通过，不代表正式发布或全招聘业务通过。
