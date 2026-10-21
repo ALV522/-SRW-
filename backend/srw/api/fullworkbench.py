@@ -58,6 +58,7 @@ from srw.runtime.settings import RuntimeSettingsRepository
 from srw.surfaces.workbench import get_workbench
 from srw.surfaces.daily_queue import local_day_end_utc
 from srw.surfaces.project_pipeline import get_project_pipeline
+from srw.surfaces.candidate_exports import compare_candidates as compare_candidates_view, contact_list_csv_text, candidates_csv_text
 
 
 def _body_dict(body: Any) -> dict[str, Any]:
@@ -1286,40 +1287,7 @@ def install_full_workbench_routes(app, factory, registry, secrets, *, data_dir: 
         ids=[x for x in (r.query_params.get("ids") or "").split(",") if x]
         if not 2<=len(ids)<=5: raise V1InvariantError("compare requires 2 to 5 candidate ids")
         with factory() as s:
-            candidates=[s.get(Candidate,cid) for cid in ids]
-            if any(c is None for c in candidates): raise V1NotFoundError("one or more candidates were not found")
-            project_ids={c.project_id for c in candidates if c is not None}
-            if len(project_ids)!=1: raise V1InvariantError("compare candidates must belong to the same project")
-            pid=next(iter(project_ids)); project=s.get(Project,pid)
-            if not project or not project.current_protocol_revision_id: raise V1InvariantError("project has no published protocol")
-            protocol_id=project.current_protocol_revision_id
-            payload=ProtocolRepository(s).get_payload(protocol_id)
-            criteria=[{"criterion_key":str(x.get("criterion_key") or ""),"name":str(x.get("name") or ""),"decision_critical":bool(x.get("decision_critical",False))} for x in (payload.get("criteria") or []) if isinstance(x,dict)]
-            contacts={x.candidate_id:x for x in s.scalars(select(CandidateContact).where(CandidateContact.candidate_id.in_(ids))).all()}
-            offers_by_candidate={}
-            for offer in s.scalars(select(OfferRecord).where(OfferRecord.candidate_id.in_(ids)).order_by(OfferRecord.created_at.desc(),OfferRecord.id.desc())).all():
-                offers_by_candidate.setdefault(offer.candidate_id,offer)
-            judgments=s.scalars(select(CriterionJudgment).where(CriterionJudgment.candidate_id.in_(ids))).all()
-            judgment_map={}
-            for c in candidates:
-                if c is None or not c.current_material_revision_id: continue
-                expected=decision_context_hash(protocol_id,c.current_material_revision_id,evaluation_policy_revision)
-                for j in judgments:
-                    if j.candidate_id==c.id and j.decision_context_hash==expected:
-                        judgment_map[(c.id,j.criterion_key)]=j
-            rows=[]
-            for c in candidates:
-                contact=contacts.get(c.id); offer=offers_by_candidate.get(c.id)
-                crit=[]
-                for definition in criteria:
-                    j=judgment_map.get((c.id,definition["criterion_key"]))
-                    crit.append({**definition,"status":j.status if j else "missing","evidence_level":j.evidence_level if j else "none","reason":j.reason if j else "","gap":j.gap if j else ""})
-                assessment=None
-                if c.current_material_revision_id:
-                    try: assessment=get_candidate_assessment(s,c.id,evaluation_policy_revision=evaluation_policy_revision)
-                    except Exception: assessment=None
-                rows.append({"candidate_id":c.id,"display_name":c.display_name,"pipeline_stage":c.pipeline_stage or "new","has_material":bool(c.current_material_revision_id),"contact":{"phone":contact.phone if contact else "","email":contact.email if contact else "","user_confirmed":bool(contact.user_confirmed) if contact else False},"offer_status":offer.status if offer else "","assessment":assessment,"criteria":crit})
-            return JSONResponse({"project_id":pid,"protocol_revision_id":protocol_id,"evaluation_policy_revision":evaluation_policy_revision,"criteria":criteria,"candidates":rows,"note":"Comparison is limited to the same project and current protocol/material decision context. Fit is shown only when evidence is publishable; no automatic hiring decision is made."})
+            return JSONResponse(compare_candidates_view(s,ids,evaluation_policy_revision=evaluation_policy_revision))
 
     async def project_audit(r):
         pid=r.path_params["project_id"]
@@ -1347,44 +1315,10 @@ def install_full_workbench_routes(app, factory, registry, secrets, *, data_dir: 
             })
 
     async def candidates_csv(r):
-        import csv
-        from io import StringIO
-        from datetime import datetime, timezone
         pid=r.path_params["project_id"]
-        def safe_cell(value):
-            text="" if value is None else str(value)
-            return "'"+text if text[:1] in ("=","+","-","@") else text
         with factory() as s:
-            project=s.get(Project,pid)
-            if project is None: raise V1NotFoundError(f"project not found: {pid}")
-            protocol_id=project.current_protocol_revision_id or ""
-            protocol_payload=ProtocolRepository(s).get_payload(protocol_id) if protocol_id else {"criteria":[]}
-            definitions=[x for x in (protocol_payload.get("criteria") or []) if isinstance(x,dict)]
-            rows=s.scalars(select(Candidate).where(Candidate.project_id==pid).order_by(Candidate.created_at,Candidate.id)).all()
-            ids=[x.id for x in rows]
-            contacts={x.candidate_id:x for x in s.scalars(select(CandidateContact).where(CandidateContact.candidate_id.in_(ids))).all()} if ids else {}
-            offers_by_candidate={}
-            if ids:
-                for offer in s.scalars(select(OfferRecord).where(OfferRecord.candidate_id.in_(ids)).order_by(OfferRecord.created_at.desc(),OfferRecord.id.desc())).all(): offers_by_candidate.setdefault(offer.candidate_id,offer)
-            all_j=s.scalars(select(CriterionJudgment).where(CriterionJudgment.candidate_id.in_(ids))).all() if ids else []
-            by_candidate={}
-            for x in rows:
-                if not protocol_id or not x.current_material_revision_id: continue
-                h=decision_context_hash(protocol_id,x.current_material_revision_id,evaluation_policy_revision)
-                by_candidate[x.id]={j.criterion_key:j for j in all_j if j.candidate_id==x.id and j.decision_context_hash==h}
-            generated=datetime.now(timezone.utc).isoformat()
-            fields=["candidate_id","display_name","pipeline_stage","archived","has_material","phone","email","contact_confirmed","offer_status","protocol_revision_id","evaluation_policy_revision","criteria_summary","evidence_gaps","created_at","generated_at"]
-            out=StringIO(); w=csv.DictWriter(out,fieldnames=fields);w.writeheader()
-            for x in rows:
-                contact=contacts.get(x.id); offer=offers_by_candidate.get(x.id); js=by_candidate.get(x.id,{})
-                summaries=[]; gaps=[]
-                for d in definitions:
-                    key=str(d.get("criterion_key") or ""); name=str(d.get("name") or key); j=js.get(key)
-                    status=j.status if j else "missing"; evidence=j.evidence_level if j else "none"
-                    summaries.append(f"{name}:{status}/{evidence}")
-                    if not j or j.gap: gaps.append(f"{name}:{j.gap if j and j.gap else '待核实'}")
-                w.writerow({"candidate_id":x.id,"display_name":safe_cell(x.display_name),"pipeline_stage":x.pipeline_stage or "new","archived":int(x.archived),"has_material":int(bool(x.current_material_revision_id)),"phone":safe_cell(contact.phone if contact else ""),"email":safe_cell(contact.email if contact else ""),"contact_confirmed":int(bool(contact.user_confirmed)) if contact else 0,"offer_status":offer.status if offer else "","protocol_revision_id":protocol_id,"evaluation_policy_revision":evaluation_policy_revision,"criteria_summary":safe_cell(" | ".join(summaries)),"evidence_gaps":safe_cell(" | ".join(gaps)),"created_at":x.created_at.isoformat(),"generated_at":generated})
-            return PlainTextResponse(out.getvalue(),media_type="text/csv; charset=utf-8",headers={"Content-Disposition":f'attachment; filename="candidates-{pid}.csv"'})
+            text=candidates_csv_text(s,project_id=pid,evaluation_policy_revision=evaluation_policy_revision)
+        return PlainTextResponse(text,media_type="text/csv; charset=utf-8",headers={"Content-Disposition":f'attachment; filename="candidates-{pid}.csv"'})
 
     async def job_setup(r):
         pid=r.path_params["project_id"]; body=await _json_body(r)
@@ -1449,19 +1383,10 @@ def install_full_workbench_routes(app, factory, registry, secrets, *, data_dir: 
             return JSONResponse({"project_id":pid,"project_title":project.title if project else "","generated_at":utc_now().isoformat(),"candidates":[_brief_payload(s,x.id) for x in rows]})
 
     async def contact_list_csv(r):
-        import csv
-        from io import StringIO
         pid=r.path_params["project_id"]
-        def safe_cell(value):
-            text="" if value is None else str(value)
-            return "'"+text if text[:1] in ("=","+","-","@") else text
         with factory() as s:
-            q=contact_queue(s,pid,limit=10000,offset=0)
-            out=StringIO();fields=["candidate_id","display_name","phone","email","priority","contact_status","next_contact_at","next_action"]
-            w=csv.DictWriter(out,fieldnames=fields);w.writeheader()
-            for x in q["candidates"]:
-                w.writerow({"candidate_id":x["candidate_id"],"display_name":safe_cell(x["display_name"]),"phone":safe_cell(x["phone"]),"email":safe_cell(x["email"]),"priority":x["priority"],"contact_status":x["contact_status"],"next_contact_at":safe_cell(x["next_contact_at"] or ""),"next_action":safe_cell(x["reason"] or "联系并核实未决条件")})
-            return PlainTextResponse(out.getvalue(),media_type="text/csv; charset=utf-8",headers={"Content-Disposition":f'attachment; filename="contact-list-{pid}.csv"'})
+            text=contact_list_csv_text(s,project_id=pid)
+        return PlainTextResponse(text,media_type="text/csv; charset=utf-8",headers={"Content-Disposition":f'attachment; filename="contact-list-{pid}.csv"'})
 
     async def backups(_r):
         p=create_backup(data_dir,database_path);return JSONResponse({"filename":p.name,"size_bytes":p.stat().st_size})
