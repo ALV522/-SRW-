@@ -45,6 +45,7 @@ from srw.providers.contracts import ProviderFailureError, ProviderNotReadyError,
 from srw.providers.runtime import ProviderRuntime
 from srw.privacy.service import build_source_privacy_projection, rebind_privacy_safe_proposals
 from srw.release import get_release_state
+from srw.runtime.backup_truth import BackupTruthError, validate_backup_archive
 from srw.runtime.db.schema import V1_SCHEMA_REVISION
 from srw.runtime.diagnostic_bundle import build_privacy_safe_diagnostic_bundle
 from srw.runtime.db.session import v1_session_scope
@@ -1442,42 +1443,19 @@ def install_full_workbench_routes(app, factory, registry, secrets, *, data_dir: 
         if not p.is_file(): raise HTTPException(404)
         return FileResponse(p,filename=name)
     async def schedule_restore(r):
-        import hashlib, sqlite3, tempfile, zipfile
         name=Path(r.path_params["filename"]).name
         p=data_dir/"backups"/name
         if not p.is_file(): raise HTTPException(404)
         try:
-            if p.stat().st_size > 512*1024*1024: raise V1InvariantError("backup exceeds 512 MB compressed limit")
-            with zipfile.ZipFile(p,"r") as z:
-                infos=z.infolist();names=[x.filename for x in infos]
-                if len(names)!=len(set(names)): raise V1InvariantError("backup contains duplicate ZIP members")
-                if "data/srw_v1.db" not in names: raise V1InvariantError("backup does not contain data/srw_v1.db")
-                total_uncompressed=0
-                for info in infos:
-                    n=info.filename;pp=Path(n)
-                    if pp.is_absolute() or ".." in pp.parts: raise V1InvariantError("backup contains an unsafe path")
-                    if info.file_size > 768*1024*1024: raise V1InvariantError("backup member exceeds 768 MB limit")
-                    total_uncompressed += int(info.file_size)
-                    if total_uncompressed > 1024*1024*1024: raise V1InvariantError("backup exceeds 1 GB uncompressed limit")
-                raw=z.read("data/srw_v1.db")
-            if raw[:16] != b"SQLite format 3\x00": raise V1InvariantError("backup database is not valid SQLite")
-            with tempfile.TemporaryDirectory(prefix="srw-restore-validate-") as td:
-                candidate_db=Path(td)/"restore.db"; candidate_db.write_bytes(raw)
-                conn=sqlite3.connect(str(candidate_db))
-                try:
-                    qc=conn.execute("PRAGMA quick_check").fetchone()
-                    if not qc or str(qc[0]).lower()!="ok": raise V1InvariantError("backup database failed SQLite quick_check")
-                    row=conn.execute("SELECT schema_revision FROM v1_schema_meta LIMIT 1").fetchone()
-                    if not row: raise V1InvariantError("backup database has no SRW schema revision")
-                    schema_revision=str(row[0])
-                finally: conn.close()
+            # Share startup's manifest/member validation before accepting a plan.
+            truth=validate_backup_archive(p)
+            schema_revision=truth["schema_revision"]
             current_n=int(V1_SCHEMA_REVISION.split("_")[-1]); allowed={f"v1_{i:04d}" for i in range(1,current_n+1)}
             if schema_revision not in allowed: raise V1InvariantError(f"backup schema is not compatible: {schema_revision}")
-        except V1InvariantError: raise
-        except (zipfile.BadZipFile,sqlite3.DatabaseError,OSError) as exc:
-            raise V1InvariantError(f"backup validation failed: {exc}") from exc
+        except BackupTruthError as exc:
+            raise V1InvariantError(str(exc)) from exc
         marker=data_dir/"pending_restore.json"
-        digest=hashlib.sha256(p.read_bytes()).hexdigest()
+        digest=truth["archive_sha256"]
         marker.write_text(json.dumps({"backup":name,"sha256":digest,"schema_revision":schema_revision},ensure_ascii=False,separators=(",",":")),encoding="utf-8")
         return JSONResponse({"scheduled":True,"filename":name,"sha256":digest,"schema_revision":schema_revision,"restart_required":True})
 

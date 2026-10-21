@@ -16,6 +16,7 @@ import unittest
 import urllib.error
 import urllib.request
 import uuid
+import zipfile
 from pathlib import Path
 
 from playwright.sync_api import expect, sync_playwright
@@ -739,6 +740,64 @@ class RecruitmentBrowserAcceptance(unittest.TestCase):
         self.assertIn("更正后的面试记录", by_id[latest["source_id"]]["text_preview"])
         self.assertIn("实际为合成回答", by_id[latest["source_id"]]["text_preview"])
         self.assertFalse(self.console_errors, self.console_errors)
+
+
+    def test_11_restore_schedule_rejects_bad_backup_before_restart(self) -> None:
+        """Settings rejects damaged evidence; valid scheduling stays explicit."""
+        pid = self.new_project("E2E-11 恢复预检")
+        data = Path(self.tmp.name) / "data"
+        # Fault injection only in this disposable synthetic workspace.
+        blob = data / "blobs" / "e2e-restore" / "synthetic"
+        blob.parent.mkdir(parents=True, exist_ok=True)
+        blob.write_bytes(b"synthetic backup evidence")
+        self.page.locator(".sidebar").get_by_role("button", name="系统设置").click()
+        with self.page.expect_response(
+            lambda response: response.url == self.base + "/api/v1/system/backups"
+            and response.request.method == "POST"
+        ) as created:
+            self.page.get_by_role("button", name="创建一致性备份").click()
+        self.assertEqual(created.value.status, 200, created.value.text())
+        filename = created.value.json()["filename"]
+        row = self.page.locator("#backup-list .quick-item").filter(has_text=filename)
+        expect(row).to_be_visible()
+        archive = data / "backups" / filename
+        original = archive.read_bytes()
+        with zipfile.ZipFile(archive) as source:
+            members = [(info.filename, source.read(info)) for info in source.infolist()]
+        with zipfile.ZipFile(archive, "w") as target:
+            for name, raw in members:
+                target.writestr(name, b"damaged evidence" if name == "data/blobs/e2e-restore/synthetic" else raw)
+        restore_url = self.base + f"/api/v1/system/backups/{filename}/restore"
+        try:
+            self.page.once("dialog", lambda dialog: dialog.accept())
+            with self.page.expect_response(
+                lambda response: response.url == restore_url and response.request.method == "POST"
+            ) as rejected:
+                row.get_by_role("button", name="下次启动恢复").click()
+            self.assertEqual(rejected.value.status, 409, rejected.value.text())
+            expect(self.page.locator("#toast-root .error")).to_contain_text("digest mismatch")
+            self.assertFalse((data / "pending_restore.json").exists())
+            self.assertFalse(self.get_json("/api/v1/system/diagnostics")["pending_restore"])
+            self.assertIn(pid, [p["project_id"] for p in self.get_json("/api/v1/projects")["projects"]])
+
+            archive.write_bytes(original)
+            self.page.once("dialog", lambda dialog: dialog.accept())
+            with self.page.expect_response(
+                lambda response: response.url == restore_url and response.request.method == "POST"
+            ) as accepted:
+                row.get_by_role("button", name="下次启动恢复").click()
+            self.assertEqual(accepted.value.status, 200, accepted.value.text())
+            expect(self.page.locator("#toast-root .toast")).to_contain_text("已计划恢复")
+            marker = json.loads((data / "pending_restore.json").read_text())
+            self.assertEqual(marker["backup"], filename)
+            self.assertEqual(marker["sha256"], accepted.value.json()["sha256"])
+            self.assertTrue(self.get_json("/api/v1/system/diagnostics")["pending_restore"])
+            self.assertFalse(self.console_errors, self.console_errors)
+        finally:
+            archive.write_bytes(original)
+            # API cleanup only; this scenario does not claim restart or WPF acceptance.
+            cancelled = self.context.request.post(self.base + "/api/v1/system/restore/cancel")
+            self.assertEqual(cancelled.status, 200, cancelled.text())
 
 
 if __name__ == "__main__":
