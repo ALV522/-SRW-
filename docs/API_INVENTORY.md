@@ -51,8 +51,8 @@
 | POST | `/api/v1/candidates/{candidate_id:str}/decision` | decisions | `srw.api.app` | yes | · | yes |
 | GET | `/api/v1/candidates/{candidate_id:str}/decision-history` | candidates | `srw.api.operations` | — | — | — |
 | POST | `/api/v1/candidates/{candidate_id:str}/decisions/reaffirm` | decisions | `srw.api.operations` | yes | · | yes |
-| GET | `/api/v1/candidates/{candidate_id:str}/events` | interviews | `srw.api.fullworkbench` | — | — | — |
-| POST | `/api/v1/candidates/{candidate_id:str}/events` | interviews | `srw.api.fullworkbench` | · | · | yes |
+| GET | `/api/v1/candidates/{candidate_id:str}/events` | interviews | `srw.api.routes.interviews` | — | — | — |
+| POST | `/api/v1/candidates/{candidate_id:str}/events` | interviews | `srw.api.routes.interviews` | · | · | yes |
 | POST | `/api/v1/candidates/{candidate_id:str}/evidence/extract` | evidence | `srw.api.app` | · | · | yes |
 | POST | `/api/v1/candidates/{candidate_id:str}/evidence/extract-task` | evidence | `srw.api.fullworkbench` | · | · | yes |
 | POST | `/api/v1/candidates/{candidate_id:str}/files` | candidates | `srw.api.fullworkbench` | · | · | yes |
@@ -74,9 +74,9 @@
 | GET | `/api/v1/dashboard` | operations | `srw.api.fullworkbench` | — | — | — |
 | POST | `/api/v1/decision-actions/{action_id:str}/knowledge-feedback` | knowledge | `srw.api.capability_recovery` | · | · | yes |
 | POST | `/api/v1/decision-actions/{action_id:str}/transition` | decisions | `srw.api.capability_recovery` | · | · | yes |
-| PATCH | `/api/v1/events/{event_id:str}` | interviews | `srw.api.fullworkbench` | · | · | yes |
-| GET | `/api/v1/events/{event_id:str}/scorecards` | interviews | `srw.api.fullworkbench` | — | — | — |
-| POST | `/api/v1/events/{event_id:str}/scorecards` | interviews | `srw.api.fullworkbench` | · | · | yes |
+| PATCH | `/api/v1/events/{event_id:str}` | interviews | `srw.api.routes.interviews` | · | · | yes |
+| GET | `/api/v1/events/{event_id:str}/scorecards` | interviews | `srw.api.routes.interviews` | — | — | — |
+| POST | `/api/v1/events/{event_id:str}/scorecards` | interviews | `srw.api.routes.interviews` | · | · | yes |
 | POST | `/api/v1/feedback/{feedback_id:str}/review` | operations | `srw.api.capability_recovery` | yes | · | yes |
 | POST | `/api/v1/identity-reviews/{review_id:str}/merge` | candidates | `srw.api.governance` | · | · | yes |
 | GET | `/api/v1/identity-reviews/{review_id:str}/merge-preview` | candidates | `srw.api.governance` | — | — | — |

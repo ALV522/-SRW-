@@ -7,6 +7,7 @@ from srw.kernel.errors import V1InvariantError, V1NotFoundError
 from srw.kernel.hashing import canonical_json_bytes, content_hash
 from srw.modules.audit.repository import append_audit_event
 from srw.modules.candidate.models import Candidate, Claim, Source
+from srw.modules.candidate.repository import MaterialRepository, get_current_source_ids
 from srw.modules.protocol.repository import ensure_project_exists
 
 
@@ -71,6 +72,35 @@ def add_source(
         project_id=candidate.project_id, candidate_id=candidate_id,
     )
     return row
+
+
+def publish_source_into_current_material(
+    session: Session,
+    candidate_id: str,
+    new_source_id: str,
+    *,
+    supersedes_source_id: str | None = None,
+):
+    """Publish one Source into the candidate's current material set.
+
+    A correction replaces only the superseded Source in the new current set;
+    historical Source and MaterialRevision rows remain immutable. This is the
+    shared Core operation previously nested in the full-workbench API adapter.
+    """
+    candidate = session.get(Candidate, candidate_id)
+    if candidate is None:
+        raise V1NotFoundError(f"candidate not found: {candidate_id}")
+    source_ids: list[str] = []
+    if candidate.current_material_revision_id:
+        source_ids = get_current_source_ids(session, candidate_id)
+    if supersedes_source_id:
+        source_ids = [source_id for source_id in source_ids if source_id != supersedes_source_id]
+    if new_source_id not in source_ids:
+        source_ids.append(new_source_id)
+    provenance = {"action": "v1_intake", "source_id": new_source_id}
+    if supersedes_source_id:
+        provenance["supersedes_source_id"] = supersedes_source_id
+    return MaterialRepository(session).publish_revision(candidate_id, source_ids, provenance)
 
 
 def add_claim(

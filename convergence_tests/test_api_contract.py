@@ -120,6 +120,37 @@ class ApiContractTests(unittest.TestCase):
             f"unclassified={sorted(unclassified)[:10]}",
         )
 
+    def test_interview_routes_are_owned_by_dedicated_adapter(self):
+        interview_routes = {
+            (row["method"], row["path"]): row["owner"]
+            for row in self.routes if row["domain"] == "interviews"
+        }
+        self.assertEqual(interview_routes, {
+            ("GET", "/api/v1/candidates/{candidate_id:str}/events"): "srw.api.routes.interviews",
+            ("POST", "/api/v1/candidates/{candidate_id:str}/events"): "srw.api.routes.interviews",
+            ("PATCH", "/api/v1/events/{event_id:str}"): "srw.api.routes.interviews",
+            ("GET", "/api/v1/events/{event_id:str}/scorecards"): "srw.api.routes.interviews",
+            ("POST", "/api/v1/events/{event_id:str}/scorecards"): "srw.api.routes.interviews",
+        })
+
+    def test_interview_mutations_have_semantic_contract_classification(self):
+        frozen = load("mutations.json")
+        indexed = {(row["method"], row["path"]): row for row in frozen["classified"]}
+        expected = {
+            ("POST", "/api/v1/candidates/{candidate_id:str}/events"),
+            ("PATCH", "/api/v1/events/{event_id:str}"),
+            ("POST", "/api/v1/events/{event_id:str}/scorecards"),
+        }
+        self.assertTrue(expected.issubset(indexed), indexed)
+        for key in expected:
+            row = indexed[key]
+            self.assertEqual(row["domain"], "interviews")
+            self.assertEqual(row["owner"], "srw.api.routes.interviews")
+            self.assertTrue(row["use_case"])
+            self.assertIn("concurrency", row)
+            self.assertIn("audit", row)
+            self.assertIn("human_actor", row)
+
     def test_observable_error_contract_is_unchanged(self):
         client = TestClient(self.app)
         errors = load("errors.json")

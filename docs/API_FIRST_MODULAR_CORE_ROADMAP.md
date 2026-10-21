@@ -157,6 +157,8 @@ backend/srw/api/
 
 本刀同时暴露两处**已记录未修改**的契约问题：创建 Offer 时缺少必填字段返回 `409 invariant_conflict`，而项目创建同类错误返回 `422 invalid_request`；Offer 状态迁移没有 `If-Match`/expected revision，属 last-write-wins。两者都要单独决策后才能改，不随搬迁顺手变更。
 
+**R2 第二刀（Issue #70）**：`interviews` 域 5 条 method+path（3 条 mutation）迁入 `backend/srw/api/routes/interviews.py`。事件预约/完成、结构化证据发布与更正、Source/MaterialRevision 历史保留、独立 Scorecard 均保持原业务语义；共享的“把新 Source 发布进当前材料集合”动作从 API 聚合闭包收回 `srw.modules.candidate.commands.publish_source_into_current_material`，供 intake/task/interview 共同使用。API 总量保持 146/73，未分类 mutation 棘轮从 71 降至 68。现有 Source/API 回归及 Chromium E2E-03/04/10 作为行为保真门禁。
+
 ### R3 · Application Use-case Layer
 
 目标：把“一个用户动作需要串联多个模块”的逻辑从 route/UI 中提取到应用层。

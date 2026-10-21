@@ -1,9 +1,9 @@
 {
   "schema": "srw.api-mutation-classification.v1",
-  "status": "R1 ratchet plus R2 offers-domain classification. Remaining domains are classified as their routes move.",
-  "frozen_at": "main e385adfb868baf5173f98d6119f253dd9d072b41",
+  "status": "R1 ratchet plus R2 offers/interviews classification. Remaining domains are classified as their routes move.",
+  "frozen_at": "main 0c1757862f3deb1455ccd3b9004e0af4424cceda + Issue #70 interview extraction",
   "rule": "live_mutations - classified MUST NOT exceed baseline_unclassified. Adding a mutation route therefore fails the contract test until it is classified or this baseline is raised in review.",
-  "baseline_unclassified": 71,
+  "baseline_unclassified": 68,
   "classified": [
     {
       "method": "POST",
@@ -32,6 +32,48 @@
       "human_actor": "yes - actor defaults to human",
       "invariants": "status must be a known OFFER_STATES value and must follow the allowed transition table (409 invariant_conflict)",
       "side_effects": "mutates OfferRecord.status plus one audit event in the same transaction"
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/candidates/{candidate_id:str}/events",
+      "domain": "interviews",
+      "owner": "srw.api.routes.interviews",
+      "use_case": "CreateRecruitmentEvent",
+      "request": "event_type, title/notes/source/metadata/schedule/interviewer/location/state/outcome, actor",
+      "response": "event_id, event_state, source_id",
+      "concurrency": "none observed - create-only",
+      "audit": "RECRUITMENT_EVENT_CREATED in the same transaction",
+      "human_actor": "yes - actor defaults to human",
+      "invariants": "event/state allowlists; candidate exists; attached Source exists and belongs to candidate; structured completion may publish immutable evidence",
+      "side_effects": "creates RecruitmentEvent; may create Source + MaterialRevision; writes audit event"
+    },
+    {
+      "method": "PATCH",
+      "path": "/api/v1/events/{event_id:str}",
+      "domain": "interviews",
+      "owner": "srw.api.routes.interviews",
+      "use_case": "UpdateRecruitmentEvent",
+      "request": "partial event fields plus actor",
+      "response": "event_id, event_state, outcome, source_id, metadata",
+      "concurrency": "none observed - no If-Match/expected revision",
+      "audit": "RECRUITMENT_EVENT_UPDATED in the same transaction",
+      "human_actor": "yes - actor defaults to human",
+      "invariants": "event exists; state/metadata validation; structured evidence correction never mutates old Source and replaces only superseded Source in current material",
+      "side_effects": "updates RecruitmentEvent; may create superseding Source + MaterialRevision; writes audit event"
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/events/{event_id:str}/scorecards",
+      "domain": "interviews",
+      "owner": "srw.api.routes.interviews",
+      "use_case": "SaveOrSubmitInterviewScorecard",
+      "request": "evaluator, feedback, recommendation, submit",
+      "response": "scorecard_id, event_id, evaluator, state, recommendation",
+      "concurrency": "none observed; submitted scorecards are locked by evaluator/event invariant",
+      "audit": "INTERVIEW_SCORECARD_SAVED or INTERVIEW_SCORECARD_SUBMITTED in the same transaction",
+      "human_actor": "yes - evaluator is the audit actor",
+      "invariants": "event exists; evaluator required; feedback ratings validated; submitted scorecard cannot be overwritten; opinions are not auto-averaged",
+      "side_effects": "creates/updates InterviewScorecardSubmission; writes audit event"
     }
   ]
 }
