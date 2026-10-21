@@ -28,6 +28,7 @@ from srw.modules.calibration.models import JudgmentReviewItem
 from srw.modules.decision.context import get_current_decision_context
 from srw.modules.decision.assessment import get_candidate_assessment
 from srw.modules.fullworkbench import BlobStore, KnowledgeService, RecruitmentEvent, ReevaluationDraft, EvaluationSnapshot, RoleTemplate, TaskRecord, create_backup, diagnostics
+from srw.modules.knowledge_governance.service import apply_result_as_criterion
 from srw.modules.protocol.models import Project, ProtocolRevision
 from srw.modules.protocol.repository import ProtocolRepository
 from srw.modules.recruiting.models import CandidateStageTransition, OfferRecord
@@ -990,16 +991,8 @@ def install_full_workbench_routes(app, factory, registry, secrets, *, data_dir: 
         pid=r.path_params["project_id"];b=await _json_body(r);result=b.get("result")
         if not isinstance(result,dict): raise V1InvariantError("result must be an object")
         with v1_session_scope(factory) as s:
-            project=s.get(Project,pid)
-            if not project: raise V1NotFoundError(f"project not found: {pid}")
-            draft=_latest_draft(s,pid)
-            if not draft: draft=ProtocolRepository(s).fork_current_to_draft(pid)
-            payload=ProtocolRepository(s).get_payload(draft.id); criteria=list(payload.get("criteria") or [])
-            criterion={"name":_s(b,"criterion_name") or str(result.get("title") or "知识建议"),"definition":str(result.get("detail") or ""),"decision_critical":bool(b.get("decision_critical",False)),"verification_required":bool(b.get("verification_required",True)),"verification_probes":[],"knowledge_source":{"database":str(result.get("database") or ""),"knowledge_id":str(result.get("knowledge_id") or ""),"title":str(result.get("title") or "")}}
-            criteria.append(criterion);payload["criteria"]=criteria
-            row=ProtocolRepository(s).update_draft(draft.id,payload,{"origin":"knowledge_apply","knowledge_id":criterion["knowledge_source"]["knowledge_id"]})
-            saved=ProtocolRepository(s).get_payload(row.id)["criteria"][-1]
-            return JSONResponse({"revision_id":row.id,"criterion":saved})
+            revision_id,criterion=apply_result_as_criterion(s,project_id=pid,result=result,criterion_name=_s(b,"criterion_name"),decision_critical=bool(b.get("decision_critical",False)),verification_required=bool(b.get("verification_required",True)))
+            return JSONResponse({"revision_id":revision_id,"criterion":criterion})
 
     def _parse_iso(value: str):
         if not value: return None

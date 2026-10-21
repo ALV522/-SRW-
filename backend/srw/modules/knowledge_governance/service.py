@@ -40,3 +40,60 @@ def payload(p:KnowledgeCurationProposal)->dict:
     try:data=json.loads(p.payload_json or '{}')
     except:data={}
     return {'id':p.id,'project_id':p.project_id,'source_kind':p.source_kind,'source_ref':p.source_ref,'status':p.status,'proposed_action':p.proposed_action,'title':p.title,'payload':data,'reviewer':p.reviewer,'review_reason':p.review_reason,'expected_state_version':p.expected_state_version,'exported_at':p.exported_at.isoformat() if p.exported_at else None,'created_at':p.created_at.isoformat() if p.created_at else None}
+
+
+def apply_result_as_criterion(
+    session: Session,
+    *,
+    project_id: str,
+    result: dict,
+    criterion_name: str = "",
+    decision_critical: bool = False,
+    verification_required: bool = True,
+) -> tuple[str, dict]:
+    """Append one knowledge-search result as a criterion on the project's current protocol draft.
+
+    Returns ``(revision_id, saved_criterion)``. Raises V1NotFoundError when the project does
+    not exist. The criterion keeps the knowledge provenance (database/knowledge_id/title) so
+    later review can trace the suggestion back to its source; nothing is auto-published.
+    """
+    from srw.modules.protocol.models import Project, ProtocolRevision
+    from srw.modules.protocol.repository import ProtocolRepository
+
+    if not isinstance(result, dict):
+        raise V1InvariantError("result must be an object")
+    project = session.get(Project, project_id)
+    if project is None:
+        raise V1NotFoundError(f"project not found: {project_id}")
+    draft = session.scalar(
+        select(ProtocolRevision)
+        .where(ProtocolRevision.project_id == project_id, ProtocolRevision.state == "draft")
+        .order_by(ProtocolRevision.revision.desc())
+        .limit(1)
+    )
+    repo = ProtocolRepository(session)
+    if draft is None:
+        draft = repo.fork_current_to_draft(project_id)
+    payload = repo.get_payload(draft.id)
+    criteria = list(payload.get("criteria") or [])
+    criterion = {
+        "name": criterion_name.strip() or str(result.get("title") or "知识建议"),
+        "definition": str(result.get("detail") or ""),
+        "decision_critical": bool(decision_critical),
+        "verification_required": bool(verification_required),
+        "verification_probes": [],
+        "knowledge_source": {
+            "database": str(result.get("database") or ""),
+            "knowledge_id": str(result.get("knowledge_id") or ""),
+            "title": str(result.get("title") or ""),
+        },
+    }
+    criteria.append(criterion)
+    payload["criteria"] = criteria
+    row = repo.update_draft(
+        draft.id,
+        payload,
+        {"origin": "knowledge_apply", "knowledge_id": criterion["knowledge_source"]["knowledge_id"]},
+    )
+    saved = repo.get_payload(row.id)["criteria"][-1]
+    return row.id, saved
