@@ -157,6 +157,12 @@ backend/srw/api/
 
 本刀同时暴露两处**已记录未修改**的契约问题：创建 Offer 时缺少必填字段返回 `409 invariant_conflict`，而项目创建同类错误返回 `422 invalid_request`；Offer 状态迁移没有 `If-Match`/expected revision，属 last-write-wins。两者都要单独决策后才能改，不随搬迁顺手变更。
 
+**R2 进度（2026-10-21，第二刀）**：`interviews` 域（5 条路由 / 3 条写操作）迁出到 `backend/srw/api/routes/interviews.py`，含 `events`、`add_event`、`update_event`、`event_scorecards` 与三个事件助手（`parse_iso`/`event_metadata`/`event_source_text`）。
+
+同时把 `_publish_current` 提升为 `backend/srw/api/shared.py` 的 `publish_current_revision`：它被 intake、事件创建、事件修订与异步任务四处调用，留在聚合层会让新模块无法独立。**Issue #41 的 Source 修订语义（新 Source 标记 `supersedes_source_id`、旧 Source 与旧 MaterialRevision 保持不可变、相同文本幂等不发布）逐字保留**，由 `test_interview_routes.py`（6 项）与既有 `test_event_source_revision.py` 双重覆盖。
+
+`fullworkbench.py` 1690 → 1530 行；累计从 1723 降至 1530（−193）。写操作归类 5/73，棘轮基线 73 → 68。同一轮记录的新事实：`PATCH /events/{id}` 与 `POST /events/{id}/scorecards` 均无 `If-Match`；评分卡用"提交后锁定"代替版本令牌。
+
 ### R3 · Application Use-case Layer
 
 目标：把“一个用户动作需要串联多个模块”的逻辑从 route/UI 中提取到应用层。

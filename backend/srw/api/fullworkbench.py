@@ -13,6 +13,8 @@ from starlette.routing import Route
 
 from srw.evidence.pipeline import extract_source_claims, persist_source_claims
 from srw.api.http_utils import body_dict as _body_dict, json_body as _json_body, s_field as _s
+from srw.api.routes.interviews import interview_routes
+from srw.api.shared import publish_current_revision as _publish_current
 from srw.api.routes.offers import offer_routes
 from srw.intake.service import CandidateIntakeService
 from srw.kernel.clock import utc_now
@@ -34,7 +36,7 @@ from srw.modules.protocol.models import Project, ProtocolRevision
 from srw.modules.protocol.repository import ProtocolRepository
 from srw.modules.recruiting.models import CandidateStageTransition, OfferRecord
 from srw.modules.recruiting.operations_models import CandidateActionPlan, InterviewScorecardSubmission
-from srw.recruiting.workbench import (update_job_setup, suggest_job_setup, upsert_action_plan, action_plan_view, contact_queue, phone_script, submit_scorecard, scorecards_view)
+from srw.recruiting.workbench import (update_job_setup, suggest_job_setup, upsert_action_plan, action_plan_view, contact_queue, phone_script)
 from srw.recruiting.operations import (
     PIPELINE_STAGES, OFFER_STATES, bulk_change_candidate_stage, change_candidate_stage,
     change_project_status, pipeline_history, project_funnel,
@@ -617,21 +619,6 @@ def install_full_workbench_routes(app, factory, registry, secrets, *, data_dir: 
             x=change_project_status(s,pid,target,actor="human",reason="project restored")
             return JSONResponse({"project_id":pid,"status":x.status})
 
-    def _publish_current(s,cid,new_source_id,*,supersedes_source_id=None):
-        cand=s.get(Candidate,cid); ids=[]
-        if cand and cand.current_material_revision_id:
-            try: ids=get_current_source_ids(s,cid)
-            except Exception: ids=[]
-        # A corrected structured interview is a replacement within the *current*
-        # evidence set, not an additional live statement. The superseded Source
-        # and previous MaterialRevision remain immutable historical records.
-        if supersedes_source_id:
-            ids=[source_id for source_id in ids if source_id!=supersedes_source_id]
-        if new_source_id not in ids: ids.append(new_source_id)
-        provenance={"action":"v1_intake","source_id":new_source_id}
-        if supersedes_source_id: provenance["supersedes_source_id"]=supersedes_source_id
-        return MaterialRepository(s).publish_revision(cid,ids,provenance)
-
     def _queue_media_task(s, *, task_type: str, candidate_id: str, source_id: str, payload: dict[str,Any]) -> TaskRecord:
         task=TaskRecord(task_type=task_type,status="queued",candidate_id=candidate_id,source_id=source_id,payload_json=json.dumps(payload,ensure_ascii=False,separators=(",",":")))
         _queue_task_job(s,task)
@@ -1059,144 +1046,6 @@ def install_full_workbench_routes(app, factory, registry, secrets, *, data_dir: 
             saved=ProtocolRepository(s).get_payload(row.id)["criteria"][-1]
             return JSONResponse({"revision_id":row.id,"criterion":saved})
 
-    def _parse_iso(value: str):
-        if not value: return None
-        try:
-            from datetime import datetime
-            return datetime.fromisoformat(value.replace("Z","+00:00"))
-        except ValueError as exc:
-            raise V1InvariantError("scheduled_at must be ISO-8601") from exc
-
-    def _event_metadata(session, candidate_id: str, event_type: str, value: Any) -> dict[str, Any]:
-        if value is None: return {}
-        if not isinstance(value,dict): raise V1InvariantError("metadata must be an object")
-        metadata=dict(value)
-        candidate=session.get(Candidate,candidate_id)
-        if candidate is None: raise V1NotFoundError(f"candidate not found: {candidate_id}")
-        project=session.get(Project,candidate.project_id)
-        known=set()
-        if project and project.current_protocol_revision_id:
-            payload=ProtocolRepository(session).get_payload(project.current_protocol_revision_id)
-            known={str(x.get("criterion_key") or "") for x in (payload.get("criteria") or []) if isinstance(x,dict)}
-        questions=metadata.get("questions",[])
-        if questions is None: questions=[]
-        if not isinstance(questions,list) or any(not isinstance(x,dict) for x in questions): raise V1InvariantError("metadata.questions must be an array of objects")
-        normalized_q=[]
-        for item in questions:
-            key=str(item.get("criterion_key") or "").strip(); question=str(item.get("question") or "").strip(); purpose=str(item.get("purpose") or "").strip(); answer=str(item.get("answer") or "").strip()
-            if not question: raise V1InvariantError("interview question is required")
-            if key and known and key not in known: raise V1InvariantError(f"unknown criterion_key: {key}")
-            normalized_q.append({"criterion_key":key,"question":question,"purpose":purpose,"answer":answer})
-        feedback=metadata.get("feedback",[])
-        if feedback is None: feedback=[]
-        if not isinstance(feedback,list) or any(not isinstance(x,dict) for x in feedback): raise V1InvariantError("metadata.feedback must be an array of objects")
-        ratings={"strong","acceptable","concern","unknown"}; normalized_f=[]
-        for item in feedback:
-            key=str(item.get("criterion_key") or "").strip(); rating=str(item.get("rating") or "unknown").strip()
-            if not key: raise V1InvariantError("feedback criterion_key is required")
-            if known and key not in known: raise V1InvariantError(f"unknown criterion_key: {key}")
-            if rating not in ratings: raise V1InvariantError("feedback rating must be strong, acceptable, concern, or unknown")
-            normalized_f.append({"criterion_key":key,"rating":rating,"observation":str(item.get("observation") or "").strip(),"supporting_evidence":str(item.get("supporting_evidence") or "").strip(),"counter_evidence":str(item.get("counter_evidence") or "").strip(),"recommendation":str(item.get("recommendation") or "").strip()})
-        metadata["questions"]=normalized_q; metadata["feedback"]=normalized_f
-        metadata["overall_recommendation"]=str(metadata.get("overall_recommendation") or "").strip()
-        return metadata
-
-    def _event_source_text(event: RecruitmentEvent, metadata: dict[str,Any]) -> str:
-        lines=[f"Recruitment event: {event.event_type}",f"Title: {event.title}",f"Outcome: {event.outcome}"]
-        if event.notes: lines += ["", "Notes:", event.notes]
-        for idx,q in enumerate(metadata.get("questions") or [],1):
-            lines += ["",f"Question {idx}: {q.get('question','')}",f"Criterion: {q.get('criterion_key','')}",f"Purpose: {q.get('purpose','')}",f"Answer: {q.get('answer','')}"]
-        for idx,f in enumerate(metadata.get("feedback") or [],1):
-            lines += ["",f"Feedback {idx} / {f.get('criterion_key','')}",f"Rating: {f.get('rating','')}",f"Observation: {f.get('observation','')}",f"Supporting evidence: {f.get('supporting_evidence','')}",f"Counter evidence: {f.get('counter_evidence','')}",f"Recommendation: {f.get('recommendation','')}"]
-        if metadata.get("overall_recommendation"): lines += ["",f"Overall recommendation: {metadata['overall_recommendation']}"]
-        return "\n".join(lines).strip()
-
-    async def events(r):
-        cid=r.path_params["candidate_id"]
-        with factory() as s:
-            rows=s.scalars(select(RecruitmentEvent).where(RecruitmentEvent.candidate_id==cid).order_by(func.coalesce(RecruitmentEvent.scheduled_at,RecruitmentEvent.created_at).desc())).all()
-            linked_ids={x.source_id for x in rows if x.source_id}
-            linked_sources={x.id:x for x in s.scalars(select(Source).where(Source.id.in_(linked_ids))).all()} if linked_ids else {}
-            def editable_event_evidence(x):
-                source=linked_sources.get(x.source_id)
-                if source is None or source.candidate_id!=cid or x.event_state!="completed": return False
-                try: metadata=json.loads(source.metadata_json or "{}")
-                except (ValueError,TypeError): return False
-                return metadata.get("structured") is True and metadata.get("event_id")==x.id
-            return JSONResponse({"events":[{
-                "event_id":x.id,"event_type":x.event_type,"title":x.title,"notes":x.notes,"source_id":x.source_id,
-                "editable_evidence_source":editable_event_evidence(x),
-                "metadata":json.loads(x.metadata_json or "{}"),
-                "scheduled_at":x.scheduled_at.isoformat() if x.scheduled_at else None,"duration_minutes":x.duration_minutes,
-                "interviewer":x.interviewer,"location":x.location,"event_state":x.event_state,"outcome":x.outcome,
-                "created_at":x.created_at.isoformat()} for x in rows]})
-    async def add_event(r):
-        cid=r.path_params["candidate_id"];b=await _json_body(r); et=_s(b,"event_type",required=True)
-        if et not in {"phone_screen","interview","feedback","note"}: raise V1InvariantError("unsupported event_type")
-        state=_s(b,"event_state",default="completed" if not b.get("scheduled_at") else "scheduled")
-        if state not in {"scheduled","completed","cancelled","no_show"}: raise V1InvariantError("unsupported event_state")
-        try: duration=max(0,int(b.get("duration_minutes") or 0))
-        except (TypeError,ValueError) as exc: raise V1InvariantError("duration_minutes must be an integer") from exc
-        with v1_session_scope(factory) as s:
-            candidate=s.get(Candidate,cid)
-            if not candidate: raise V1NotFoundError(f"candidate not found: {cid}")
-            source_id=_s(b,"source_id") or None
-            if source_id:
-                source=s.get(Source,source_id)
-                if not source: raise V1NotFoundError(f"source not found: {source_id}")
-                if source.candidate_id != cid: raise V1InvariantError("source belongs to another candidate")
-            metadata=_event_metadata(s,cid,et,b.get("metadata",{}))
-            x=RecruitmentEvent(candidate_id=cid,event_type=et,title=_s(b,"title"),notes=_s(b,"notes"),source_id=source_id,metadata_json=json.dumps(metadata,ensure_ascii=False,separators=(",",":")),scheduled_at=_parse_iso(_s(b,"scheduled_at")),duration_minutes=duration,interviewer=_s(b,"interviewer"),location=_s(b,"location"),event_state=state,outcome=_s(b,"outcome"))
-            s.add(x);s.flush()
-            if state=="completed" and et in {"phone_screen","interview","feedback"} and (metadata.get("questions") or metadata.get("feedback")) and not x.source_id:
-                text=_event_source_text(x,metadata); source=add_source(s,cid,source_kind=f"{et}_record",content_hash=content_hash({"event_id":x.id,"text":text}),text_content=text,media_type="text/plain",metadata={"event_id":x.id,"event_type":et,"structured":True}); _publish_current(s,cid,source.id); x.source_id=source.id
-            append_audit_event(s,event_type="RECRUITMENT_EVENT_CREATED",entity_type="recruitment_event",entity_id=x.id,actor=_s(b,"actor",default="human"),payload={"event_type":et,"event_state":state,"source_id":x.source_id},project_id=candidate.project_id,candidate_id=cid)
-            return JSONResponse({"event_id":x.id,"event_state":x.event_state,"source_id":x.source_id})
-
-    async def update_event(r):
-        eid=r.path_params["event_id"]; b=await _json_body(r)
-        with v1_session_scope(factory) as s:
-            x=s.get(RecruitmentEvent,eid)
-            if not x: raise V1NotFoundError(f"event not found: {eid}")
-            candidate=s.get(Candidate,x.candidate_id)
-            metadata=json.loads(x.metadata_json or "{}")
-            if "metadata" in b:
-                metadata=_event_metadata(s,x.candidate_id,x.event_type,b.get("metadata")); x.metadata_json=json.dumps(metadata,ensure_ascii=False,separators=(",",":"))
-            if "event_state" in b:
-                state=_s(b,"event_state",required=True)
-                if state not in {"scheduled","completed","cancelled","no_show"}: raise V1InvariantError("unsupported event_state")
-                x.event_state=state
-            if "outcome" in b: x.outcome=_s(b,"outcome")
-            if "notes" in b: x.notes=_s(b,"notes")
-            if "scheduled_at" in b: x.scheduled_at=_parse_iso(_s(b,"scheduled_at"))
-            if "duration_minutes" in b:
-                try: x.duration_minutes=max(0,int(b.get("duration_minutes") or 0))
-                except (TypeError,ValueError) as exc: raise V1InvariantError("duration_minutes must be an integer") from exc
-            if "interviewer" in b: x.interviewer=_s(b,"interviewer")
-            if "location" in b: x.location=_s(b,"location")
-            if x.event_state=="completed" and x.event_type in {"phone_screen","interview","feedback"}:
-                # An auto-published structured record is immutable evidence. Editing a
-                # completed interview must publish a new Source/MaterialRevision rather
-                # than leaving its event UI and the cited Source in disagreement.
-                current_source=s.get(Source,x.source_id) if x.source_id else None
-                source_meta=json.loads(current_source.metadata_json or "{}") if current_source else {}
-                generated_here=(current_source is not None and source_meta.get("structured") is True
-                                and source_meta.get("event_id")==x.id and current_source.candidate_id==x.candidate_id)
-                structured=bool(metadata.get("questions") or metadata.get("feedback"))
-                if (not x.source_id and structured) or generated_here:
-                    text=_event_source_text(x,metadata)
-                    if current_source is None or current_source.text_content!=text:
-                        origin=current_source.id if generated_here else None
-                        provenance={"event_id":x.id,"event_type":x.event_type,"structured":True}
-                        if origin: provenance["supersedes_source_id"]=origin
-                        source=add_source(s,x.candidate_id,source_kind=f"{x.event_type}_record",
-                                          content_hash=content_hash({"event_id":x.id,"text":text}),
-                                          text_content=text,media_type="text/plain",metadata=provenance)
-                        _publish_current(s,x.candidate_id,source.id,supersedes_source_id=origin)
-                        x.source_id=source.id
-            append_audit_event(s,event_type="RECRUITMENT_EVENT_UPDATED",entity_type="recruitment_event",entity_id=x.id,actor=_s(b,"actor",default="human"),payload={"event_state":x.event_state,"outcome":x.outcome,"source_id":x.source_id},project_id=candidate.project_id if candidate else None,candidate_id=x.candidate_id)
-            return JSONResponse({"event_id":x.id,"event_state":x.event_state,"outcome":x.outcome,"source_id":x.source_id,"metadata":metadata})
-
     def _judgment_payload(row):
         return {"criterion_key":row.criterion_key,"status":row.status,"evidence_level":row.evidence_level,"reason":row.reason,"gap":row.gap}
 
@@ -1545,15 +1394,6 @@ def install_full_workbench_routes(app, factory, registry, secrets, *, data_dir: 
     async def candidate_phone_script(r):
         with factory() as s: return JSONResponse(phone_script(s,r.path_params["candidate_id"],evaluation_policy_revision=evaluation_policy_revision))
 
-    async def event_scorecards(r):
-        eid=r.path_params["event_id"]
-        if r.method=="GET":
-            with factory() as s: return JSONResponse(scorecards_view(s,eid))
-        body=await _json_body(r)
-        with v1_session_scope(factory) as s:
-            row=submit_scorecard(s,eid,body)
-            return JSONResponse({"scorecard_id":row.id,"event_id":row.event_id,"evaluator":row.evaluator,"state":row.state,"recommendation":row.recommendation})
-
     def _brief_payload(s,cid):
         candidate=s.get(Candidate,cid)
         if candidate is None: raise V1NotFoundError(f"candidate not found: {cid}")
@@ -1676,14 +1516,14 @@ def install_full_workbench_routes(app, factory, registry, secrets, *, data_dir: 
       Route('/api/v1/tasks',tasks, methods=['GET']),Route('/api/v1/tasks/{task_id:str}',task_detail, methods=['GET']),Route('/api/v1/tasks/{task_id:str}/retry',retry_task, methods=['POST']),Route('/api/v1/tasks/{task_id:str}/cancel',cancel_task, methods=['POST']),
       Route('/api/v1/templates',templates, methods=['GET']),Route('/api/v1/templates',template_create, methods=['POST']),Route('/api/v1/templates/{template_id:str}',template_delete, methods=['DELETE']),Route('/api/v1/templates/{template_id:str}',template_update, methods=['PATCH']),Route('/api/v1/projects/{project_id:str}/templates/from-current',template_from_current, methods=['POST']),Route('/api/v1/templates/{template_id:str}/apply/{project_id:str}',template_apply, methods=['POST']),
       Route('/api/v1/knowledge/status',knowledge_status, methods=['GET']),Route('/api/v1/knowledge/search',knowledge_search, methods=['GET']),Route('/api/v1/projects/{project_id:str}/knowledge/apply',knowledge_apply, methods=['POST']),
-      Route('/api/v1/candidates/{candidate_id:str}/events',events, methods=['GET']),Route('/api/v1/candidates/{candidate_id:str}/events',add_event, methods=['POST']),
-      Route('/api/v1/events/{event_id:str}',update_event, methods=['PATCH']),
+      *interview_routes(factory=factory),
+      
       Route('/api/v1/candidates/{candidate_id:str}/reevaluations',reevaluations, methods=['GET']),Route('/api/v1/candidates/{candidate_id:str}/reevaluations',reevaluation_create, methods=['POST']),Route('/api/v1/reevaluations/{draft_id:str}/apply',reevaluation_apply, methods=['POST']),
       Route('/api/v1/candidates/compare',compare_candidates, methods=['GET']),
       Route('/api/v1/projects/{project_id:str}/audit',project_audit, methods=['GET']),Route('/api/v1/projects/{project_id:str}/candidates.csv',candidates_csv, methods=['GET']),
       Route('/api/v1/projects/{project_id:str}/job-setup',job_setup,methods=['PATCH']),Route('/api/v1/projects/{project_id:str}/job-setup/suggest',job_setup_suggest,methods=['POST']),
       Route('/api/v1/candidates/{candidate_id:str}/action-plan',candidate_action_plan,methods=['GET','PATCH']),Route('/api/v1/projects/{project_id:str}/contact-queue',project_contact_queue,methods=['GET']),Route('/api/v1/candidates/{candidate_id:str}/phone-script',candidate_phone_script,methods=['GET']),
-      Route('/api/v1/events/{event_id:str}/scorecards',event_scorecards,methods=['GET','POST']),
+      
       Route('/api/v1/candidates/{candidate_id:str}/brief',candidate_brief,methods=['GET']),Route('/api/v1/projects/{project_id:str}/handoff',project_handoff,methods=['GET']),Route('/api/v1/projects/{project_id:str}/contact-list.csv',contact_list_csv,methods=['GET']),
       Route('/api/v1/system/backups',backups, methods=['POST']),Route('/api/v1/system/backups',backup_list, methods=['GET']),Route('/api/v1/system/backups/{filename:str}',backup_download, methods=['GET']),Route('/api/v1/system/backups/{filename:str}/restore',schedule_restore, methods=['POST']),Route('/api/v1/system/restore/cancel',cancel_restore, methods=['POST']),Route('/api/v1/system/diagnostics',diag, methods=['GET']),Route('/api/v1/system/diagnostics/export',diag_export, methods=['GET']),
     ]

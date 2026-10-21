@@ -184,7 +184,7 @@
     {
       "method": "GET",
       "path": "/api/v1/candidates/{candidate_id:str}/events",
-      "owner": "srw.api.fullworkbench",
+      "owner": "srw.api.routes.interviews",
       "domain": "interviews",
       "mutation": false,
       "signals": null
@@ -192,7 +192,7 @@
     {
       "method": "POST",
       "path": "/api/v1/candidates/{candidate_id:str}/events",
-      "owner": "srw.api.fullworkbench",
+      "owner": "srw.api.routes.interviews",
       "domain": "interviews",
       "mutation": true,
       "signals": {
@@ -433,7 +433,7 @@
     {
       "method": "PATCH",
       "path": "/api/v1/events/{event_id:str}",
-      "owner": "srw.api.fullworkbench",
+      "owner": "srw.api.routes.interviews",
       "domain": "interviews",
       "mutation": true,
       "signals": {
@@ -446,7 +446,7 @@
     {
       "method": "GET",
       "path": "/api/v1/events/{event_id:str}/scorecards",
-      "owner": "srw.api.fullworkbench",
+      "owner": "srw.api.routes.interviews",
       "domain": "interviews",
       "mutation": false,
       "signals": null
@@ -454,7 +454,7 @@
     {
       "method": "POST",
       "path": "/api/v1/events/{event_id:str}/scorecards",
-      "owner": "srw.api.fullworkbench",
+      "owner": "srw.api.routes.interviews",
       "domain": "interviews",
       "mutation": true,
       "signals": {
