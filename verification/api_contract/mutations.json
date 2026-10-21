@@ -1,9 +1,9 @@
 {
   "schema": "srw.api-mutation-classification.v1",
-  "status": "R1 ratchet plus R2 offers-domain classification. Remaining domains are classified as their routes move.",
+  "status": "R1 ratchet plus R2 classification for the offers and interviews domains.",
   "frozen_at": "main e385adfb868baf5173f98d6119f253dd9d072b41",
   "rule": "live_mutations - classified MUST NOT exceed baseline_unclassified. Adding a mutation route therefore fails the contract test until it is classified or this baseline is raised in review.",
-  "baseline_unclassified": 71,
+  "baseline_unclassified": 68,
   "classified": [
     {
       "method": "POST",
@@ -32,6 +32,48 @@
       "human_actor": "yes - actor defaults to human",
       "invariants": "status must be a known OFFER_STATES value and must follow the allowed transition table (409 invariant_conflict)",
       "side_effects": "mutates OfferRecord.status plus one audit event in the same transaction"
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/candidates/{candidate_id:str}/events",
+      "domain": "interviews",
+      "owner": "srw.api.routes.interviews",
+      "use_case": "CreateInterviewEvent",
+      "request": "event_type (required), title, notes, source_id, metadata{questions,feedback}, scheduled_at, duration_minutes, interviewer, location, event_state, outcome, actor",
+      "response": "event_id, event_state, source_id",
+      "concurrency": "none - create-only, no If-Match or expected revision",
+      "audit": "RECRUITMENT_EVENT_CREATED with event_type, event_state, source_id",
+      "human_actor": "yes - actor defaults to human",
+      "invariants": "event_type and event_state are whitelisted (409); a cited source must exist (404) and belong to the same candidate (409); metadata criterion_key must exist in the published protocol",
+      "side_effects": "a completed phone_screen/interview/feedback with questions or feedback auto-publishes a structured Source and a MaterialRevision inside the same transaction"
+    },
+    {
+      "method": "PATCH",
+      "path": "/api/v1/events/{event_id:str}",
+      "domain": "interviews",
+      "owner": "srw.api.routes.interviews",
+      "use_case": "CorrectInterviewEvidence",
+      "request": "any of metadata, event_state, outcome, notes, scheduled_at, duration_minutes, interviewer, location, actor",
+      "response": "event_id, event_state, outcome, source_id, metadata",
+      "concurrency": "none observed - no If-Match; two clients editing the same event race last-write-wins",
+      "audit": "RECRUITMENT_EVENT_UPDATED with event_state, outcome, source_id",
+      "human_actor": "yes - actor defaults to human",
+      "invariants": "event_state whitelisted; a completed structured event keeps its cited Source in agreement with the event text",
+      "side_effects": "when the structured text changes, publishes a new Source with supersedes_source_id and a new MaterialRevision; the old Source and revision stay immutable; identical text is idempotent and publishes nothing"
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/events/{event_id:str}/scorecards",
+      "domain": "interviews",
+      "owner": "srw.api.routes.interviews",
+      "use_case": "SubmitScorecard",
+      "request": "evaluator (required), feedback (non-empty array), recommendation, submit",
+      "response": "scorecard_id, event_id, evaluator, state, recommendation",
+      "concurrency": "state-based lock: a submitted scorecard cannot be overwritten by the same evaluator (409); no revision token across evaluators",
+      "audit": "INTERVIEW_SCORECARD_SAVED or INTERVIEW_SCORECARD_SUBMITTED with state",
+      "human_actor": "yes - the evaluator is the human author and is recorded on the audit event",
+      "invariants": "feedback must be a non-empty array of validated entries; each evaluator keeps an independent scorecard",
+      "side_effects": "upserts one scorecard row per (event, evaluator)"
     }
   ]
 }
