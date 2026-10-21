@@ -35,8 +35,7 @@ from srw.modules.recruiting.operations_models import CandidateActionPlan, Interv
 from srw.recruiting.workbench import (update_job_setup, suggest_job_setup, upsert_action_plan, action_plan_view, contact_queue, phone_script, submit_scorecard, scorecards_view)
 from srw.recruiting.operations import (
     PIPELINE_STAGES, OFFER_STATES, bulk_change_candidate_stage, change_candidate_stage,
-    change_offer_status, change_project_status, create_offer, offer_view, pipeline_history,
-    project_funnel,
+    change_project_status, pipeline_history, project_funnel,
 )
 from srw.providers.contracts import ProviderFailureError, ProviderNotReadyError, ProviderOutputInvalidError
 from srw.providers.runtime import ProviderRuntime
@@ -1426,25 +1425,6 @@ def install_full_workbench_routes(app, factory, registry, secrets, *, data_dir: 
             append_audit_event(s,event_type="CANDIDATE_CONTACT_UPDATED",entity_type="candidate",entity_id=cid,actor=_s(b,"actor",default="human"),payload={"confirmed_fields":fields,"user_confirmed":contact.user_confirmed})
             return JSONResponse(_contact_view(candidate,contact))
 
-    async def candidate_offers(r):
-        cid=r.path_params["candidate_id"]
-        with factory() as s:
-            if s.get(Candidate,cid) is None: raise V1NotFoundError(f"candidate not found: {cid}")
-            rows=s.scalars(select(OfferRecord).where(OfferRecord.candidate_id==cid).order_by(OfferRecord.created_at.desc())).all()
-            return JSONResponse({"offers":[offer_view(x) for x in rows]})
-
-    async def create_candidate_offer(r):
-        cid=r.path_params["candidate_id"];b=await _json_body(r)
-        with v1_session_scope(factory) as s:
-            row=create_offer(s,cid,title=_s(b,"title",required=True),compensation_note=_s(b,"compensation_note"),target_start_date=_s(b,"target_start_date"),terms=_s(b,"terms"),actor=_s(b,"actor",default="human"))
-            return JSONResponse(offer_view(row))
-
-    async def offer_status(r):
-        oid=r.path_params["offer_id"];b=await _json_body(r)
-        with v1_session_scope(factory) as s:
-            row=change_offer_status(s,oid,_s(b,"status",required=True),actor=_s(b,"actor",default="human"),reason=_s(b,"reason"))
-            return JSONResponse(offer_view(row))
-
     async def compare_candidates(r):
         ids=[x for x in (r.query_params.get("ids") or "").split(",") if x]
         if not 2<=len(ids)<=5: raise V1InvariantError("compare requires 2 to 5 candidate ids")
@@ -1700,7 +1680,6 @@ def install_full_workbench_routes(app, factory, registry, secrets, *, data_dir: 
       Route('/api/v1/projects/{project_id:str}/candidates/stage',bulk_candidate_stage, methods=['POST']),
       Route('/api/v1/candidates/{candidate_id:str}/stage',candidate_stage, methods=['POST']),Route('/api/v1/candidates/{candidate_id:str}/pipeline',candidate_pipeline, methods=['GET']),
       Route('/api/v1/candidates/{candidate_id:str}/contact',candidate_contact, methods=['GET']),Route('/api/v1/candidates/{candidate_id:str}/contact',update_candidate_contact, methods=['PATCH']),
-      Route('/api/v1/candidates/{candidate_id:str}/offers',candidate_offers, methods=['GET']),Route('/api/v1/candidates/{candidate_id:str}/offers',create_candidate_offer, methods=['POST']),Route('/api/v1/offers/{offer_id:str}/status',offer_status, methods=['POST']),
       Route('/api/v1/projects/{project_id:str}/candidates/batch-intake',batch_intake, methods=['POST']),
       Route('/api/v1/projects/{project_id:str}/archive',archive_project, methods=['POST']),Route('/api/v1/projects/{project_id:str}/restore',restore_project, methods=['POST']),
       Route('/api/v1/candidates/{candidate_id:str}/archive',archive_candidate, methods=['POST']),Route('/api/v1/candidates/{candidate_id:str}/restore',restore_candidate, methods=['POST']),
@@ -1721,3 +1700,8 @@ def install_full_workbench_routes(app, factory, registry, secrets, *, data_dir: 
       Route('/api/v1/system/backups',backups, methods=['POST']),Route('/api/v1/system/backups',backup_list, methods=['GET']),Route('/api/v1/system/backups/{filename:str}',backup_download, methods=['GET']),Route('/api/v1/system/backups/{filename:str}/restore',schedule_restore, methods=['POST']),Route('/api/v1/system/restore/cancel',cancel_restore, methods=['POST']),Route('/api/v1/system/diagnostics',diag, methods=['GET']),Route('/api/v1/system/diagnostics/export',diag_export, methods=['GET']),
     ]
     app.routes.extend(routes)
+
+    # R2 / ADR-0002: extracted transport adapter; Offer state and audit rules
+    # remain in srw.recruiting.operations.
+    from srw.api.routes.offers import install_offer_routes
+    install_offer_routes(app, factory)

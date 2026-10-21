@@ -151,6 +151,8 @@ backend/srw/api/
 - 每次迁移先跑该域 Source/API 回归，再跑适用 Chromium；
 - 旧 `fullworkbench.py` 只删除已经完全迁出且有回归保护的内容。
 
+**R2 第一刀（Issue #69）**：选择最小且已有真实 Chromium 业务覆盖的 `offers` 域。三条冻结路由迁入 `srw.api.routes.offers`，`CreateCandidateOffer` 与 `TransitionOfferStatus` 两个 mutation 开始在 `verification/api_contract/mutations.json` 记录 operator use case、并发策略、审计与人工 actor；业务状态机和审计仍由 `srw.recruiting.operations` 权威实现。该迁移的 route/mutation 数量必须保持 146/73，只有 owner 变化；E2E-02/E2E-05 继续作为真实浏览器保真证据。
+
 退出条件：新增功能不再默认进入 `fullworkbench.py`；文件规模持续下降，且不存在第二套业务实现。
 
 ### R3 · Application Use-case Layer

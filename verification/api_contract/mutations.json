@@ -1,8 +1,62 @@
 {
   "schema": "srw.api-mutation-classification.v1",
-  "status": "R1 ratchet only. Per-route use-case, concurrency, audit and human-actor annotation is R2 work, done one domain at a time as routes move out of fullworkbench.py.",
-  "frozen_at": "main e7816bc4f4881e217c453635e41b4121907cde21",
-  "rule": "live_mutations - classified MUST NOT exceed baseline_unclassified. Adding a mutation route therefore fails the contract test until it is classified or this baseline is raised in review.",
-  "baseline_unclassified": 73,
-  "classified": {}
+  "status": "R2 in progress. Classified domains have explicit operator use-case, concurrency, audit and human-actor semantics; the remaining mutation surface stays under the R1 no-growth ratchet.",
+  "frozen_at": "main ca5a5ea000e870b98d9e5cd49ae4da8a88e330a9 + Issue #69 Offer extraction",
+  "rule": "live_mutations - classified MUST equal baseline_unclassified or less. Each extracted domain reduces baseline_unclassified; new mutating routes must be classified in the same PR.",
+  "baseline_unclassified": 71,
+  "classified": [
+    {
+      "method": "POST",
+      "path": "/api/v1/candidates/{candidate_id:str}/offers",
+      "domain": "offers",
+      "owner": "srw.api.routes.offers",
+      "use_case": "CreateCandidateOffer",
+      "concurrency": "none",
+      "audit": {
+        "required": true,
+        "event": "OFFER_CREATED",
+        "enforced_by": "srw.recruiting.operations.create_offer"
+      },
+      "human_actor": {
+        "required": true,
+        "field": "actor",
+        "default": "human"
+      },
+      "side_effects": [
+        "creates OfferRecord",
+        "writes OFFER_CREATED audit event"
+      ],
+      "invariants": [
+        "candidate must be in interview or offer stage",
+        "new offer status is draft"
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/offers/{offer_id:str}/status",
+      "domain": "offers",
+      "owner": "srw.api.routes.offers",
+      "use_case": "TransitionOfferStatus",
+      "concurrency": "none",
+      "audit": {
+        "required": true,
+        "event": "OFFER_STATUS_CHANGED",
+        "enforced_by": "srw.recruiting.operations.change_offer_status"
+      },
+      "human_actor": {
+        "required": true,
+        "field": "actor",
+        "default": "human"
+      },
+      "side_effects": [
+        "updates OfferRecord.status",
+        "writes OFFER_STATUS_CHANGED audit event"
+      ],
+      "invariants": [
+        "only OFFER_STATES are accepted",
+        "transition must follow the Offer state machine",
+        "status change does not auto-hire candidate"
+      ]
+    }
+  ]
 }

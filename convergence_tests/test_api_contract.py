@@ -120,6 +120,38 @@ class ApiContractTests(unittest.TestCase):
             f"unclassified={sorted(unclassified)[:10]}",
         )
 
+
+    def test_offer_routes_are_owned_by_dedicated_adapter(self):
+        offer_routes = {
+            (row["method"], row["path"]): row["owner"]
+            for row in self.routes if row["domain"] == "offers"
+        }
+        self.assertEqual(offer_routes, {
+            ("GET", "/api/v1/candidates/{candidate_id:str}/offers"): "srw.api.routes.offers",
+            ("POST", "/api/v1/candidates/{candidate_id:str}/offers"): "srw.api.routes.offers",
+            ("POST", "/api/v1/offers/{offer_id:str}/status"): "srw.api.routes.offers",
+        })
+
+    def test_offer_mutations_have_semantic_contract_classification(self):
+        frozen = load("mutations.json")
+        classified = frozen["classified"]
+        self.assertIsInstance(classified, list)
+        indexed = {(row["method"], row["path"]): row for row in classified}
+        expected = {
+            ("POST", "/api/v1/candidates/{candidate_id:str}/offers"),
+            ("POST", "/api/v1/offers/{offer_id:str}/status"),
+        }
+        self.assertTrue(expected.issubset(indexed), indexed)
+        for key in expected:
+            row = indexed[key]
+            self.assertEqual(row["domain"], "offers")
+            self.assertEqual(row["owner"], "srw.api.routes.offers")
+            self.assertTrue(row["use_case"])
+            self.assertIn(row["concurrency"], {"none", "revision", "if-match", "idempotent"})
+            self.assertTrue(row["audit"]["required"])
+            self.assertTrue(row["audit"]["enforced_by"].startswith("srw."))
+            self.assertTrue(row["human_actor"]["required"])
+
     def test_observable_error_contract_is_unchanged(self):
         client = TestClient(self.app)
         errors = load("errors.json")
