@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-import base64, io, json, mimetypes, wave, threading, time, uuid
+import base64, json, mimetypes, threading, time, uuid
 from time import perf_counter
 from pathlib import Path
 from typing import Any
@@ -38,7 +38,14 @@ from srw.recruiting.operations import (
     change_offer_status, change_project_status, create_offer, offer_view, pipeline_history,
     project_funnel,
 )
-from srw.providers.contracts import ProviderFailureError, ProviderNotReadyError, ProviderOutputInvalidError
+from srw.providers.contracts import ProviderNotReadyError, ProviderOutputInvalidError
+from srw.providers.probing import (
+    ocr_image_bytes,
+    probe_provider,
+    provider_profile_view,
+    provider_secret_key,
+    transcribe_audio_bytes,
+)
 from srw.providers.runtime import ProviderRuntime
 from srw.privacy.service import build_source_privacy_projection, rebind_privacy_safe_proposals
 from srw.release import get_release_state
@@ -80,24 +87,6 @@ def _decode_file(body: dict[str,Any]) -> tuple[bytes,str,str]:
     return raw,filename,media
 
 
-def _profile_view(session, secrets) -> dict[str,Any]:
-    repo=RuntimeSettingsRepository(session); profiles={}
-    for name in ("text_ai","ocr","asr"):
-        p=repo.get_provider_profile(name)
-        profiles[name]={"name":name,"provider_type":p.provider_type,"model":p.model,"base_url":p.base_url,"reasoning_effort":p.reasoning_effort,
-                        "api_key_configured":secrets.configured(f"provider_{name}_api_key" if name!="text_ai" else "provider_api_key")}
-    return {"profiles":profiles,"secret_persistence":secrets.persistence}
-
-
-def _httpx():
-    try: import httpx
-    except ImportError as exc: raise ProviderNotReadyError("httpx provider pack is unavailable") from exc
-    return httpx
-
-
-def _key_for(name:str)->str: return "provider_api_key" if name=="text_ai" else f"provider_{name}_api_key"
-
-
 def _task_begin(task: TaskRecord) -> float:
     task.attempt_count = int(task.attempt_count or 0) + 1
     task.status = "running"
@@ -136,67 +125,6 @@ def _task_json(task: TaskRecord) -> dict[str, Any]:
         "result": result,
         "created_at": task.created_at.isoformat(),
     }
-
-
-def _probe(session,secrets,name:str) -> dict[str,Any]:
-    repo=RuntimeSettingsRepository(session); p=repo.get_provider_profile(name); key=secrets.get(_key_for(name))
-    if not key: raise ProviderNotReadyError(f"{name} API key is not configured")
-    httpx=_httpx(); base=p.base_url.rstrip("/")
-    try:
-        with httpx.Client(timeout=30.0) as c:
-            if name=="asr":
-                b=io.BytesIO()
-                with wave.open(b,"wb") as w: w.setnchannels(1);w.setsampwidth(2);w.setframerate(8000);w.writeframes(b"\x00\x00"*800)
-                uri="data:audio/wav;base64,"+base64.b64encode(b.getvalue()).decode()
-                r=c.post(f"{base}/chat/completions",headers={"Authorization":f"Bearer {key}","Content-Type":"application/json"},json={"model":p.model,"messages":[{"role":"user","content":[{"type":"input_audio","input_audio":{"data":uri}}]}],"stream":False,"asr_options":{"enable_itn":False}})
-            elif name=="ocr":
-                # 1x1 valid PNG: endpoint reachability/model authentication probe. Real OCR is tested with user material.
-                png=base64.b64decode("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=")
-                uri="data:image/png;base64,"+base64.b64encode(png).decode()
-                r=c.post(f"{base}/chat/completions",headers={"Authorization":f"Bearer {key}"},json={"model":p.model,"messages":[{"role":"user","content":[{"type":"text","text":"Respond with OK."},{"type":"image_url","image_url":{"url":uri}}]}],"max_tokens":8})
-            else:
-                r=c.post(f"{base}/chat/completions",headers={"Authorization":f"Bearer {key}"},json={"model":p.model,"messages":[{"role":"user","content":"Reply exactly OK"}],"max_tokens":8})
-            r.raise_for_status()
-        return {"ok":True,"profile":name,"model":p.model}
-    except Exception as exc:
-        raise ProviderFailureError(f"{name} capability probe failed: {exc}") from exc
-
-
-def _ocr_bytes(session,secrets,raw:bytes,media_type:str) -> str:
-    p=RuntimeSettingsRepository(session).get_provider_profile("ocr"); key=secrets.get(_key_for("ocr"))
-    if not key: raise ProviderNotReadyError("OCR API key is not configured")
-    uri=f"data:{media_type};base64,"+base64.b64encode(raw).decode()
-    httpx=_httpx()
-    try:
-        with httpx.Client(timeout=90.0) as c:
-            r=c.post(p.base_url.rstrip("/")+"/chat/completions",headers={"Authorization":f"Bearer {key}"},json={"model":p.model,"messages":[{"role":"user","content":[{"type":"text","text":"Extract all visible text faithfully. Return plain text only."},{"type":"image_url","image_url":{"url":uri}}]}]})
-            r.raise_for_status(); body=r.json(); text=str(body["choices"][0]["message"]["content"]).strip()
-            if not text: raise ValueError("empty OCR output")
-            return text
-    except ProviderNotReadyError: raise
-    except Exception as exc: raise ProviderFailureError(f"OCR request failed: {exc}") from exc
-
-
-def _asr_bytes(session,secrets,raw:bytes,filename:str,media_type:str) -> str:
-    p=RuntimeSettingsRepository(session).get_provider_profile("asr"); key=secrets.get(_key_for("asr"))
-    if not key: raise ProviderNotReadyError("ASR API key is not configured")
-    if len(raw) > 10*1024*1024: raise ProviderOutputInvalidError("qwen3-asr-flash accepts at most 10 MB; use a long-audio/file-transcription profile")
-    data_uri=f"data:{media_type or 'audio/wav'};base64,"+base64.b64encode(raw).decode()
-    httpx=_httpx()
-    try:
-        with httpx.Client(timeout=180.0) as c:
-            r=c.post(p.base_url.rstrip("/")+"/chat/completions",headers={"Authorization":f"Bearer {key}","Content-Type":"application/json"},json={
-                "model":p.model,
-                "messages":[{"role":"user","content":[{"type":"input_audio","input_audio":{"data":data_uri}}]}],
-                "stream":False,
-                "asr_options":{"enable_itn":False},
-            })
-            r.raise_for_status(); body=r.json(); text=str(body["choices"][0]["message"]["content"] or "").strip()
-            if not text: raise ValueError("empty ASR output")
-            return text
-    except ProviderNotReadyError: raise
-    except ProviderOutputInvalidError: raise
-    except Exception as exc: raise ProviderFailureError(f"ASR request failed: {exc}") from exc
 
 
 def install_full_workbench_routes(app, factory, registry, secrets, *, data_dir: Path, knowledge_dir: Path, database_path: Path, frontend_dist: Path | None = None, evaluation_policy_revision: str) -> None:
@@ -487,7 +415,7 @@ def install_full_workbench_routes(app, factory, registry, secrets, *, data_dir: 
             })
 
     async def provider_settings(_r):
-        with factory() as s: return JSONResponse(_profile_view(s,secrets))
+        with factory() as s: return JSONResponse(provider_profile_view(s,secrets))
     async def provider_update(r):
         name=r.path_params["name"]
         if name not in {"text_ai","ocr","asr"}: raise HTTPException(404)
@@ -495,11 +423,11 @@ def install_full_workbench_routes(app, factory, registry, secrets, *, data_dir: 
         with v1_session_scope(factory) as s:
             current=RuntimeSettingsRepository(s).get_provider_profile(name)
             RuntimeSettingsRepository(s).update_provider_profile(name,provider_type=_s(b,"provider_type",current.provider_type),model=_s(b,"model",current.model),base_url=_s(b,"base_url",current.base_url),reasoning_effort=_s(b,"reasoning_effort",current.reasoning_effort))
-            if "api_key" in b: secrets.set(_key_for(name),_s(b,"api_key"))
-            return JSONResponse(_profile_view(s,secrets))
+            if "api_key" in b: secrets.set(provider_secret_key(name),_s(b,"api_key"))
+            return JSONResponse(provider_profile_view(s,secrets))
     async def provider_probe(r):
         name=r.path_params["name"]
-        with factory() as s: return JSONResponse(_probe(s,secrets,name))
+        with factory() as s: return JSONResponse(probe_provider(s,secrets,name))
 
     def _evidence_result(result) -> dict[str, Any]:
         return {
@@ -864,7 +792,7 @@ def install_full_workbench_routes(app, factory, registry, secrets, *, data_dir: 
             raw=blobs.get(str(payload.get("blob_hash") or ""))
             # Provider call intentionally happens outside any write transaction.
             with factory() as read_session:
-                if task_type=="ocr": text=_ocr_bytes(read_session,secrets,raw,str(payload.get("media_type") or "image/png"))
+                if task_type=="ocr": text=ocr_image_bytes(read_session,secrets,raw,str(payload.get("media_type") or "image/png"))
                 elif task_type=="ocr_pdf":
                     import importlib
                     fitz=importlib.import_module("fitz"); doc=fitz.open(stream=raw,filetype="pdf"); page_text=[]
@@ -874,10 +802,10 @@ def install_full_workbench_routes(app, factory, registry, secrets, *, data_dir: 
                                 page_text.append(f"[Page {page_no}]\n"+page.get_text("text").strip())
                             else:
                                 pix=page.get_pixmap(matrix=fitz.Matrix(1.5,1.5),alpha=False)
-                                page_text.append(f"[Page {page_no}]\n"+_ocr_bytes(read_session,secrets,pix.tobytes("png"),"image/png"))
+                                page_text.append(f"[Page {page_no}]\n"+ocr_image_bytes(read_session,secrets,pix.tobytes("png"),"image/png"))
                     finally: doc.close()
                     text="\n\n".join(page_text).strip()
-                elif task_type=="asr": text=_asr_bytes(read_session,secrets,raw,str(payload.get("filename") or "audio"),str(payload.get("media_type") or "audio/wav"))
+                elif task_type=="asr": text=transcribe_audio_bytes(read_session,secrets,raw,str(payload.get("filename") or "audio"),str(payload.get("media_type") or "audio/wav"))
                 else: raise V1InvariantError("unsupported durable task type")
             with v1_session_scope(factory) as s:
                 if not _job_owned(s,job_id,worker_id,token): return
