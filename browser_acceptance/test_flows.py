@@ -6,6 +6,7 @@ temporary directory. This is browser acceptance, NOT WPF/WebView2 acceptance.
 from __future__ import annotations
 
 import json
+import csv
 import os
 import socket
 import subprocess
@@ -672,6 +673,88 @@ class RecruitmentBrowserAcceptance(unittest.TestCase):
         data = self.get_json(f"/api/v1/candidates/{cid}/workspace")
         self.assertFalse(data["decision_context_hash"])
         self.assertFalse(data["decision_ready"])
+        self.assertFalse(self.console_errors, self.console_errors)
+
+
+
+    def test_10_knowledge_suggestion_applies_to_draft_with_provenance(self) -> None:
+        pid = self.new_project("知识应用")
+        self.page.get_by_role("button", name="知识库").click()
+        self.page.locator("#k-q").fill("数据分析")
+        self.page.get_by_role("button", name="搜索").click()
+        expect(self.page.locator("#k-results .quick-item").first).to_be_visible()
+        self.page.get_by_role("button", name="应用到项目标准草案").first.click()
+        expect(self.page.locator("#ka-name")).to_be_visible()
+        self.page.locator("#ka-project").select_option(pid)
+        self.page.locator("#ka-name").fill("数据敏感度")
+        self.page.locator("#ka-critical").check()
+        self.page.locator("#modal-root").get_by_role("button", name="应用", exact=True).click()
+        expect(self.page.locator("#modal-root .modal")).to_have_count(0)
+        data = self.get_json(f"/api/v1/projects/{pid}/protocol-workspace")
+        draft = data.get("draft") or {}
+        criteria = draft.get("criteria") or []
+        applied = [c for c in criteria if c.get("name") == "数据敏感度"]
+        self.assertEqual(len(applied), 1)
+        self.assertTrue(applied[0]["decision_critical"])
+        self.assertTrue(applied[0]["verification_required"])
+        source = applied[0].get("knowledge_source") or {}
+        self.assertEqual(source.get("database"), "competency")
+        self.assertTrue(source.get("knowledge_id"))
+        self.assertFalse((data.get("current") or {}).get("criteria"))
+        self.assertFalse(self.console_errors, self.console_errors)
+
+    def test_11_project_handoff_download_is_complete_json(self) -> None:
+        pid = self.new_project("交接下载")
+        cid = self.new_candidate(pid, "交接合成人")
+        self.page.get_by_role("button", name="← 返回项目工作区").click()
+        self.page.locator(".tabs").get_by_role("button", name="项目首页").click()
+        self.page.get_by_role("button", name="项目交接摘要").click()
+        expect(self.page.locator("#modal-root")).to_contain_text("交接合成人")
+        with self.page.expect_download() as download_info:
+            self.page.get_by_role("button", name="下载完整交接 JSON").click()
+        download = download_info.value
+        self.assertIn(f"SRW_handoff_{pid}", download.suggested_filename)
+        path = Path(self.tmp.name) / ("handoff-" + uuid.uuid4().hex[:8] + ".json")
+        download.save_as(str(path))
+        payload = json.loads(path.read_text(encoding="utf-8"))
+        self.assertEqual(payload["project_id"], pid)
+        names = [c["display_name"] for c in payload["candidates"]]
+        self.assertIn("交接合成人", names)
+        brief = next(c for c in payload["candidates"] if c["display_name"] == "交接合成人")
+        self.assertEqual(brief["candidate_id"], cid)
+        self.assertIn("version_context", brief)
+        self.assertFalse(self.console_errors, self.console_errors)
+
+    def test_12_candidate_csv_export_neutralizes_formula_injection(self) -> None:
+        pid = self.new_project("导出防护")
+        self.new_candidate(pid, "=HYPERLINK 合成")
+        self.page.get_by_role("button", name="← 返回项目工作区").click()
+        self.page.locator(".tabs").get_by_role("button", name="候选人收件").click()
+        with self.page.expect_download() as download_info:
+            self.page.get_by_role("link", name="导出 CSV").click()
+        download = download_info.value
+        path = Path(self.tmp.name) / ("candidates-" + uuid.uuid4().hex[:8] + ".csv")
+        download.save_as(str(path))
+        with path.open(encoding="utf-8", newline="") as handle:
+            rows = list(csv.DictReader(handle))
+        exported = [r for r in rows if r["display_name"].lstrip("'") == "=HYPERLINK 合成"]
+        self.assertEqual(len(exported), 1)
+        self.assertTrue(exported[0]["display_name"].startswith("'"))
+        self.assertEqual(exported[0]["has_material"], "0")
+        self.assertFalse(self.console_errors, self.console_errors)
+
+    def test_13_inline_page_handlers_resolve_in_browser(self) -> None:
+        pid = self.new_project("处理器修复")
+        cid = self.new_candidate(pid, "处理器合成人")
+        self.page.get_by_role("button", name="← 返回项目工作区").click()
+        self.page.locator(".tabs").get_by_role("button", name="面试流程").click()
+        selector = self.page.locator("select.select").filter(has_text="处理器合成人").first
+        selector.select_option(cid)
+        expect(self.page.locator("#content")).to_contain_text("处理器合成人")
+        self.page.get_by_role("button", name="系统设置").click()
+        expect(self.page.locator("#content")).to_contain_text("运行诊断")
+        self.page.get_by_role("button", name="刷新").click()
+        expect(self.page.locator("#content")).to_contain_text("运行诊断")
         self.assertFalse(self.console_errors, self.console_errors)
 
 

@@ -33,10 +33,12 @@ def create_minimal_knowledge_tree(root: str | Path) -> Path:
             "CREATE TABLE specialization(specialization_id TEXT PRIMARY KEY, title TEXT, status TEXT)",
             "CREATE TABLE title_alias(alias_id TEXT PRIMARY KEY, title TEXT, normalized_title TEXT, language TEXT, alias_type TEXT, ambiguity INTEGER, source_id TEXT, status TEXT)",
             "CREATE TABLE title_mapping(mapping_id TEXT PRIMARY KEY, alias_id TEXT, target_type TEXT, target_id TEXT, mapping_type TEXT, seniority_hint TEXT, management_scope_hint TEXT, confidence REAL, rationale TEXT, status TEXT, valid_from TEXT, valid_to TEXT, version TEXT)",
+            "CREATE TABLE alias_fts(alias_id TEXT PRIMARY KEY, title TEXT)",
         ],
         [
             ("INSERT INTO schema_meta VALUES (?,?)", ("schema", "test-taxonomy")),
             ("INSERT INTO canonical_role VALUES (?,?,?)", ("ROLE-001", "Software Engineer", "active")),
+            ("INSERT INTO alias_fts VALUES (?,?)", ("ALIAS-001", "Software Engineer")),
         ],
     )
 
@@ -59,11 +61,13 @@ def create_minimal_knowledge_tree(root: str | Path) -> Path:
             "CREATE TABLE competency_facet(facet_id TEXT PRIMARY KEY, competency_id TEXT, facet_text TEXT)",
             "CREATE TABLE job_competency_requirement(requirement_id TEXT PRIMARY KEY, competency_id TEXT)",
             "CREATE TABLE evidence_policy(policy_id TEXT PRIMARY KEY, competency_id TEXT)",
+            "CREATE TABLE competency_fts(competency_id TEXT PRIMARY KEY, name_zh TEXT, name_en TEXT, definition TEXT, facet_text TEXT)",
         ],
         [
             ("INSERT INTO schema_meta VALUES (?,?)", ("schema", "test-competency")),
             ("INSERT INTO competency VALUES (?,?,?,?,?)", ("COMP-001", "数据分析", "Data Analysis", "Analyse structured evidence", "active")),
             ("INSERT INTO competency VALUES (?,?,?,?,?)", ("COMP-002", "项目管理", "Project Management", "Coordinate project delivery", "active")),
+            ("INSERT INTO competency_fts VALUES (?,?,?,?,?)", ("COMP-001", "数据分析", "Data Analysis", "Analyse structured evidence", "结构化证据分析与归纳")),
         ],
     )
 

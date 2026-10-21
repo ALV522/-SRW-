@@ -9,7 +9,17 @@ database. No HTTP responses or candidate/business actions are mocked.
 
 ## Scope
 
-The initial real-browser acceptance covers:
+Thirteen real-browser scenarios run in CI (2026-10-21 local re-verification: all 13 PASS on
+Windows with the CI-pinned Playwright 1.56.0 + Chromium): test_01 job setup draft; test_02
+candidate/material/contact/offer-draft persistence; test_03 interview scheduling; test_04
+independent scorecards; test_05 offer lifecycle; test_06 material-change staleness and
+reaffirmation; test_07 protocol-republish staleness; test_08 archive/restore; test_09
+first-use readiness; test_10 knowledge suggestion applied to a protocol draft with
+provenance; test_11 project handoff JSON download completeness; test_12 candidate CSV
+export formula-injection guard; test_13 inline page handlers resolve in the browser
+(regression guard for the ES-module scope defect fixed 2026-10-21).
+
+The initial real-browser acceptance covered:
 
 1. Open the dashboard; create a recruiting project; use all four Job Setup
    wizard screens; save Draft; verify persisted recruitment context and that

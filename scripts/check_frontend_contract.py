@@ -26,15 +26,19 @@ SCRIPT_SRC = re.compile(r'<script[^>]+src="([^"]+)"', re.I)
 WINDOW_DEF = re.compile(r"window\.([A-Za-z_$][\w$]*)\s*=")
 WINDOW_USE = re.compile(r"window\.([A-Za-z_$][\w$]*)")
 INLINE_HANDLER = re.compile(r'\bon[a-z]+\s*=\s*"([^"]*)"')
-BARE_CALL = re.compile(r"(?<![.\w$])([A-Za-z_$][\w$]*)\s*\(")
+BARE_CALL = re.compile(r"(?<![.\w$'\"`])([A-Za-z_$][\w$]*)\s*\(")
+BARE_IDENT = re.compile(r"(?<![.\w$'\"`])([A-Za-z_$][\w$]*)")
 TEMPLATE_EXPR = re.compile(r"\$\{[^{}]*\}")
+STRING_LITERAL = re.compile(r"'[^']*'|\"[^\"]*\"")
 FETCH_PATH = re.compile(r"""['"`](/api/v1/[^'"`$]*)['"`]""")
+MODULE_BINDING = re.compile(r"^(?:const|let|var)\s+([A-Za-z_$][\w$]*)|^(?:async\s+)?function\s+([A-Za-z_$][\w$]*)", re.M)
 
 # Globals an inline handler may legitimately call without a window assignment.
 BROWSER_GLOBALS = {
     "location", "history", "open", "console", "event", "confirm", "prompt", "alert",
     "close", "focus", "blur", "print", "scrollTo", "setTimeout", "clearTimeout",
     "fetch", "btoa", "atob", "encodeURIComponent", "decodeURIComponent", "parseInt",
+    "true", "false", "null", "undefined", "NaN", "Infinity",
     "parseFloat", "isNaN", "String", "Number", "Boolean", "Array", "Object", "JSON",
     "Date", "Math", "RegExp", "Error", "Promise", "Map", "Set", "URL",
 }
@@ -58,6 +62,16 @@ def collect_definitions(modules: list[Path]) -> set[str]:
     return defined
 
 
+def collect_module_bindings(modules: list[Path]) -> set[str]:
+    """Top-level ES module bindings: invisible to inline handlers (global scope)."""
+    bindings: set[str] = set()
+    for path in modules:
+        text = path.read_text(encoding="utf-8")
+        for const, func in MODULE_BINDING.findall(text):
+            bindings.add(const or func)
+    return bindings
+
+
 def collect_references(modules: list[Path]) -> set[str]:
     used: set[str] = set()
     for path in modules:
@@ -65,9 +79,11 @@ def collect_references(modules: list[Path]) -> set[str]:
         used.update(WINDOW_USE.findall(text))
         for handler in INLINE_HANDLER.findall(text):
             # Template expressions are evaluated at render time in module scope;
-            # only the remaining bare calls run when the handler fires (global scope).
+            # only the remaining code runs when the handler fires (global scope).
             runtime_handler = TEMPLATE_EXPR.sub("''", handler)
+            runtime_handler = STRING_LITERAL.sub("''", runtime_handler)
             used.update(BARE_CALL.findall(runtime_handler))
+            used.update(BARE_IDENT.findall(runtime_handler))
     return used
 
 
@@ -108,10 +124,14 @@ def main(dist: Path | None = None, inventory: Path | None = None) -> int:
 
     defined = collect_definitions(modules)
     used = collect_references(modules)
+    module_bindings = collect_module_bindings(modules)
     for symbol in sorted(used - defined):
-        if symbol in BROWSER_GLOBALS:
+        if symbol in BROWSER_GLOBALS or symbol == "this":
             continue
-        problems.append(f"window symbol referenced but not defined: {symbol}")
+        if symbol in module_bindings:
+            problems.append(f"inline handler references module-scope binding: {symbol}")
+        else:
+            problems.append(f"window symbol referenced but not defined: {symbol}")
 
     inventory_paths = load_inventory_paths(inventory)
     for path in sorted(collect_api_paths(modules)):

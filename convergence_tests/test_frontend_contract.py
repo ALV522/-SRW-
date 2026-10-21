@@ -54,6 +54,23 @@ class FrontendContractTests(unittest.TestCase):
             inventory.write_text("GET /api/v1/real\n", encoding="utf-8")
             self.assertEqual(frontend.main(dist=dist, inventory=inventory), 1)
 
+    def test_detects_module_scoped_binding_in_handler(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            dist = Path(tmp) / "dist"
+            dist.mkdir()
+            (dist / "index.html").write_text(
+                '<script type="module" src="/v1/app.js"></script>', encoding="utf-8"
+            )
+            (dist / "app.js").write_text(
+                "const state={id:null};\n"
+                "window.go=()=>{};\n"
+                'document.body.innerHTML=`<select onchange="state.id=this.value;go()"></select>`;\n',
+                encoding="utf-8",
+            )
+            inventory = Path(tmp) / "inventory.txt"
+            inventory.write_text("# empty\n", encoding="utf-8")
+            self.assertEqual(frontend.main(dist=dist, inventory=inventory), 1)
+
     def test_template_expressions_are_not_handler_requirements(self):
         with tempfile.TemporaryDirectory() as tmp:
             dist = Path(tmp) / "dist"

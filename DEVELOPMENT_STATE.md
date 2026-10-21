@@ -129,3 +129,9 @@ A real SQLite and HTTP regression found historical HumanDecision entries falsely
 ## 2026-10-21: #44 SemVer 原子迁移 1.0.0-alpha10-convergence11 → 1.0.0-alpha.11（本地执行）
 
 按 VERSION_POLICY.md 第 4 节程序完成版本迁移（Issue #44 本地部分）：单一原子提交更新八处权威身份——VERSION、BUILD_INFO.json（version/release_id，source_revision 改为代码基线完整 SHA `4dc0c9f4491b892a1eaed8a8f5db8315ac156a56`，新增 engineering_milestone=C11 保留工程代号）、backend/srw/release_state.json（version，parent 记录 `1.0.0-alpha10-convergence11@45abc4c` 血缘）、PORTABLE_MANIFEST.json、VERIFICATION_TRUTH.json、VERIFICATION_INVENTORY.json、WINDOWS_NATIVE_HOST_STATUS.json、VERSION_POLICY.json（current_runtime_version/current_version_format=semver/next_product_version=1.0.0-alpha.12 proposed-not-effective/intended_channel/last_transition）。同步更新三处镜像当前身份的测试夹具与五处当前状态文档；历史证据（verification/、docs/history/、CONVERGENCE_DELIVERY.md 交付日志）与历史 alpha10 工件引用一律未改。Schema 保持 v1_0014 独立；发行通道仍为 development，未 tag、未发布。本地实测：check_release_truth PASS、check_governance_contract PASS、全量回归维持基线；GitHub CI = NOT RUN（负责人授权仅本地执行）。RC/GA 门槛与双载体工件验收不变，见 VERSION_POLICY.md 迁移执行记录表。
+
+## 2026-10-21: #41 业务 E2E 补缺 4 场景 + 前端处理器缺陷深修（本地实跑通过）
+
+本地搭建隔离 Playwright/Chromium 环境（D:/srw-tools venv，CI 固定 1.56.0），首次在本机真实跑通浏览器验收：既有 9 场景全 PASS。新增 4 场景并全部本地实跑通过：test_10 知识建议经 UI 应用到标准草案（含 knowledge_source 溯源与 decision_critical 传递，为此扩充合成知识夹具的 alias_fts/competency_fts 检索表）；test_11 项目交接完整 JSON 下载内容核验；test_12 候选人 CSV 导出的公式注入防护（`=HYPERLINK` 合成名前导撇号）；test_13 内联页面处理器浏览器解析回归。
+
+test_13 实证并深修了一类真实缺陷：app.js 四个页面入口函数（settingsPage/renderPage/tasksPage/projectWorkspace）此前未挂 window（ES module 作用域对内联 onclick 不可达）；仅挂函数仍不够——候选人下拉 onchange 与漏斗筛选 onclick 还直接引用模块作用域 `state`，本次新增 `selectFlowCandidate`/`filterCandidatesByStage` 两个拥有状态变更的 window 包装并重写两处 handler。`scripts/check_frontend_contract.py` 同步升级为可检出“内联处理器引用模块作用域绑定”（剥离模板表达式与字符串字面量后比对顶层绑定），`test_frontend_contract.py` 增至 5 项。全套 13/13 浏览器场景本地 PASS；全量源回归 291 项维持基线（288 PASS / 3 skipped / 2 既有 symlink 环境 FAIL）。Schema v1_0014、VERSION 1.0.0-alpha.11 未变；本地执行未同步 GitHub。
