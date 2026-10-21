@@ -112,6 +112,17 @@ class RecruitmentBrowserAcceptance(unittest.TestCase):
         self.assertEqual(r.status, 200, r.text()[:1000])
         return r.json()
 
+    def save_criteria(self, project_id: str) -> None:
+        workspace = self.get_json(f"/api/v1/projects/{project_id}/protocol-workspace")
+        revision_id = workspace["draft_revision_id"]
+        self.assertTrue(revision_id)
+        with self.page.expect_response(
+            lambda response: response.url == self.base + f"/api/v1/protocol-revisions/{revision_id}"
+            and response.request.method == "PATCH"
+        ) as saved:
+            self.page.get_by_role("button", name="保存草案").click()
+        self.assertEqual(saved.value.status, 200, saved.value.text())
+
     def new_project(self, label: str) -> str:
         title = label + "-" + uuid.uuid4().hex[:8]
         self.page.goto(self.base + "/v1", wait_until="domcontentloaded")
@@ -405,7 +416,7 @@ class RecruitmentBrowserAcceptance(unittest.TestCase):
         self.page.locator(".criterion-row .c-verify").check()
         self.page.locator(".criterion-row .c-probe").fill("请说明项目与个人职责")
         key = self.page.locator(".criterion-row").get_attribute("data-criterion-key")
-        self.page.get_by_role("button", name="保存草案").click()
+        self.save_criteria(pid)
         expect(self.page.get_by_role("button", name="发布当前标准")).to_be_visible()
         protocol = self.get_json(f"/api/v1/projects/{pid}/protocol-workspace")
         criterion = (protocol.get("draft") or {})["criteria"][0]
@@ -540,7 +551,7 @@ class RecruitmentBrowserAcceptance(unittest.TestCase):
         first.locator(".c-critical").check()
         first.locator(".c-verify").check()
         first.locator(".c-probe").fill("请说明项目交付")
-        self.page.get_by_role("button", name="保存草案").click()
+        self.save_criteria(pid)
         expect(self.page.get_by_role("button", name="发布当前标准")).to_be_visible()
         self.page.once("dialog", lambda dialog: dialog.accept())
         with self.page.expect_response(
@@ -603,7 +614,21 @@ class RecruitmentBrowserAcceptance(unittest.TestCase):
         second.locator(".c-critical").check()
         second.locator(".c-verify").check()
         second.locator(".c-probe").fill("新增人工核实要求")
-        self.page.get_by_role("button", name="保存草案").click()
+        # Delay only the next real save dispatch, never fake its response.
+        # The publish button already exists while this write is pending.
+        self.page.evaluate("""() => {
+            const originalFetch = window.fetch;
+            window.fetch = function(input, options) {
+                if (String(input).includes('/api/v1/protocol-revisions/')
+                        && options?.method === 'PATCH') {
+                    window.fetch = originalFetch;
+                    return new Promise(resolve => setTimeout(resolve, 300))
+                        .then(() => originalFetch.call(window, input, options));
+                }
+                return originalFetch.call(window, input, options);
+            };
+        }""")
+        self.save_criteria(pid)
         expect(self.page.get_by_role("button", name="发布当前标准")).to_be_visible()
         second_protocol = self.get_json(f"/api/v1/projects/{pid}/protocol-workspace")
         self.assertEqual(len(second_protocol["draft"]["criteria"]), 2)
