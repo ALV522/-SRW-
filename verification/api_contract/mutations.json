@@ -1,9 +1,9 @@
 {
   "schema": "srw.api-mutation-classification.v1",
-  "status": "R1 ratchet plus R2 classification for the offers and interviews domains.",
+  "status": "R1 ratchet plus R2 classification for offers, interviews and the task/template operational routes.",
   "frozen_at": "main e385adfb868baf5173f98d6119f253dd9d072b41",
   "rule": "live_mutations - classified MUST NOT exceed baseline_unclassified. Adding a mutation route therefore fails the contract test until it is classified or this baseline is raised in review.",
-  "baseline_unclassified": 68,
+  "baseline_unclassified": 61,
   "classified": [
     {
       "method": "POST",
@@ -74,6 +74,104 @@
       "human_actor": "yes - the evaluator is the human author and is recorded on the audit event",
       "invariants": "feedback must be a non-empty array of validated entries; each evaluator keeps an independent scorecard",
       "side_effects": "upserts one scorecard row per (event, evaluator)"
+    },
+    {
+      "domain": "operations",
+      "owner": "srw.api.routes.operations",
+      "method": "POST",
+      "path": "/api/v1/tasks/{task_id:str}/cancel",
+      "use_case": "CancelBackgroundTask",
+      "request": "path task_id only",
+      "response": "task_id, status",
+      "concurrency": "none - status comparison only; cancelling a succeeded task is a reported no-op",
+      "audit": "none written by this route (task state only)",
+      "human_actor": "implicit - anyone able to reach the local Core",
+      "invariants": "unknown task 404; succeeded task returns its actual status instead of mutating",
+      "side_effects": "sets cancel_requested, status=cancelled and cancels the linked JobEngine job"
+    },
+    {
+      "domain": "operations",
+      "owner": "srw.api.routes.operations",
+      "method": "POST",
+      "path": "/api/v1/tasks/{task_id:str}/retry",
+      "use_case": "RetryBackgroundTask",
+      "request": "path task_id only",
+      "response": "task_id, job_id, status",
+      "concurrency": "idempotency key task:{id}:retry:{attempt+1} prevents duplicate job creation per attempt",
+      "audit": "none written by this route",
+      "human_actor": "implicit",
+      "invariants": "unknown task 404; a cancelled task cannot be retried (409)",
+      "side_effects": "enqueues or requeues a job and resets task error/finish fields"
+    },
+    {
+      "domain": "operations",
+      "owner": "srw.api.routes.operations",
+      "method": "POST",
+      "path": "/api/v1/templates",
+      "use_case": "CreateRoleTemplate",
+      "request": "name (required), role_title, payload",
+      "response": "template_id, name",
+      "concurrency": "none - create-only",
+      "audit": "none written by this route",
+      "human_actor": "implicit",
+      "invariants": "name is required (409); payload is coerced to an object",
+      "side_effects": "inserts one RoleTemplate"
+    },
+    {
+      "domain": "operations",
+      "owner": "srw.api.routes.operations",
+      "method": "PATCH",
+      "path": "/api/v1/templates/{template_id:str}",
+      "use_case": "UpdateRoleTemplate",
+      "request": "name, role_title, payload",
+      "response": "template_id, name",
+      "concurrency": "none - no If-Match",
+      "audit": "none written by this route",
+      "human_actor": "implicit",
+      "invariants": "unknown template 404; payload must be an object (409)",
+      "side_effects": "mutates the template row"
+    },
+    {
+      "domain": "operations",
+      "owner": "srw.api.routes.operations",
+      "method": "DELETE",
+      "path": "/api/v1/templates/{template_id:str}",
+      "use_case": "DeleteRoleTemplate",
+      "request": "path template_id only",
+      "response": "deleted: true",
+      "concurrency": "none",
+      "audit": "none written by this route",
+      "human_actor": "implicit",
+      "invariants": "unknown template 404",
+      "side_effects": "deletes the template row; projects already created from it keep their own protocol"
+    },
+    {
+      "domain": "operations",
+      "owner": "srw.api.routes.operations",
+      "method": "POST",
+      "path": "/api/v1/projects/{project_id:str}/templates/from-current",
+      "use_case": "SaveCurrentProtocolAsTemplate",
+      "request": "name (required)",
+      "response": "template_id, name, source_revision_id",
+      "concurrency": "none - reads the newest draft or published revision",
+      "audit": "none written by this route",
+      "human_actor": "implicit",
+      "invariants": "unknown project 404; a project with no protocol cannot produce a template (409)",
+      "side_effects": "inserts one RoleTemplate carrying a copy of the protocol payload"
+    },
+    {
+      "domain": "operations",
+      "owner": "srw.api.routes.operations",
+      "method": "POST",
+      "path": "/api/v1/templates/{template_id:str}/apply/{project_id:str}",
+      "use_case": "ApplyRoleTemplate",
+      "request": "mode (merge|replace, default merge)",
+      "response": "revision_id, state, mode, criteria_count",
+      "concurrency": "none - edits the newest draft, no If-Match",
+      "audit": "recorded as protocol provenance {origin: template_apply, template_id, mode}",
+      "human_actor": "implicit",
+      "invariants": "unknown template/project 404 (template first); mode must be merge or replace (409); a draft is forked when none exists",
+      "side_effects": "creates or mutates a draft ProtocolRevision; published revisions are never touched"
     }
   ]
 }

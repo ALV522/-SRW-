@@ -163,6 +163,12 @@ backend/srw/api/
 
 `fullworkbench.py` 1690 → 1530 行；累计从 1723 降至 1530（−193）。写操作归类 5/73，棘轮基线 73 → 68。同一轮记录的新事实：`PATCH /events/{id}` 与 `POST /events/{id}/scorecards` 均无 `If-Match`；评分卡用"提交后锁定"代替版本令牌。
 
+**R2 进度（2026-10-22，第三刀）**：`tasks`（4 条）与 `templates`（6 条）共 10 条路由迁出到 `backend/srw/api/routes/operations.py`，`_latest_draft` 提升为 `api/shared.py::latest_draft`（`knowledge_apply` 仍在聚合层使用）。
+
+**`GET /api/v1/dashboard` 刻意不随本次迁出**：该处理器 284 行，聚合项目/候选人/Claim/Offer/面试/联系六类数据，属读模型而非传输适配；放进 route 模块会把一个聚合热点换成另一个。它保留在聚合层，`inventory.json` 继续如实记录其 owner，待读模型切片单独处理。
+
+`fullworkbench.py` 1530 → **1387 行**；累计从 1723 降至 1387（−336）。写操作归类 12/73，棘轮 68 → 61。本轮记录：任务 cancel/retry 与模板增删改**均不写审计**，且无 `If-Match`；cancel 对已成功任务是"如实返回 no-op"而不是拒绝。
+
 ### R3 · Application Use-case Layer
 
 目标：把“一个用户动作需要串联多个模块”的逻辑从 route/UI 中提取到应用层。
