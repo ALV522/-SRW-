@@ -7,7 +7,7 @@
       "code": "machine readable snake_case code"
     }
   },
-  "known_gap": "FastAPI/Starlette default 404 and 405 responses are plain text and do not use the envelope. Recorded here instead of hidden; fixing it is an explicit contract change.",
+  "known_gap": "FastAPI/Starlette default 404 and 405 responses are plain text and do not use the envelope. A second, separate gap: a missing required input field returns 422 invalid_request on /api/v1/projects but 409 invariant_conflict on offer routes, because the two use different validation exceptions. Both gaps are recorded instead of hidden; unifying them is a client-visible contract change and needs its own PR.",
   "cases": [
     {
       "case": "validation_failure",

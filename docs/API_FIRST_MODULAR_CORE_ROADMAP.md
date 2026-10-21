@@ -153,6 +153,10 @@ backend/srw/api/
 
 退出条件：新增功能不再默认进入 `fullworkbench.py`；文件规模持续下降，且不存在第二套业务实现。
 
+**R2 进度（2026-10-21，第一刀）**：`offers` 域（3 条路由 / 2 条写操作）已迁出到 `backend/srw/api/routes/offers.py`，`install_full_workbench_routes` 改为 `*offer_routes(factory=factory)` 装配。同批把 `_s`/`_json_body`/`_body_dict` 三个纯传输助手移入 `backend/srw/api/http_utils.py`，避免新 route 模块反向依赖聚合层而形成循环导入。URL、方法、响应体、错误码与事务边界均保持不变，由 `convergence_tests/test_offer_routes.py`（5 项）与冻结清单共同证明。
+
+本刀同时暴露两处**已记录未修改**的契约问题：创建 Offer 时缺少必填字段返回 `409 invariant_conflict`，而项目创建同类错误返回 `422 invalid_request`；Offer 状态迁移没有 `If-Match`/expected revision，属 last-write-wins。两者都要单独决策后才能改，不随搬迁顺手变更。
+
 ### R3 · Application Use-case Layer
 
 目标：把“一个用户动作需要串联多个模块”的逻辑从 route/UI 中提取到应用层。

@@ -1,8 +1,37 @@
 {
   "schema": "srw.api-mutation-classification.v1",
-  "status": "R1 ratchet only. Per-route use-case, concurrency, audit and human-actor annotation is R2 work, done one domain at a time as routes move out of fullworkbench.py.",
-  "frozen_at": "main e7816bc4f4881e217c453635e41b4121907cde21",
+  "status": "R1 ratchet plus R2 offers-domain classification. Remaining domains are classified as their routes move.",
+  "frozen_at": "main e385adfb868baf5173f98d6119f253dd9d072b41",
   "rule": "live_mutations - classified MUST NOT exceed baseline_unclassified. Adding a mutation route therefore fails the contract test until it is classified or this baseline is raised in review.",
-  "baseline_unclassified": 73,
-  "classified": {}
+  "baseline_unclassified": 71,
+  "classified": [
+    {
+      "method": "POST",
+      "path": "/api/v1/candidates/{candidate_id:str}/offers",
+      "domain": "offers",
+      "owner": "srw.api.routes.offers",
+      "use_case": "CreateOffer",
+      "request": "title (required), compensation_note, target_start_date, terms, actor",
+      "response": "offer view with offer_id, candidate_id, project_id, status",
+      "concurrency": "none - create-only, no If-Match or expected revision",
+      "audit": "OFFER_CREATED with candidate_id and status=draft",
+      "human_actor": "yes - actor defaults to human; the offer is never created by AI",
+      "invariants": "candidate must exist (404) and be in interview or offer stage (409 invariant_conflict)",
+      "side_effects": "creates one OfferRecord row plus one audit event in the same transaction"
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/offers/{offer_id:str}/status",
+      "domain": "offers",
+      "owner": "srw.api.routes.offers",
+      "use_case": "TransitionOffer",
+      "request": "status (required), actor, reason",
+      "response": "offer view with the new status",
+      "concurrency": "none observed - no If-Match/expected revision, so two clients race last-write-wins. Recorded as a gap, not a guarantee.",
+      "audit": "OFFER_STATUS_CHANGED with from/to status and candidate_id",
+      "human_actor": "yes - actor defaults to human",
+      "invariants": "status must be a known OFFER_STATES value and must follow the allowed transition table (409 invariant_conflict)",
+      "side_effects": "mutates OfferRecord.status plus one audit event in the same transaction"
+    }
+  ]
 }
