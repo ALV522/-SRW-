@@ -113,3 +113,15 @@ A real SQLite and HTTP regression found historical HumanDecision entries falsely
 ## 2026-10-21: HTTP 层分解切片 1 — Provider 探测/OCR/ASR 归位 providers 域（本地执行）
 
 按 [ADR-0002](docs/decisions/ADR-0002-http-layer-decomposition.md)（负责人 2026-10-21 批准）启动 HTTP 层分解，首个切片把 `api/fullworkbench.py` 中内联的 Provider 配置投影、能力探测、OCR/ASR 字节处理提取为新域模块 `backend/srw/providers/probing.py`（185 行），HTTP 侧只留 thin adapters；`api/fullworkbench.py` 1714→1642 行，行为与请求/超时/错误映射逐字保持不变，`/api/v1` 路由契约零变更。新增 `convergence_tests/test_provider_probing.py` 16 项（fake secrets/settings + fake httpx 传输，无真实网络、无候选内容），含 GET `/api/v1/settings/providers` 的 HTTP 边界集成测试；此前无任何测试覆盖这三条 Provider 路由，属净增覆盖。Schema v1_0014、VERSION、发行状态不变。**执行方式：经负责人授权仅本地执行（任务分支 `dev/43-http-decomposition-slice1-providers`，不 push、不建 PR、不合入），GitHub CI = NOT RUN。** 本地实测：`python -m unittest discover -s convergence_tests` 252 项 = 247 PASS / 3 skipped（平台门禁）/ 2 FAIL；2 项 FAIL（`test_rejects_symlink_database`、`test_rejects_malicious_host_symlink`）在未改动 main 的干净 worktree 上原样复现，属本机 Windows 临时目录 symlink 权限环境问题，非本次引入。远端 CI 验证与合并待负责人指令，届时按无保护协议走完整 PR 门禁。
+
+## 2026-10-21: ADR-0002 HTTP 层分解切片 1–4 + 契约显式化 + 前端守卫（本地执行）
+
+经负责人授权（“全部按建议、仅本地执行、D 盘新文件夹开发”），在 `D:/SRW-dev` 的任务分支完成 ADR-0002 分解第一轮：`api/fullworkbench.py` 1714 → 1485 行。切片 1 Provider 探测/OCR/ASR → `providers/probing.py`；切片 2 Knowledge apply 编排 → `modules/knowledge_governance/service.py`；切片 3 项目 Pipeline 读模型（含 next_action 链）→ `surfaces/project_pipeline.py`；切片 4 候选人对比/CSV 导出（含公式注入防护 `csv_safe_cell`）→ `surfaces/candidate_exports.py`。四切片均行为逐字保持、`/api/v1` 契约零变更，新增 46 项测试（Provider 三路由、knowledge/apply、pipeline、compare/CSV 路由此前零覆盖）。Schema v1_0014、VERSION、发行身份未变。
+
+契约显式化：`scripts/check_api_contract.py` 将 146 条路由与 `docs/contracts/api-v1-inventory.txt` 基线比对，Source Gate（`test_api_contract.py`）与 CI 双通道强制路由漂移即失败；`docs/contracts/API_V1.md` 记录分域不变量与错误映射。
+
+前端守卫与缺陷修复：`scripts/check_frontend_contract.py`（`test_frontend_contract.py` 进门禁）静态校验内联处理器引用与静态 API 路径登记；借此发现真实潜在缺陷——app.js 的 `settingsPage/renderPage/tasksPage/projectWorkspace` 被内联 onclick/onchange 引用但未挂 window（ES module 作用域不可达，点击即 ReferenceError，含候选人下拉切换），已按文件既有模式显式挂载修复。修复使引用可解析（静态可证）；按钮实际行为待真实 Chromium 复验。
+
+**前端六代基建合并与 app.js 按域拆分：BLOCKED**——本机无 Playwright/Chromium，无行为等价兜底手段，按既定规则不硬改；前置条件为可用的真实浏览器验收环境（CI 的 Chromium 门禁可在负责人授权同步后承担）。
+
+本轮为本地执行（分支 `dev/43-http-decomposition-slice1-providers`，6 个提交），未 push、未建 PR、未合入；GitHub CI = NOT RUN。本地实测：全量 290 项 = 288 PASS / 3 skipped（平台门禁）/ 2 FAIL（`test_rejects_symlink_database`、`test_rejects_malicious_host_symlink`，本机 symlink 权限既有失败，未改动 main 的干净 worktree 复现）；治理三查（source integrity 340 项 / release truth / governance contract）PASS。

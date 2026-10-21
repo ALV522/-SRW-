@@ -49,3 +49,10 @@ C. 已分离骨架上的分解 + 契约显式化 —— 采纳：直接消除三
 ## 可重新讨论条件
 
 有可重复证据表明统一 Core 在核心招聘业务、目标资源/性能或离线使用上不可行；或负责人批准改变目标用户/部署边界；或出现本 ADR 未覆盖的新型载体需求。
+
+## 执行进展（2026-10-21，本地执行，未同步 GitHub）
+
+1. **切片 1–4 已完成**（`dev/43-http-decomposition-slice1-providers`，5 个提交）：Provider 探测/OCR/ASR → `providers/probing.py`；Knowledge apply 编排 → `modules/knowledge_governance/service.py`；项目 Pipeline 读模型 → `surfaces/project_pipeline.py`；候选人对比/CSV 导出 → `surfaces/candidate_exports.py`（含公式注入防护收敛）。`api/fullworkbench.py` 1714 → 1485 行；新增 46 项测试（含此前后零覆盖的 Provider 路由、knowledge/apply、pipeline、compare/CSV 路由）。本地全量 290 项 = 288 PASS / 3 skipped（平台门禁）/ 2 FAIL（本机 symlink 权限既有失败，未改动 main 上复现）。
+2. **契约显式化已落地**：`scripts/check_api_contract.py` + `docs/contracts/api-v1-inventory.txt`（146 条路由基线）+ `docs/contracts/API_V1.md` 分域契约；Source Gate 与 CI 双通道强制，路由漂移即失败。
+3. **前端整合 BLOCKED（验证前置缺失）**：本机无 Playwright/Chromium，无法做行为等价兜底，按预定规则不硬改前端结构。已交付可静态验证的守卫 `scripts/check_frontend_contract.py`（内联处理器引用完整性 + 静态 API 路径登记），并借此发现并修复一个**真实潜在缺陷**：app.js 四个页面入口函数（`settingsPage/renderPage/tasksPage/projectWorkspace`）被内联 onclick/onchange 引用但未挂 window（ES module 作用域不可达），点击即 ReferenceError——含候选人下拉切换。修复为显式挂载（最小变更）；修复使引用可解析（静态可证），按钮实际行为待浏览器 E2E 复验。前端六代基建合并与 app.js 按域拆分保留为后续任务，前置条件 = 可用的真实 Chromium 环境。
+4. 本轮全部提交为本地执行；GitHub CI = NOT RUN（负责人授权）。合并与远端验证待负责人指令。

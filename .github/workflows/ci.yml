@@ -43,6 +43,8 @@ jobs:
         run: python scripts/check_release_truth.py
       - name: Verify API v1 route inventory contract
         run: python scripts/check_api_contract.py
+      - name: Verify frontend handler and API path contract
+        run: python scripts/check_frontend_contract.py
       - name: Run capability and resource regression
         shell: bash
         env:

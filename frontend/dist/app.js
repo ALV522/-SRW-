@@ -1,6 +1,10 @@
 const state={page:'dashboard',projects:[],projectId:null,projectTab:'overview',candidateId:null,candidateSection:'evidence',candidateReturnTab:'candidates',providers:null,health:false,candidateQuery:'',candidateArchive:'active',candidateMaterial:'all',candidateStage:'all',candidatePage:0,candidateLimit:25,candidateRows:[],taskStatus:'',taskType:'',taskPage:0,taskLimit:50,cockpitPage:0,cockpitLimit:25,auditOffset:0,flowQuery:'',handoffPayload:null,jobSetupStep:1,jobSetupDraft:null,jobSetupSuggestions:[],criteriaStageDefs:[],criteriaRecruitmentContext:{},criteriaDecisionPolicy:{},criteriaBrief:{},criteriaOriginalByKey:{}};
 // Ephemeral drafts survive in-flight workbench redraws but never leave this browser session.
 const materialDrafts=new Map();
+// Inline event-handler attributes (onclick/onchange) resolve in global scope, but these page
+// entry points are module-scoped. Expose them explicitly so injected handlers resolve;
+// scripts/check_frontend_contract.py fails the source gate if a handler reference is unassigned.
+window.settingsPage=settingsPage;window.renderPage=renderPage;window.tasksPage=tasksPage;window.projectWorkspace=projectWorkspace;
 const $=s=>document.querySelector(s); const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const fmt=n=>new Intl.NumberFormat('zh-CN').format(Number(n||0));
 async function api(path,opts={}){const r=await fetch(path,{headers:{'Content-Type':'application/json',...(opts.headers||{})},...opts});let body;const ct=r.headers.get('content-type')||'';body=ct.includes('json')?await r.json():await r.text();if(!r.ok){const msg=body?.detail||body?.error?.code||String(body);throw new Error(msg)}return body}
