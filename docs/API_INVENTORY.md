@@ -57,8 +57,8 @@
 | POST | `/api/v1/candidates/{candidate_id:str}/evidence/extract-task` | evidence | `srw.api.fullworkbench` | · | · | yes |
 | POST | `/api/v1/candidates/{candidate_id:str}/files` | candidates | `srw.api.fullworkbench` | · | · | yes |
 | GET | `/api/v1/candidates/{candidate_id:str}/identity-history` | candidates | `srw.api.governance` | — | — | — |
-| GET | `/api/v1/candidates/{candidate_id:str}/offers` | offers | `srw.api.fullworkbench` | — | — | — |
-| POST | `/api/v1/candidates/{candidate_id:str}/offers` | offers | `srw.api.fullworkbench` | · | · | yes |
+| GET | `/api/v1/candidates/{candidate_id:str}/offers` | offers | `srw.api.routes.offers` | — | — | — |
+| POST | `/api/v1/candidates/{candidate_id:str}/offers` | offers | `srw.api.routes.offers` | · | · | yes |
 | GET | `/api/v1/candidates/{candidate_id:str}/phone-script` | candidates | `srw.api.fullworkbench` | — | — | — |
 | GET | `/api/v1/candidates/{candidate_id:str}/pipeline` | candidates | `srw.api.fullworkbench` | — | — | — |
 | GET | `/api/v1/candidates/{candidate_id:str}/reevaluations` | decisions | `srw.api.fullworkbench` | — | — | — |
@@ -91,7 +91,7 @@
 | POST | `/api/v1/knowledge-packages/{package_id:str}/activate` | knowledge | `srw.api.capability_recovery06` | · | · | yes |
 | GET | `/api/v1/knowledge/search` | knowledge | `srw.api.fullworkbench` | — | — | — |
 | GET | `/api/v1/knowledge/status` | knowledge | `srw.api.fullworkbench` | — | — | — |
-| POST | `/api/v1/offers/{offer_id:str}/status` | offers | `srw.api.fullworkbench` | · | · | yes |
+| POST | `/api/v1/offers/{offer_id:str}/status` | offers | `srw.api.routes.offers` | · | · | yes |
 | GET | `/api/v1/projects` | projects | `srw.api.app` | — | — | — |
 | POST | `/api/v1/projects` | projects | `srw.api.app` | · | · | yes |
 | POST | `/api/v1/projects/import-package` | projects | `srw.api.project_portability` | · | · | yes |

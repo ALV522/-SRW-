@@ -252,7 +252,7 @@
     {
       "method": "GET",
       "path": "/api/v1/candidates/{candidate_id:str}/offers",
-      "owner": "srw.api.fullworkbench",
+      "owner": "srw.api.routes.offers",
       "domain": "offers",
       "mutation": false,
       "signals": null
@@ -260,7 +260,7 @@
     {
       "method": "POST",
       "path": "/api/v1/candidates/{candidate_id:str}/offers",
-      "owner": "srw.api.fullworkbench",
+      "owner": "srw.api.routes.offers",
       "domain": "offers",
       "mutation": true,
       "signals": {
@@ -624,7 +624,7 @@
     {
       "method": "POST",
       "path": "/api/v1/offers/{offer_id:str}/status",
-      "owner": "srw.api.fullworkbench",
+      "owner": "srw.api.routes.offers",
       "domain": "offers",
       "mutation": true,
       "signals": {
