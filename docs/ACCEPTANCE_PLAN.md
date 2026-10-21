@@ -52,3 +52,29 @@ A user-supplied screenshot and a 45-record Host JSONL log prove actual Windows W
 ## Added independent evaluator and Offer state business acceptance
 
 Real browser tests `test_04_independent_interview_scorecards_cannot_be_overwritten` and `test_05_offer_lifecycle_requires_human_transitions_and_never_auto_hires` now exercise independent interviewer judgments and legitimate Offer state transitions end to end. A submitted scorecard cannot be overwritten, disagreement is not automatically averaged, an Offer may not skip approval, and accepted Offer must not autonomously mark the candidate hired or create a HumanDecision. Five Chromium scenarios should be reflected in CI evidence only after the exact head and merged main checks pass. The Windows WPF frontend and full evidence->HumanDecision workflow remain distinct acceptance requirements.
+
+## Issue #72: reject damaged backups before scheduling restore
+
+`POST /api/v1/system/backups/{filename}/restore` must use the same Core archive
+validator as startup recovery before reporting `scheduled=true`. A modified or
+missing manifested blob, invalid manifest, unexpected ZIP member or incompatible
+Schema must fail before replacing `pending_restore.json`; an existing plan and
+live recruiting data remain unchanged. The URL and successful response/marker
+fields remain unchanged. Historical DB-only backup compatibility is retained;
+legacy archives do not acquire a false manifest-integrity guarantee.
+
+`convergence_tests/test_restore_schedule_integrity.py` covers rejection, previous
+plan preservation, valid scheduling/cancel, legacy compatibility, missing files
+and the existing Schema allowlist using disposable SQLite and synthetic blobs.
+`browser_acceptance/test_flows.py::test_11_restore_schedule_rejects_bad_backup_before_restart`
+creates a backup through Settings, injects damaged bytes into its temporary ZIP,
+then clicks restore and checks the error and absence of a pending marker. After
+restoring the original ZIP bytes, an explicit second click schedules it normally.
+Only fault injection uses filesystem writes; business HTTP responses are real.
+Cancellation at test cleanup uses the API, not a claimed UI cancellation flow.
+
+Exact-SHA Source and Chromium results belong in the associated PR/Actions
+evidence. This scenario does **not** execute restart recovery, prove crash-safe
+restore, run WPF/WebView2, validate production Knowledge/Provider inputs, or
+complete Windows/dual-carrier acceptance. Startup must still revalidate the
+scheduled archive hash and members before replacing live data.
