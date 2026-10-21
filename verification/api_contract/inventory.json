@@ -1136,7 +1136,7 @@
     {
       "method": "POST",
       "path": "/api/v1/projects/{project_id:str}/templates/from-current",
-      "owner": "srw.api.fullworkbench",
+      "owner": "srw.api.routes.operations",
       "domain": "operations",
       "mutation": true,
       "signals": {
@@ -1412,7 +1412,7 @@
     {
       "method": "GET",
       "path": "/api/v1/tasks",
-      "owner": "srw.api.fullworkbench",
+      "owner": "srw.api.routes.operations",
       "domain": "operations",
       "mutation": false,
       "signals": null
@@ -1420,7 +1420,7 @@
     {
       "method": "GET",
       "path": "/api/v1/tasks/{task_id:str}",
-      "owner": "srw.api.fullworkbench",
+      "owner": "srw.api.routes.operations",
       "domain": "operations",
       "mutation": false,
       "signals": null
@@ -1428,7 +1428,7 @@
     {
       "method": "POST",
       "path": "/api/v1/tasks/{task_id:str}/cancel",
-      "owner": "srw.api.fullworkbench",
+      "owner": "srw.api.routes.operations",
       "domain": "operations",
       "mutation": true,
       "signals": {
@@ -1441,7 +1441,7 @@
     {
       "method": "POST",
       "path": "/api/v1/tasks/{task_id:str}/retry",
-      "owner": "srw.api.fullworkbench",
+      "owner": "srw.api.routes.operations",
       "domain": "operations",
       "mutation": true,
       "signals": {
@@ -1454,7 +1454,7 @@
     {
       "method": "GET",
       "path": "/api/v1/templates",
-      "owner": "srw.api.fullworkbench",
+      "owner": "srw.api.routes.operations",
       "domain": "operations",
       "mutation": false,
       "signals": null
@@ -1462,7 +1462,7 @@
     {
       "method": "POST",
       "path": "/api/v1/templates",
-      "owner": "srw.api.fullworkbench",
+      "owner": "srw.api.routes.operations",
       "domain": "operations",
       "mutation": true,
       "signals": {
@@ -1475,7 +1475,7 @@
     {
       "method": "DELETE",
       "path": "/api/v1/templates/{template_id:str}",
-      "owner": "srw.api.fullworkbench",
+      "owner": "srw.api.routes.operations",
       "domain": "operations",
       "mutation": true,
       "signals": {
@@ -1488,7 +1488,7 @@
     {
       "method": "PATCH",
       "path": "/api/v1/templates/{template_id:str}",
-      "owner": "srw.api.fullworkbench",
+      "owner": "srw.api.routes.operations",
       "domain": "operations",
       "mutation": true,
       "signals": {
@@ -1501,7 +1501,7 @@
     {
       "method": "POST",
       "path": "/api/v1/templates/{template_id:str}/apply/{project_id:str}",
-      "owner": "srw.api.fullworkbench",
+      "owner": "srw.api.routes.operations",
       "domain": "operations",
       "mutation": true,
       "signals": {

@@ -15,8 +15,11 @@ module (ADR-0002 §2.3).
 """
 from __future__ import annotations
 
+from sqlalchemy import select
+
 from srw.modules.candidate.models import Candidate
 from srw.modules.candidate.repository import MaterialRepository, get_current_source_ids
+from srw.modules.protocol.models import ProtocolRevision
 
 
 def publish_current_revision(session, candidate_id: str, new_source_id: str,
@@ -39,3 +42,17 @@ def publish_current_revision(session, candidate_id: str, new_source_id: str,
     if supersedes_source_id:
         provenance["supersedes_source_id"] = supersedes_source_id
     return MaterialRepository(session).publish_revision(candidate_id, ids, provenance)
+
+
+def latest_draft(session, project_id: str):
+    """Newest draft ProtocolRevision for a project, or None.
+
+    Shared by template application, template creation from the current protocol
+    and knowledge curation, so it cannot live inside one domain module.
+    """
+    return session.scalar(
+        select(ProtocolRevision)
+        .where(ProtocolRevision.project_id == project_id, ProtocolRevision.state == "draft")
+        .order_by(ProtocolRevision.revision.desc())
+        .limit(1)
+    )

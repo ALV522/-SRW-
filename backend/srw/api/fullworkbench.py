@@ -14,6 +14,8 @@ from starlette.routing import Route
 from srw.evidence.pipeline import extract_source_claims, persist_source_claims
 from srw.api.http_utils import body_dict as _body_dict, json_body as _json_body, s_field as _s
 from srw.api.routes.interviews import interview_routes
+from srw.api.routes.operations import operation_routes
+from srw.api.shared import latest_draft as _latest_draft
 from srw.api.shared import publish_current_revision as _publish_current
 from srw.api.routes.offers import offer_routes
 from srw.intake.service import CandidateIntakeService
@@ -31,7 +33,7 @@ from srw.modules.identity.models import CandidateIdentityReview
 from srw.modules.calibration.models import JudgmentReviewItem
 from srw.modules.decision.context import get_current_decision_context
 from srw.modules.decision.assessment import get_candidate_assessment
-from srw.modules.fullworkbench import BlobStore, KnowledgeService, RecruitmentEvent, ReevaluationDraft, EvaluationSnapshot, RoleTemplate, TaskRecord, create_backup, diagnostics
+from srw.modules.fullworkbench import BlobStore, KnowledgeService, RecruitmentEvent, ReevaluationDraft, EvaluationSnapshot, TaskRecord, create_backup, diagnostics
 from srw.modules.protocol.models import Project, ProtocolRevision
 from srw.modules.protocol.repository import ProtocolRepository
 from srw.modules.recruiting.models import CandidateStageTransition, OfferRecord
@@ -105,26 +107,6 @@ def _task_finish(task: TaskRecord, started: float, *, status: str, result: dict[
     task.error_code = error_code
     task.error_message = error_message
     task.result_json = json.dumps(result or {}, ensure_ascii=False, separators=(",", ":"))
-
-
-def _task_json(task: TaskRecord) -> dict[str, Any]:
-    try:
-        result = json.loads(task.result_json or "{}")
-    except Exception:
-        result = {}
-    return {
-        "task_id": task.id, "type": task.task_type, "status": task.status,
-        "candidate_id": task.candidate_id, "source_id": task.source_id,
-        "result_source_id": task.result_source_id,
-        "progress_current": task.progress_current, "progress_total": task.progress_total,
-        "attempt_count": task.attempt_count,
-        "started_at": task.started_at.isoformat() if task.started_at else None,
-        "finished_at": task.finished_at.isoformat() if task.finished_at else None,
-        "duration_ms": task.duration_ms,
-        "error_code": task.error_code, "error_message": task.error_message,
-        "result": result,
-        "created_at": task.created_at.isoformat(),
-    }
 
 
 def _probe(session,secrets,name:str) -> dict[str,Any]:
@@ -927,109 +909,6 @@ def install_full_workbench_routes(app, factory, registry, secrets, *, data_dir: 
         if t and t.is_alive(): t.join(timeout=2.0)
     app.add_event_handler("startup",_start_worker);app.add_event_handler("shutdown",_stop_worker)
 
-    async def tasks(r):
-        status=(r.query_params.get("status") or "").strip()
-        task_type=(r.query_params.get("type") or "").strip()
-        candidate_id=(r.query_params.get("candidate_id") or "").strip()
-        try:
-            limit=min(200,max(1,int(r.query_params.get("limit","50"))))
-            offset=max(0,int(r.query_params.get("offset","0")))
-        except ValueError as exc:
-            raise V1InvariantError("limit and offset must be integers") from exc
-        filters=[]
-        if status: filters.append(TaskRecord.status==status)
-        if task_type: filters.append(TaskRecord.task_type==task_type)
-        if candidate_id: filters.append(TaskRecord.candidate_id==candidate_id)
-        with factory() as s:
-            total=s.scalar(select(func.count(TaskRecord.id)).where(*filters)) or 0
-            rows=s.scalars(select(TaskRecord).where(*filters).order_by(TaskRecord.created_at.desc()).limit(limit).offset(offset)).all()
-            return JSONResponse({"tasks":[_task_json(x) for x in rows],"total":total,"limit":limit,"offset":offset})
-    async def task_detail(r):
-        tid=r.path_params["task_id"]
-        with factory() as s:
-            row=s.get(TaskRecord,tid)
-            if not row: raise V1NotFoundError(f"task not found: {tid}")
-            return JSONResponse(_task_json(row))
-    async def cancel_task(r):
-        tid=r.path_params["task_id"]
-        with v1_session_scope(factory) as s:
-            x=s.get(TaskRecord,tid)
-            if not x: raise V1NotFoundError(f"task not found: {tid}")
-            if x.status=="succeeded": return JSONResponse({"task_id":tid,"status":x.status})
-            x.cancel_requested=True;x.status="cancelled"
-            if x.job_id: JobEngine(s).cancel(x.job_id)
-            return JSONResponse({"task_id":tid,"status":x.status})
-    async def retry_task(r):
-        tid=r.path_params["task_id"]
-        with v1_session_scope(factory) as s:
-            x=s.get(TaskRecord,tid)
-            if not x: raise V1NotFoundError(f"task not found: {tid}")
-            if x.status=="cancelled": raise V1InvariantError("cancelled task cannot be retried")
-            if not x.job_id:
-                job=JobEngine(s).enqueue(f"task.{x.task_type}",{"task_id":x.id},idempotency_key=f"task:{x.id}:retry:{x.attempt_count+1}")
-                x.job_id=job.id
-            else:
-                JobEngine(s).requeue(x.job_id)
-            x.cancel_requested=False;x.status="queued";x.error_code="";x.error_message="";x.finished_at=None
-            return JSONResponse({"task_id":tid,"job_id":x.job_id,"status":"queued"})
-
-    def _latest_draft(s,pid):
-        return s.scalar(select(ProtocolRevision).where(ProtocolRevision.project_id==pid,ProtocolRevision.state=="draft").order_by(ProtocolRevision.revision.desc()).limit(1))
-
-    async def templates(_r):
-        with factory() as s:
-            rows=s.scalars(select(RoleTemplate).order_by(RoleTemplate.updated_at.desc())).all();return JSONResponse({"templates":[{"template_id":x.id,"name":x.name,"role_title":x.role_title,"payload":json.loads(x.payload_json),"updated_at":x.updated_at.isoformat()} for x in rows]})
-    async def template_create(r):
-        b=await _json_body(r)
-        with v1_session_scope(factory) as s:
-            x=RoleTemplate(name=_s(b,"name",required=True),role_title=_s(b,"role_title"),payload_json=json.dumps(b.get("payload") if isinstance(b.get("payload"),dict) else {},ensure_ascii=False));s.add(x);s.flush();return JSONResponse({"template_id":x.id,"name":x.name})
-    async def template_update(r):
-        tid=r.path_params["template_id"];b=await _json_body(r)
-        with v1_session_scope(factory) as s:
-            x=s.get(RoleTemplate,tid)
-            if not x: raise V1NotFoundError(f"template not found: {tid}")
-            if "name" in b: x.name=_s(b,"name",required=True)
-            if "role_title" in b: x.role_title=_s(b,"role_title")
-            if "payload" in b:
-                if not isinstance(b["payload"],dict): raise V1InvariantError("payload must be an object")
-                x.payload_json=json.dumps(b["payload"],ensure_ascii=False)
-            return JSONResponse({"template_id":x.id,"name":x.name})
-    async def template_delete(r):
-        tid=r.path_params["template_id"]
-        with v1_session_scope(factory) as s:
-            x=s.get(RoleTemplate,tid)
-            if not x: raise V1NotFoundError(f"template not found: {tid}")
-            s.delete(x);return JSONResponse({"deleted":True})
-    async def template_from_current(r):
-        pid=r.path_params["project_id"];b=await _json_body(r)
-        with v1_session_scope(factory) as s:
-            project=s.get(Project,pid)
-            if not project: raise V1NotFoundError(f"project not found: {pid}")
-            rev=_latest_draft(s,pid) or (s.get(ProtocolRevision,project.current_protocol_revision_id) if project.current_protocol_revision_id else None)
-            if not rev: raise V1InvariantError("project has no protocol to save as template")
-            payload=ProtocolRepository(s).get_payload(rev.id)
-            role=str((payload.get("brief") or {}).get("title") or "")
-            x=RoleTemplate(name=_s(b,"name",required=True),role_title=role,payload_json=json.dumps(payload,ensure_ascii=False));s.add(x);s.flush()
-            return JSONResponse({"template_id":x.id,"name":x.name,"source_revision_id":rev.id})
-    async def template_apply(r):
-        tid=r.path_params["template_id"];pid=r.path_params["project_id"];b=await _json_body(r);mode=_s(b,"mode",default="merge")
-        if mode not in {"merge","replace"}: raise V1InvariantError("mode must be merge or replace")
-        with v1_session_scope(factory) as s:
-            tpl=s.get(RoleTemplate,tid);project=s.get(Project,pid)
-            if not tpl: raise V1NotFoundError(f"template not found: {tid}")
-            if not project: raise V1NotFoundError(f"project not found: {pid}")
-            draft=_latest_draft(s,pid)
-            if not draft: draft=ProtocolRepository(s).fork_current_to_draft(pid)
-            current=ProtocolRepository(s).get_payload(draft.id); incoming=json.loads(tpl.payload_json or "{}")
-            if mode=="replace": merged=incoming
-            else:
-                merged=dict(current); existing=list(current.get("criteria") or []); names={str(x.get("name") or "").strip().lower() for x in existing if isinstance(x,dict)}
-                for item in incoming.get("criteria") or []:
-                    if isinstance(item,dict) and str(item.get("name") or "").strip().lower() not in names: existing.append(dict(item))
-                merged["criteria"]=existing
-            row=ProtocolRepository(s).update_draft(draft.id,merged,{"origin":"template_apply","template_id":tid,"mode":mode})
-            return JSONResponse({"revision_id":row.id,"state":row.state,"mode":mode,"criteria_count":len(ProtocolRepository(s).get_payload(row.id).get("criteria") or [])})
-
     async def knowledge_status(_r): return JSONResponse({"databases":knowledge.status()})
     async def knowledge_search(r): return JSONResponse({"results":knowledge.search(r.query_params.get("q","")[:200],limit=min(50,max(1,int(r.query_params.get("limit","10")))))})
     async def knowledge_apply(r):
@@ -1491,8 +1370,8 @@ def install_full_workbench_routes(app, factory, registry, secrets, *, data_dir: 
       Route('/api/v1/candidates/{candidate_id:str}/archive',archive_candidate, methods=['POST']),Route('/api/v1/candidates/{candidate_id:str}/restore',restore_candidate, methods=['POST']),
       Route('/api/v1/candidates/{candidate_id:str}/files',ingest_file, methods=['POST']),
       Route('/api/v1/candidates/{candidate_id:str}/evidence/extract-task',extract_evidence_task, methods=['POST']),
-      Route('/api/v1/tasks',tasks, methods=['GET']),Route('/api/v1/tasks/{task_id:str}',task_detail, methods=['GET']),Route('/api/v1/tasks/{task_id:str}/retry',retry_task, methods=['POST']),Route('/api/v1/tasks/{task_id:str}/cancel',cancel_task, methods=['POST']),
-      Route('/api/v1/templates',templates, methods=['GET']),Route('/api/v1/templates',template_create, methods=['POST']),Route('/api/v1/templates/{template_id:str}',template_delete, methods=['DELETE']),Route('/api/v1/templates/{template_id:str}',template_update, methods=['PATCH']),Route('/api/v1/projects/{project_id:str}/templates/from-current',template_from_current, methods=['POST']),Route('/api/v1/templates/{template_id:str}/apply/{project_id:str}',template_apply, methods=['POST']),
+      *operation_routes(factory=factory),
+      
       Route('/api/v1/knowledge/status',knowledge_status, methods=['GET']),Route('/api/v1/knowledge/search',knowledge_search, methods=['GET']),Route('/api/v1/projects/{project_id:str}/knowledge/apply',knowledge_apply, methods=['POST']),
       *interview_routes(factory=factory),
       
