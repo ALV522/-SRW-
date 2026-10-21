@@ -1,0 +1,118 @@
+"""Backup, restore-scheduling and diagnostics routes (ADR-0002 R2, fourth slice).
+
+These are the operator's data-safety surfaces: take a backup, inspect it,
+download it, schedule a restore, cancel a pending restore, and export a
+privacy-safe diagnostic bundle. Behaviour is intentionally identical to the code
+that lived inside ``install_full_workbench_routes``.
+
+Deliberate boundary: scheduling a restore only validates the archive manifest and
+writes ``pending_restore.json``. The actual restore runs at startup, before
+SQLite is opened, so this module never touches live data. That is also why these
+routes matter for the Windows/Portable acceptance work (#42): they are the API
+half of the recovery contract, not a substitute for on-device acceptance.
+"""
+from __future__ import annotations
+
+import json
+from pathlib import Path
+
+from starlette.exceptions import HTTPException
+from starlette.requests import Request
+from starlette.responses import FileResponse, JSONResponse, Response
+from starlette.routing import Route
+
+from srw.kernel.errors import V1InvariantError
+from srw.modules.fullworkbench import create_backup, diagnostics
+from srw.release import get_release_state
+from srw.runtime.backup_truth import BackupTruthError, validate_backup_archive
+from srw.runtime.db.schema import V1_SCHEMA_REVISION
+from srw.runtime.diagnostic_bundle import build_privacy_safe_diagnostic_bundle
+
+
+def system_routes(*, factory, data_dir: Path, knowledge_dir: Path,
+                  database_path: Path, frontend_dist: Path | None) -> list[Route]:
+    """Bind the system endpoints to one Core workspace."""
+
+    async def backups(_r: Request) -> JSONResponse:
+        path = create_backup(data_dir, database_path)
+        return JSONResponse({"filename": path.name, "size_bytes": path.stat().st_size})
+
+    async def backup_list(_r: Request) -> JSONResponse:
+        root = data_dir / "backups"
+        root.mkdir(parents=True, exist_ok=True)
+        return JSONResponse({"backups": [
+            {"filename": p.name, "size_bytes": p.stat().st_size}
+            for p in sorted(root.glob("*.zip"), reverse=True)
+        ]})
+
+    async def backup_download(request: Request) -> FileResponse:
+        name = Path(request.path_params["filename"]).name
+        path = data_dir / "backups" / name
+        if not path.is_file():
+            raise HTTPException(404)
+        return FileResponse(path, filename=name)
+
+    async def schedule_restore(request: Request) -> JSONResponse:
+        name = Path(request.path_params["filename"]).name
+        path = data_dir / "backups" / name
+        if not path.is_file():
+            raise HTTPException(404)
+        try:
+            # Share startup's manifest/member validation before accepting a plan.
+            truth = validate_backup_archive(path)
+            schema_revision = truth["schema_revision"]
+            current = int(V1_SCHEMA_REVISION.split("_")[-1])
+            allowed = {f"v1_{i:04d}" for i in range(1, current + 1)}
+            if schema_revision not in allowed:
+                raise V1InvariantError(f"backup schema is not compatible: {schema_revision}")
+        except BackupTruthError as exc:
+            raise V1InvariantError(str(exc)) from exc
+        marker = data_dir / "pending_restore.json"
+        digest = truth["archive_sha256"]
+        marker.write_text(
+            json.dumps({"backup": name, "sha256": digest, "schema_revision": schema_revision},
+                       ensure_ascii=False, separators=(",", ":")),
+            encoding="utf-8",
+        )
+        return JSONResponse({"scheduled": True, "filename": name, "sha256": digest,
+                             "schema_revision": schema_revision, "restart_required": True})
+
+    async def cancel_restore(_r: Request) -> JSONResponse:
+        marker = data_dir / "pending_restore.json"
+        if marker.exists():
+            marker.unlink()
+        return JSONResponse({"scheduled": False})
+
+    async def diag(_r: Request) -> JSONResponse:
+        with factory() as session:
+            release = get_release_state()
+            return JSONResponse(diagnostics(
+                session, data_dir=data_dir, knowledge_dir=knowledge_dir,
+                database_path=database_path, frontend_dist=frontend_dist,
+                version=release["version"], schema_revision=V1_SCHEMA_REVISION,
+            ))
+
+    async def diag_export(_r: Request) -> Response:
+        with factory() as session:
+            release = get_release_state()
+            payload = diagnostics(
+                session, data_dir=data_dir, knowledge_dir=knowledge_dir,
+                database_path=database_path, frontend_dist=frontend_dist,
+                version=release["version"], schema_revision=V1_SCHEMA_REVISION,
+            )
+            raw = build_privacy_safe_diagnostic_bundle(payload, release)
+        headers = {
+            "Content-Disposition": f'attachment; filename="srw-diagnostics-{release["version"]}.zip"',
+            "Cache-Control": "no-store",
+        }
+        return Response(raw, media_type="application/zip", headers=headers)
+
+    return [
+        Route("/api/v1/system/backups", backups, methods=["POST"]),
+        Route("/api/v1/system/backups", backup_list, methods=["GET"]),
+        Route("/api/v1/system/backups/{filename:str}", backup_download, methods=["GET"]),
+        Route("/api/v1/system/backups/{filename:str}/restore", schedule_restore, methods=["POST"]),
+        Route("/api/v1/system/restore/cancel", cancel_restore, methods=["POST"]),
+        Route("/api/v1/system/diagnostics", diag, methods=["GET"]),
+        Route("/api/v1/system/diagnostics/export", diag_export, methods=["GET"]),
+    ]

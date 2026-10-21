@@ -1,9 +1,9 @@
 {
   "schema": "srw.api-mutation-classification.v1",
-  "status": "R1 ratchet plus R2 classification for offers, interviews and the task/template operational routes.",
+  "status": "R1 ratchet plus R2 classification for offers, interviews, operational and system data-safety routes.",
   "frozen_at": "main e385adfb868baf5173f98d6119f253dd9d072b41",
   "rule": "live_mutations - classified MUST NOT exceed baseline_unclassified. Adding a mutation route therefore fails the contract test until it is classified or this baseline is raised in review.",
-  "baseline_unclassified": 61,
+  "baseline_unclassified": 58,
   "classified": [
     {
       "method": "POST",
@@ -172,6 +172,48 @@
       "human_actor": "implicit",
       "invariants": "unknown template/project 404 (template first); mode must be merge or replace (409); a draft is forked when none exists",
       "side_effects": "creates or mutates a draft ProtocolRevision; published revisions are never touched"
+    },
+    {
+      "domain": "system",
+      "owner": "srw.api.routes.system",
+      "method": "POST",
+      "path": "/api/v1/system/backups",
+      "use_case": "CreateBackup",
+      "request": "no body",
+      "response": "filename, size_bytes",
+      "concurrency": "none - each call creates a new archive",
+      "audit": "implied by the archive manifest; no audit event written by the route",
+      "human_actor": "implicit",
+      "invariants": "the archive must pass the same manifest validation used at startup",
+      "side_effects": "writes a zip containing SQLite plus Source blobs into data/backups"
+    },
+    {
+      "domain": "system",
+      "owner": "srw.api.routes.system",
+      "method": "POST",
+      "path": "/api/v1/system/backups/{filename:str}/restore",
+      "use_case": "ScheduleRestore",
+      "request": "path filename only",
+      "response": "scheduled, filename, sha256, schema_revision, restart_required",
+      "concurrency": "single marker file; last writer wins",
+      "audit": "none written here; the restore itself is recorded at startup",
+      "human_actor": "implicit - restart_required makes the operator act",
+      "invariants": "unknown file 404; archive manifest and member allowlist are validated (409 on BackupTruthError); backup schema must be <= current V1_SCHEMA_REVISION",
+      "side_effects": "writes data/pending_restore.json only. Live data is untouched until restart, by design"
+    },
+    {
+      "domain": "system",
+      "owner": "srw.api.routes.system",
+      "method": "POST",
+      "path": "/api/v1/system/restore/cancel",
+      "use_case": "CancelScheduledRestore",
+      "request": "no body",
+      "response": "scheduled: false",
+      "concurrency": "none - marker deletion is idempotent",
+      "audit": "none",
+      "human_actor": "implicit",
+      "invariants": "cancelling with no pending restore is a reported no-op",
+      "side_effects": "removes data/pending_restore.json if present"
     }
   ]
 }

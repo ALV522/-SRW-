@@ -8,13 +8,14 @@ from typing import Any
 from sqlalchemy import func, select, or_, case
 from starlette.exceptions import HTTPException
 from starlette.requests import Request
-from starlette.responses import FileResponse, JSONResponse, Response, PlainTextResponse
+from starlette.responses import JSONResponse, PlainTextResponse
 from starlette.routing import Route
 
 from srw.evidence.pipeline import extract_source_claims, persist_source_claims
 from srw.api.http_utils import body_dict as _body_dict, json_body as _json_body, s_field as _s
 from srw.api.routes.interviews import interview_routes
 from srw.api.routes.operations import operation_routes
+from srw.api.routes.system import system_routes
 from srw.api.shared import latest_draft as _latest_draft
 from srw.api.shared import publish_current_revision as _publish_current
 from srw.api.routes.offers import offer_routes
@@ -33,7 +34,7 @@ from srw.modules.identity.models import CandidateIdentityReview
 from srw.modules.calibration.models import JudgmentReviewItem
 from srw.modules.decision.context import get_current_decision_context
 from srw.modules.decision.assessment import get_candidate_assessment
-from srw.modules.fullworkbench import BlobStore, KnowledgeService, RecruitmentEvent, ReevaluationDraft, EvaluationSnapshot, TaskRecord, create_backup, diagnostics
+from srw.modules.fullworkbench import BlobStore, KnowledgeService, RecruitmentEvent, ReevaluationDraft, EvaluationSnapshot, TaskRecord
 from srw.modules.protocol.models import Project, ProtocolRevision
 from srw.modules.protocol.repository import ProtocolRepository
 from srw.modules.recruiting.models import CandidateStageTransition, OfferRecord
@@ -46,10 +47,6 @@ from srw.recruiting.operations import (
 from srw.providers.contracts import ProviderFailureError, ProviderNotReadyError, ProviderOutputInvalidError
 from srw.providers.runtime import ProviderRuntime
 from srw.privacy.service import build_source_privacy_projection, rebind_privacy_safe_proposals
-from srw.release import get_release_state
-from srw.runtime.backup_truth import BackupTruthError, validate_backup_archive
-from srw.runtime.db.schema import V1_SCHEMA_REVISION
-from srw.runtime.diagnostic_bundle import build_privacy_safe_diagnostic_bundle
 from srw.runtime.db.session import v1_session_scope
 from srw.runtime.jobs.engine import JobEngine
 from srw.runtime.jobs.models import Job
@@ -1313,48 +1310,6 @@ def install_full_workbench_routes(app, factory, registry, secrets, *, data_dir: 
                 w.writerow({"candidate_id":x["candidate_id"],"display_name":safe_cell(x["display_name"]),"phone":safe_cell(x["phone"]),"email":safe_cell(x["email"]),"priority":x["priority"],"contact_status":x["contact_status"],"next_contact_at":safe_cell(x["next_contact_at"] or ""),"next_action":safe_cell(x["reason"] or "联系并核实未决条件")})
             return PlainTextResponse(out.getvalue(),media_type="text/csv; charset=utf-8",headers={"Content-Disposition":f'attachment; filename="contact-list-{pid}.csv"'})
 
-    async def backups(_r):
-        p=create_backup(data_dir,database_path);return JSONResponse({"filename":p.name,"size_bytes":p.stat().st_size})
-    async def backup_list(_r):
-        root=data_dir/"backups"; root.mkdir(parents=True,exist_ok=True);return JSONResponse({"backups":[{"filename":p.name,"size_bytes":p.stat().st_size} for p in sorted(root.glob("*.zip"),reverse=True)]})
-    async def backup_download(r):
-        name=Path(r.path_params["filename"]).name;p=data_dir/"backups"/name
-        if not p.is_file(): raise HTTPException(404)
-        return FileResponse(p,filename=name)
-    async def schedule_restore(r):
-        name=Path(r.path_params["filename"]).name
-        p=data_dir/"backups"/name
-        if not p.is_file(): raise HTTPException(404)
-        try:
-            # Share startup's manifest/member validation before accepting a plan.
-            truth=validate_backup_archive(p)
-            schema_revision=truth["schema_revision"]
-            current_n=int(V1_SCHEMA_REVISION.split("_")[-1]); allowed={f"v1_{i:04d}" for i in range(1,current_n+1)}
-            if schema_revision not in allowed: raise V1InvariantError(f"backup schema is not compatible: {schema_revision}")
-        except BackupTruthError as exc:
-            raise V1InvariantError(str(exc)) from exc
-        marker=data_dir/"pending_restore.json"
-        digest=truth["archive_sha256"]
-        marker.write_text(json.dumps({"backup":name,"sha256":digest,"schema_revision":schema_revision},ensure_ascii=False,separators=(",",":")),encoding="utf-8")
-        return JSONResponse({"scheduled":True,"filename":name,"sha256":digest,"schema_revision":schema_revision,"restart_required":True})
-
-    async def cancel_restore(_r):
-        marker=data_dir/"pending_restore.json"
-        if marker.exists(): marker.unlink()
-        return JSONResponse({"scheduled":False})
-
-    async def diag(_r):
-        with factory() as s:
-            rel=get_release_state();return JSONResponse(diagnostics(s,data_dir=data_dir,knowledge_dir=knowledge_dir,database_path=database_path,frontend_dist=frontend_dist,version=rel["version"],schema_revision=V1_SCHEMA_REVISION))
-
-    async def diag_export(_r):
-        with factory() as s:
-            rel=get_release_state()
-            payload=diagnostics(s,data_dir=data_dir,knowledge_dir=knowledge_dir,database_path=database_path,frontend_dist=frontend_dist,version=rel["version"],schema_revision=V1_SCHEMA_REVISION)
-            raw=build_privacy_safe_diagnostic_bundle(payload,rel)
-        headers={"Content-Disposition":f'attachment; filename="srw-diagnostics-{rel["version"]}.zip"',"Cache-Control":"no-store"}
-        return Response(raw,media_type="application/zip",headers=headers)
-
     routes=[
       Route('/api/v1/dashboard',dashboard, methods=['GET']),
       Route('/api/v1/settings/providers',provider_settings, methods=['GET']),Route('/api/v1/settings/providers/{name:str}',provider_update, methods=['PATCH']),Route('/api/v1/settings/providers/{name:str}/test',provider_probe, methods=['POST']),
@@ -1382,6 +1337,6 @@ def install_full_workbench_routes(app, factory, registry, secrets, *, data_dir: 
       Route('/api/v1/candidates/{candidate_id:str}/action-plan',candidate_action_plan,methods=['GET','PATCH']),Route('/api/v1/projects/{project_id:str}/contact-queue',project_contact_queue,methods=['GET']),Route('/api/v1/candidates/{candidate_id:str}/phone-script',candidate_phone_script,methods=['GET']),
       
       Route('/api/v1/candidates/{candidate_id:str}/brief',candidate_brief,methods=['GET']),Route('/api/v1/projects/{project_id:str}/handoff',project_handoff,methods=['GET']),Route('/api/v1/projects/{project_id:str}/contact-list.csv',contact_list_csv,methods=['GET']),
-      Route('/api/v1/system/backups',backups, methods=['POST']),Route('/api/v1/system/backups',backup_list, methods=['GET']),Route('/api/v1/system/backups/{filename:str}',backup_download, methods=['GET']),Route('/api/v1/system/backups/{filename:str}/restore',schedule_restore, methods=['POST']),Route('/api/v1/system/restore/cancel',cancel_restore, methods=['POST']),Route('/api/v1/system/diagnostics',diag, methods=['GET']),Route('/api/v1/system/diagnostics/export',diag_export, methods=['GET']),
+      *system_routes(factory=factory, data_dir=data_dir, knowledge_dir=knowledge_dir, database_path=database_path, frontend_dist=frontend_dist),
     ]
     app.routes.extend(routes)

@@ -62,3 +62,22 @@ Two business workflow E2E tests are added: (04) independent immutable Interview 
 ## Protocol republish and stale human decision (E2E-07)
 
 The additional Chromium acceptance creates a human-grounded Decision on a published project protocol, then **changes only the published protocol**, adding a mandatory verification-critical Criterion without changing candidate Source IDs. The prior Decision must become stale, the new criterion must block `advance` reaffirmation through both server API and UI until it is verified. This complements E2E-06 material-revision staleness. [Full test contract](BUSINESS_E2E_PROTOCOL_REVISION.md). It only counts as PASS after the corresponding exact-commit CI succeeds.
+
+## Known flake: criterion row count after clicking "添加标准" (2026-10-21)
+
+`test_07_published_protocol_change_invalidates_previous_human_decision` failed **once on main** `ce41239a860aff1ec2c2dc00ed030788c5af47ae` with `AssertionError: 1 != 2`, i.e. `.criterion-row` was expected to reach two rows after the add-criterion interaction and only one was present.
+
+Investigation, in order:
+
+1. The **same tree** had passed `chromium-real-browser-ubuntu` on PR head `f186e857fc633fb07b24bb7ca0bc007c39a11cd3`, so the merge itself introduced no behavioural change.
+2. `POST /actions/runs/39636651612/rerun-failed-jobs` re-ran only the failed job and it passed. Main is green at that commit.
+3. The failing step is `Run real-browser recruitment workflow acceptance`; the assertion is a row-count expectation immediately after a UI action whose persistence is asynchronous.
+
+Classification: **timing flake in the acceptance test, not a product regression**. Recording it here rather than silently re-running, because a suite that intermittently reddens main erodes the value of every other green result.
+
+Stabilisation direction (not yet implemented, needs its own PR with a browser re-run):
+
+- Do not assert a container count immediately after a mutating click. Wait for the specific new row (by its label) or for the save acknowledgement the way #67 did for criteria persistence.
+- Where a count assertion is unavoidable, first wait for the request that creates the row to settle, then assert the count.
+
+Until that PR lands, treat a lone `1 != 2` on this test as a known flake **only after** confirming the same tree passed on the PR head or on a rerun; never fold it into a PASS claim without that evidence.

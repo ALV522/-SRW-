@@ -169,6 +169,12 @@ backend/srw/api/
 
 `fullworkbench.py` 1530 → **1387 行**；累计从 1723 降至 1387（−336）。写操作归类 12/73，棘轮 68 → 61。本轮记录：任务 cancel/retry 与模板增删改**均不写审计**，且无 `If-Match`；cancel 对已成功任务是"如实返回 no-op"而不是拒绝。
 
+**R2 进度（2026-10-22，第四刀）**：`system` 域 7 条路由（备份创建/列表/下载、恢复排期、恢复取消、诊断、诊断导出）迁出到 `backend/srw/api/routes/system.py`，builder 显式接收 `data_dir`/`knowledge_dir`/`database_path`/`frontend_dist` 四个工作区依赖，而不是继续闭包捕获。同步清理聚合层 6 条失效导入。
+
+这批路由与 **#42 的恢复验收**直接相关：排期只校验归档清单并写 `pending_restore.json`，真正恢复发生在启动时、SQLite 打开之前，因此 route 层永不触碰在线数据。这一点写进了模块文档，避免以后有人把"排期成功"误读为"恢复已完成"。
+
+`fullworkbench.py` 1387 → **1346 行**；累计从 1723 降至 1346（−377，−21.9%）。写操作归类 15/73，棘轮 61 → 58。浏览器套件的时序 flake 已记入 `docs/BROWSER_ACCEPTANCE.md`，稳定化另开 PR。
+
 ### R3 · Application Use-case Layer
 
 目标：把“一个用户动作需要串联多个模块”的逻辑从 route/UI 中提取到应用层。
