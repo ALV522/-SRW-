@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-import base64, io, json, mimetypes, wave, threading, time, uuid
+import base64, json, mimetypes, threading, time, uuid
 from time import perf_counter
 from pathlib import Path
 from typing import Any
@@ -16,6 +16,8 @@ from srw.api.http_utils import body_dict as _body_dict, json_body as _json_body,
 from srw.api.routes.interviews import interview_routes
 from srw.api.routes.operations import operation_routes
 from srw.api.routes.system import system_routes
+from srw.api.routes.providers import provider_routes
+from srw.api.provider_support import api_key_name as _key_for, httpx_module as _httpx, profile_view as _profile_view, probe_provider as _probe
 from srw.api.shared import latest_draft as _latest_draft
 from srw.api.shared import publish_current_revision as _publish_current
 from srw.api.routes.offers import offer_routes
@@ -68,24 +70,6 @@ def _decode_file(body: dict[str,Any]) -> tuple[bytes,str,str]:
     return raw,filename,media
 
 
-def _profile_view(session, secrets) -> dict[str,Any]:
-    repo=RuntimeSettingsRepository(session); profiles={}
-    for name in ("text_ai","ocr","asr"):
-        p=repo.get_provider_profile(name)
-        profiles[name]={"name":name,"provider_type":p.provider_type,"model":p.model,"base_url":p.base_url,"reasoning_effort":p.reasoning_effort,
-                        "api_key_configured":secrets.configured(f"provider_{name}_api_key" if name!="text_ai" else "provider_api_key")}
-    return {"profiles":profiles,"secret_persistence":secrets.persistence}
-
-
-def _httpx():
-    try: import httpx
-    except ImportError as exc: raise ProviderNotReadyError("httpx provider pack is unavailable") from exc
-    return httpx
-
-
-def _key_for(name:str)->str: return "provider_api_key" if name=="text_ai" else f"provider_{name}_api_key"
-
-
 def _task_begin(task: TaskRecord) -> float:
     task.attempt_count = int(task.attempt_count or 0) + 1
     task.status = "running"
@@ -104,30 +88,6 @@ def _task_finish(task: TaskRecord, started: float, *, status: str, result: dict[
     task.error_code = error_code
     task.error_message = error_message
     task.result_json = json.dumps(result or {}, ensure_ascii=False, separators=(",", ":"))
-
-
-def _probe(session,secrets,name:str) -> dict[str,Any]:
-    repo=RuntimeSettingsRepository(session); p=repo.get_provider_profile(name); key=secrets.get(_key_for(name))
-    if not key: raise ProviderNotReadyError(f"{name} API key is not configured")
-    httpx=_httpx(); base=p.base_url.rstrip("/")
-    try:
-        with httpx.Client(timeout=30.0) as c:
-            if name=="asr":
-                b=io.BytesIO()
-                with wave.open(b,"wb") as w: w.setnchannels(1);w.setsampwidth(2);w.setframerate(8000);w.writeframes(b"\x00\x00"*800)
-                uri="data:audio/wav;base64,"+base64.b64encode(b.getvalue()).decode()
-                r=c.post(f"{base}/chat/completions",headers={"Authorization":f"Bearer {key}","Content-Type":"application/json"},json={"model":p.model,"messages":[{"role":"user","content":[{"type":"input_audio","input_audio":{"data":uri}}]}],"stream":False,"asr_options":{"enable_itn":False}})
-            elif name=="ocr":
-                # 1x1 valid PNG: endpoint reachability/model authentication probe. Real OCR is tested with user material.
-                png=base64.b64decode("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=")
-                uri="data:image/png;base64,"+base64.b64encode(png).decode()
-                r=c.post(f"{base}/chat/completions",headers={"Authorization":f"Bearer {key}"},json={"model":p.model,"messages":[{"role":"user","content":[{"type":"text","text":"Respond with OK."},{"type":"image_url","image_url":{"url":uri}}]}],"max_tokens":8})
-            else:
-                r=c.post(f"{base}/chat/completions",headers={"Authorization":f"Bearer {key}"},json={"model":p.model,"messages":[{"role":"user","content":"Reply exactly OK"}],"max_tokens":8})
-            r.raise_for_status()
-        return {"ok":True,"profile":name,"model":p.model}
-    except Exception as exc:
-        raise ProviderFailureError(f"{name} capability probe failed: {exc}") from exc
 
 
 def _ocr_bytes(session,secrets,raw:bytes,media_type:str) -> str:
@@ -453,21 +413,6 @@ def install_full_workbench_routes(app, factory, registry, secrets, *, data_dir: 
                     "total":len(workbench.items),
                 },
             })
-
-    async def provider_settings(_r):
-        with factory() as s: return JSONResponse(_profile_view(s,secrets))
-    async def provider_update(r):
-        name=r.path_params["name"]
-        if name not in {"text_ai","ocr","asr"}: raise HTTPException(404)
-        b=await _json_body(r)
-        with v1_session_scope(factory) as s:
-            current=RuntimeSettingsRepository(s).get_provider_profile(name)
-            RuntimeSettingsRepository(s).update_provider_profile(name,provider_type=_s(b,"provider_type",current.provider_type),model=_s(b,"model",current.model),base_url=_s(b,"base_url",current.base_url),reasoning_effort=_s(b,"reasoning_effort",current.reasoning_effort))
-            if "api_key" in b: secrets.set(_key_for(name),_s(b,"api_key"))
-            return JSONResponse(_profile_view(s,secrets))
-    async def provider_probe(r):
-        name=r.path_params["name"]
-        with factory() as s: return JSONResponse(_probe(s,secrets,name))
 
     def _evidence_result(result) -> dict[str, Any]:
         return {
@@ -1312,7 +1257,7 @@ def install_full_workbench_routes(app, factory, registry, secrets, *, data_dir: 
 
     routes=[
       Route('/api/v1/dashboard',dashboard, methods=['GET']),
-      Route('/api/v1/settings/providers',provider_settings, methods=['GET']),Route('/api/v1/settings/providers/{name:str}',provider_update, methods=['PATCH']),Route('/api/v1/settings/providers/{name:str}/test',provider_probe, methods=['POST']),
+      *provider_routes(factory=factory, secrets=secrets),
       Route('/api/v1/projects/{project_id:str}/candidates',list_candidates, methods=['GET']),Route('/api/v1/projects/{project_id:str}/candidates',add_candidate, methods=['POST']),
       Route('/api/v1/candidates/{candidate_id:str}/summary',candidate_summary, methods=['GET']),Route('/api/v1/projects/{project_id:str}/candidate-search',candidate_search, methods=['GET']),Route('/api/v1/projects/{project_id:str}/cockpit',cockpit, methods=['GET']),
       Route('/api/v1/projects/{project_id:str}/status',project_status, methods=['POST']),Route('/api/v1/projects/{project_id:str}/pipeline',project_pipeline, methods=['GET']),

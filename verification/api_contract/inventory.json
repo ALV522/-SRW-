@@ -1275,7 +1275,7 @@
     {
       "method": "GET",
       "path": "/api/v1/settings/providers",
-      "owner": "srw.api.fullworkbench",
+      "owner": "srw.api.routes.providers",
       "domain": "providers",
       "mutation": false,
       "signals": null
@@ -1283,7 +1283,7 @@
     {
       "method": "PATCH",
       "path": "/api/v1/settings/providers/{name:str}",
-      "owner": "srw.api.fullworkbench",
+      "owner": "srw.api.routes.providers",
       "domain": "providers",
       "mutation": true,
       "signals": {
@@ -1296,7 +1296,7 @@
     {
       "method": "POST",
       "path": "/api/v1/settings/providers/{name:str}/test",
-      "owner": "srw.api.fullworkbench",
+      "owner": "srw.api.routes.providers",
       "domain": "providers",
       "mutation": true,
       "signals": {

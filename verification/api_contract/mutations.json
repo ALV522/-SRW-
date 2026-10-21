@@ -1,9 +1,9 @@
 {
   "schema": "srw.api-mutation-classification.v1",
-  "status": "R1 ratchet plus R2 classification for offers, interviews, operational and system data-safety routes.",
+  "status": "R1 ratchet plus R2 classification for offers, interviews, operational, system and provider routes.",
   "frozen_at": "main e385adfb868baf5173f98d6119f253dd9d072b41",
   "rule": "live_mutations - classified MUST NOT exceed baseline_unclassified. Adding a mutation route therefore fails the contract test until it is classified or this baseline is raised in review.",
-  "baseline_unclassified": 58,
+  "baseline_unclassified": 56,
   "classified": [
     {
       "method": "POST",
@@ -214,6 +214,34 @@
       "human_actor": "implicit",
       "invariants": "cancelling with no pending restore is a reported no-op",
       "side_effects": "removes data/pending_restore.json if present"
+    },
+    {
+      "domain": "providers",
+      "owner": "srw.api.routes.providers",
+      "method": "PATCH",
+      "path": "/api/v1/settings/providers/{name:str}",
+      "use_case": "UpdateProviderProfile",
+      "request": "provider_type, model, base_url, reasoning_effort, api_key",
+      "response": "profiles map with api_key_configured booleans; never the key",
+      "concurrency": "none - no If-Match",
+      "audit": "none written by this route",
+      "human_actor": "implicit - local operator only",
+      "invariants": "provider name must be text_ai/ocr/asr (404); string fields must be strings (409)",
+      "side_effects": "updates the provider profile row and, when api_key is present, writes the key to SecretStore only"
+    },
+    {
+      "domain": "providers",
+      "owner": "srw.api.routes.providers",
+      "method": "POST",
+      "path": "/api/v1/settings/providers/{name:str}/test",
+      "use_case": "ProbeProviderCapability",
+      "request": "path name only",
+      "response": "ok, profile, model",
+      "concurrency": "none; outbound call with a 30s timeout",
+      "audit": "none",
+      "human_actor": "implicit",
+      "invariants": "a missing key is provider_not_ready (409); upstream failure is provider_failure (502) and must not echo the key",
+      "side_effects": "one outbound provider request from the local Core; no database write"
     }
   ]
 }
