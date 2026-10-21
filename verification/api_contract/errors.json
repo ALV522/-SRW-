@@ -1,0 +1,46 @@
+{
+  "schema": "srw.api-error-contract.v1",
+  "intent": "Freeze the observed error shape so a route move cannot silently change it, and so an intentional improvement (e.g. giving 404 a JSON envelope) must update this file in review.",
+  "standard_envelope": {
+    "detail": "human readable string",
+    "error": {
+      "code": "machine readable snake_case code"
+    }
+  },
+  "known_gap": "FastAPI/Starlette default 404 and 405 responses are plain text and do not use the envelope. Recorded here instead of hidden; fixing it is an explicit contract change.",
+  "cases": [
+    {
+      "case": "validation_failure",
+      "method": "POST",
+      "path": "/api/v1/projects",
+      "body": {},
+      "status": 422,
+      "form": "envelope",
+      "note": "missing required field must stay a structured, code-bearing error"
+    },
+    {
+      "case": "unknown_resource_id",
+      "method": "GET",
+      "path": "/api/v1/projects/does-not-exist",
+      "status": 404,
+      "form": "plain_text",
+      "note": "known gap: path-level 404 is not enveloped"
+    },
+    {
+      "case": "unknown_route",
+      "method": "GET",
+      "path": "/api/v1/does-not-exist",
+      "status": 404,
+      "form": "plain_text",
+      "note": "known gap: router-level 404 is not enveloped"
+    },
+    {
+      "case": "method_not_allowed",
+      "method": "DELETE",
+      "path": "/api/v1/projects",
+      "status": 405,
+      "form": "plain_text",
+      "note": "known gap: 405 is not enveloped"
+    }
+  ]
+}
