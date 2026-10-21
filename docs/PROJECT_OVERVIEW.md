@@ -16,7 +16,7 @@ C11 的目标不是重写为新 UI、全新业务内核、微服务或者 SaaS�
 
 ## 3. 已知事实（不外推）
 
-- 当前开发主线 main 以 VERSION=1.0.0-alpha10-convergence11 / Schema=v1_0014 标识；更精确的源码身份是 Git SHA。实施新版本政策见 VERSION_POLICY.md。
+- 当前开发主线以 VERSION=1.0.0-alpha.11（工程里程碑 C11）/ Schema=v1_0014 标识；2026-10-21 已按版本政策完成 SemVer 迁移（本地执行，远端 CI NOT RUN）；更精确的源码身份是 Git SHA。实施新版本政策见 VERSION_POLICY.md。
 - 2026-10-19 文档曾在 c9d70cd 提交上记录 Ubuntu/Windows 各146项源码回归、5条 Chromium 业务场景；后又增加关于 Evidence Decision 和标准重新发布的 E2E-06/07，是否通过以各自精确提交 CI 为准。不可累计不同提交的数字。
 - d8d032d 的 Windows WPF/WebView2 Native 候选在用户机器上实际通过启动、项目创建、标准草案修改和干净退出；**不**意味着最新 main 的所有业务或新版完整 Native 已在实机通过。
 - main 包含新版 Native upgrade kit 的脚本和来源核验流程；相关构建是否在当前 HEAD 成功且实机通过，需要独立验收。

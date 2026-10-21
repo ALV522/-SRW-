@@ -28,7 +28,7 @@ class NativeSourceKitTests(unittest.TestCase):
         self.host=self.base/"host"
         self.host.mkdir()
         files={
-            "VERSION":b"1.0.0-alpha10-convergence11\n",
+            "VERSION":b"1.0.0-alpha.11\n",
             "README.md":b"Fake test project, no user data\n",
             "requirements-ci.txt":b"sqlalchemy==2.0.43\n",
             "SOURCE_RECOVERY_MANIFEST.sha256":b"",

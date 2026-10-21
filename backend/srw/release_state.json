@@ -1,10 +1,10 @@
 {
   "schema": "srw.v1.release-state.v1",
-  "version": "1.0.0-alpha10-convergence11",
+  "version": "1.0.0-alpha.11",
   "schema_revision": "v1_0014",
   "artifact_profile": "business_convergence_11_source",
   "parent": {
-    "version": "1.0.0-alpha10-convergence10",
-    "source_commit": "e31dca1df57e9e835f8bee925f1aff33c1bc799b"
+    "version": "1.0.0-alpha10-convergence11",
+    "source_commit": "45abc4cae766cbc1b52cb40bfe3c762e6e151a57"
   }
 }

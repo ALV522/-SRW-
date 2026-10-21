@@ -125,3 +125,7 @@ A real SQLite and HTTP regression found historical HumanDecision entries falsely
 **前端六代基建合并与 app.js 按域拆分：BLOCKED**——本机无 Playwright/Chromium，无行为等价兜底手段，按既定规则不硬改；前置条件为可用的真实浏览器验收环境（CI 的 Chromium 门禁可在负责人授权同步后承担）。
 
 本轮为本地执行（分支 `dev/43-http-decomposition-slice1-providers`，6 个提交），未 push、未建 PR、未合入；GitHub CI = NOT RUN。本地实测：全量 290 项 = 288 PASS / 3 skipped（平台门禁）/ 2 FAIL（`test_rejects_symlink_database`、`test_rejects_malicious_host_symlink`，本机 symlink 权限既有失败，未改动 main 的干净 worktree 复现）；治理三查（source integrity 340 项 / release truth / governance contract）PASS。
+
+## 2026-10-21: #44 SemVer 原子迁移 1.0.0-alpha10-convergence11 → 1.0.0-alpha.11（本地执行）
+
+按 VERSION_POLICY.md 第 4 节程序完成版本迁移（Issue #44 本地部分）：单一原子提交更新八处权威身份——VERSION、BUILD_INFO.json（version/release_id，source_revision 改为代码基线完整 SHA `4dc0c9f4491b892a1eaed8a8f5db8315ac156a56`，新增 engineering_milestone=C11 保留工程代号）、backend/srw/release_state.json（version，parent 记录 `1.0.0-alpha10-convergence11@45abc4c` 血缘）、PORTABLE_MANIFEST.json、VERIFICATION_TRUTH.json、VERIFICATION_INVENTORY.json、WINDOWS_NATIVE_HOST_STATUS.json、VERSION_POLICY.json（current_runtime_version/current_version_format=semver/next_product_version=1.0.0-alpha.12 proposed-not-effective/intended_channel/last_transition）。同步更新三处镜像当前身份的测试夹具与五处当前状态文档；历史证据（verification/、docs/history/、CONVERGENCE_DELIVERY.md 交付日志）与历史 alpha10 工件引用一律未改。Schema 保持 v1_0014 独立；发行通道仍为 development，未 tag、未发布。本地实测：check_release_truth PASS、check_governance_contract PASS、全量回归维持基线；GitHub CI = NOT RUN（负责人授权仅本地执行）。RC/GA 门槛与双载体工件验收不变，见 VERSION_POLICY.md 迁移执行记录表。

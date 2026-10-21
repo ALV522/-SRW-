@@ -31,7 +31,7 @@ class SourceRebuildVerifierTests(unittest.TestCase):
         self.root = Path(self.temp.name) / "candidate"
         self.root.mkdir()
         source = {
-            "VERSION": b"1.0.0-alpha10-convergence11\n",
+            "VERSION": b"1.0.0-alpha.11\n",
             "requirements-ci.txt": b"sqlalchemy==2.0.43\n",
             "README.md": b"Synthetic source only\n",
         }
@@ -89,7 +89,7 @@ class SourceRebuildVerifierTests(unittest.TestCase):
             "host_executable_sha256": self.host_sha,
             "source_manifest_sha256": digest((self.root / "SOURCE_MANIFEST.sha256").read_bytes()),
             "runtime_manifest_sha256": digest((self.root / "PRODUCTION_RUNTIME.sha256").read_bytes()),
-            "target_version": "1.0.0-alpha10-convergence11",
+            "target_version": "1.0.0-alpha.11",
             "c11_pinned_dependency_metadata": "MATCH",
             "independent_legacy_origin_provenance_verified": False,
             "windows_gui_accepted": False,

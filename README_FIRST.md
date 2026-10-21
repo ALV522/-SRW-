@@ -1,6 +1,6 @@
 # SRW · 从这里开始
 
-当前唯一产品整合研发主线：[main](https://github.com/ALV522/-SRW-/tree/main)；C11 源码版本 `1.0.0-alpha10-convergence11`，Schema `v1_0014`。
+当前唯一产品整合研发主线：[main](https://github.com/ALV522/-SRW-/tree/main)；源码产品版本 `1.0.0-alpha.11`（工程里程碑 C11），Schema `v1_0014`。
 
 SRW 是本地优先、证据驱动的智能招聘工作台。AI/OCR/ASR 用于可追溯的辅助处理，**不自动作出录用决定**；历史 v0.8.x 是业务功能完整性对标对象。
 

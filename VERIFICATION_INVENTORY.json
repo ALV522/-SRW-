@@ -1,6 +1,6 @@
 {
   "schema": "srw.verification-inventory.v1",
-  "release": "1.0.0-alpha10-convergence11",
+  "release": "1.0.0-alpha.11",
   "schema_revision": "v1_0014",
   "reference": {
     "release": "v0.8.12-R2",

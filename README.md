@@ -7,7 +7,7 @@
 
 **本地优先、证据驱动的招聘业务工作台。** SRW 覆盖建岗、招聘标准、候选人收件、材料与 Claim 证据、人工核实、面试/Scorecard、Decision、Offer、联系运营、Knowledge、AI/OCR/ASR 辅助。AI 建议不等于人工录用决定；缺失证据不按零分处理；材料或招聘标准变化后，旧决策上下文不能自动复用。
 
-> **项目状态（2026-10-19）**：当前唯一整合研发主线是 `main`，C11 版本 `1.0.0-alpha10-convergence11`、Schema `v1_0014`。此前 **`d8d032d` 的 Windows Native 候选包**在真实 Windows 上通过 WPF/WebView2 基础启动、后端就绪、项目创建、招聘标准草案修改和退出验证。这是**特定旧工件的基础 GUI 验收**，不是最新 `main` 已发布正式 Portable/RC/GA。
+> **项目状态（2026-10-19）**：当前唯一整合研发主线是 `main`，产品版本 `1.0.0-alpha.11`（工程里程碑 C11）、Schema `v1_0014`（2026-10-21 按版本政策完成 SemVer 迁移，本地执行）。此前 **`d8d032d` 的 Windows Native 候选包**在真实 Windows 上通过 WPF/WebView2 基础启动、后端就绪、项目创建、招聘标准草案修改和退出验证。这是**特定旧工件的基础 GUI 验收**，不是最新 `main` 已发布正式 Portable/RC/GA。
 
 ## 目前已经验证了什么
 

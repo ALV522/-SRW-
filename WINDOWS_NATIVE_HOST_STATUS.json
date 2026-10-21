@@ -1,6 +1,6 @@
 {
   "schema": "srw.windows-native-host-status.v1",
-  "release": "1.0.0-alpha10-convergence11",
+  "release": "1.0.0-alpha.11",
   "host_source": "desktop/SRW.Desktop inherited from v0.8.12-R2",
   "host_binary_in_web_portable": false,
   "runtime_abi": {

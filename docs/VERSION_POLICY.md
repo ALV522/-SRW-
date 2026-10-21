@@ -30,7 +30,20 @@ Convergence11/C11 是工程历史**里程碑代号**；G1 是治理制度版本�
 
 ## 4. 当前迁移边界
 
-目前 VERSION、BUILD_INFO.json、backend/srw/release_state.json、PORTABLE_MANIFEST.json、VERIFICATION_TRUTH.json、VERIFICATION_INVENTORY.json、WINDOWS_NATIVE_HOST_STATUS.json 等多处必须严格相等。仓库当前运行版本 **1.0.0-alpha10-convergence11** 仍是旧格式、仅属于 source-development 状态。本轮 G1 落地时不能只改 VERSION，否则 source release truth 会失败；更不能发布 1.0.0-alpha.11 而未验证程序。
+目前 VERSION、BUILD_INFO.json、backend/srw/release_state.json、PORTABLE_MANIFEST.json、VERIFICATION_TRUTH.json、VERIFICATION_INVENTORY.json、WINDOWS_NATIVE_HOST_STATUS.json 等多处必须严格相等。**版本迁移已于 2026-10-21 执行**（本地任务分支，负责人授权仅本地执行，未同步 GitHub）：运行产品版本由旧格式 `1.0.0-alpha10-convergence11` 迁至 SemVer **`1.0.0-alpha.11`**，仍属 source-development 通道；`BUILD_INFO.source_revision` 记录代码基线完整 Git SHA，工程里程碑代号 C11 保留于 `artifact_profile`/`engineering_milestone`，不进入产品版号；历史 alpha10 工件引用与证据快照（verification/、docs/history/、历史交付日志）一律不改。执行记录见下文；`check_release_truth` 与 `check_governance_contract` 对八处身份与政策字段强制一致。
+
+### 迁移执行记录（2026-10-21）
+
+| 项 | 值 |
+|---|---|
+| 迁移前身份 | `1.0.0-alpha10-convergence11`（legacy-pre-migration） |
+| 迁移后身份 | `1.0.0-alpha.11`（SemVer，source-development） |
+| 前一主线 SHA | `45abc4cae766cbc1b52cb40bfe3c762e6e151a57` |
+| 代码基线 SHA（BUILD_INFO.source_revision） | `4dc0c9f4491b892a1eaed8a8f5db8315ac156a56` |
+| Schema | `v1_0014`（独立，未随版本迁移变动） |
+| 执行方式 | 本地任务分支单一原子提交；未 push、未建 PR、未 tag |
+| CI 状态 | GitHub CI = NOT RUN（负责人指令）；本地 check_release_truth / check_governance_contract / 全量源回归实跑通过 |
+| 后续门槛 | alpha.12→beta.1→rc.1→1.0.0 各自门禁见上表；RC/GA 仍需负责人批准 |
 
 根目录 VERSION_POLICY.json 明确 current_runtime_version（旧格式）、next_product_version（新 SemVer 规划值）、schema_revision 和 release state。scripts/check_governance_contract.py 检查其与真实元数据的一致性。待下一次实际版本迁移 PR：
 1. 冻结准确开发 SHA 和业务能力基线，创建变更 Issue；
