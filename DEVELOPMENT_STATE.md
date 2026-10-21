@@ -135,3 +135,9 @@ A real SQLite and HTTP regression found historical HumanDecision entries falsely
 本地搭建隔离 Playwright/Chromium 环境（D:/srw-tools venv，CI 固定 1.56.0），首次在本机真实跑通浏览器验收：既有 9 场景全 PASS。新增 4 场景并全部本地实跑通过：test_10 知识建议经 UI 应用到标准草案（含 knowledge_source 溯源与 decision_critical 传递，为此扩充合成知识夹具的 alias_fts/competency_fts 检索表）；test_11 项目交接完整 JSON 下载内容核验；test_12 候选人 CSV 导出的公式注入防护（`=HYPERLINK` 合成名前导撇号）；test_13 内联页面处理器浏览器解析回归。
 
 test_13 实证并深修了一类真实缺陷：app.js 四个页面入口函数（settingsPage/renderPage/tasksPage/projectWorkspace）此前未挂 window（ES module 作用域对内联 onclick 不可达）；仅挂函数仍不够——候选人下拉 onchange 与漏斗筛选 onclick 还直接引用模块作用域 `state`，本次新增 `selectFlowCandidate`/`filterCandidatesByStage` 两个拥有状态变更的 window 包装并重写两处 handler。`scripts/check_frontend_contract.py` 同步升级为可检出“内联处理器引用模块作用域绑定”（剥离模板表达式与字符串字面量后比对顶层绑定），`test_frontend_contract.py` 增至 5 项。全套 13/13 浏览器场景本地 PASS；全量源回归 291 项维持基线（288 PASS / 3 skipped / 2 既有 symlink 环境 FAIL）。Schema v1_0014、VERSION 1.0.0-alpha.11 未变；本地执行未同步 GitHub。
+
+## 2026-10-21：业务↔代码映射 + #43 Supervisor 设计稿（本地执行）
+
+产出 `docs/development/BUSINESS_CODE_MAP.md`：12 个业务域逐一映射 modules/surfaces/api 落点、测试与载体覆盖；登记 6 个臃肿靶点（fullworkbench 余量 1485 行、两个 fullworkbench.py 同名、capability_recovery* 名不副实、前端六代重复、app.js 126KB）与 5 个覆盖缺口（身份合并/备份恢复/招聘智能 UI E2E、OCR/ASR 真实链路、双端并发），并立 5 条防再臃肿维护规则（新能力落 modules/surfaces、路由基线 CI 强制、前端处理器守卫、新场景必须真实 Chromium、状态只用证据）。
+
+产出 `docs/decisions/ADR-0003-core-supervisor.md`（Proposed，待负责人批准）：S1 按需分离 Supervisor + 引用计数生命周期（载体永不持租约）；S2 Schema v1_0015 + If-Match 事务级 CAS（412 不产假审计）；S3 一次性会话附着 + CSRF/Origin + 撤销；S4 Job Engine 唯一所有权（复用现有 worker 租约与 idempotency_key）；S5 生命周期四原语；T1–T10 逐条落法；三相位实施与回滚。实现未启动——按负责人指令待 #41 E2E 补缺完成（已完成）后先设计，批准再动代码。
