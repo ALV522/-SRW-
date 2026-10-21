@@ -61,8 +61,8 @@
 | POST | `/api/v1/candidates/{candidate_id:str}/offers` | offers | `srw.api.routes.offers` | · | · | yes |
 | GET | `/api/v1/candidates/{candidate_id:str}/phone-script` | candidates | `srw.api.fullworkbench` | — | — | — |
 | GET | `/api/v1/candidates/{candidate_id:str}/pipeline` | candidates | `srw.api.fullworkbench` | — | — | — |
-| GET | `/api/v1/candidates/{candidate_id:str}/reevaluations` | decisions | `srw.api.fullworkbench` | — | — | — |
-| POST | `/api/v1/candidates/{candidate_id:str}/reevaluations` | decisions | `srw.api.fullworkbench` | yes | · | yes |
+| GET | `/api/v1/candidates/{candidate_id:str}/reevaluations` | decisions | `srw.api.routes.decisions` | — | — | — |
+| POST | `/api/v1/candidates/{candidate_id:str}/reevaluations` | decisions | `srw.api.routes.decisions` | yes | · | yes |
 | POST | `/api/v1/candidates/{candidate_id:str}/restore` | candidates | `srw.api.fullworkbench` | · | · | yes |
 | POST | `/api/v1/candidates/{candidate_id:str}/sources/text` | evidence | `srw.api.app` | yes | · | yes |
 | POST | `/api/v1/candidates/{candidate_id:str}/stage` | candidates | `srw.api.fullworkbench` | · | · | yes |
@@ -144,7 +144,7 @@
 | PATCH | `/api/v1/protocol-revisions/{revision_id:str}` | projects | `srw.api.app` | yes | · | yes |
 | POST | `/api/v1/protocol-revisions/{revision_id:str}/publish` | projects | `srw.api.app` | yes | · | yes |
 | GET | `/api/v1/ranked-shortlists/{publication_id:str}` | candidates | `srw.api.ranking` | — | — | — |
-| POST | `/api/v1/reevaluations/{draft_id:str}/apply` | decisions | `srw.api.fullworkbench` | yes | · | yes |
+| POST | `/api/v1/reevaluations/{draft_id:str}/apply` | decisions | `srw.api.routes.decisions` | yes | · | yes |
 | GET | `/api/v1/runtime/capabilities` | system | `srw.api.app` | — | — | — |
 | GET | `/api/v1/runtime/info` | system | `srw.api.app` | — | — | — |
 | GET | `/api/v1/runtime/live` | system | `srw.api.app` | — | — | — |

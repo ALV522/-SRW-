@@ -17,6 +17,7 @@ from srw.api.routes.interviews import interview_routes
 from srw.api.routes.operations import operation_routes
 from srw.api.routes.system import system_routes
 from srw.api.routes.providers import provider_routes
+from srw.api.routes.decisions import reevaluation_routes
 from srw.api.provider_support import api_key_name as _key_for, httpx_module as _httpx, profile_view as _profile_view, probe_provider as _probe
 from srw.api.shared import latest_draft as _latest_draft
 from srw.api.shared import publish_current_revision as _publish_current
@@ -36,7 +37,7 @@ from srw.modules.identity.models import CandidateIdentityReview
 from srw.modules.calibration.models import JudgmentReviewItem
 from srw.modules.decision.context import get_current_decision_context
 from srw.modules.decision.assessment import get_candidate_assessment
-from srw.modules.fullworkbench import BlobStore, KnowledgeService, RecruitmentEvent, ReevaluationDraft, EvaluationSnapshot, TaskRecord
+from srw.modules.fullworkbench import BlobStore, KnowledgeService, RecruitmentEvent, ReevaluationDraft, TaskRecord
 from srw.modules.protocol.models import Project, ProtocolRevision
 from srw.modules.protocol.repository import ProtocolRepository
 from srw.modules.recruiting.models import CandidateStageTransition, OfferRecord
@@ -868,77 +869,6 @@ def install_full_workbench_routes(app, factory, registry, secrets, *, data_dir: 
             saved=ProtocolRepository(s).get_payload(row.id)["criteria"][-1]
             return JSONResponse({"revision_id":row.id,"criterion":saved})
 
-    def _judgment_payload(row):
-        return {"criterion_key":row.criterion_key,"status":row.status,"evidence_level":row.evidence_level,"reason":row.reason,"gap":row.gap}
-
-    async def reevaluations(r):
-        cid=r.path_params["candidate_id"]
-        with factory() as s:
-            rows=s.scalars(select(ReevaluationDraft).where(ReevaluationDraft.candidate_id==cid).order_by(ReevaluationDraft.created_at.desc())).all()
-            return JSONResponse({"drafts":[{"draft_id":x.id,"state":x.state,"summary":x.summary,"proposal":json.loads(x.proposal_json),"diff":json.loads(x.diff_json or "[]"),"decision_context_hash":x.decision_context_hash,"created_at":x.created_at.isoformat(),"applied_at":x.applied_at.isoformat() if x.applied_at else None} for x in rows]})
-
-    async def reevaluation_create(r):
-        from srw.modules.decision.context import get_current_decision_context
-        cid=r.path_params["candidate_id"];b=await _json_body(r)
-        proposal=b.get("proposal") if isinstance(b.get("proposal"),dict) else {}
-        proposed=proposal.get("judgments") or []
-        if not isinstance(proposed,list): raise V1InvariantError("proposal.judgments must be an array")
-        with v1_session_scope(factory) as s:
-            cand=s.get(Candidate,cid)
-            if not cand: raise V1NotFoundError(f"candidate not found: {cid}")
-            ctx=get_current_decision_context(s,cid,evaluation_policy_revision=evaluation_policy_revision)
-            current={x.criterion_key:x for x in s.scalars(select(CriterionJudgment).where(CriterionJudgment.candidate_id==cid,CriterionJudgment.decision_context_hash==ctx.hash)).all()}
-            protocol=ProtocolRepository(s).get_payload(ctx.protocol_revision_id); known={str(x.get("criterion_key") or "") for x in protocol.get("criteria",[]) if isinstance(x,dict)}
-            # A new MaterialRevision intentionally changes the decision context. Reevaluation must still
-            # compare against the latest prior human judgment for the same stable criterion key, rather
-            # than pretending the prior assessment never existed. Current-context judgments win.
-            baseline=dict(current)
-            previous=s.scalars(select(CriterionJudgment).where(CriterionJudgment.candidate_id==cid,CriterionJudgment.criterion_key.in_(known)).order_by(CriterionJudgment.updated_at.desc(),CriterionJudgment.id.desc())).all() if known else []
-            for row in previous: baseline.setdefault(row.criterion_key,row)
-            diff=[]
-            for item in proposed:
-                if not isinstance(item,dict): raise V1InvariantError("reevaluation judgment must be an object")
-                key=str(item.get("criterion_key") or "").strip()
-                if not key or key not in known: raise V1InvariantError(f"unknown criterion_key: {key}")
-                before=baseline.get(key)
-                before_view=_judgment_payload(before) if before else {"criterion_key":key,"status":"missing","evidence_level":"none","reason":"","gap":""}
-                after={"criterion_key":key,"status":str(item.get("status") or "missing"),"evidence_level":str(item.get("evidence_level") or "none"),"reason":str(item.get("reason") or ""),"gap":str(item.get("gap") or ""),"claim_ids":[str(x) for x in (item.get("claim_ids") or [])]}
-                if after["status"] not in {"met","partial","missing","conflict","not_met"}: raise V1InvariantError("invalid reevaluation status")
-                if after["evidence_level"] not in {"strong","medium","weak","none"}: raise V1InvariantError("invalid reevaluation evidence_level")
-                if any(before_view.get(k)!=after.get(k) for k in ("status","evidence_level","reason","gap")):
-                    diff.append({"criterion_key":key,"before":before_view,"after":after})
-            x=ReevaluationDraft(candidate_id=cid,summary=_s(b,"summary"),proposal_json=json.dumps(proposal,ensure_ascii=False),protocol_revision_id=ctx.protocol_revision_id,material_revision_id=ctx.material_revision_id,decision_context_hash=ctx.hash,diff_json=json.dumps(diff,ensure_ascii=False,separators=(",",":")))
-            s.add(x);s.flush()
-            append_audit_event(s,event_type="REEVALUATION_DRAFT_CREATED",entity_type="reevaluation",entity_id=x.id,actor=_s(b,"actor",default="human"),payload={"diff_count":len(diff),"context_hash":ctx.hash},project_id=ctx.project_id,candidate_id=cid)
-            return JSONResponse({"draft_id":x.id,"state":x.state,"diff":diff,"decision_context_hash":ctx.hash})
-
-    async def reevaluation_apply(r):
-        from srw.modules.decision.context import get_current_decision_context
-        from srw.modules.decision.commands import record_assessment
-        did=r.path_params["draft_id"]
-        with v1_session_scope(factory) as s:
-            x=s.get(ReevaluationDraft,did)
-            if not x: raise V1NotFoundError(f"draft not found: {did}")
-            diff=json.loads(x.diff_json or "[]")
-            if x.state=="applied": return JSONResponse({"draft_id":x.id,"state":"applied","applied_changes":len(diff),"idempotent":True})
-            if x.state=="stale": return JSONResponse({"draft_id":x.id,"state":"stale","detail":"reevaluation context is stale"},status_code=409)
-            if x.state!="draft": raise V1InvariantError("draft is not applicable")
-            ctx=get_current_decision_context(s,x.candidate_id,evaluation_policy_revision=evaluation_policy_revision)
-            if ctx.hash!=x.decision_context_hash:
-                x.state="stale"
-                return JSONResponse({"draft_id":x.id,"state":"stale","detail":"material or protocol changed; recalculate reevaluation"},status_code=409)
-            before_rows=s.scalars(select(CriterionJudgment).where(CriterionJudgment.candidate_id==x.candidate_id,CriterionJudgment.decision_context_hash==ctx.hash)).all()
-            before_payload=[_judgment_payload(row) for row in before_rows]
-            s.add(EvaluationSnapshot(candidate_id=x.candidate_id,project_id=ctx.project_id,decision_context_hash=ctx.hash,reevaluation_id=x.id,snapshot_kind="pre_reevaluation",payload_json=json.dumps({"judgments":before_payload},ensure_ascii=False,separators=(",",":"))))
-            for change in diff:
-                after=change.get("after") or {}
-                record_assessment(s,x.candidate_id,str(change.get("criterion_key") or ""),status=str(after.get("status") or "missing"),evidence_level=str(after.get("evidence_level") or "none"),reason=str(after.get("reason") or ""),gap=str(after.get("gap") or ""),claim_ids=[str(v) for v in (after.get("claim_ids") or [])],actor="human:reevaluation",evaluation_policy_revision=evaluation_policy_revision)
-            after_rows=s.scalars(select(CriterionJudgment).where(CriterionJudgment.candidate_id==x.candidate_id,CriterionJudgment.decision_context_hash==ctx.hash)).all()
-            s.add(EvaluationSnapshot(candidate_id=x.candidate_id,project_id=ctx.project_id,decision_context_hash=ctx.hash,reevaluation_id=x.id,snapshot_kind="post_reevaluation",payload_json=json.dumps({"judgments":[_judgment_payload(row) for row in after_rows]},ensure_ascii=False,separators=(",",":"))))
-            x.state="applied";x.applied_at=utc_now()
-            append_audit_event(s,event_type="REEVALUATION_APPLIED",entity_type="reevaluation",entity_id=x.id,actor="human",payload={"diff_count":len(diff),"context_hash":ctx.hash},project_id=ctx.project_id,candidate_id=x.candidate_id)
-            return JSONResponse({"draft_id":x.id,"state":x.state,"applied_changes":len(diff),"human_decision_unchanged":True})
-
     async def project_status(r):
         pid=r.path_params["project_id"];b=await _json_body(r)
         with v1_session_scope(factory) as s:
@@ -1275,7 +1205,7 @@ def install_full_workbench_routes(app, factory, registry, secrets, *, data_dir: 
       Route('/api/v1/knowledge/status',knowledge_status, methods=['GET']),Route('/api/v1/knowledge/search',knowledge_search, methods=['GET']),Route('/api/v1/projects/{project_id:str}/knowledge/apply',knowledge_apply, methods=['POST']),
       *interview_routes(factory=factory),
       
-      Route('/api/v1/candidates/{candidate_id:str}/reevaluations',reevaluations, methods=['GET']),Route('/api/v1/candidates/{candidate_id:str}/reevaluations',reevaluation_create, methods=['POST']),Route('/api/v1/reevaluations/{draft_id:str}/apply',reevaluation_apply, methods=['POST']),
+      *reevaluation_routes(factory=factory, evaluation_policy_revision=evaluation_policy_revision),
       Route('/api/v1/candidates/compare',compare_candidates, methods=['GET']),
       Route('/api/v1/projects/{project_id:str}/audit',project_audit, methods=['GET']),Route('/api/v1/projects/{project_id:str}/candidates.csv',candidates_csv, methods=['GET']),
       Route('/api/v1/projects/{project_id:str}/job-setup',job_setup,methods=['PATCH']),Route('/api/v1/projects/{project_id:str}/job-setup/suggest',job_setup_suggest,methods=['POST']),

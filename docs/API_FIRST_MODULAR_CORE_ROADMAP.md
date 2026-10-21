@@ -181,6 +181,12 @@ backend/srw/api/
 
 `fullworkbench.py` 1346 → **1311 行**；累计从 1723 降至 1311（−412，−23.9%）。写操作归类 17/73，棘轮 58 → 56。搬移中发现并修正一处自我引入的偏差：清理 `_probe` 时因位置在 `_task_begin` 之后而漏删，导致模块级定义遮蔽同名导入别名——已删除并验证 `_probe.__module__` 指向新模块。
 
+**R2 进度（2026-10-22，第六刀）**：`decisions` 域的重评估三件套（草稿列表 / 创建 / 应用）迁出到 `backend/srw/api/routes/decisions.py`，`_judgment_payload` 随域迁移。
+
+本轮先评估了 `knowledge` 的"跨模块归并"，结论是**不做**：那 15 条路由分布在 `capability_recovery*.py` 三个共 261 行、本身已按域组织的模块里，按分类桶硬拆会制造错误边界并复制共享助手。判断依据写入了 PR，避免以后有人重复评估。
+
+`fullworkbench.py` 1311 → **1217 行**；累计从 1723 降至 1217（−506，−29.4%）。写操作归类 19/73，棘轮 56 → 54。新增 `test_reevaluation_routes.py`（5 项），首次为重评估补上真实 HTTP happy path + stale 拒绝，此前只有 dashboard 计数间接覆盖。
+
 ### R3 · Application Use-case Layer
 
 目标：把“一个用户动作需要串联多个模块”的逻辑从 route/UI 中提取到应用层。
