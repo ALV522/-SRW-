@@ -18,6 +18,7 @@ from srw.api.routes.operations import operation_routes
 from srw.api.routes.system import system_routes
 from srw.api.routes.providers import provider_routes
 from srw.api.routes.decisions import reevaluation_routes
+from srw.api.routes.candidates import candidate_routes
 from srw.api.provider_support import api_key_name as _key_for, httpx_module as _httpx, profile_view as _profile_view, probe_provider as _probe
 from srw.api.shared import latest_draft as _latest_draft
 from srw.api.shared import publish_current_revision as _publish_current
@@ -444,55 +445,6 @@ def install_full_workbench_routes(app, factory, registry, secrets, *, data_dir: 
             job=_queue_task_job(s,task)
             return JSONResponse({"task_id":task.id,"job_id":job.id,"task_status":"queued"})
 
-    async def list_candidates(r):
-        pid=r.path_params["project_id"]
-        q=(r.query_params.get("q") or "").strip()[:200]
-        archived=(r.query_params.get("archived") or "all").strip().lower()
-        material=(r.query_params.get("material") or "all").strip().lower()
-        stage=(r.query_params.get("stage") or "all").strip().lower()
-        if archived not in {"all","active","archived"}: raise V1InvariantError("archived must be all, active, or archived")
-        if material not in {"all","with","without"}: raise V1InvariantError("material must be all, with, or without")
-        if stage != "all" and stage not in PIPELINE_STAGES: raise V1InvariantError("unsupported pipeline stage")
-        try:
-            limit=min(200,max(1,int(r.query_params.get("limit","100"))))
-            offset=max(0,int(r.query_params.get("offset","0")))
-        except ValueError as exc:
-            raise V1InvariantError("limit and offset must be integers") from exc
-        filters=[Candidate.project_id==pid]
-        if q: filters.append(func.lower(Candidate.display_name).like(f"%{q.lower()}%"))
-        if archived=="active": filters.append(Candidate.archived.is_(False))
-        elif archived=="archived": filters.append(Candidate.archived.is_(True))
-        if material=="with": filters.append(Candidate.current_material_revision_id.is_not(None))
-        elif material=="without": filters.append(Candidate.current_material_revision_id.is_(None))
-        if stage!="all": filters.append(Candidate.pipeline_stage==stage)
-        with factory() as s:
-            total=s.scalar(select(func.count(Candidate.id)).where(*filters)) or 0
-            rows=s.scalars(select(Candidate).where(*filters).order_by(Candidate.archived,Candidate.created_at.desc(),Candidate.id).limit(limit).offset(offset)).all()
-            return JSONResponse({"candidates":[{"candidate_id":x.id,"display_name":x.display_name,"archived":x.archived,"merged_into_candidate_id":x.merged_into_candidate_id,"pipeline_stage":x.pipeline_stage or "new","has_material":bool(x.current_material_revision_id),"created_at":x.created_at.isoformat()} for x in rows],"total":total,"limit":limit,"offset":offset})
-    async def candidate_summary(r):
-        cid=r.path_params["candidate_id"]
-        with factory() as s:
-            cand=s.get(Candidate,cid)
-            if not cand: raise V1NotFoundError(f"candidate not found: {cid}")
-            contact=s.scalar(select(CandidateContact).where(CandidateContact.candidate_id==cid))
-            offer=s.scalar(select(OfferRecord).where(OfferRecord.candidate_id==cid).order_by(OfferRecord.created_at.desc()).limit(1))
-            return JSONResponse({
-                "candidate_id":cand.id,"project_id":cand.project_id,"display_name":cand.display_name,"pipeline_stage":cand.pipeline_stage or "new",
-                "archived":bool(cand.archived),"merged_into_candidate_id":cand.merged_into_candidate_id,"has_material":bool(cand.current_material_revision_id),
-                "contact":{"phone":contact.phone if contact else "","email":contact.email if contact else "","user_confirmed":bool(contact.user_confirmed) if contact else False},
-                "offer_status":offer.status if offer else "",
-            })
-
-    async def candidate_search(r):
-        pid=r.path_params["project_id"];q=(r.query_params.get("q") or "").strip()[:200]
-        try: limit=min(50,max(1,int(r.query_params.get("limit","20"))))
-        except ValueError as exc: raise V1InvariantError("limit must be an integer") from exc
-        filters=[Candidate.project_id==pid,Candidate.archived.is_(False)]
-        if q: filters.append(func.lower(Candidate.display_name).like(f"%{q.lower()}%"))
-        with factory() as s:
-            rows=s.scalars(select(Candidate).where(*filters).order_by(Candidate.display_name,Candidate.id).limit(limit)).all()
-            return JSONResponse({"candidates":[{"candidate_id":x.id,"display_name":x.display_name,"pipeline_stage":x.pipeline_stage or "new","has_material":bool(x.current_material_revision_id)} for x in rows]})
-
     async def cockpit(r):
         pid=r.path_params["project_id"]
         try: limit=min(100,max(1,int(r.query_params.get("limit","25"))));offset=max(0,int(r.query_params.get("offset","0")))
@@ -511,25 +463,6 @@ def install_full_workbench_routes(app, factory, registry, secrets, *, data_dir: 
                     except Exception: assessment=None
                 output.append({"candidate_id":c.id,"display_name":c.display_name,"pipeline_stage":c.pipeline_stage or "new","has_material":bool(c.current_material_revision_id),"confirmed_claims":int(a or 0),"unreviewed_claims":int(b or 0),"judgments":int(j or 0),"assessment":assessment})
             return JSONResponse({"candidates":output,"total":int(total),"limit":limit,"offset":offset})
-
-    async def add_candidate(r):
-        pid=r.path_params["project_id"]; b=await _json_body(r)
-        with v1_session_scope(factory) as s:
-            x=create_candidate(s,pid,_s(b,"display_name",required=True)); return JSONResponse({"candidate_id":x.id,"display_name":x.display_name})
-    async def archive_candidate(r):
-        cid=r.path_params["candidate_id"]
-        with v1_session_scope(factory) as s:
-            x=s.get(Candidate,cid)
-            if not x: raise V1NotFoundError(f"candidate not found: {cid}")
-            x.archived=True; return JSONResponse({"candidate_id":cid,"archived":True})
-    async def restore_candidate(r):
-        cid=r.path_params["candidate_id"]
-        with v1_session_scope(factory) as s:
-            x=s.get(Candidate,cid)
-            if not x: raise V1NotFoundError(f"candidate not found: {cid}")
-            if x.merged_into_candidate_id:
-                raise V1InvariantError("merged source identity cannot be restored; open the canonical candidate instead")
-            x.archived=False; return JSONResponse({"candidate_id":cid,"archived":False})
 
     async def archive_project(r):
         pid=r.path_params["project_id"]
@@ -971,48 +904,6 @@ def install_full_workbench_routes(app, factory, registry, secrets, *, data_dir: 
         with v1_session_scope(factory) as s:
             return JSONResponse(bulk_change_candidate_stage(s,pid,ids,_s(b,"stage",required=True),actor=_s(b,"actor",default="human"),reason=_s(b,"reason")))
 
-    def _contact_view(candidate, contact):
-        return {
-            "candidate_id":candidate.id,"display_name":contact.display_name if contact else candidate.display_name,
-            "phone":contact.phone if contact else "","email":contact.email if contact else "",
-            "user_confirmed":bool(contact.user_confirmed) if contact else False,
-            "confirmed_fields":json.loads(contact.confirmed_fields_json or "[]") if contact else [],
-        }
-
-    async def candidate_contact(r):
-        cid=r.path_params["candidate_id"]
-        with factory() as s:
-            candidate=s.get(Candidate,cid)
-            if not candidate: raise V1NotFoundError(f"candidate not found: {cid}")
-            contact=s.scalar(select(CandidateContact).where(CandidateContact.candidate_id==cid))
-            return JSONResponse(_contact_view(candidate,contact))
-
-    async def update_candidate_contact(r):
-        cid=r.path_params["candidate_id"]; b=await _json_body(r)
-        with v1_session_scope(factory) as s:
-            candidate=s.get(Candidate,cid)
-            if not candidate: raise V1NotFoundError(f"candidate not found: {cid}")
-            contact=s.scalar(select(CandidateContact).where(CandidateContact.candidate_id==cid))
-            if contact is None:
-                contact=CandidateContact(candidate_id=cid,display_name=candidate.display_name)
-                s.add(contact); s.flush()
-            if "display_name" in b:
-                name=_s(b,"display_name",required=True); contact.display_name=name; candidate.display_name=name
-            if "phone" in b: contact.phone=_s(b,"phone")
-            if "email" in b: contact.email=_s(b,"email")
-            if "user_confirmed" in b:
-                value=b.get("user_confirmed")
-                if not isinstance(value,bool): raise V1InvariantError("user_confirmed must be a boolean")
-                contact.user_confirmed=value
-            fields=[]
-            if contact.display_name: fields.append("display_name")
-            if contact.phone: fields.append("phone")
-            if contact.email: fields.append("email")
-            contact.confirmed_fields_json=json.dumps(fields if contact.user_confirmed else [],ensure_ascii=False)
-            contact.provenance_json=json.dumps({"actor":_s(b,"actor",default="human"),"source":"manual"},ensure_ascii=False)
-            append_audit_event(s,event_type="CANDIDATE_CONTACT_UPDATED",entity_type="candidate",entity_id=cid,actor=_s(b,"actor",default="human"),payload={"confirmed_fields":fields,"user_confirmed":contact.user_confirmed})
-            return JSONResponse(_contact_view(candidate,contact))
-
     async def compare_candidates(r):
         ids=[x for x in (r.query_params.get("ids") or "").split(",") if x]
         if not 2<=len(ids)<=5: raise V1InvariantError("compare requires 2 to 5 candidate ids")
@@ -1188,16 +1079,16 @@ def install_full_workbench_routes(app, factory, registry, secrets, *, data_dir: 
     routes=[
       Route('/api/v1/dashboard',dashboard, methods=['GET']),
       *provider_routes(factory=factory, secrets=secrets),
-      Route('/api/v1/projects/{project_id:str}/candidates',list_candidates, methods=['GET']),Route('/api/v1/projects/{project_id:str}/candidates',add_candidate, methods=['POST']),
-      Route('/api/v1/candidates/{candidate_id:str}/summary',candidate_summary, methods=['GET']),Route('/api/v1/projects/{project_id:str}/candidate-search',candidate_search, methods=['GET']),Route('/api/v1/projects/{project_id:str}/cockpit',cockpit, methods=['GET']),
+      *candidate_routes(factory=factory),
+      Route('/api/v1/projects/{project_id:str}/cockpit',cockpit, methods=['GET']),
       Route('/api/v1/projects/{project_id:str}/status',project_status, methods=['POST']),Route('/api/v1/projects/{project_id:str}/pipeline',project_pipeline, methods=['GET']),
       Route('/api/v1/projects/{project_id:str}/candidates/stage',bulk_candidate_stage, methods=['POST']),
       Route('/api/v1/candidates/{candidate_id:str}/stage',candidate_stage, methods=['POST']),Route('/api/v1/candidates/{candidate_id:str}/pipeline',candidate_pipeline, methods=['GET']),
-      Route('/api/v1/candidates/{candidate_id:str}/contact',candidate_contact, methods=['GET']),Route('/api/v1/candidates/{candidate_id:str}/contact',update_candidate_contact, methods=['PATCH']),
+      
       *offer_routes(factory=factory),
       Route('/api/v1/projects/{project_id:str}/candidates/batch-intake',batch_intake, methods=['POST']),
       Route('/api/v1/projects/{project_id:str}/archive',archive_project, methods=['POST']),Route('/api/v1/projects/{project_id:str}/restore',restore_project, methods=['POST']),
-      Route('/api/v1/candidates/{candidate_id:str}/archive',archive_candidate, methods=['POST']),Route('/api/v1/candidates/{candidate_id:str}/restore',restore_candidate, methods=['POST']),
+      
       Route('/api/v1/candidates/{candidate_id:str}/files',ingest_file, methods=['POST']),
       Route('/api/v1/candidates/{candidate_id:str}/evidence/extract-task',extract_evidence_task, methods=['POST']),
       *operation_routes(factory=factory),

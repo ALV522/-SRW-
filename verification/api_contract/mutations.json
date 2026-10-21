@@ -1,9 +1,9 @@
 {
   "schema": "srw.api-mutation-classification.v1",
-  "status": "R1 ratchet plus R2 classification for offers, interviews, operations, system, providers and reevaluation routes.",
+  "status": "R1 ratchet plus R2 classification for offers, interviews, operations, system, providers, reevaluations and candidate CRUD.",
   "frozen_at": "main e385adfb868baf5173f98d6119f253dd9d072b41",
   "rule": "live_mutations - classified MUST NOT exceed baseline_unclassified. Adding a mutation route therefore fails the contract test until it is classified or this baseline is raised in review.",
-  "baseline_unclassified": 54,
+  "baseline_unclassified": 50,
   "classified": [
     {
       "method": "POST",
@@ -270,6 +270,62 @@
       "human_actor": "assessments are recorded with actor human:reevaluation; a HumanDecision is never written here",
       "invariants": "draft must exist (404) and be in draft state; context hash must still match",
       "side_effects": "writes pre_ and post_reevaluation EvaluationSnapshots and updates CriterionJudgments inside one transaction"
+    },
+    {
+      "domain": "candidates",
+      "owner": "srw.api.routes.candidates",
+      "method": "POST",
+      "path": "/api/v1/projects/{project_id:str}/candidates",
+      "use_case": "CreateCandidate",
+      "request": "display_name (required)",
+      "response": "candidate_id, display_name",
+      "concurrency": "none - create-only",
+      "audit": "none written by this route",
+      "human_actor": "implicit",
+      "invariants": "display_name required; project must exist",
+      "side_effects": "inserts one Candidate row"
+    },
+    {
+      "domain": "candidates",
+      "owner": "srw.api.routes.candidates",
+      "method": "POST",
+      "path": "/api/v1/candidates/{candidate_id:str}/archive",
+      "use_case": "ArchiveCandidate",
+      "request": "path candidate_id only",
+      "response": "candidate_id, archived: true",
+      "concurrency": "none",
+      "audit": "none written by this route",
+      "human_actor": "implicit",
+      "invariants": "unknown candidate 404",
+      "side_effects": "sets archived flag; reversible via restore"
+    },
+    {
+      "domain": "candidates",
+      "owner": "srw.api.routes.candidates",
+      "method": "POST",
+      "path": "/api/v1/candidates/{candidate_id:str}/restore",
+      "use_case": "RestoreCandidate",
+      "request": "path candidate_id only",
+      "response": "candidate_id, archived: false",
+      "concurrency": "none",
+      "audit": "none written by this route",
+      "human_actor": "implicit",
+      "invariants": "unknown candidate 404; a merged source identity cannot be restored (409) - the operator must open the canonical candidate",
+      "side_effects": "clears the archived flag"
+    },
+    {
+      "domain": "candidates",
+      "owner": "srw.api.routes.candidates",
+      "method": "PATCH",
+      "path": "/api/v1/candidates/{candidate_id:str}/contact",
+      "use_case": "UpdateCandidateContact",
+      "request": "display_name, phone, email, user_confirmed (boolean), actor",
+      "response": "contact view with confirmed_fields",
+      "concurrency": "none - no If-Match",
+      "audit": "CANDIDATE_CONTACT_UPDATED with confirmed_fields and user_confirmed",
+      "human_actor": "yes - actor defaults to human and is stored in contact provenance",
+      "invariants": "user_confirmed must be a boolean (409); confirmed_fields is emptied when user_confirmed is false",
+      "side_effects": "upserts CandidateContact, mirrors display_name onto the candidate, writes provenance and one audit event"
     }
   ]
 }
