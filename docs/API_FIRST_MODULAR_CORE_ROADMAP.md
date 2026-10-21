@@ -187,6 +187,14 @@ backend/srw/api/
 
 `fullworkbench.py` 1311 → **1217 行**；累计从 1723 降至 1217（−506，−29.4%）。写操作归类 19/73，棘轮 56 → 54。新增 `test_reevaluation_routes.py`（5 项），首次为重评估补上真实 HTTP happy path + stale 拒绝，此前只有 dashboard 计数间接覆盖。
 
+**R2 进度（2026-10-22，第七刀）**：候选人 CRUD 与联系人 8 条路由（列表 / 摘要 / 搜索 / 创建 / 归档 / 恢复 / 联系人读 / 联系人写）+ `_contact_view` 迁出到 `backend/srw/api/routes/candidates.py`。
+
+**刻意不随本次迁出**：`batch-intake`、`files`（摄入）、`evidence/extract-task` 三条虽也属于候选人，但它们入队后台任务，应与 Job Engine 一起切；按实体硬切会把两件不同的事塞进一个 PR。
+
+`fullworkbench.py` 1217 → **1108 行**；累计从 1723 降至 1108（−615，−35.7%）。写操作归类 23/73，棘轮 54 → 50。
+
+**过程事故（已修复，值得记录）**：本刀第一次用"区间删除"移除了 `add_candidate → ingest_file` 之间的全部内容，连带删掉未计划迁移的 `archive_project`、`restore_project`、`_queue_media_task`、`_ingest_candidate_file`。contract test 立刻以 `NameError` 报警，说明路由冻结网捕捉到了模块级损坏。处理：回退整文件，改为按函数名精确删除（每个名字删后断言 `^def <name>` 不再匹配）。**结论：多函数搬迁一律按名删除，禁止按区间删除。**
+
 ### R3 · Application Use-case Layer
 
 目标：把“一个用户动作需要串联多个模块”的逻辑从 route/UI 中提取到应用层。

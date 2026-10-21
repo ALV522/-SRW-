@@ -100,7 +100,7 @@
     {
       "method": "POST",
       "path": "/api/v1/candidates/{candidate_id:str}/archive",
-      "owner": "srw.api.fullworkbench",
+      "owner": "srw.api.routes.candidates",
       "domain": "candidates",
       "mutation": true,
       "signals": {
@@ -129,7 +129,7 @@
     {
       "method": "GET",
       "path": "/api/v1/candidates/{candidate_id:str}/contact",
-      "owner": "srw.api.fullworkbench",
+      "owner": "srw.api.routes.candidates",
       "domain": "candidates",
       "mutation": false,
       "signals": null
@@ -137,7 +137,7 @@
     {
       "method": "PATCH",
       "path": "/api/v1/candidates/{candidate_id:str}/contact",
-      "owner": "srw.api.fullworkbench",
+      "owner": "srw.api.routes.candidates",
       "domain": "candidates",
       "mutation": true,
       "signals": {
@@ -310,7 +310,7 @@
     {
       "method": "POST",
       "path": "/api/v1/candidates/{candidate_id:str}/restore",
-      "owner": "srw.api.fullworkbench",
+      "owner": "srw.api.routes.candidates",
       "domain": "candidates",
       "mutation": true,
       "signals": {
@@ -349,7 +349,7 @@
     {
       "method": "GET",
       "path": "/api/v1/candidates/{candidate_id:str}/summary",
-      "owner": "srw.api.fullworkbench",
+      "owner": "srw.api.routes.candidates",
       "domain": "candidates",
       "mutation": false,
       "signals": null
@@ -755,7 +755,7 @@
     {
       "method": "GET",
       "path": "/api/v1/projects/{project_id:str}/candidate-search",
-      "owner": "srw.api.fullworkbench",
+      "owner": "srw.api.routes.candidates",
       "domain": "projects",
       "mutation": false,
       "signals": null
@@ -763,7 +763,7 @@
     {
       "method": "GET",
       "path": "/api/v1/projects/{project_id:str}/candidates",
-      "owner": "srw.api.fullworkbench",
+      "owner": "srw.api.routes.candidates",
       "domain": "candidates",
       "mutation": false,
       "signals": null
@@ -771,7 +771,7 @@
     {
       "method": "POST",
       "path": "/api/v1/projects/{project_id:str}/candidates",
-      "owner": "srw.api.fullworkbench",
+      "owner": "srw.api.routes.candidates",
       "domain": "candidates",
       "mutation": true,
       "signals": {
