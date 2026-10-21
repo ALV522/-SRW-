@@ -8,7 +8,7 @@
 
 1. `backend/srw/api/fullworkbench.py` 1714 行、27 个路由，Provider 密钥探测、OCR/ASR 字节处理、Knowledge apply/回滚、管道与 Offer 状态机等业务逻辑内联于 HTTP 闭包，与 `modules/`（20 域）+ `surfaces/` 读模型的清晰分层形成唯一“分层破窗”；新增功能必须改这一处，闭包无法脱离应用单测。
 2. `frontend/dist/app.js` 126KB 单文件承载全部 UI/渲染/API 调用；convergence03–08 六个世代文件（合计 44KB）各自重复实现 api/toast/modal 基建。
-3. 约 90 个 `/api/v1` 路由的契约只存在于路由注册与前端硬编码路径：无机器可读清单、无分域契约文档，接口“存在但不可发现、不可评审、不可 CI 校验”。
+3. 约 146 个 `/api/v1` 路由的契约只存在于路由注册与前端硬编码路径：无机器可读清单、无分域契约文档，接口“存在但不可发现、不可评审、不可 CI 校验”。
 
 同时，负责人曾提出“重构把后端和前端分离”。事实核查表明传输层早已分离（Starlette 版本化 HTTP 契约；WPF Host 经 loopback HTTP；Browser 经 `start_local_web.py` 消费同一契约），该分离是宪章 A6 / ADR-0001 的承重架构——“分离重构”要么空转，要么落入宪章非目标（全新 UI 体系、业务内核重写）。
 
