@@ -109,6 +109,14 @@ Carrier-specific acceptance
 
 退出条件：主要 `/api/v1` 路由都能定位到 owner/use case；后续 route move 可以通过 contract test 证明 URL/方法/错误语义不变。
 
+**R1 进度（2026-10-21）**：已交付 `scripts/api_inventory.py`、`verification/api_contract/inventory.json`（146 条 method+path，其中 73 条写操作）、`verification/api_contract/errors.json`、`convergence_tests/test_api_contract.py` 与生成文档 `docs/API_INVENTORY.md`。
+
+已完成：route → 归属模块（取自运行中端点的 `__module__`，非文本匹配）→ 业务域归属；`/api/v1` 路径冻结（增删路由会使 contract test 失败）；前端 104 个 `/api/v1` 字面量与路由的对账（全部可解析）；错误封套现状记录。
+
+仍属 R2：逐路由的 operator use case 映射，以及 concurrency/audit/human-actor 的**语义**归类。当前 `mutations.json` 只提供 73 条“不得增长”棘轮，`inventory.json` 里的三个 signal 列是端点源码静态标记，不代表不变量已被验证。
+
+已知缺口（本轮未改行为）：404/405 仍返回纯文本，未使用 `{"detail", "error": {"code"}}` 封套，已在 `errors.json` 显式记录而不是隐藏。
+
 ### R2 · 后端 Route Decomposition
 
 目标：让 `fullworkbench.py` 从“多领域控制器”变成逐步淘汰的兼容聚合层。

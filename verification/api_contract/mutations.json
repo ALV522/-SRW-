@@ -1,0 +1,8 @@
+{
+  "schema": "srw.api-mutation-classification.v1",
+  "status": "R1 ratchet only. Per-route use-case, concurrency, audit and human-actor annotation is R2 work, done one domain at a time as routes move out of fullworkbench.py.",
+  "frozen_at": "main e7816bc4f4881e217c453635e41b4121907cde21",
+  "rule": "live_mutations - classified MUST NOT exceed baseline_unclassified. Adding a mutation route therefore fails the contract test until it is classified or this baseline is raised in review.",
+  "baseline_unclassified": 73,
+  "classified": {}
+}

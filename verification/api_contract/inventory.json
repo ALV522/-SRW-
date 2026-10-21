@@ -1,0 +1,2285 @@
+{
+  "schema": "srw.api-inventory.v1",
+  "generated_by": "scripts/api_inventory.py",
+  "source": "live Starlette route table built from srw.api.app.create_v1_app",
+  "route_count": 146,
+  "mutation_count": 73,
+  "domains": {
+    "candidates": 27,
+    "decisions": 15,
+    "evidence": 9,
+    "interviews": 5,
+    "knowledge": 12,
+    "offers": 3,
+    "operations": 15,
+    "projects": 33,
+    "providers": 7,
+    "static": 3,
+    "system": 17
+  },
+  "routes": [
+    {
+      "method": "GET",
+      "path": "/",
+      "owner": "srw.api.app",
+      "domain": "static",
+      "mutation": false,
+      "signals": null
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/ai-runs/{run_id:str}",
+      "owner": "srw.api.operations",
+      "domain": "providers",
+      "mutation": false,
+      "signals": null
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/calibration/anchors/{anchor_id:str}/promote",
+      "owner": "srw.api.governance",
+      "domain": "decisions",
+      "mutation": true,
+      "signals": {
+        "concurrency": false,
+        "audit": false,
+        "human_actor": true,
+        "basis": "endpoint-source-scan"
+      }
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/calibration/reviews/{review_id:str}/resolve",
+      "owner": "srw.api.governance",
+      "domain": "decisions",
+      "mutation": true,
+      "signals": {
+        "concurrency": false,
+        "audit": false,
+        "human_actor": true,
+        "basis": "endpoint-source-scan"
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/candidates/compare",
+      "owner": "srw.api.fullworkbench",
+      "domain": "candidates",
+      "mutation": false,
+      "signals": null
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/candidates/{candidate_id:str}/action-plan",
+      "owner": "srw.api.fullworkbench",
+      "domain": "candidates",
+      "mutation": false,
+      "signals": null
+    },
+    {
+      "method": "PATCH",
+      "path": "/api/v1/candidates/{candidate_id:str}/action-plan",
+      "owner": "srw.api.fullworkbench",
+      "domain": "candidates",
+      "mutation": true,
+      "signals": {
+        "concurrency": false,
+        "audit": false,
+        "human_actor": true,
+        "basis": "endpoint-source-scan"
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/candidates/{candidate_id:str}/ai-runs",
+      "owner": "srw.api.operations",
+      "domain": "providers",
+      "mutation": false,
+      "signals": null
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/candidates/{candidate_id:str}/archive",
+      "owner": "srw.api.fullworkbench",
+      "domain": "candidates",
+      "mutation": true,
+      "signals": {
+        "concurrency": false,
+        "audit": false,
+        "human_actor": true,
+        "basis": "endpoint-source-scan"
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/candidates/{candidate_id:str}/assessment",
+      "owner": "srw.api.app",
+      "domain": "decisions",
+      "mutation": false,
+      "signals": null
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/candidates/{candidate_id:str}/brief",
+      "owner": "srw.api.fullworkbench",
+      "domain": "projects",
+      "mutation": false,
+      "signals": null
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/candidates/{candidate_id:str}/contact",
+      "owner": "srw.api.fullworkbench",
+      "domain": "candidates",
+      "mutation": false,
+      "signals": null
+    },
+    {
+      "method": "PATCH",
+      "path": "/api/v1/candidates/{candidate_id:str}/contact",
+      "owner": "srw.api.fullworkbench",
+      "domain": "candidates",
+      "mutation": true,
+      "signals": {
+        "concurrency": false,
+        "audit": false,
+        "human_actor": true,
+        "basis": "endpoint-source-scan"
+      }
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/candidates/{candidate_id:str}/decision",
+      "owner": "srw.api.app",
+      "domain": "decisions",
+      "mutation": true,
+      "signals": {
+        "concurrency": true,
+        "audit": false,
+        "human_actor": true,
+        "basis": "endpoint-source-scan"
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/candidates/{candidate_id:str}/decision-history",
+      "owner": "srw.api.operations",
+      "domain": "candidates",
+      "mutation": false,
+      "signals": null
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/candidates/{candidate_id:str}/decisions/reaffirm",
+      "owner": "srw.api.operations",
+      "domain": "decisions",
+      "mutation": true,
+      "signals": {
+        "concurrency": true,
+        "audit": false,
+        "human_actor": true,
+        "basis": "endpoint-source-scan"
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/candidates/{candidate_id:str}/events",
+      "owner": "srw.api.fullworkbench",
+      "domain": "interviews",
+      "mutation": false,
+      "signals": null
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/candidates/{candidate_id:str}/events",
+      "owner": "srw.api.fullworkbench",
+      "domain": "interviews",
+      "mutation": true,
+      "signals": {
+        "concurrency": false,
+        "audit": false,
+        "human_actor": true,
+        "basis": "endpoint-source-scan"
+      }
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/candidates/{candidate_id:str}/evidence/extract",
+      "owner": "srw.api.app",
+      "domain": "evidence",
+      "mutation": true,
+      "signals": {
+        "concurrency": false,
+        "audit": false,
+        "human_actor": true,
+        "basis": "endpoint-source-scan"
+      }
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/candidates/{candidate_id:str}/evidence/extract-task",
+      "owner": "srw.api.fullworkbench",
+      "domain": "evidence",
+      "mutation": true,
+      "signals": {
+        "concurrency": false,
+        "audit": false,
+        "human_actor": true,
+        "basis": "endpoint-source-scan"
+      }
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/candidates/{candidate_id:str}/files",
+      "owner": "srw.api.fullworkbench",
+      "domain": "candidates",
+      "mutation": true,
+      "signals": {
+        "concurrency": false,
+        "audit": false,
+        "human_actor": true,
+        "basis": "endpoint-source-scan"
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/candidates/{candidate_id:str}/identity-history",
+      "owner": "srw.api.governance",
+      "domain": "candidates",
+      "mutation": false,
+      "signals": null
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/candidates/{candidate_id:str}/offers",
+      "owner": "srw.api.fullworkbench",
+      "domain": "offers",
+      "mutation": false,
+      "signals": null
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/candidates/{candidate_id:str}/offers",
+      "owner": "srw.api.fullworkbench",
+      "domain": "offers",
+      "mutation": true,
+      "signals": {
+        "concurrency": false,
+        "audit": false,
+        "human_actor": true,
+        "basis": "endpoint-source-scan"
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/candidates/{candidate_id:str}/phone-script",
+      "owner": "srw.api.fullworkbench",
+      "domain": "candidates",
+      "mutation": false,
+      "signals": null
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/candidates/{candidate_id:str}/pipeline",
+      "owner": "srw.api.fullworkbench",
+      "domain": "candidates",
+      "mutation": false,
+      "signals": null
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/candidates/{candidate_id:str}/reevaluations",
+      "owner": "srw.api.fullworkbench",
+      "domain": "decisions",
+      "mutation": false,
+      "signals": null
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/candidates/{candidate_id:str}/reevaluations",
+      "owner": "srw.api.fullworkbench",
+      "domain": "decisions",
+      "mutation": true,
+      "signals": {
+        "concurrency": true,
+        "audit": false,
+        "human_actor": true,
+        "basis": "endpoint-source-scan"
+      }
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/candidates/{candidate_id:str}/restore",
+      "owner": "srw.api.fullworkbench",
+      "domain": "candidates",
+      "mutation": true,
+      "signals": {
+        "concurrency": false,
+        "audit": false,
+        "human_actor": true,
+        "basis": "endpoint-source-scan"
+      }
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/candidates/{candidate_id:str}/sources/text",
+      "owner": "srw.api.app",
+      "domain": "evidence",
+      "mutation": true,
+      "signals": {
+        "concurrency": true,
+        "audit": false,
+        "human_actor": true,
+        "basis": "endpoint-source-scan"
+      }
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/candidates/{candidate_id:str}/stage",
+      "owner": "srw.api.fullworkbench",
+      "domain": "candidates",
+      "mutation": true,
+      "signals": {
+        "concurrency": false,
+        "audit": false,
+        "human_actor": true,
+        "basis": "endpoint-source-scan"
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/candidates/{candidate_id:str}/summary",
+      "owner": "srw.api.fullworkbench",
+      "domain": "candidates",
+      "mutation": false,
+      "signals": null
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/candidates/{candidate_id:str}/verifications",
+      "owner": "srw.api.app",
+      "domain": "candidates",
+      "mutation": true,
+      "signals": {
+        "concurrency": true,
+        "audit": false,
+        "human_actor": true,
+        "basis": "endpoint-source-scan"
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/candidates/{candidate_id:str}/workspace",
+      "owner": "srw.api.app",
+      "domain": "candidates",
+      "mutation": false,
+      "signals": null
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/claims/{claim_id:str}/grounding",
+      "owner": "srw.api.app",
+      "domain": "evidence",
+      "mutation": false,
+      "signals": null
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/claims/{claim_id:str}/review",
+      "owner": "srw.api.app",
+      "domain": "evidence",
+      "mutation": true,
+      "signals": {
+        "concurrency": false,
+        "audit": false,
+        "human_actor": true,
+        "basis": "endpoint-source-scan"
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/dashboard",
+      "owner": "srw.api.fullworkbench",
+      "domain": "operations",
+      "mutation": false,
+      "signals": null
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/decision-actions/{action_id:str}/knowledge-feedback",
+      "owner": "srw.api.capability_recovery",
+      "domain": "knowledge",
+      "mutation": true,
+      "signals": {
+        "concurrency": false,
+        "audit": false,
+        "human_actor": true,
+        "basis": "endpoint-source-scan"
+      }
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/decision-actions/{action_id:str}/transition",
+      "owner": "srw.api.capability_recovery",
+      "domain": "decisions",
+      "mutation": true,
+      "signals": {
+        "concurrency": false,
+        "audit": false,
+        "human_actor": true,
+        "basis": "endpoint-source-scan"
+      }
+    },
+    {
+      "method": "PATCH",
+      "path": "/api/v1/events/{event_id:str}",
+      "owner": "srw.api.fullworkbench",
+      "domain": "interviews",
+      "mutation": true,
+      "signals": {
+        "concurrency": false,
+        "audit": false,
+        "human_actor": true,
+        "basis": "endpoint-source-scan"
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/events/{event_id:str}/scorecards",
+      "owner": "srw.api.fullworkbench",
+      "domain": "interviews",
+      "mutation": false,
+      "signals": null
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/events/{event_id:str}/scorecards",
+      "owner": "srw.api.fullworkbench",
+      "domain": "interviews",
+      "mutation": true,
+      "signals": {
+        "concurrency": false,
+        "audit": false,
+        "human_actor": true,
+        "basis": "endpoint-source-scan"
+      }
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/feedback/{feedback_id:str}/review",
+      "owner": "srw.api.capability_recovery",
+      "domain": "operations",
+      "mutation": true,
+      "signals": {
+        "concurrency": true,
+        "audit": false,
+        "human_actor": true,
+        "basis": "endpoint-source-scan"
+      }
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/identity-reviews/{review_id:str}/merge",
+      "owner": "srw.api.governance",
+      "domain": "candidates",
+      "mutation": true,
+      "signals": {
+        "concurrency": false,
+        "audit": false,
+        "human_actor": true,
+        "basis": "endpoint-source-scan"
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/identity-reviews/{review_id:str}/merge-preview",
+      "owner": "srw.api.governance",
+      "domain": "candidates",
+      "mutation": false,
+      "signals": null
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/identity-reviews/{review_id:str}/resolve",
+      "owner": "srw.api.governance",
+      "domain": "candidates",
+      "mutation": true,
+      "signals": {
+        "concurrency": false,
+        "audit": false,
+        "human_actor": true,
+        "basis": "endpoint-source-scan"
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/info",
+      "owner": "srw.api.app",
+      "domain": "system",
+      "mutation": false,
+      "signals": null
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/knowledge-curation/{proposal_id:str}/export",
+      "owner": "srw.api.capability_recovery",
+      "domain": "knowledge",
+      "mutation": true,
+      "signals": {
+        "concurrency": false,
+        "audit": false,
+        "human_actor": true,
+        "basis": "endpoint-source-scan"
+      }
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/knowledge-curation/{proposal_id:str}/prepare-apply",
+      "owner": "srw.api.capability_recovery06",
+      "domain": "knowledge",
+      "mutation": true,
+      "signals": {
+        "concurrency": false,
+        "audit": false,
+        "human_actor": true,
+        "basis": "endpoint-source-scan"
+      }
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/knowledge-curation/{proposal_id:str}/review",
+      "owner": "srw.api.capability_recovery",
+      "domain": "knowledge",
+      "mutation": true,
+      "signals": {
+        "concurrency": false,
+        "audit": false,
+        "human_actor": true,
+        "basis": "endpoint-source-scan"
+      }
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/knowledge-feedback/{feedback_id:str}/promote",
+      "owner": "srw.api.capability_recovery",
+      "domain": "knowledge",
+      "mutation": true,
+      "signals": {
+        "concurrency": false,
+        "audit": false,
+        "human_actor": true,
+        "basis": "endpoint-source-scan"
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/knowledge-packages",
+      "owner": "srw.api.capability_recovery06",
+      "domain": "knowledge",
+      "mutation": false,
+      "signals": null
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/knowledge-packages/rollback",
+      "owner": "srw.api.capability_recovery06",
+      "domain": "knowledge",
+      "mutation": true,
+      "signals": {
+        "concurrency": false,
+        "audit": false,
+        "human_actor": true,
+        "basis": "endpoint-source-scan"
+      }
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/knowledge-packages/{package_id:str}/activate",
+      "owner": "srw.api.capability_recovery06",
+      "domain": "knowledge",
+      "mutation": true,
+      "signals": {
+        "concurrency": false,
+        "audit": false,
+        "human_actor": true,
+        "basis": "endpoint-source-scan"
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/knowledge/search",
+      "owner": "srw.api.fullworkbench",
+      "domain": "knowledge",
+      "mutation": false,
+      "signals": null
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/knowledge/status",
+      "owner": "srw.api.fullworkbench",
+      "domain": "knowledge",
+      "mutation": false,
+      "signals": null
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/offers/{offer_id:str}/status",
+      "owner": "srw.api.fullworkbench",
+      "domain": "offers",
+      "mutation": true,
+      "signals": {
+        "concurrency": false,
+        "audit": false,
+        "human_actor": true,
+        "basis": "endpoint-source-scan"
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/projects",
+      "owner": "srw.api.app",
+      "domain": "projects",
+      "mutation": false,
+      "signals": null
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/projects",
+      "owner": "srw.api.app",
+      "domain": "projects",
+      "mutation": true,
+      "signals": {
+        "concurrency": false,
+        "audit": false,
+        "human_actor": true,
+        "basis": "endpoint-source-scan"
+      }
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/projects/import-package",
+      "owner": "srw.api.project_portability",
+      "domain": "projects",
+      "mutation": true,
+      "signals": {
+        "concurrency": false,
+        "audit": false,
+        "human_actor": true,
+        "basis": "endpoint-source-scan"
+      }
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/projects/import-package/preview",
+      "owner": "srw.api.project_portability",
+      "domain": "projects",
+      "mutation": true,
+      "signals": {
+        "concurrency": false,
+        "audit": false,
+        "human_actor": false,
+        "basis": "endpoint-source-scan"
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/projects/{project_id:str}/ai-runs",
+      "owner": "srw.api.operations",
+      "domain": "providers",
+      "mutation": false,
+      "signals": null
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/projects/{project_id:str}/archive",
+      "owner": "srw.api.fullworkbench",
+      "domain": "projects",
+      "mutation": true,
+      "signals": {
+        "concurrency": false,
+        "audit": false,
+        "human_actor": true,
+        "basis": "endpoint-source-scan"
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/projects/{project_id:str}/audit",
+      "owner": "srw.api.fullworkbench",
+      "domain": "projects",
+      "mutation": false,
+      "signals": null
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/projects/{project_id:str}/calibration/anchors",
+      "owner": "srw.api.governance",
+      "domain": "decisions",
+      "mutation": false,
+      "signals": null
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/projects/{project_id:str}/calibration/anchors",
+      "owner": "srw.api.governance",
+      "domain": "decisions",
+      "mutation": true,
+      "signals": {
+        "concurrency": false,
+        "audit": false,
+        "human_actor": true,
+        "basis": "endpoint-source-scan"
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/projects/{project_id:str}/calibration/reviews",
+      "owner": "srw.api.governance",
+      "domain": "decisions",
+      "mutation": false,
+      "signals": null
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/projects/{project_id:str}/calibration/reviews",
+      "owner": "srw.api.governance",
+      "domain": "decisions",
+      "mutation": true,
+      "signals": {
+        "concurrency": false,
+        "audit": false,
+        "human_actor": true,
+        "basis": "endpoint-source-scan"
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/projects/{project_id:str}/candidate-search",
+      "owner": "srw.api.fullworkbench",
+      "domain": "projects",
+      "mutation": false,
+      "signals": null
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/projects/{project_id:str}/candidates",
+      "owner": "srw.api.fullworkbench",
+      "domain": "candidates",
+      "mutation": false,
+      "signals": null
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/projects/{project_id:str}/candidates",
+      "owner": "srw.api.fullworkbench",
+      "domain": "candidates",
+      "mutation": true,
+      "signals": {
+        "concurrency": false,
+        "audit": false,
+        "human_actor": true,
+        "basis": "endpoint-source-scan"
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/projects/{project_id:str}/candidates.csv",
+      "owner": "srw.api.fullworkbench",
+      "domain": "projects",
+      "mutation": false,
+      "signals": null
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/projects/{project_id:str}/candidates/batch-intake",
+      "owner": "srw.api.fullworkbench",
+      "domain": "candidates",
+      "mutation": true,
+      "signals": {
+        "concurrency": false,
+        "audit": false,
+        "human_actor": true,
+        "basis": "endpoint-source-scan"
+      }
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/projects/{project_id:str}/candidates/stage",
+      "owner": "srw.api.fullworkbench",
+      "domain": "candidates",
+      "mutation": true,
+      "signals": {
+        "concurrency": false,
+        "audit": false,
+        "human_actor": true,
+        "basis": "endpoint-source-scan"
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/projects/{project_id:str}/cockpit",
+      "owner": "srw.api.fullworkbench",
+      "domain": "projects",
+      "mutation": false,
+      "signals": null
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/projects/{project_id:str}/contact-list.csv",
+      "owner": "srw.api.fullworkbench",
+      "domain": "projects",
+      "mutation": false,
+      "signals": null
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/projects/{project_id:str}/contact-queue",
+      "owner": "srw.api.fullworkbench",
+      "domain": "projects",
+      "mutation": false,
+      "signals": null
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/projects/{project_id:str}/decision-actions",
+      "owner": "srw.api.capability_recovery",
+      "domain": "decisions",
+      "mutation": false,
+      "signals": null
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/projects/{project_id:str}/decision-actions/recommend",
+      "owner": "srw.api.capability_recovery",
+      "domain": "decisions",
+      "mutation": true,
+      "signals": {
+        "concurrency": false,
+        "audit": false,
+        "human_actor": true,
+        "basis": "endpoint-source-scan"
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/projects/{project_id:str}/export-package",
+      "owner": "srw.api.project_portability",
+      "domain": "projects",
+      "mutation": false,
+      "signals": null
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/projects/{project_id:str}/feedback",
+      "owner": "srw.api.capability_recovery",
+      "domain": "operations",
+      "mutation": false,
+      "signals": null
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/projects/{project_id:str}/feedback",
+      "owner": "srw.api.capability_recovery",
+      "domain": "operations",
+      "mutation": true,
+      "signals": {
+        "concurrency": false,
+        "audit": false,
+        "human_actor": true,
+        "basis": "endpoint-source-scan"
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/projects/{project_id:str}/handoff",
+      "owner": "srw.api.fullworkbench",
+      "domain": "projects",
+      "mutation": false,
+      "signals": null
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/projects/{project_id:str}/identity-reviews",
+      "owner": "srw.api.governance",
+      "domain": "candidates",
+      "mutation": false,
+      "signals": null
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/projects/{project_id:str}/identity-reviews/scan",
+      "owner": "srw.api.governance",
+      "domain": "candidates",
+      "mutation": true,
+      "signals": {
+        "concurrency": false,
+        "audit": false,
+        "human_actor": true,
+        "basis": "endpoint-source-scan"
+      }
+    },
+    {
+      "method": "PATCH",
+      "path": "/api/v1/projects/{project_id:str}/job-setup",
+      "owner": "srw.api.fullworkbench",
+      "domain": "projects",
+      "mutation": true,
+      "signals": {
+        "concurrency": false,
+        "audit": false,
+        "human_actor": true,
+        "basis": "endpoint-source-scan"
+      }
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/projects/{project_id:str}/job-setup/suggest",
+      "owner": "srw.api.fullworkbench",
+      "domain": "projects",
+      "mutation": true,
+      "signals": {
+        "concurrency": false,
+        "audit": false,
+        "human_actor": true,
+        "basis": "endpoint-source-scan"
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/projects/{project_id:str}/knowledge-curation",
+      "owner": "srw.api.capability_recovery",
+      "domain": "knowledge",
+      "mutation": false,
+      "signals": null
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/projects/{project_id:str}/knowledge/apply",
+      "owner": "srw.api.fullworkbench",
+      "domain": "knowledge",
+      "mutation": true,
+      "signals": {
+        "concurrency": true,
+        "audit": false,
+        "human_actor": true,
+        "basis": "endpoint-source-scan"
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/projects/{project_id:str}/operations-learning",
+      "owner": "srw.api.capability_recovery",
+      "domain": "projects",
+      "mutation": false,
+      "signals": null
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/projects/{project_id:str}/pipeline",
+      "owner": "srw.api.fullworkbench",
+      "domain": "projects",
+      "mutation": false,
+      "signals": null
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/projects/{project_id:str}/planning",
+      "owner": "srw.api.capability_recovery",
+      "domain": "projects",
+      "mutation": false,
+      "signals": null
+    },
+    {
+      "method": "PUT",
+      "path": "/api/v1/projects/{project_id:str}/planning",
+      "owner": "srw.api.capability_recovery",
+      "domain": "projects",
+      "mutation": true,
+      "signals": {
+        "concurrency": false,
+        "audit": false,
+        "human_actor": true,
+        "basis": "endpoint-source-scan"
+      }
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/projects/{project_id:str}/protocol-drafts",
+      "owner": "srw.api.app",
+      "domain": "projects",
+      "mutation": true,
+      "signals": {
+        "concurrency": true,
+        "audit": false,
+        "human_actor": true,
+        "basis": "endpoint-source-scan"
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/projects/{project_id:str}/protocol-workspace",
+      "owner": "srw.api.app",
+      "domain": "projects",
+      "mutation": false,
+      "signals": null
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/projects/{project_id:str}/ranked-shortlist",
+      "owner": "srw.api.ranking",
+      "domain": "projects",
+      "mutation": false,
+      "signals": null
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/projects/{project_id:str}/ranked-shortlist",
+      "owner": "srw.api.ranking",
+      "domain": "projects",
+      "mutation": true,
+      "signals": {
+        "concurrency": true,
+        "audit": false,
+        "human_actor": true,
+        "basis": "endpoint-source-scan"
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/projects/{project_id:str}/ranked-shortlists",
+      "owner": "srw.api.ranking",
+      "domain": "candidates",
+      "mutation": false,
+      "signals": null
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/projects/{project_id:str}/recruitment-intelligence",
+      "owner": "srw.api.capability_recovery06",
+      "domain": "projects",
+      "mutation": false,
+      "signals": null
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/projects/{project_id:str}/restore",
+      "owner": "srw.api.fullworkbench",
+      "domain": "projects",
+      "mutation": true,
+      "signals": {
+        "concurrency": true,
+        "audit": false,
+        "human_actor": true,
+        "basis": "endpoint-source-scan"
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/projects/{project_id:str}/sourcing-observations",
+      "owner": "srw.api.capability_recovery06",
+      "domain": "projects",
+      "mutation": false,
+      "signals": null
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/projects/{project_id:str}/sourcing-observations",
+      "owner": "srw.api.capability_recovery06",
+      "domain": "projects",
+      "mutation": true,
+      "signals": {
+        "concurrency": false,
+        "audit": false,
+        "human_actor": true,
+        "basis": "endpoint-source-scan"
+      }
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/projects/{project_id:str}/sourcing-observations/import-commit",
+      "owner": "srw.api.capability_recovery07",
+      "domain": "projects",
+      "mutation": true,
+      "signals": {
+        "concurrency": false,
+        "audit": false,
+        "human_actor": true,
+        "basis": "endpoint-source-scan"
+      }
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/projects/{project_id:str}/sourcing-observations/import-preview",
+      "owner": "srw.api.capability_recovery07",
+      "domain": "projects",
+      "mutation": true,
+      "signals": {
+        "concurrency": false,
+        "audit": false,
+        "human_actor": false,
+        "basis": "endpoint-source-scan"
+      }
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/projects/{project_id:str}/status",
+      "owner": "srw.api.fullworkbench",
+      "domain": "projects",
+      "mutation": true,
+      "signals": {
+        "concurrency": false,
+        "audit": false,
+        "human_actor": true,
+        "basis": "endpoint-source-scan"
+      }
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/projects/{project_id:str}/templates/from-current",
+      "owner": "srw.api.fullworkbench",
+      "domain": "operations",
+      "mutation": true,
+      "signals": {
+        "concurrency": true,
+        "audit": false,
+        "human_actor": true,
+        "basis": "endpoint-source-scan"
+      }
+    },
+    {
+      "method": "PATCH",
+      "path": "/api/v1/protocol-revisions/{revision_id:str}",
+      "owner": "srw.api.app",
+      "domain": "projects",
+      "mutation": true,
+      "signals": {
+        "concurrency": true,
+        "audit": false,
+        "human_actor": true,
+        "basis": "endpoint-source-scan"
+      }
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/protocol-revisions/{revision_id:str}/publish",
+      "owner": "srw.api.app",
+      "domain": "projects",
+      "mutation": true,
+      "signals": {
+        "concurrency": true,
+        "audit": false,
+        "human_actor": true,
+        "basis": "endpoint-source-scan"
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/ranked-shortlists/{publication_id:str}",
+      "owner": "srw.api.ranking",
+      "domain": "candidates",
+      "mutation": false,
+      "signals": null
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/reevaluations/{draft_id:str}/apply",
+      "owner": "srw.api.fullworkbench",
+      "domain": "decisions",
+      "mutation": true,
+      "signals": {
+        "concurrency": true,
+        "audit": false,
+        "human_actor": true,
+        "basis": "endpoint-source-scan"
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/runtime/capabilities",
+      "owner": "srw.api.app",
+      "domain": "system",
+      "mutation": false,
+      "signals": null
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/runtime/info",
+      "owner": "srw.api.app",
+      "domain": "system",
+      "mutation": false,
+      "signals": null
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/runtime/live",
+      "owner": "srw.api.app",
+      "domain": "system",
+      "mutation": false,
+      "signals": null
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/runtime/ready",
+      "owner": "srw.api.app",
+      "domain": "system",
+      "mutation": false,
+      "signals": null
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/runtime/shutdown",
+      "owner": "srw.api.app",
+      "domain": "system",
+      "mutation": true,
+      "signals": {
+        "concurrency": false,
+        "audit": false,
+        "human_actor": false,
+        "basis": "endpoint-source-scan"
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/settings",
+      "owner": "srw.api.app",
+      "domain": "system",
+      "mutation": false,
+      "signals": null
+    },
+    {
+      "method": "PATCH",
+      "path": "/api/v1/settings/capabilities/{name:str}",
+      "owner": "srw.api.app",
+      "domain": "system",
+      "mutation": true,
+      "signals": {
+        "concurrency": false,
+        "audit": false,
+        "human_actor": true,
+        "basis": "endpoint-source-scan"
+      }
+    },
+    {
+      "method": "PATCH",
+      "path": "/api/v1/settings/provider",
+      "owner": "srw.api.app",
+      "domain": "providers",
+      "mutation": true,
+      "signals": {
+        "concurrency": false,
+        "audit": false,
+        "human_actor": true,
+        "basis": "endpoint-source-scan"
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/settings/providers",
+      "owner": "srw.api.fullworkbench",
+      "domain": "providers",
+      "mutation": false,
+      "signals": null
+    },
+    {
+      "method": "PATCH",
+      "path": "/api/v1/settings/providers/{name:str}",
+      "owner": "srw.api.fullworkbench",
+      "domain": "providers",
+      "mutation": true,
+      "signals": {
+        "concurrency": false,
+        "audit": false,
+        "human_actor": true,
+        "basis": "endpoint-source-scan"
+      }
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/settings/providers/{name:str}/test",
+      "owner": "srw.api.fullworkbench",
+      "domain": "providers",
+      "mutation": true,
+      "signals": {
+        "concurrency": false,
+        "audit": false,
+        "human_actor": true,
+        "basis": "endpoint-source-scan"
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/sources/{source_id:str}/content",
+      "owner": "srw.api.app",
+      "domain": "evidence",
+      "mutation": false,
+      "signals": null
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/sources/{source_id:str}/file",
+      "owner": "srw.api.app",
+      "domain": "evidence",
+      "mutation": false,
+      "signals": null
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/sources/{source_id:str}/page/{page_number:int}",
+      "owner": "srw.api.app",
+      "domain": "evidence",
+      "mutation": false,
+      "signals": null
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/sources/{source_id:str}/scoring-view",
+      "owner": "srw.api.app",
+      "domain": "evidence",
+      "mutation": false,
+      "signals": null
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/system/backups",
+      "owner": "srw.api.fullworkbench",
+      "domain": "system",
+      "mutation": false,
+      "signals": null
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/system/backups",
+      "owner": "srw.api.fullworkbench",
+      "domain": "system",
+      "mutation": true,
+      "signals": {
+        "concurrency": false,
+        "audit": false,
+        "human_actor": false,
+        "basis": "endpoint-source-scan"
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/system/backups/{filename:str}",
+      "owner": "srw.api.fullworkbench",
+      "domain": "system",
+      "mutation": false,
+      "signals": null
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/system/backups/{filename:str}/restore",
+      "owner": "srw.api.fullworkbench",
+      "domain": "system",
+      "mutation": true,
+      "signals": {
+        "concurrency": true,
+        "audit": false,
+        "human_actor": false,
+        "basis": "endpoint-source-scan"
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/system/diagnostics",
+      "owner": "srw.api.fullworkbench",
+      "domain": "system",
+      "mutation": false,
+      "signals": null
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/system/diagnostics/export",
+      "owner": "srw.api.fullworkbench",
+      "domain": "system",
+      "mutation": false,
+      "signals": null
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/system/restore/cancel",
+      "owner": "srw.api.fullworkbench",
+      "domain": "system",
+      "mutation": true,
+      "signals": {
+        "concurrency": false,
+        "audit": false,
+        "human_actor": false,
+        "basis": "endpoint-source-scan"
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/tasks",
+      "owner": "srw.api.fullworkbench",
+      "domain": "operations",
+      "mutation": false,
+      "signals": null
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/tasks/{task_id:str}",
+      "owner": "srw.api.fullworkbench",
+      "domain": "operations",
+      "mutation": false,
+      "signals": null
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/tasks/{task_id:str}/cancel",
+      "owner": "srw.api.fullworkbench",
+      "domain": "operations",
+      "mutation": true,
+      "signals": {
+        "concurrency": false,
+        "audit": false,
+        "human_actor": true,
+        "basis": "endpoint-source-scan"
+      }
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/tasks/{task_id:str}/retry",
+      "owner": "srw.api.fullworkbench",
+      "domain": "operations",
+      "mutation": true,
+      "signals": {
+        "concurrency": false,
+        "audit": false,
+        "human_actor": true,
+        "basis": "endpoint-source-scan"
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/templates",
+      "owner": "srw.api.fullworkbench",
+      "domain": "operations",
+      "mutation": false,
+      "signals": null
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/templates",
+      "owner": "srw.api.fullworkbench",
+      "domain": "operations",
+      "mutation": true,
+      "signals": {
+        "concurrency": false,
+        "audit": false,
+        "human_actor": true,
+        "basis": "endpoint-source-scan"
+      }
+    },
+    {
+      "method": "DELETE",
+      "path": "/api/v1/templates/{template_id:str}",
+      "owner": "srw.api.fullworkbench",
+      "domain": "operations",
+      "mutation": true,
+      "signals": {
+        "concurrency": false,
+        "audit": false,
+        "human_actor": true,
+        "basis": "endpoint-source-scan"
+      }
+    },
+    {
+      "method": "PATCH",
+      "path": "/api/v1/templates/{template_id:str}",
+      "owner": "srw.api.fullworkbench",
+      "domain": "operations",
+      "mutation": true,
+      "signals": {
+        "concurrency": false,
+        "audit": false,
+        "human_actor": true,
+        "basis": "endpoint-source-scan"
+      }
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/templates/{template_id:str}/apply/{project_id:str}",
+      "owner": "srw.api.fullworkbench",
+      "domain": "operations",
+      "mutation": true,
+      "signals": {
+        "concurrency": true,
+        "audit": false,
+        "human_actor": true,
+        "basis": "endpoint-source-scan"
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/workbench",
+      "owner": "srw.api.app",
+      "domain": "operations",
+      "mutation": false,
+      "signals": null
+    },
+    {
+      "method": "GET",
+      "path": "/health/live",
+      "owner": "srw.api.app",
+      "domain": "system",
+      "mutation": false,
+      "signals": null
+    },
+    {
+      "method": "GET",
+      "path": "/health/ready",
+      "owner": "srw.api.app",
+      "domain": "system",
+      "mutation": false,
+      "signals": null
+    },
+    {
+      "method": "GET",
+      "path": "/v1",
+      "owner": "srw.api.app",
+      "domain": "static",
+      "mutation": false,
+      "signals": null
+    },
+    {
+      "method": "GET",
+      "path": "/v1/{asset_path:path}",
+      "owner": "srw.api.app",
+      "domain": "static",
+      "mutation": false,
+      "signals": null
+    }
+  ],
+  "frontend_calls": [
+    {
+      "literal": "/api/v1/calibration/anchors/{param}/promote",
+      "matched_path": "/api/v1/calibration/anchors/{anchor_id:str}/promote",
+      "files": [
+        "app.js"
+      ]
+    },
+    {
+      "literal": "/api/v1/calibration/reviews/{param}/resolve",
+      "matched_path": "/api/v1/calibration/reviews/{review_id:str}/resolve",
+      "files": [
+        "app.js"
+      ]
+    },
+    {
+      "literal": "/api/v1/candidates/compare",
+      "matched_path": "/api/v1/candidates/compare",
+      "files": [
+        "app.js"
+      ]
+    },
+    {
+      "literal": "/api/v1/candidates/{param}/action-plan",
+      "matched_path": "/api/v1/candidates/{candidate_id:str}/action-plan",
+      "files": [
+        "app.js"
+      ]
+    },
+    {
+      "literal": "/api/v1/candidates/{param}/ai-runs",
+      "matched_path": "/api/v1/candidates/{candidate_id:str}/ai-runs",
+      "files": [
+        "convergence04.js"
+      ]
+    },
+    {
+      "literal": "/api/v1/candidates/{param}/archive",
+      "matched_path": "/api/v1/candidates/{candidate_id:str}/archive",
+      "files": [
+        "app.js"
+      ]
+    },
+    {
+      "literal": "/api/v1/candidates/{param}/assessment",
+      "matched_path": "/api/v1/candidates/{candidate_id:str}/assessment",
+      "files": [
+        "app.js"
+      ]
+    },
+    {
+      "literal": "/api/v1/candidates/{param}/brief",
+      "matched_path": "/api/v1/candidates/{candidate_id:str}/brief",
+      "files": [
+        "app.js"
+      ]
+    },
+    {
+      "literal": "/api/v1/candidates/{param}/contact",
+      "matched_path": "/api/v1/candidates/{candidate_id:str}/contact",
+      "files": [
+        "app.js"
+      ]
+    },
+    {
+      "literal": "/api/v1/candidates/{param}/decision",
+      "matched_path": "/api/v1/candidates/{candidate_id:str}/decision",
+      "files": [
+        "app.js"
+      ]
+    },
+    {
+      "literal": "/api/v1/candidates/{param}/decision-history",
+      "matched_path": "/api/v1/candidates/{candidate_id:str}/decision-history",
+      "files": [
+        "convergence04.js"
+      ]
+    },
+    {
+      "literal": "/api/v1/candidates/{param}/decisions/reaffirm",
+      "matched_path": "/api/v1/candidates/{candidate_id:str}/decisions/reaffirm",
+      "files": [
+        "convergence04.js"
+      ]
+    },
+    {
+      "literal": "/api/v1/candidates/{param}/events",
+      "matched_path": "/api/v1/candidates/{candidate_id:str}/events",
+      "files": [
+        "app.js"
+      ]
+    },
+    {
+      "literal": "/api/v1/candidates/{param}/evidence/extract-task",
+      "matched_path": "/api/v1/candidates/{candidate_id:str}/evidence/extract-task",
+      "files": [
+        "app.js"
+      ]
+    },
+    {
+      "literal": "/api/v1/candidates/{param}/files",
+      "matched_path": "/api/v1/candidates/{candidate_id:str}/files",
+      "files": [
+        "app.js"
+      ]
+    },
+    {
+      "literal": "/api/v1/candidates/{param}/offers",
+      "matched_path": "/api/v1/candidates/{candidate_id:str}/offers",
+      "files": [
+        "app.js"
+      ]
+    },
+    {
+      "literal": "/api/v1/candidates/{param}/phone-script",
+      "matched_path": "/api/v1/candidates/{candidate_id:str}/phone-script",
+      "files": [
+        "app.js"
+      ]
+    },
+    {
+      "literal": "/api/v1/candidates/{param}/pipeline",
+      "matched_path": "/api/v1/candidates/{candidate_id:str}/pipeline",
+      "files": [
+        "app.js"
+      ]
+    },
+    {
+      "literal": "/api/v1/candidates/{param}/reevaluations",
+      "matched_path": "/api/v1/candidates/{candidate_id:str}/reevaluations",
+      "files": [
+        "app.js"
+      ]
+    },
+    {
+      "literal": "/api/v1/candidates/{param}/restore",
+      "matched_path": "/api/v1/candidates/{candidate_id:str}/restore",
+      "files": [
+        "app.js"
+      ]
+    },
+    {
+      "literal": "/api/v1/candidates/{param}/sources/text",
+      "matched_path": "/api/v1/candidates/{candidate_id:str}/sources/text",
+      "files": [
+        "app.js"
+      ]
+    },
+    {
+      "literal": "/api/v1/candidates/{param}/stage",
+      "matched_path": "/api/v1/candidates/{candidate_id:str}/stage",
+      "files": [
+        "app.js"
+      ]
+    },
+    {
+      "literal": "/api/v1/candidates/{param}/summary",
+      "matched_path": "/api/v1/candidates/{candidate_id:str}/summary",
+      "files": [
+        "app.js"
+      ]
+    },
+    {
+      "literal": "/api/v1/candidates/{param}/verifications",
+      "matched_path": "/api/v1/candidates/{candidate_id:str}/verifications",
+      "files": [
+        "app.js"
+      ]
+    },
+    {
+      "literal": "/api/v1/candidates/{param}/workspace",
+      "matched_path": "/api/v1/candidates/{candidate_id:str}/workspace",
+      "files": [
+        "app.js"
+      ]
+    },
+    {
+      "literal": "/api/v1/claims/{param}/grounding",
+      "matched_path": "/api/v1/claims/{claim_id:str}/grounding",
+      "files": [
+        "app.js"
+      ]
+    },
+    {
+      "literal": "/api/v1/claims/{param}/review",
+      "matched_path": "/api/v1/claims/{claim_id:str}/review",
+      "files": [
+        "app.js"
+      ]
+    },
+    {
+      "literal": "/api/v1/dashboard",
+      "matched_path": "/api/v1/dashboard",
+      "files": [
+        "app.js"
+      ]
+    },
+    {
+      "literal": "/api/v1/decision-actions/{param}/knowledge-feedback",
+      "matched_path": "/api/v1/decision-actions/{action_id:str}/knowledge-feedback",
+      "files": [
+        "convergence05.js"
+      ]
+    },
+    {
+      "literal": "/api/v1/decision-actions/{param}/transition",
+      "matched_path": "/api/v1/decision-actions/{action_id:str}/transition",
+      "files": [
+        "convergence05.js"
+      ]
+    },
+    {
+      "literal": "/api/v1/events/{param",
+      "matched_path": "/api/v1/events/{event_id:str}",
+      "files": [
+        "app.js"
+      ]
+    },
+    {
+      "literal": "/api/v1/events/{param}/scorecards",
+      "matched_path": "/api/v1/events/{event_id:str}/scorecards",
+      "files": [
+        "app.js"
+      ]
+    },
+    {
+      "literal": "/api/v1/feedback/{param}/review",
+      "matched_path": "/api/v1/feedback/{feedback_id:str}/review",
+      "files": [
+        "convergence05.js"
+      ]
+    },
+    {
+      "literal": "/api/v1/identity-reviews/{param}/merge",
+      "matched_path": "/api/v1/identity-reviews/{review_id:str}/merge",
+      "files": [
+        "convergence03.js"
+      ]
+    },
+    {
+      "literal": "/api/v1/identity-reviews/{param}/merge-preview",
+      "matched_path": "/api/v1/identity-reviews/{review_id:str}/merge-preview",
+      "files": [
+        "convergence03.js"
+      ]
+    },
+    {
+      "literal": "/api/v1/identity-reviews/{param}/resolve",
+      "matched_path": "/api/v1/identity-reviews/{review_id:str}/resolve",
+      "files": [
+        "app.js"
+      ]
+    },
+    {
+      "literal": "/api/v1/knowledge-curation/{param}/export",
+      "matched_path": "/api/v1/knowledge-curation/{proposal_id:str}/export",
+      "files": [
+        "convergence05.js"
+      ]
+    },
+    {
+      "literal": "/api/v1/knowledge-curation/{param}/prepare-apply",
+      "matched_path": "/api/v1/knowledge-curation/{proposal_id:str}/prepare-apply",
+      "files": [
+        "convergence06.js"
+      ]
+    },
+    {
+      "literal": "/api/v1/knowledge-curation/{param}/review",
+      "matched_path": "/api/v1/knowledge-curation/{proposal_id:str}/review",
+      "files": [
+        "convergence05.js"
+      ]
+    },
+    {
+      "literal": "/api/v1/knowledge-feedback/{param}/promote",
+      "matched_path": "/api/v1/knowledge-feedback/{feedback_id:str}/promote",
+      "files": [
+        "convergence05.js"
+      ]
+    },
+    {
+      "literal": "/api/v1/knowledge-packages",
+      "matched_path": "/api/v1/knowledge-packages",
+      "files": [
+        "convergence06.js"
+      ]
+    },
+    {
+      "literal": "/api/v1/knowledge-packages/rollback",
+      "matched_path": "/api/v1/knowledge-packages/rollback",
+      "files": [
+        "convergence06.js"
+      ]
+    },
+    {
+      "literal": "/api/v1/knowledge-packages/{param}/activate",
+      "matched_path": "/api/v1/knowledge-packages/{package_id:str}/activate",
+      "files": [
+        "convergence06.js"
+      ]
+    },
+    {
+      "literal": "/api/v1/knowledge/search",
+      "matched_path": "/api/v1/knowledge/search",
+      "files": [
+        "app.js"
+      ]
+    },
+    {
+      "literal": "/api/v1/knowledge/status",
+      "matched_path": "/api/v1/knowledge/status",
+      "files": [
+        "app.js"
+      ]
+    },
+    {
+      "literal": "/api/v1/offers/{param}/status",
+      "matched_path": "/api/v1/offers/{offer_id:str}/status",
+      "files": [
+        "app.js"
+      ]
+    },
+    {
+      "literal": "/api/v1/projects",
+      "matched_path": "/api/v1/projects",
+      "files": [
+        "app.js"
+      ]
+    },
+    {
+      "literal": "/api/v1/projects/import-package",
+      "matched_path": "/api/v1/projects/import-package",
+      "files": [
+        "convergence08.js"
+      ]
+    },
+    {
+      "literal": "/api/v1/projects/import-package/preview",
+      "matched_path": "/api/v1/projects/import-package/preview",
+      "files": [
+        "convergence08.js"
+      ]
+    },
+    {
+      "literal": "/api/v1/projects/{param}/ai-runs",
+      "matched_path": "/api/v1/projects/{project_id:str}/ai-runs",
+      "files": [
+        "convergence04.js"
+      ]
+    },
+    {
+      "literal": "/api/v1/projects/{param}/archive",
+      "matched_path": "/api/v1/projects/{project_id:str}/archive",
+      "files": [
+        "app.js"
+      ]
+    },
+    {
+      "literal": "/api/v1/projects/{param}/audit",
+      "matched_path": "/api/v1/projects/{project_id:str}/audit",
+      "files": [
+        "app.js"
+      ]
+    },
+    {
+      "literal": "/api/v1/projects/{param}/calibration/anchors",
+      "matched_path": "/api/v1/projects/{project_id:str}/calibration/anchors",
+      "files": [
+        "app.js"
+      ]
+    },
+    {
+      "literal": "/api/v1/projects/{param}/calibration/reviews",
+      "matched_path": "/api/v1/projects/{project_id:str}/calibration/reviews",
+      "files": [
+        "app.js"
+      ]
+    },
+    {
+      "literal": "/api/v1/projects/{param}/candidate-search",
+      "matched_path": "/api/v1/projects/{project_id:str}/candidate-search",
+      "files": [
+        "app.js"
+      ]
+    },
+    {
+      "literal": "/api/v1/projects/{param}/candidates",
+      "matched_path": "/api/v1/projects/{project_id:str}/candidates",
+      "files": [
+        "app.js"
+      ]
+    },
+    {
+      "literal": "/api/v1/projects/{param}/candidates.csv",
+      "matched_path": "/api/v1/projects/{project_id:str}/candidates.csv",
+      "files": [
+        "app.js"
+      ]
+    },
+    {
+      "literal": "/api/v1/projects/{param}/candidates/batch-intake",
+      "matched_path": "/api/v1/projects/{project_id:str}/candidates/batch-intake",
+      "files": [
+        "app.js"
+      ]
+    },
+    {
+      "literal": "/api/v1/projects/{param}/candidates/stage",
+      "matched_path": "/api/v1/projects/{project_id:str}/candidates/stage",
+      "files": [
+        "app.js"
+      ]
+    },
+    {
+      "literal": "/api/v1/projects/{param}/cockpit",
+      "matched_path": "/api/v1/projects/{project_id:str}/cockpit",
+      "files": [
+        "app.js"
+      ]
+    },
+    {
+      "literal": "/api/v1/projects/{param}/contact-list.csv",
+      "matched_path": "/api/v1/projects/{project_id:str}/contact-list.csv",
+      "files": [
+        "app.js"
+      ]
+    },
+    {
+      "literal": "/api/v1/projects/{param}/contact-queue",
+      "matched_path": "/api/v1/projects/{project_id:str}/contact-queue",
+      "files": [
+        "app.js"
+      ]
+    },
+    {
+      "literal": "/api/v1/projects/{param}/decision-actions/recommend",
+      "matched_path": "/api/v1/projects/{project_id:str}/decision-actions/recommend",
+      "files": [
+        "convergence05.js"
+      ]
+    },
+    {
+      "literal": "/api/v1/projects/{param}/export-package",
+      "matched_path": "/api/v1/projects/{project_id:str}/export-package",
+      "files": [
+        "convergence08.js"
+      ]
+    },
+    {
+      "literal": "/api/v1/projects/{param}/feedback",
+      "matched_path": "/api/v1/projects/{project_id:str}/feedback",
+      "files": [
+        "convergence05.js"
+      ]
+    },
+    {
+      "literal": "/api/v1/projects/{param}/handoff",
+      "matched_path": "/api/v1/projects/{project_id:str}/handoff",
+      "files": [
+        "app.js"
+      ]
+    },
+    {
+      "literal": "/api/v1/projects/{param}/identity-reviews",
+      "matched_path": "/api/v1/projects/{project_id:str}/identity-reviews",
+      "files": [
+        "app.js"
+      ]
+    },
+    {
+      "literal": "/api/v1/projects/{param}/identity-reviews/scan",
+      "matched_path": "/api/v1/projects/{project_id:str}/identity-reviews/scan",
+      "files": [
+        "app.js"
+      ]
+    },
+    {
+      "literal": "/api/v1/projects/{param}/job-setup",
+      "matched_path": "/api/v1/projects/{project_id:str}/job-setup",
+      "files": [
+        "app.js"
+      ]
+    },
+    {
+      "literal": "/api/v1/projects/{param}/job-setup/suggest",
+      "matched_path": "/api/v1/projects/{project_id:str}/job-setup/suggest",
+      "files": [
+        "app.js"
+      ]
+    },
+    {
+      "literal": "/api/v1/projects/{param}/knowledge/apply",
+      "matched_path": "/api/v1/projects/{project_id:str}/knowledge/apply",
+      "files": [
+        "app.js"
+      ]
+    },
+    {
+      "literal": "/api/v1/projects/{param}/operations-learning",
+      "matched_path": "/api/v1/projects/{project_id:str}/operations-learning",
+      "files": [
+        "convergence05.js"
+      ]
+    },
+    {
+      "literal": "/api/v1/projects/{param}/pipeline",
+      "matched_path": "/api/v1/projects/{project_id:str}/pipeline",
+      "files": [
+        "app.js"
+      ]
+    },
+    {
+      "literal": "/api/v1/projects/{param}/planning",
+      "matched_path": "/api/v1/projects/{project_id:str}/planning",
+      "files": [
+        "convergence05.js"
+      ]
+    },
+    {
+      "literal": "/api/v1/projects/{param}/protocol-drafts",
+      "matched_path": "/api/v1/projects/{project_id:str}/protocol-drafts",
+      "files": [
+        "app.js"
+      ]
+    },
+    {
+      "literal": "/api/v1/projects/{param}/protocol-workspace",
+      "matched_path": "/api/v1/projects/{project_id:str}/protocol-workspace",
+      "files": [
+        "app.js"
+      ]
+    },
+    {
+      "literal": "/api/v1/projects/{param}/ranked-shortlist",
+      "matched_path": "/api/v1/projects/{project_id:str}/ranked-shortlist",
+      "files": [
+        "convergence03.js"
+      ]
+    },
+    {
+      "literal": "/api/v1/projects/{param}/ranked-shortlists",
+      "matched_path": "/api/v1/projects/{project_id:str}/ranked-shortlists",
+      "files": [
+        "convergence03.js"
+      ]
+    },
+    {
+      "literal": "/api/v1/projects/{param}/recruitment-intelligence",
+      "matched_path": "/api/v1/projects/{project_id:str}/recruitment-intelligence",
+      "files": [
+        "convergence06.js"
+      ]
+    },
+    {
+      "literal": "/api/v1/projects/{param}/sourcing-observations",
+      "matched_path": "/api/v1/projects/{project_id:str}/sourcing-observations",
+      "files": [
+        "convergence06.js"
+      ]
+    },
+    {
+      "literal": "/api/v1/projects/{param}/sourcing-observations/import-commit",
+      "matched_path": "/api/v1/projects/{project_id:str}/sourcing-observations/import-commit",
+      "files": [
+        "convergence07.js"
+      ]
+    },
+    {
+      "literal": "/api/v1/projects/{param}/sourcing-observations/import-preview",
+      "matched_path": "/api/v1/projects/{project_id:str}/sourcing-observations/import-preview",
+      "files": [
+        "convergence07.js"
+      ]
+    },
+    {
+      "literal": "/api/v1/projects/{param}/status",
+      "matched_path": "/api/v1/projects/{project_id:str}/status",
+      "files": [
+        "app.js"
+      ]
+    },
+    {
+      "literal": "/api/v1/projects/{param}/templates/from-current",
+      "matched_path": "/api/v1/projects/{project_id:str}/templates/from-current",
+      "files": [
+        "app.js"
+      ]
+    },
+    {
+      "literal": "/api/v1/protocol-revisions/{param",
+      "matched_path": "/api/v1/protocol-revisions/{revision_id:str}",
+      "files": [
+        "app.js"
+      ]
+    },
+    {
+      "literal": "/api/v1/protocol-revisions/{param}/publish",
+      "matched_path": "/api/v1/protocol-revisions/{revision_id:str}/publish",
+      "files": [
+        "app.js"
+      ]
+    },
+    {
+      "literal": "/api/v1/reevaluations/{param}/apply",
+      "matched_path": "/api/v1/reevaluations/{draft_id:str}/apply",
+      "files": [
+        "app.js"
+      ]
+    },
+    {
+      "literal": "/api/v1/settings/providers",
+      "matched_path": "/api/v1/settings/providers",
+      "files": [
+        "app.js"
+      ]
+    },
+    {
+      "literal": "/api/v1/settings/providers/{param",
+      "matched_path": "/api/v1/settings/providers/{name:str}",
+      "files": [
+        "app.js"
+      ]
+    },
+    {
+      "literal": "/api/v1/settings/providers/{param}/test",
+      "matched_path": "/api/v1/settings/providers/{name:str}/test",
+      "files": [
+        "app.js"
+      ]
+    },
+    {
+      "literal": "/api/v1/sources/{param}/content",
+      "matched_path": "/api/v1/sources/{source_id:str}/content",
+      "files": [
+        "convergence03.js"
+      ]
+    },
+    {
+      "literal": "/api/v1/sources/{param}/page/{param",
+      "matched_path": "/api/v1/sources/{source_id:str}/page/{page_number:int}",
+      "files": [
+        "convergence03.js"
+      ]
+    },
+    {
+      "literal": "/api/v1/sources/{param}/scoring-view",
+      "matched_path": "/api/v1/sources/{source_id:str}/scoring-view",
+      "files": [
+        "app.js"
+      ]
+    },
+    {
+      "literal": "/api/v1/system/backups",
+      "matched_path": "/api/v1/system/backups",
+      "files": [
+        "app.js"
+      ]
+    },
+    {
+      "literal": "/api/v1/system/backups/{param",
+      "matched_path": "/api/v1/system/backups/{filename:str}",
+      "files": [
+        "app.js"
+      ]
+    },
+    {
+      "literal": "/api/v1/system/backups/{param}/restore",
+      "matched_path": "/api/v1/system/backups/{filename:str}/restore",
+      "files": [
+        "app.js"
+      ]
+    },
+    {
+      "literal": "/api/v1/system/diagnostics",
+      "matched_path": "/api/v1/system/diagnostics",
+      "files": [
+        "app.js"
+      ]
+    },
+    {
+      "literal": "/api/v1/system/diagnostics/export",
+      "matched_path": "/api/v1/system/diagnostics/export",
+      "files": [
+        "app.js"
+      ]
+    },
+    {
+      "literal": "/api/v1/tasks",
+      "matched_path": "/api/v1/tasks",
+      "files": [
+        "app.js"
+      ]
+    },
+    {
+      "literal": "/api/v1/tasks/{param}/cancel",
+      "matched_path": "/api/v1/tasks/{task_id:str}/cancel",
+      "files": [
+        "app.js"
+      ]
+    },
+    {
+      "literal": "/api/v1/tasks/{param}/retry",
+      "matched_path": "/api/v1/tasks/{task_id:str}/retry",
+      "files": [
+        "app.js"
+      ]
+    },
+    {
+      "literal": "/api/v1/templates",
+      "matched_path": "/api/v1/templates",
+      "files": [
+        "app.js"
+      ]
+    },
+    {
+      "literal": "/api/v1/templates/{param",
+      "matched_path": "/api/v1/templates/{template_id:str}",
+      "files": [
+        "app.js"
+      ]
+    },
+    {
+      "literal": "/api/v1/templates/{param}/apply/{param",
+      "matched_path": "/api/v1/templates/{template_id:str}/apply/{project_id:str}",
+      "files": [
+        "app.js"
+      ]
+    }
+  ]
+}
