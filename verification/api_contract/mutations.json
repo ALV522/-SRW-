@@ -1,9 +1,9 @@
 {
   "schema": "srw.api-mutation-classification.v1",
-  "status": "R1 ratchet plus R2 classification for offers, interviews, operational, system and provider routes.",
+  "status": "R1 ratchet plus R2 classification for offers, interviews, operations, system, providers and reevaluation routes.",
   "frozen_at": "main e385adfb868baf5173f98d6119f253dd9d072b41",
   "rule": "live_mutations - classified MUST NOT exceed baseline_unclassified. Adding a mutation route therefore fails the contract test until it is classified or this baseline is raised in review.",
-  "baseline_unclassified": 56,
+  "baseline_unclassified": 54,
   "classified": [
     {
       "method": "POST",
@@ -242,6 +242,34 @@
       "human_actor": "implicit",
       "invariants": "a missing key is provider_not_ready (409); upstream failure is provider_failure (502) and must not echo the key",
       "side_effects": "one outbound provider request from the local Core; no database write"
+    },
+    {
+      "domain": "decisions",
+      "owner": "srw.api.routes.decisions",
+      "method": "POST",
+      "path": "/api/v1/candidates/{candidate_id:str}/reevaluations",
+      "use_case": "CreateReevaluationDraft",
+      "request": "summary, proposal.judgments[{criterion_key,status,evidence_level,reason,gap,claim_ids}], actor",
+      "response": "draft_id, state, diff[{before,after}], decision_context_hash",
+      "concurrency": "none on the draft itself; the draft snapshots the current decision context hash and is invalidated later, not now",
+      "audit": "REEVALUATION_DRAFT_CREATED with diff_count and context_hash",
+      "human_actor": "yes - actor defaults to human",
+      "invariants": "criterion_key must exist in the published protocol (409); status and evidence_level are whitelisted; the diff baseline is the latest prior human judgment per key, not only current-context judgments",
+      "side_effects": "creates one ReevaluationDraft plus one audit event; no assessment is written yet"
+    },
+    {
+      "domain": "decisions",
+      "owner": "srw.api.routes.decisions",
+      "method": "POST",
+      "path": "/api/v1/reevaluations/{draft_id:str}/apply",
+      "use_case": "ApplyReevaluation",
+      "request": "path draft_id only",
+      "response": "draft_id, state, applied_changes, human_decision_unchanged",
+      "concurrency": "context-hash guard: if the protocol or material changed since the draft, the draft becomes stale and the call returns 409; re-applying an applied draft is idempotent",
+      "audit": "REEVALUATION_APPLIED with diff_count and context_hash",
+      "human_actor": "assessments are recorded with actor human:reevaluation; a HumanDecision is never written here",
+      "invariants": "draft must exist (404) and be in draft state; context hash must still match",
+      "side_effects": "writes pre_ and post_reevaluation EvaluationSnapshots and updates CriterionJudgments inside one transaction"
     }
   ]
 }

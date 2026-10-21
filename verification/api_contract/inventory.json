@@ -289,7 +289,7 @@
     {
       "method": "GET",
       "path": "/api/v1/candidates/{candidate_id:str}/reevaluations",
-      "owner": "srw.api.fullworkbench",
+      "owner": "srw.api.routes.decisions",
       "domain": "decisions",
       "mutation": false,
       "signals": null
@@ -297,7 +297,7 @@
     {
       "method": "POST",
       "path": "/api/v1/candidates/{candidate_id:str}/reevaluations",
-      "owner": "srw.api.fullworkbench",
+      "owner": "srw.api.routes.decisions",
       "domain": "decisions",
       "mutation": true,
       "signals": {
@@ -1183,7 +1183,7 @@
     {
       "method": "POST",
       "path": "/api/v1/reevaluations/{draft_id:str}/apply",
-      "owner": "srw.api.fullworkbench",
+      "owner": "srw.api.routes.decisions",
       "domain": "decisions",
       "mutation": true,
       "signals": {
