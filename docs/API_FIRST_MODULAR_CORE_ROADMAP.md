@@ -175,6 +175,12 @@ backend/srw/api/
 
 `fullworkbench.py` 1387 → **1346 行**；累计从 1723 降至 1346（−377，−21.9%）。写操作归类 15/73，棘轮 61 → 58。浏览器套件的时序 flake 已记入 `docs/BROWSER_ACCEPTANCE.md`，稳定化另开 PR。
 
+**R2 进度（2026-10-22，第五刀）**：`providers` 域 3 条路由（配置读取 / 更新 / 探测）迁出到 `backend/srw/api/routes/providers.py`。三个 provider 助手（`profile_view` / `api_key_name` / `probe_provider`）与 `httpx` 加载器移入新的 `backend/srw/api/provider_support.py`——它们同时被留在聚合层的 OCR/ASR 字节处理使用，放进 route 模块必然循环依赖。
+
+本轮同时补上一条**安全回归**：`test_provider_routes.py` 断言 `/api/v1/settings/providers` 的序列化响应里不出现原始 API key，连前 8 位也不允许出现，并覆盖"探测失败不得回显密钥"。此前只有诊断包层面的脱敏断言，没有 API 层的。
+
+`fullworkbench.py` 1346 → **1311 行**；累计从 1723 降至 1311（−412，−23.9%）。写操作归类 17/73，棘轮 58 → 56。搬移中发现并修正一处自我引入的偏差：清理 `_probe` 时因位置在 `_task_begin` 之后而漏删，导致模块级定义遮蔽同名导入别名——已删除并验证 `_probe.__module__` 指向新模块。
+
 ### R3 · Application Use-case Layer
 
 目标：把“一个用户动作需要串联多个模块”的逻辑从 route/UI 中提取到应用层。

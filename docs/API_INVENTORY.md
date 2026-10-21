@@ -153,9 +153,9 @@
 | GET | `/api/v1/settings` | system | `srw.api.app` | — | — | — |
 | PATCH | `/api/v1/settings/capabilities/{name:str}` | system | `srw.api.app` | · | · | yes |
 | PATCH | `/api/v1/settings/provider` | providers | `srw.api.app` | · | · | yes |
-| GET | `/api/v1/settings/providers` | providers | `srw.api.fullworkbench` | — | — | — |
-| PATCH | `/api/v1/settings/providers/{name:str}` | providers | `srw.api.fullworkbench` | · | · | yes |
-| POST | `/api/v1/settings/providers/{name:str}/test` | providers | `srw.api.fullworkbench` | · | · | yes |
+| GET | `/api/v1/settings/providers` | providers | `srw.api.routes.providers` | — | — | — |
+| PATCH | `/api/v1/settings/providers/{name:str}` | providers | `srw.api.routes.providers` | · | · | yes |
+| POST | `/api/v1/settings/providers/{name:str}/test` | providers | `srw.api.routes.providers` | · | · | yes |
 | GET | `/api/v1/sources/{source_id:str}/content` | evidence | `srw.api.app` | — | — | — |
 | GET | `/api/v1/sources/{source_id:str}/file` | evidence | `srw.api.app` | — | — | — |
 | GET | `/api/v1/sources/{source_id:str}/page/{page_number:int}` | evidence | `srw.api.app` | — | — | — |
