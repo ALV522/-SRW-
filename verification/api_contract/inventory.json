@@ -692,7 +692,7 @@
     {
       "method": "POST",
       "path": "/api/v1/projects/{project_id:str}/archive",
-      "owner": "srw.api.fullworkbench",
+      "owner": "srw.api.routes.projects",
       "domain": "projects",
       "mutation": true,
       "signals": {
@@ -705,7 +705,7 @@
     {
       "method": "GET",
       "path": "/api/v1/projects/{project_id:str}/audit",
-      "owner": "srw.api.fullworkbench",
+      "owner": "srw.api.routes.projects",
       "domain": "projects",
       "mutation": false,
       "signals": null
@@ -826,7 +826,7 @@
     {
       "method": "GET",
       "path": "/api/v1/projects/{project_id:str}/contact-list.csv",
-      "owner": "srw.api.fullworkbench",
+      "owner": "srw.api.routes.projects",
       "domain": "projects",
       "mutation": false,
       "signals": null
@@ -834,7 +834,7 @@
     {
       "method": "GET",
       "path": "/api/v1/projects/{project_id:str}/contact-queue",
-      "owner": "srw.api.fullworkbench",
+      "owner": "srw.api.routes.projects",
       "domain": "projects",
       "mutation": false,
       "signals": null
@@ -921,7 +921,7 @@
     {
       "method": "PATCH",
       "path": "/api/v1/projects/{project_id:str}/job-setup",
-      "owner": "srw.api.fullworkbench",
+      "owner": "srw.api.routes.projects",
       "domain": "projects",
       "mutation": true,
       "signals": {
@@ -934,7 +934,7 @@
     {
       "method": "POST",
       "path": "/api/v1/projects/{project_id:str}/job-setup/suggest",
-      "owner": "srw.api.fullworkbench",
+      "owner": "srw.api.routes.projects",
       "domain": "projects",
       "mutation": true,
       "signals": {
@@ -1063,7 +1063,7 @@
     {
       "method": "POST",
       "path": "/api/v1/projects/{project_id:str}/restore",
-      "owner": "srw.api.fullworkbench",
+      "owner": "srw.api.routes.projects",
       "domain": "projects",
       "mutation": true,
       "signals": {
@@ -1123,7 +1123,7 @@
     {
       "method": "POST",
       "path": "/api/v1/projects/{project_id:str}/status",
-      "owner": "srw.api.fullworkbench",
+      "owner": "srw.api.routes.projects",
       "domain": "projects",
       "mutation": true,
       "signals": {

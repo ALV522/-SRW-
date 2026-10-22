@@ -5,7 +5,7 @@ from time import perf_counter
 from pathlib import Path
 from typing import Any
 
-from sqlalchemy import func, select, or_, case
+from sqlalchemy import func, select, case
 from starlette.exceptions import HTTPException
 from starlette.requests import Request
 from starlette.responses import JSONResponse, PlainTextResponse
@@ -19,6 +19,7 @@ from srw.api.routes.system import system_routes
 from srw.api.routes.providers import provider_routes
 from srw.api.routes.decisions import reevaluation_routes
 from srw.api.routes.candidates import candidate_routes
+from srw.api.routes.projects import project_routes
 from srw.api.provider_support import api_key_name as _key_for, httpx_module as _httpx, profile_view as _profile_view, probe_provider as _probe
 from srw.api.shared import latest_draft as _latest_draft
 from srw.api.shared import publish_current_revision as _publish_current
@@ -33,20 +34,20 @@ from srw.modules.ai_runs.service import start_ai_run, finish_ai_run, fail_ai_run
 from srw.modules.candidate.commands import add_source, create_candidate
 from srw.modules.candidate.models import Candidate, CandidateContact, Claim, Source
 from srw.modules.candidate.repository import MaterialRepository, get_current_source_ids
-from srw.modules.decision.models import CriterionJudgment, HumanDecision
+from srw.modules.decision.models import CriterionJudgment
 from srw.modules.identity.models import CandidateIdentityReview
 from srw.modules.calibration.models import JudgmentReviewItem
 from srw.modules.decision.context import get_current_decision_context
 from srw.modules.decision.assessment import get_candidate_assessment
 from srw.modules.fullworkbench import BlobStore, KnowledgeService, RecruitmentEvent, ReevaluationDraft, TaskRecord
-from srw.modules.protocol.models import Project, ProtocolRevision
+from srw.modules.protocol.models import Project
 from srw.modules.protocol.repository import ProtocolRepository
 from srw.modules.recruiting.models import CandidateStageTransition, OfferRecord
 from srw.modules.recruiting.operations_models import CandidateActionPlan, InterviewScorecardSubmission
-from srw.recruiting.workbench import (update_job_setup, suggest_job_setup, upsert_action_plan, action_plan_view, contact_queue, phone_script)
+from srw.recruiting.workbench import (upsert_action_plan, action_plan_view, phone_script)
 from srw.recruiting.operations import (
     PIPELINE_STAGES, OFFER_STATES, bulk_change_candidate_stage, change_candidate_stage,
-    change_project_status, pipeline_history, project_funnel,
+    pipeline_history, project_funnel,
 )
 from srw.providers.contracts import ProviderFailureError, ProviderNotReadyError, ProviderOutputInvalidError
 from srw.providers.runtime import ProviderRuntime
@@ -464,20 +465,6 @@ def install_full_workbench_routes(app, factory, registry, secrets, *, data_dir: 
                 output.append({"candidate_id":c.id,"display_name":c.display_name,"pipeline_stage":c.pipeline_stage or "new","has_material":bool(c.current_material_revision_id),"confirmed_claims":int(a or 0),"unreviewed_claims":int(b or 0),"judgments":int(j or 0),"assessment":assessment})
             return JSONResponse({"candidates":output,"total":int(total),"limit":limit,"offset":offset})
 
-    async def archive_project(r):
-        pid=r.path_params["project_id"]
-        with v1_session_scope(factory) as s:
-            x=change_project_status(s,pid,"archived",actor="human",reason="project archived")
-            return JSONResponse({"project_id":pid,"status":x.status})
-    async def restore_project(r):
-        pid=r.path_params["project_id"]
-        with v1_session_scope(factory) as s:
-            x=s.get(Project,pid)
-            if not x: raise V1NotFoundError(f"project not found: {pid}")
-            target="open" if x.current_protocol_revision_id else "draft"
-            x=change_project_status(s,pid,target,actor="human",reason="project restored")
-            return JSONResponse({"project_id":pid,"status":x.status})
-
     def _queue_media_task(s, *, task_type: str, candidate_id: str, source_id: str, payload: dict[str,Any]) -> TaskRecord:
         task=TaskRecord(task_type=task_type,status="queued",candidate_id=candidate_id,source_id=source_id,payload_json=json.dumps(payload,ensure_ascii=False,separators=(",",":")))
         _queue_task_job(s,task)
@@ -802,12 +789,6 @@ def install_full_workbench_routes(app, factory, registry, secrets, *, data_dir: 
             saved=ProtocolRepository(s).get_payload(row.id)["criteria"][-1]
             return JSONResponse({"revision_id":row.id,"criterion":saved})
 
-    async def project_status(r):
-        pid=r.path_params["project_id"];b=await _json_body(r)
-        with v1_session_scope(factory) as s:
-            row=change_project_status(s,pid,_s(b,"status",required=True),actor=_s(b,"actor",default="human"),reason=_s(b,"reason"))
-            return JSONResponse({"project_id":row.id,"status":row.status})
-
     async def candidate_stage(r):
         cid=r.path_params["candidate_id"];b=await _json_body(r)
         with v1_session_scope(factory) as s:
@@ -943,31 +924,6 @@ def install_full_workbench_routes(app, factory, registry, secrets, *, data_dir: 
                 rows.append({"candidate_id":c.id,"display_name":c.display_name,"pipeline_stage":c.pipeline_stage or "new","has_material":bool(c.current_material_revision_id),"contact":{"phone":contact.phone if contact else "","email":contact.email if contact else "","user_confirmed":bool(contact.user_confirmed) if contact else False},"offer_status":offer.status if offer else "","assessment":assessment,"criteria":crit})
             return JSONResponse({"project_id":pid,"protocol_revision_id":protocol_id,"evaluation_policy_revision":evaluation_policy_revision,"criteria":criteria,"candidates":rows,"note":"Comparison is limited to the same project and current protocol/material decision context. Fit is shown only when evidence is publishable; no automatic hiring decision is made."})
 
-    async def project_audit(r):
-        pid=r.path_params["project_id"]
-        try:
-            limit=min(200,max(1,int(r.query_params.get("limit","50")))); offset=max(0,int(r.query_params.get("offset","0")))
-        except ValueError as exc: raise V1InvariantError("limit and offset must be integers") from exc
-        with factory() as s:
-            if s.get(Project,pid) is None: raise V1NotFoundError(f"project not found: {pid}")
-            revisions=s.scalars(select(ProtocolRevision).where(ProtocolRevision.project_id==pid).order_by(ProtocolRevision.revision.desc())).all()
-            candidate_ids=list(s.scalars(select(Candidate.id).where(Candidate.project_id==pid)).all())
-            source_ids=list(s.scalars(select(Source.id).where(Source.candidate_id.in_(candidate_ids))).all()) if candidate_ids else []
-            claim_ids=list(s.scalars(select(Claim.id).where(Claim.candidate_id.in_(candidate_ids))).all()) if candidate_ids else []
-            judgment_ids=list(s.scalars(select(CriterionJudgment.id).where(CriterionJudgment.candidate_id.in_(candidate_ids))).all()) if candidate_ids else []
-            decision_ids=list(s.scalars(select(HumanDecision.id).where(HumanDecision.candidate_id.in_(candidate_ids))).all()) if candidate_ids else []
-            event_ids=list(s.scalars(select(RecruitmentEvent.id).where(RecruitmentEvent.candidate_id.in_(candidate_ids))).all()) if candidate_ids else []
-            offer_ids=list(s.scalars(select(OfferRecord.id).where(OfferRecord.project_id==pid)).all())
-            legacy_ids=[pid,*candidate_ids,*source_ids,*claim_ids,*judgment_ids,*decision_ids,*event_ids,*offer_ids]
-            filt=or_(AuditEvent.project_id==pid,AuditEvent.entity_id.in_(legacy_ids))
-            total=s.scalar(select(func.count(AuditEvent.id)).where(filt)) or 0
-            events=s.scalars(select(AuditEvent).where(filt).order_by(AuditEvent.created_at.desc(),AuditEvent.id.desc()).limit(limit).offset(offset)).all()
-            return JSONResponse({
-                "protocol_revisions":[{"revision_id":x.id,"revision":x.revision,"state":x.state,"created_at":x.created_at.isoformat(),"published_at":x.published_at.isoformat() if x.published_at else None,"content_hash":x.content_hash} for x in revisions],
-                "audit_events":[{"event_id":x.id,"event_type":x.event_type,"entity_type":x.entity_type,"entity_id":x.entity_id,"project_id":x.project_id,"candidate_id":x.candidate_id,"actor":x.actor,"reason":x.reason,"created_at":x.created_at.isoformat()} for x in events],
-                "total":int(total),"limit":limit,"offset":offset,
-            })
-
     async def candidates_csv(r):
         import csv
         from io import StringIO
@@ -1008,14 +964,6 @@ def install_full_workbench_routes(app, factory, registry, secrets, *, data_dir: 
                 w.writerow({"candidate_id":x.id,"display_name":safe_cell(x.display_name),"pipeline_stage":x.pipeline_stage or "new","archived":int(x.archived),"has_material":int(bool(x.current_material_revision_id)),"phone":safe_cell(contact.phone if contact else ""),"email":safe_cell(contact.email if contact else ""),"contact_confirmed":int(bool(contact.user_confirmed)) if contact else 0,"offer_status":offer.status if offer else "","protocol_revision_id":protocol_id,"evaluation_policy_revision":evaluation_policy_revision,"criteria_summary":safe_cell(" | ".join(summaries)),"evidence_gaps":safe_cell(" | ".join(gaps)),"created_at":x.created_at.isoformat(),"generated_at":generated})
             return PlainTextResponse(out.getvalue(),media_type="text/csv; charset=utf-8",headers={"Content-Disposition":f'attachment; filename="candidates-{pid}.csv"'})
 
-    async def job_setup(r):
-        pid=r.path_params["project_id"]; body=await _json_body(r)
-        with v1_session_scope(factory) as s: return JSONResponse(update_job_setup(s,pid,body))
-
-    async def job_setup_suggest(r):
-        pid=r.path_params["project_id"]
-        with v1_session_scope(factory) as s: return JSONResponse(suggest_job_setup(s,pid))
-
     async def candidate_action_plan(r):
         cid=r.path_params["candidate_id"]
         if r.method=="GET":
@@ -1028,11 +976,6 @@ def install_full_workbench_routes(app, factory, registry, secrets, *, data_dir: 
                 return JSONResponse(action_plan_view(row))
         body=await _json_body(r)
         with v1_session_scope(factory) as s: return JSONResponse(action_plan_view(upsert_action_plan(s,cid,body)))
-
-    async def project_contact_queue(r):
-        try: limit=min(200,max(1,int(r.query_params.get("limit","50"))));offset=max(0,int(r.query_params.get("offset","0")))
-        except ValueError as exc: raise V1InvariantError("limit and offset must be integers") from exc
-        with factory() as s: return JSONResponse(contact_queue(s,r.path_params["project_id"],limit=limit,offset=offset))
 
     async def candidate_phone_script(r):
         with factory() as s: return JSONResponse(phone_script(s,r.path_params["candidate_id"],evaluation_policy_revision=evaluation_policy_revision))
@@ -1061,33 +1004,19 @@ def install_full_workbench_routes(app, factory, registry, secrets, *, data_dir: 
             project=s.get(Project,pid)
             return JSONResponse({"project_id":pid,"project_title":project.title if project else "","generated_at":utc_now().isoformat(),"candidates":[_brief_payload(s,x.id) for x in rows]})
 
-    async def contact_list_csv(r):
-        import csv
-        from io import StringIO
-        pid=r.path_params["project_id"]
-        def safe_cell(value):
-            text="" if value is None else str(value)
-            return "'"+text if text[:1] in ("=","+","-","@") else text
-        with factory() as s:
-            q=contact_queue(s,pid,limit=10000,offset=0)
-            out=StringIO();fields=["candidate_id","display_name","phone","email","priority","contact_status","next_contact_at","next_action"]
-            w=csv.DictWriter(out,fieldnames=fields);w.writeheader()
-            for x in q["candidates"]:
-                w.writerow({"candidate_id":x["candidate_id"],"display_name":safe_cell(x["display_name"]),"phone":safe_cell(x["phone"]),"email":safe_cell(x["email"]),"priority":x["priority"],"contact_status":x["contact_status"],"next_contact_at":safe_cell(x["next_contact_at"] or ""),"next_action":safe_cell(x["reason"] or "联系并核实未决条件")})
-            return PlainTextResponse(out.getvalue(),media_type="text/csv; charset=utf-8",headers={"Content-Disposition":f'attachment; filename="contact-list-{pid}.csv"'})
 
     routes=[
       Route('/api/v1/dashboard',dashboard, methods=['GET']),
       *provider_routes(factory=factory, secrets=secrets),
       *candidate_routes(factory=factory),
       Route('/api/v1/projects/{project_id:str}/cockpit',cockpit, methods=['GET']),
-      Route('/api/v1/projects/{project_id:str}/status',project_status, methods=['POST']),Route('/api/v1/projects/{project_id:str}/pipeline',project_pipeline, methods=['GET']),
+      Route('/api/v1/projects/{project_id:str}/pipeline',project_pipeline, methods=['GET']),
       Route('/api/v1/projects/{project_id:str}/candidates/stage',bulk_candidate_stage, methods=['POST']),
       Route('/api/v1/candidates/{candidate_id:str}/stage',candidate_stage, methods=['POST']),Route('/api/v1/candidates/{candidate_id:str}/pipeline',candidate_pipeline, methods=['GET']),
       
       *offer_routes(factory=factory),
       Route('/api/v1/projects/{project_id:str}/candidates/batch-intake',batch_intake, methods=['POST']),
-      Route('/api/v1/projects/{project_id:str}/archive',archive_project, methods=['POST']),Route('/api/v1/projects/{project_id:str}/restore',restore_project, methods=['POST']),
+      *project_routes(factory=factory),
       
       Route('/api/v1/candidates/{candidate_id:str}/files',ingest_file, methods=['POST']),
       Route('/api/v1/candidates/{candidate_id:str}/evidence/extract-task',extract_evidence_task, methods=['POST']),
@@ -1098,11 +1027,11 @@ def install_full_workbench_routes(app, factory, registry, secrets, *, data_dir: 
       
       *reevaluation_routes(factory=factory, evaluation_policy_revision=evaluation_policy_revision),
       Route('/api/v1/candidates/compare',compare_candidates, methods=['GET']),
-      Route('/api/v1/projects/{project_id:str}/audit',project_audit, methods=['GET']),Route('/api/v1/projects/{project_id:str}/candidates.csv',candidates_csv, methods=['GET']),
-      Route('/api/v1/projects/{project_id:str}/job-setup',job_setup,methods=['PATCH']),Route('/api/v1/projects/{project_id:str}/job-setup/suggest',job_setup_suggest,methods=['POST']),
-      Route('/api/v1/candidates/{candidate_id:str}/action-plan',candidate_action_plan,methods=['GET','PATCH']),Route('/api/v1/projects/{project_id:str}/contact-queue',project_contact_queue,methods=['GET']),Route('/api/v1/candidates/{candidate_id:str}/phone-script',candidate_phone_script,methods=['GET']),
+      Route('/api/v1/projects/{project_id:str}/candidates.csv',candidates_csv, methods=['GET']),
       
-      Route('/api/v1/candidates/{candidate_id:str}/brief',candidate_brief,methods=['GET']),Route('/api/v1/projects/{project_id:str}/handoff',project_handoff,methods=['GET']),Route('/api/v1/projects/{project_id:str}/contact-list.csv',contact_list_csv,methods=['GET']),
+      Route('/api/v1/candidates/{candidate_id:str}/action-plan',candidate_action_plan,methods=['GET','PATCH']),Route('/api/v1/candidates/{candidate_id:str}/phone-script',candidate_phone_script,methods=['GET']),
+      
+      Route('/api/v1/candidates/{candidate_id:str}/brief',candidate_brief,methods=['GET']),Route('/api/v1/projects/{project_id:str}/handoff',project_handoff,methods=['GET']),
       *system_routes(factory=factory, data_dir=data_dir, knowledge_dir=knowledge_dir, database_path=database_path, frontend_dist=frontend_dist),
     ]
     app.routes.extend(routes)

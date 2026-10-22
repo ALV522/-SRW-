@@ -1,9 +1,9 @@
 {
   "schema": "srw.api-mutation-classification.v1",
-  "status": "R1 ratchet plus R2 classification for offers, interviews, operations, system, providers, reevaluations and candidate CRUD.",
+  "status": "R1 ratchet plus R2 classification for offers, interviews, operations, system, providers, reevaluations, candidate CRUD and project lifecycle.",
   "frozen_at": "main e385adfb868baf5173f98d6119f253dd9d072b41",
   "rule": "live_mutations - classified MUST NOT exceed baseline_unclassified. Adding a mutation route therefore fails the contract test until it is classified or this baseline is raised in review.",
-  "baseline_unclassified": 50,
+  "baseline_unclassified": 45,
   "classified": [
     {
       "method": "POST",
@@ -326,6 +326,76 @@
       "human_actor": "yes - actor defaults to human and is stored in contact provenance",
       "invariants": "user_confirmed must be a boolean (409); confirmed_fields is emptied when user_confirmed is false",
       "side_effects": "upserts CandidateContact, mirrors display_name onto the candidate, writes provenance and one audit event"
+    },
+    {
+      "domain": "projects",
+      "owner": "srw.api.routes.projects",
+      "method": "POST",
+      "path": "/api/v1/projects/{project_id:str}/status",
+      "use_case": "TransitionProjectStatus",
+      "request": "status (required), actor, reason",
+      "response": "project_id, status",
+      "concurrency": "none - no If-Match",
+      "audit": "written by change_project_status inside the domain service",
+      "human_actor": "yes - actor defaults to human",
+      "invariants": "status must be a value the domain state machine accepts (409)",
+      "side_effects": "updates project status plus its audit event"
+    },
+    {
+      "domain": "projects",
+      "owner": "srw.api.routes.projects",
+      "method": "POST",
+      "path": "/api/v1/projects/{project_id:str}/archive",
+      "use_case": "ArchiveProject",
+      "request": "path project_id only",
+      "response": "project_id, status=archived",
+      "concurrency": "none",
+      "audit": "PROJECT_STATUS_CHANGED via the domain service with reason 'project archived'",
+      "human_actor": "recorded as human",
+      "invariants": "archive is a status transition, not a direct column write, so legality and audit still apply",
+      "side_effects": "status becomes archived"
+    },
+    {
+      "domain": "projects",
+      "owner": "srw.api.routes.projects",
+      "method": "POST",
+      "path": "/api/v1/projects/{project_id:str}/restore",
+      "use_case": "RestoreProject",
+      "request": "path project_id only",
+      "response": "project_id, status",
+      "concurrency": "none",
+      "audit": "PROJECT_STATUS_CHANGED with reason 'project restored'",
+      "human_actor": "recorded as human",
+      "invariants": "unknown project 404; target status is open only when a protocol revision exists, otherwise draft - a restored project must not claim more progress than it has",
+      "side_effects": "status becomes open or draft"
+    },
+    {
+      "domain": "projects",
+      "owner": "srw.api.routes.projects",
+      "method": "PATCH",
+      "path": "/api/v1/projects/{project_id:str}/job-setup",
+      "use_case": "UpdateJobSetup",
+      "request": "job setup fields accepted by update_job_setup",
+      "response": "job setup snapshot",
+      "concurrency": "none - no If-Match",
+      "audit": "depends on update_job_setup; not asserted by this route",
+      "human_actor": "implicit",
+      "invariants": "validation lives in the recruiting domain service",
+      "side_effects": "updates the project draft protocol payload"
+    },
+    {
+      "domain": "projects",
+      "owner": "srw.api.routes.projects",
+      "method": "POST",
+      "path": "/api/v1/projects/{project_id:str}/job-setup/suggest",
+      "use_case": "SuggestJobSetup",
+      "request": "path project_id only",
+      "response": "suggested setup",
+      "concurrency": "none",
+      "audit": "none",
+      "human_actor": "suggestion only; the operator must accept it",
+      "invariants": "unknown project 404",
+      "side_effects": "none - read-only suggestion"
     }
   ]
 }
