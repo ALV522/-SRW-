@@ -450,9 +450,11 @@ def install_full_workbench_routes(app, factory, registry, secrets, *, data_dir: 
         return task
 
     def _ingest_candidate_file(s, cid: str, *, raw: bytes, filename: str, media: str, source_kind: str = "resume") -> dict[str, Any]:
-        digest=blobs.put(raw)
+        # Reject invalid targets before persisting sensitive applicant bytes.
+        # A 404 must not leave a source-less private blob on the local disk.
         cand=s.get(Candidate,cid)
         if not cand: raise V1NotFoundError(f"candidate not found: {cid}")
+        digest=blobs.put(raw)
         lower=filename.lower()
         if media.startswith(("audio/","video/")) or lower.endswith((".mp3",".wav",".m4a",".mp4",".webm",".aac",".flac")):
             original=add_source(s,cid,source_kind="asr_input",content_hash=digest,text_content="",media_type=media,blob_hash=digest,metadata={"filename":filename})
@@ -492,15 +494,21 @@ def install_full_workbench_routes(app, factory, registry, secrets, *, data_dir: 
         pid=r.path_params["project_id"]; body=await _json_body(r); items=body.get("items")
         if not isinstance(items,list) or not items: raise V1InvariantError("items must be a non-empty array")
         if len(items)>50: raise V1InvariantError("batch intake supports at most 50 files; split the batch explicitly")
-        prepared=[]; raw_total=0
+        # Validate the complete request (including later items and aggregate
+        # size) without persisting any private blobs. The two passes avoid
+        # retaining up to 100 MB of decoded files in addition to the JSON body.
+        validated=[]; raw_total=0
         for index,item in enumerate(items):
             if not isinstance(item,dict): raise V1InvariantError("batch item must be an object")
             raw,filename,media=_decode_file(item); raw_total += len(raw)
             if raw_total > 100*1024*1024: raise V1InvariantError("batch intake exceeds 100 MB aggregate limit")
-            digest=blobs.put(raw)
-            prepared.append({"index":index,"blob_hash":digest,"filename":filename,"media_type":media,"display_name":_s(item,"display_name") or Path(filename).stem.strip() or f"Candidate {index+1}","source_kind":_s(item,"source_kind","resume")})
+            validated.append({"index":index,"filename":filename,"media_type":media,"display_name":_s(item,"display_name") or Path(filename).stem.strip() or f"Candidate {index+1}","source_kind":_s(item,"source_kind","resume")})
         with v1_session_scope(factory) as s:
             if s.get(Project,pid) is None: raise V1NotFoundError(f"project not found: {pid}")
+            prepared=[]
+            for entry in validated:
+                raw,_,_=_decode_file(items[entry["index"]])
+                prepared.append({**entry,"blob_hash":blobs.put(raw)})
             task=TaskRecord(task_type="batch_candidate_intake",status="queued",progress_total=len(prepared),payload_json=json.dumps({"project_id":pid,"items":prepared},ensure_ascii=False,separators=(",",":")),result_json=json.dumps({"items":[]},ensure_ascii=False))
             job=_queue_task_job(s,task)
             return JSONResponse({"task_id":task.id,"job_id":job.id,"status":"queued","item_count":len(prepared)})
