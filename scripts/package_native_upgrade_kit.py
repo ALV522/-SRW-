@@ -39,7 +39,7 @@ if errorlevel 1 (
     echo [BLOCKED] Python 3.12 launcher not found. Install Python 3.12.
     exit /b 2
 )
-py -3.12 "%~dp0scripts\rebuild_native_from_prepared.py" --source "%~dp0" --host "%~dp0windows-host" --base-zip "%~1" --out "%~2"
+py -3.12 "%~dp0scripts\rebuild_native_from_prepared.py" --source "%~dp0." --host "%~dp0windows-host" --base-zip "%~1" --out "%~2"
 if errorlevel 1 (
     echo [BLOCKED] Assembly failed. Previous prepared ZIP and existing data were not overwritten.
     exit /b 2
