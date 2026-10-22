@@ -14,6 +14,7 @@ import tempfile
 import unittest
 import zipfile
 from pathlib import Path
+from unittest.mock import patch
 
 from scripts.rebuild_native_from_prepared import (
     BASE_PREPARED_ZIP_SHA256, _members, stage_attested_inputs, upgrade,
@@ -117,6 +118,23 @@ class NativeCandidateUpgradeTests(unittest.TestCase):
         with self.assertRaisesRegex(PayloadError, "overwrit"):
             stage_attested_inputs(path, stage, required_sha256=digest)
         self.assertEqual((stage / "KEEP.txt").read_text(), "do not overwrite")
+
+    def test_verify_only_does_not_reject_or_modify_an_existing_output_filename(self):
+        """A read-only preflight must not depend on a stale output path."""
+        existing = self.root / "previous-candidate.zip"
+        existing.write_bytes(b"EXISTING CANDIDATE - NEVER OVERWRITE")
+        host = self.root / "host"
+        host.mkdir()
+        source = self.root / "source"
+        source.mkdir()
+        with patch("scripts.rebuild_native_from_prepared._source_sha", return_value="a" * 40), \
+             patch("scripts.rebuild_native_from_prepared._verify_host", return_value={}), \
+             patch("scripts.rebuild_native_from_prepared.stage_attested_inputs", return_value={"runtime_files": 2332, "knowledge_databases": 5}), \
+             patch("scripts.rebuild_native_from_prepared.check", return_value={"status": "PINNED_METADATA_MATCH"}):
+            report = upgrade(source, self.root / "pinned.zip", host, existing, verify_only=True)
+        self.assertEqual(report["status"], "INPUTS_VERIFIED_ONLY")
+        self.assertFalse(report["assembled"])
+        self.assertEqual(existing.read_bytes(), b"EXISTING CANDIDATE - NEVER OVERWRITE")
 
     def test_cli_has_no_user_hash_override(self):
         from scripts.rebuild_native_from_prepared import main
