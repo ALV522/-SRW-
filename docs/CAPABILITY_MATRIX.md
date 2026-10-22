@@ -93,3 +93,9 @@ Event creation rejects nonexistent source references (404) and sources owned by 
 候选人的「流程与跟进」页及项目招聘流程页，对于当前真正由该 Event 生成的结构化 Source，显示「更正证据记录」按钮；非 Event 原生 Source 不显示更正入口。操作员可查看并修改备注与现有结构化问题的回答。未开放编辑的标准关联、问题、评价字段、Outcome 及总体建议保持原值，不因文本分隔符造成静默丢失。保存调用已有 PATCH Event API；服务端按前述材料版本规则替换当前证据绑定，旧 Source/MaterialRevision、Scorecard/Decision 历史不删除，材料上下文变化使旧人工决定失效。
 
 `browser_acceptance/test_flows.py::test_10_completed_interview_correction_replaces_current_evidence_via_ui` 计划在真实 Chromium + 合成 Core/SQLite 中点击创建完成的面试→打开更正→修改答案与备注→保存→验证当前 Source 被替换和新正文可见。`convergence_tests/test_event_source_revision.py` 分别确认 Event 原生 Source 的 `editable_evidence_source=true` 与人工附着外部来源的 `false`。这些测试是否 PASS 仅以准确 SHA 的 CI 为准；Windows WPF 实机、生产 Knowledge、Provider、恢复和双端并发仍待验收。
+
+## #41/#43 Offer 状态条件写入（Core 事务 CAS）
+
+现有 `POST /api/v1/offers/{offer_id}/status` 接受可选的 `expected_status` 字段。浏览器将其当前显示的 Offer 状态发给统一 Core；若另一个入口已改变状态，Core 在同一事务中执行带旧状态条件的 SQL UPDATE，以 `409 invariant_conflict` 拒绝过期写入，且不会新增虚假 `OFFER_STATUS_CHANGED` 审计。对无操作请求也先校验预期状态。旧客户端不提供字段时保留原有行为，未来全面强制 CAS 需要单独合同审核。
+
+`convergence_tests/test_offer_routes.py` 覆盖过期写入、无效预期、无额外审计与旧路径兼容；`browser_acceptance/test_flows.py::test_05` 验证真实 Chromium 通过现有 Offer 操作发送预期状态并拒绝陈旧 HTTP 写入。精确 SHA CI 结果独立记录；该增量不构成 Windows Native GUI 或双载体 Supervisor/CAS 的整体 PASS。

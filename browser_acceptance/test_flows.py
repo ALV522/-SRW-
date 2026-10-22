@@ -393,10 +393,27 @@ class RecruitmentBrowserAcceptance(unittest.TestCase):
                 self.assertNotIn("sent", options)
             self.page.locator("#offer-status").select_option(expected)
             self.page.locator("#offer-status-reason").fill("合成测试：人工状态批准/发送/接收")
-            self.page.locator("#modal-root").get_by_role("button", name="保存", exact=True).click()
+            with self.page.expect_request(
+                lambda req: req.method == "POST" and req.url.endswith(f"/api/v1/offers/{oid}/status")
+            ) as pending:
+                self.page.locator("#modal-root").get_by_role("button", name="保存", exact=True).click()
+            submitted = json.loads(pending.value.post_data)
+            self.assertEqual(submitted.get("expected_status"),
+                             {"approved": "draft", "sent": "approved", "accepted": "sent"}[expected])
             expect(self.page.locator("#modal-root .modal")).to_have_count(0)
             persisted = self.get_json(f"/api/v1/candidates/{cid}/offers")["offers"][0]
             self.assertEqual(persisted["status"], expected)
+            if expected == "approved":
+                # A second browser still showing "draft" may not silently
+                # progress the Offer or create a misleading second audit.
+                stale = self.context.request.post(
+                    self.base + f"/api/v1/offers/{oid}/status",
+                    data=json.dumps({"expected_status": "draft", "status": "sent",
+                                     "actor": "human", "reason": "stale UI"}),
+                    headers={"Content-Type": "application/json"},
+                )
+                self.assertEqual(stale.status, 409, stale.text())
+                self.assertEqual(self.get_json(f"/api/v1/candidates/{cid}/offers")["offers"][0]["status"], "approved")
 
         expect(self.page.get_by_role("button", name="更新状态")).to_be_disabled()
         pipeline = self.get_json(f"/api/v1/candidates/{cid}/pipeline")

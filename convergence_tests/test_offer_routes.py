@@ -110,6 +110,40 @@ class OfferRouteTests(unittest.TestCase):
         self.assertEqual(response.status_code, 409)
         self.assertIn("not allowed", response.json()["detail"])
 
+    def test_stale_offer_status_cas_rejects_write_without_changing_audit(self):
+        """Two stale local clients cannot silently advance the same Offer twice."""
+        offer = self.create_offer(self.ready_id).json()
+        oid = offer["offer_id"]
+        endpoint = f"/api/v1/offers/{oid}/status"
+        first = self.client.post(endpoint, json={"expected_status": "draft", "status": "approved", "actor": "human"})
+        self.assertEqual(first.status_code, 200, first.text)
+        self.assertEqual(first.json()["status"], "approved")
+
+        # Another UI still displaying `draft` must refresh, not send a second
+        # transition that rewrites this offer and pollutes its audit history.
+        stale = self.client.post(endpoint, json={"expected_status": "draft", "status": "sent", "actor": "human"})
+        self.assertEqual(stale.status_code, 409, stale.text)
+        self.assertEqual(stale.json()["error"]["code"], "invariant_conflict")
+        self.assertEqual(self.client.get(f"/api/v1/candidates/{self.ready_id}/offers").json()["offers"][0]["status"], "approved")
+        self.assertEqual(len(self.audit_events("OFFER_STATUS_CHANGED")), 1)
+
+        current = self.client.post(endpoint, json={"expected_status": "approved", "status": "sent", "actor": "human"})
+        self.assertEqual(current.status_code, 200, current.text)
+        self.assertEqual(current.json()["status"], "sent")
+        self.assertEqual(len(self.audit_events("OFFER_STATUS_CHANGED")), 2)
+
+    def test_expected_status_is_checked_even_for_noop_and_invalid_values(self):
+        offer = self.create_offer(self.ready_id).json()
+        endpoint = f"/api/v1/offers/{offer['offer_id']}/status"
+        for expected in ("sent", "INVALID", ""):
+            with self.subTest(expected=expected):
+                response = self.client.post(endpoint, json={"expected_status": expected, "status": "draft"})
+                self.assertEqual(response.status_code, 409, response.text)
+        self.assertEqual(self.audit_events("OFFER_STATUS_CHANGED"), [])
+        noop = self.client.post(endpoint, json={"expected_status": "draft", "status": "draft"})
+        self.assertEqual(noop.status_code, 200, noop.text)
+        self.assertEqual(self.audit_events("OFFER_STATUS_CHANGED"), [])
+
     def test_unknown_ids_return_not_found(self):
         self.assertEqual(self.client.get("/api/v1/candidates/missing/offers").status_code, 404)
         self.assertEqual(self.client.post("/api/v1/offers/missing/status",
