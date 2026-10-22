@@ -758,5 +758,33 @@ class RecruitmentBrowserAcceptance(unittest.TestCase):
         self.assertFalse(self.console_errors, self.console_errors)
 
 
+    def test_14_channel_observation_flows_through_ops_panel(self) -> None:
+        pid = self.new_project("渠道观测")
+        self.page.locator(".tabs").get_by_role("button", name="跟进运营").click()
+        self.page.get_by_role("button", name="录入渠道观测").click()
+        self.page.locator("#c06-ch").fill("内推渠道")
+        self.page.locator("#c06-period").fill("2026Q4")
+        self.page.locator("#c06-sourced").fill("12")
+        self.page.locator("#c06-contacted").fill("10")
+        self.page.locator("#c06-screened").fill("8")
+        self.page.locator("#c06-interviewed").fill("5")
+        self.page.locator("#c06-offered").fill("3")
+        self.page.locator("#c06-hired").fill("2")
+        self.page.locator("#c06-spend").fill("5000")
+        self.page.locator("#c06-confirmed").check()
+        self.page.locator("#modal-root").get_by_role("button", name="保存", exact=True).click()
+        expect(self.page.locator("#toast-root")).to_contain_text("渠道观测已保存")
+        expect(self.page.locator("#content")).to_contain_text("内推渠道")
+        intel = self.get_json(f"/api/v1/projects/{pid}/recruitment-intelligence")
+        channels = intel.get("channels") or []
+        observed = [c for c in channels if c.get("channel") == "内推渠道"]
+        self.assertEqual(len(observed), 1)
+        self.assertEqual(observed[0]["sourced"], 12)
+        self.assertEqual(observed[0]["hired"], 2)
+        self.assertTrue(observed[0]["all_human_confirmed"])
+        self.assertFalse(self.console_errors, self.console_errors)
+
+
+
 if __name__ == "__main__":
     unittest.main()

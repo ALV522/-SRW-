@@ -17,7 +17,9 @@ reaffirmation; test_07 protocol-republish staleness; test_08 archive/restore; te
 first-use readiness; test_10 knowledge suggestion applied to a protocol draft with
 provenance; test_11 project handoff JSON download completeness; test_12 candidate CSV
 export formula-injection guard; test_13 inline page handlers resolve in the browser
-(regression guard for the ES-module scope defect fixed 2026-10-21).
+(regression guard for the ES-module scope defect fixed 2026-10-21); test_14 channel-effect
+observation flows through the ops panel end to end (regression guard for the cross-shim
+module-scope call defects fixed 2026-10-23).
 
 The initial real-browser acceptance covered:
 
