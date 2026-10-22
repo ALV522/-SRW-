@@ -203,6 +203,14 @@ backend/srw/api/
 
 **第二次删除事故（同类问题的新形态）**：按名删除最后一个函数时，若其后没有下一个 `def`，边界回退到文件末尾，把整个 `routes=[...]` 表一起删掉。已加硬边界：删除终点取 `min(下一个 def, "\\n    routes=[")`。**结论：任何"删除到下一个 def"的实现都必须显式指定终点上限。**
 
+**R2 进度（2026-10-22，第九刀）**：报表与读模型 6 条路由（cockpit / pipeline / candidates.csv / brief / handoff / compare）与共享投影 `_brief_payload` 迁出到 `backend/srw/api/routes/reporting.py`。
+
+这一刀的唯一理由是 `_brief_payload`：brief、handoff、cockpit 三处都依赖它，单独搬任何一个只会把助手换个文件，不消除耦合。六条一起搬才真正把它移出聚合层。本轮全为 GET，**写操作归类不变（28/73），棘轮维持 45**。
+
+`fullworkbench.py` 1037 → **835 行**；累计从 1723 降至 835（**−888，−51.5%**）。新增 `test_reporting_routes.py`（7 项），含 compare 拒绝跨协议比较、CSV 导出、brief/handoff 载荷与本轮的路由归属守卫。
+
+**方法改进**：本次不再逐个补 `NameError`，而是先用 AST 静态列出模块内全部未定义标识符，再一次性补齐导入，首次运行即通过。搬迁新模块时应当沿用该检查，而不是靠报错驱动。
+
 ### R3 · Application Use-case Layer
 
 目标：把“一个用户动作需要串联多个模块”的逻辑从 route/UI 中提取到应用层。
