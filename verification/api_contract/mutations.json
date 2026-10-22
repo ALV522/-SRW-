@@ -1,9 +1,9 @@
 {
   "schema": "srw.api-mutation-classification.v1",
-  "status": "R1 ratchet plus R2 classification for offers, interviews, operations, system, providers, reevaluations, candidate CRUD and project lifecycle.",
+  "status": "R1 ratchet plus R2 classification for offers, interviews, operations, system, providers, reevaluations, candidate CRUD, project lifecycle and evidence.",
   "frozen_at": "main e385adfb868baf5173f98d6119f253dd9d072b41",
   "rule": "live_mutations - classified MUST NOT exceed baseline_unclassified. Adding a mutation route therefore fails the contract test until it is classified or this baseline is raised in review.",
-  "baseline_unclassified": 45,
+  "baseline_unclassified": 42,
   "classified": [
     {
       "method": "POST",
@@ -396,6 +396,48 @@
       "human_actor": "suggestion only; the operator must accept it",
       "invariants": "unknown project 404",
       "side_effects": "none - read-only suggestion"
+    },
+    {
+      "domain": "evidence",
+      "owner": "srw.api.routes.evidence",
+      "method": "POST",
+      "path": "/api/v1/candidates/{candidate_id:str}/sources/text",
+      "use_case": "AddTextSource",
+      "request": "text_content (required), filename, source_kind, media_type, publish_material",
+      "response": "source_id, candidate_id, source_kind, content_hash, material_revision_id",
+      "concurrency": "none - create-only",
+      "audit": "no audit event; the Source row and optional MaterialRevision are the record",
+      "human_actor": "implicit",
+      "invariants": "text_content required (422); publish_material=true requires an existing candidate and publishes a revision only when the source is not already current",
+      "side_effects": "inserts a Source; with publish_material it also writes a MaterialRevision"
+    },
+    {
+      "domain": "evidence",
+      "owner": "srw.api.routes.evidence",
+      "method": "POST",
+      "path": "/api/v1/candidates/{candidate_id:str}/evidence/extract",
+      "use_case": "ExtractEvidenceSynchronously",
+      "request": "source_id (required)",
+      "response": "extraction result with claims and AI run ledger",
+      "concurrency": "none; provider call is synchronous",
+      "audit": "AI run ledger (start/finish/fail) records provider, model and privacy metadata",
+      "human_actor": "implicit - extraction proposes, a human still reviews each claim",
+      "invariants": "source and candidate must exist (404); the source must belong to the candidate (409); text is privacy-projected before leaving the process",
+      "side_effects": "writes claims, the AI run ledger, and finishes the run with success or failure"
+    },
+    {
+      "domain": "evidence",
+      "owner": "srw.api.routes.evidence",
+      "method": "POST",
+      "path": "/api/v1/claims/{claim_id:str}/review",
+      "use_case": "ReviewClaim",
+      "request": "accepted (required boolean), actor",
+      "response": "claim_id, confirmation_state, authority",
+      "concurrency": "none - no If-Match",
+      "audit": "claim confirmation state plus authority are persisted on the Claim",
+      "human_actor": "yes - actor defaults to human and is recorded as the confirming authority",
+      "invariants": "accepted must be a boolean (422); unknown claim 404",
+      "side_effects": "sets confirmation_state and authority on the claim"
     }
   ]
 }

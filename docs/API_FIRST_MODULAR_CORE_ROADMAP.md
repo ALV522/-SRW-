@@ -357,3 +357,9 @@ Windows Host 只保留：Core lifecycle、workspace/session、WebView2、native 
 - API compatibility/concurrency/audit 有自动化验证；
 - v0.8.12-R2 关键能力没有因重构缩水；
 - Windows 与 Browser 最终通过各自及共享 Core 的真实验收。
+
+**R2 进度（2026-10-23，第十刀）**：`evidence` 域 8 条路由（文本来源入库 / 同步证据抽取 / 来源内容、文件、分页渲染、评分视图 / Claim grounding、Claim 复核）从 `api/app.py` 迁出到 `backend/srw/api/routes/evidence.py`。
+
+本刀第一次动 `app.py`——它此前持有 33 条路由、737 行，是 R2 之后新的最大聚合点。同时把三个 app 私有请求助手（`_body`/`_string`/`_bool`）上提为 `api/request_fields.py`，它们使用 **422 `invalid_request` 封套**，与 `api/http_utils` 的 409 `invariant_conflict` 是两套不同契约，不能合并；`V1RequestValidationError` 随之移入 `kernel/errors.py`，避免新模块反向依赖 app。`_json` 序列化助手移入 `api/serialization.py`。
+
+`app.py` 737 → **424 行**（−313，−42.5%）。写操作归类 31/73（42%），棘轮 45 → 42。新增 `test_evidence_routes.py`（8 项），其中"缺少必填字段必须仍是 422"是撤防式断言：一旦有人把两套封套合并，该测试立即失败。
