@@ -78,3 +78,25 @@ evidence. This scenario does **not** execute restart recovery, prove crash-safe
 restore, run WPF/WebView2, validate production Knowledge/Provider inputs, or
 complete Windows/dual-carrier acceptance. Startup must still revalidate the
 scheduled archive hash and members before replacing live data.
+
+## Process-restart backup restore acceptance (P0 #41 / Native prerequisite #42)
+
+`convergence_tests/test_real_restore_restart.py` launches the **real** C11
+`run_local.py` Core on a disposable loopback port with synthetic SQLite,
+Knowledge and Source blob content; it uses real HTTP backup and schedule
+routes. The test takes a backup containing project A and its Source bytes,
+creates project B afterward, schedules restore, then gracefully shuts down
+Core. It modifies the scheduled ZIP after approval and verifies a subsequent
+startup fails closed **before mutating SQLite** and preserves both the
+pending marker and an absent/released workspace lease. Restoring the original
+archive bytes and restarting executes the real pending restore and verifies:
+only A survives, original Source bytes are reinstated, later blobs disappear,
+the pending marker is removed, and one independently valid pre-restore
+snapshot is created. The second process closes cleanly and releases the lock.
+
+This is a **source/API real-process** acceptance test, not a mocked handler
+or merely a call to `apply_pending_restore`. The GitHub Ubuntu/Windows Source
+Gate must prove it at the exact PR HEAD. It does **not** establish actual WPF
+GUI, embedded Windows Runtime, production Knowledge, physical disk crash/power
+loss safety, user-data migration, or finished Native ZIP acceptance. All
+inputs are generated under a temporary synthetic workspace and cleaned up.
