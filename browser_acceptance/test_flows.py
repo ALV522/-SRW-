@@ -823,7 +823,7 @@ class RecruitmentBrowserAcceptance(unittest.TestCase):
         Synthetic one-page text PDF; no provider, external documents or real PII.
         Browser UI drives all writes; HTTP endpoints independently verify evidence.
         """
-        import fitz
+        import pymupdf as fitz
         import hashlib
 
         pid = self.new_project("PDF 简历收件")
@@ -863,7 +863,7 @@ class RecruitmentBrowserAcceptance(unittest.TestCase):
         self.assertIn("PROVENANCE-PDF-E2E-12", details["text_content"])
         self.assertEqual(details["metadata"]["intake_method"], "rich_document")
         downloaded = self.context.request.get(self.base + f"/api/v1/sources/{sid}/file")
-        self.assertEqual(downloaded.status, 200, downloaded.text()[:500])
+        self.assertEqual(downloaded.status, 200)
         self.assertEqual(hashlib.sha256(downloaded.body).hexdigest(), hashlib.sha256(pdf).hexdigest())
         self.assertFalse(workspace["decision_ready"], "Uploaded resume alone is not a human judgment")
         self.assertFalse(self.console_errors, self.console_errors)
