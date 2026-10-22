@@ -67,6 +67,7 @@ class CandidateFilePrevalidationTests(unittest.TestCase):
         self.assertEqual(response.status_code, 409, response.text)
         self.assert_absent(raw)
 
+
     def test_valid_batch_still_stores_original_file_and_queues_work(self):
         raw = b"SYNTHETIC-VALID-BATCH-" + uuid.uuid4().bytes
         response = self.client.post(
