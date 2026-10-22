@@ -190,6 +190,35 @@ def inspect_lease(data_dir: Path | str) -> LeaseInspection:
     return LeaseInspection(STALE, holder=holder, detail=f"holding process {holder.pid} is gone")
 
 
+def require_parent_host_lease(data_dir: Path | str, *, port: int,
+                              instance_id: str, session_id: str) -> None:
+    """Fail closed when a purported WPF backend has no matching *parent* owner.
+
+    ``--workspace-lock host`` deliberately skips acquiring the lease because
+    the WPF process already owns it. Three environment variables alone must
+    never allow an unrelated process to bypass the single-writer contract.
+    The actual WPF host starts the Python child directly and writes both IDs,
+    its process PID and the selected port to the schema-v2 lease before start.
+    """
+    inspection = inspect_lease(data_dir)
+    holder = inspection.holder
+    if (inspection.state != ACTIVE or holder is None or
+            holder.edition != "windows" or holder.schema_version != LEASE_SCHEMA_VERSION or
+            holder.pid != os.getppid() or holder.port != port or
+            holder.instance_id != instance_id):
+        raise WorkspaceLeaseError("HOST_WORKSPACE_INVALID: active parent WPF lease required")
+    try:
+        metadata = json.loads((lease_directory(data_dir) / LEASE_METADATA_NAME).read_text(encoding="utf-8"))
+    except (OSError, ValueError) as exc:
+        raise WorkspaceLeaseError("HOST_WORKSPACE_INVALID: WPF lease metadata unavailable") from exc
+    expected_root = os.path.normcase(os.path.abspath(str(data_dir)))
+    actual_root = os.path.normcase(os.path.abspath(str(metadata.get("data_dir") or "")))
+    if (metadata.get("session_id") != session_id or
+            metadata.get("instance_id") != instance_id or
+            actual_root != expected_root):
+        raise WorkspaceLeaseError("HOST_WORKSPACE_INVALID: parent lease identity mismatch")
+
+
 class WorkspaceLease:
     """Exclusive single-writer lease over one SRW workspace ``data`` directory."""
 
