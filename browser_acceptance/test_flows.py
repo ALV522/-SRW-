@@ -817,5 +817,57 @@ class RecruitmentBrowserAcceptance(unittest.TestCase):
             self.assertEqual(cancelled.status, 200, cancelled.text())
 
 
+    def test_12_operator_uploads_real_pdf_resume_with_source_provenance(self) -> None:
+        """Upload a generated PDF through UI, then verify material and original bytes.
+
+        Synthetic one-page text PDF; no provider, external documents or real PII.
+        Browser UI drives all writes; HTTP endpoints independently verify evidence.
+        """
+        import fitz
+        import hashlib
+
+        pid = self.new_project("PDF 简历收件")
+        cid = self.new_candidate(pid, "模拟 PDF 候选人")
+        doc = fitz.open()
+        page = doc.new_page(width=595, height=842)
+        page.insert_text((72, 96), "SYNTHETIC RESUME: 6 years verified analysis experience")
+        page.insert_text((72, 128), "PROVENANCE-PDF-E2E-12; synthetic data only")
+        pdf = doc.tobytes(garbage=4, deflate=True)
+        doc.close()
+        self.assertTrue(pdf.startswith(b"%PDF-"))
+
+        expect(self.page.locator("#candidate-file")).to_be_visible()
+        self.page.locator("#candidate-file").set_input_files({
+            "name": "synthetic_resume.pdf", "mimeType": "application/pdf", "buffer": pdf,
+        })
+        target = self.base + f"/api/v1/candidates/{cid}/files"
+        with self.page.expect_response(
+            lambda response: response.url == target and response.request.method == "POST"
+        ) as upload:
+            self.page.get_by_role("button", name="上传并处理").click()
+        self.assertEqual(upload.value.status, 200, upload.value.text())
+        outcome = upload.value.json()
+        self.assertEqual(outcome["intake_status"], "published")
+        self.assertEqual(outcome["extraction_status"], "not_required")
+        self.assertFalse(outcome.get("task_id"), "Text PDF must not enqueue unnecessary OCR")
+
+        sid = outcome["source_id"]
+        workspace = self.get_json(f"/api/v1/candidates/{cid}/workspace")
+        record = next(x for x in workspace["sources"] if x["source_id"] == sid)
+        self.assertTrue(record["in_current_material"])
+        self.assertIn("PROVENANCE-PDF-E2E-12", record["text_preview"])
+        self.assertIn("6 years verified analysis experience", record["text_preview"])
+        details = self.get_json(f"/api/v1/sources/{sid}/content")
+        self.assertEqual(details["media_type"], "application/pdf")
+        self.assertEqual(details["filename"], "synthetic_resume.pdf")
+        self.assertIn("PROVENANCE-PDF-E2E-12", details["text_content"])
+        self.assertEqual(details["metadata"]["intake_method"], "rich_document")
+        downloaded = self.context.request.get(self.base + f"/api/v1/sources/{sid}/file")
+        self.assertEqual(downloaded.status, 200, downloaded.text()[:500])
+        self.assertEqual(hashlib.sha256(downloaded.body).hexdigest(), hashlib.sha256(pdf).hexdigest())
+        self.assertFalse(workspace["decision_ready"], "Uploaded resume alone is not a human judgment")
+        self.assertFalse(self.console_errors, self.console_errors)
+
+
 if __name__ == "__main__":
     unittest.main()
