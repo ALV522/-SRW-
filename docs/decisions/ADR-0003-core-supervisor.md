@@ -56,6 +56,7 @@
 ## 实施相位（每相独立可发布、可回滚）
 
 1. **相位 1**：Supervisor 模式 + 附着协议（特性开关，默认关）。开关关时行为与今天逐字一致（Host 自派生 Core）。验收：单载体全回归 + 附着/重附/崩溃恢复集成测试。
+   **状态：已实现（2026-10-23 本地提交，未同步 GitHub）**。落点：`backend/srw/supervisor/`（service 纯逻辑 + runtime 分离进程 + client 载体侧）、租约新增 `edition="supervisor"`、`create_v1_app(supervisor_service=...)` 条件挂载 4 条附着路由、`start_local_web.py --supervisor` 载体路径（默认关）。`convergence_tests/test_supervisor.py` 14 项：单测（引用计数/空闲宽限/心跳保活/静默自动 detach/令牌与未知附着拒绝）+ HTTP 边界（TestClient）+ 租约（supervisor 持租约时载体被拒）+ 真实子进程生命周期（附着→服务→A 关闭 B 存续→宽限自退、租约释放）。路由基线 146→150。已知缺口（相位 2/3 处理）：Supervisor 未持 `.srw-instance.lock` 旧 Portable 兼容锁、未接 pending-restore、CAS/一次性会话未做。
 2. **相位 2**：Schema v1_0015 + If-Match CAS + 一次性会话/CSRF。验收：412 冲突矩阵 + 会话撤销测试 + 前端全量带 If-Match（E2E 更新）。
 3. **相位 3**：双载体并发验收（T1–T10 全量）+ 文档与 Owner Guide 更新。通过后才具备 DUAL_CARRIER_ACCEPTED 申报条件。
 

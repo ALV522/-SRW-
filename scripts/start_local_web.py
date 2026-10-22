@@ -115,6 +115,11 @@ def make_parser() -> argparse.ArgumentParser:
                    help="isolated testing only; requires SRW_SYNTHETIC_BROWSER_ACCEPTANCE=1")
     p.add_argument("--port", type=int, default=8765)
     p.add_argument("--no-browser", action="store_true")
+    p.add_argument("--supervisor", action="store_true",
+                   help="ADR-0003 S1: attach to (or derive) a detached Core Supervisor instead of "
+                        "running the Core in this process. Default off = today's behaviour verbatim.")
+    p.add_argument("--supervisor-idle-grace", type=float, default=300.0,
+                   help="idle seconds a derived Supervisor waits after the last carrier detaches")
     return p
 
 
@@ -128,6 +133,44 @@ def _open_when_ready(port: int) -> None:
         except (OSError, urllib.error.URLError):
             pass
         time.sleep(0.15)
+
+
+def _run_with_supervisor(args: argparse.Namespace, *, data: Path, db: Path, frontend: Path, knowledge: Path) -> int:
+    """ADR-0003 S1 carrier path: never hold the lease; attach to the Core Supervisor."""
+    from urllib.parse import urlparse
+
+    from srw.supervisor.client import SupervisorUnavailable, ensure_supervisor
+
+    try:
+        handle = ensure_supervisor(
+            args.workspace.expanduser(),
+            carrier="local-web",
+            edition="local-web",
+            database=db,
+            frontend_dist=frontend,
+            knowledge_root=knowledge,
+            idle_grace_seconds=args.supervisor_idle_grace,
+        )
+    except SupervisorUnavailable as exc:
+        print(f"BLOCKED: {exc}", file=sys.stderr)
+        return 2
+    port = urlparse(handle.base_url).port or args.port
+    print(f"SRW C11 Local Web (Supervisor mode, instance {handle.instance_id[:8]}): http://127.0.0.1:{port}/v1", flush=True)
+    print("This carrier holds no workspace lease; the Core survives this carrier closing.", flush=True)
+    if not args.no_browser:
+        threading.Thread(target=_open_when_ready, args=(port,), daemon=True).start()
+    try:
+        while True:
+            handle.heartbeat()
+            time.sleep(30)
+    except KeyboardInterrupt:
+        pass
+    finally:
+        try:
+            handle.detach()
+        except SupervisorUnavailable:
+            pass
+    return 0
 
 
 def run(args: argparse.Namespace) -> int:
@@ -159,6 +202,8 @@ def run(args: argparse.Namespace) -> int:
     data = workspace / "data"
     data.mkdir(exist_ok=True)
     db = data / "srw_v1.db"
+    if args.supervisor:
+        return _run_with_supervisor(args, data=data, db=db, frontend=frontend, knowledge=knowledge)
     version = (ROOT / "VERSION").read_text(encoding="utf-8").strip()
     try:
         release_id = json.loads((ROOT / "BUILD_INFO.json").read_text(encoding="utf-8")).get("release_id", version)

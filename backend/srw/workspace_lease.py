@@ -43,7 +43,9 @@ LEASE_DIRECTORY_NAME = "app.lock"
 LEASE_METADATA_NAME = "instance.json"
 LEASE_SCHEMA_VERSION = 2
 FRESH_INCOMPLETE_WINDOW_SECONDS = 5.0
-KNOWN_EDITIONS = ("windows", "local-web")
+# "supervisor" is the detached Core owner introduced by ADR-0003 S1: it holds
+# the lease on behalf of every attached carrier instead of a carrier itself.
+KNOWN_EDITIONS = ("windows", "local-web", "supervisor")
 
 ABSENT = "absent"
 ACTIVE = "active"

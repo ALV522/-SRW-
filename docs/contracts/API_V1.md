@@ -21,12 +21,15 @@
 | 知识与治理 | `knowledge/status`、`knowledge/search`、`projects/{id}/knowledge/apply` | 知识建议只进 Draft；携带来源溯源；不自动发布 |
 | 设置与 Provider | `settings/providers`、`settings/providers/{name}/test` | 探测用合成载荷，不带候选内容；密钥只存本地 SecretStore |
 | 运维与导出 | `pipeline`、`candidates.csv`、`contact-list.csv`、`audit`、`backups` | 导出带公式注入防护；审计只读投影 |
+| Supervisor（ADR-0003） | `supervisor/attach`、`supervisor/heartbeat`、`supervisor/detach`、`supervisor/status` | 仅 Supervisor 进程注册；附着令牌每次附着独立、仅存内存；未知附着 404、令牌不符 403；最后一个载体 detach 后按空闲宽限期自退 |
 
 ## 3. 双载体一致性要求
 
 - 同一工作区任意时刻只有一个权威 Core 写入者（`data/app.lock` 租约，见 [工作区租约合同](../WORKSPACE_LEASE_CONTRACT.md)）。
 - 所有重要写入走事务级 revision/If-Match 校验；过期写入明确拒绝且不产生虚假审计（DUAL_CARRIER_PLAN D3；正式 CAS 属 Issue #43 范围）。
 - 本地 HTTP 仅绑定 loopback；远程访问、云端登录不在本期范围。
+- Supervisor 模式下 Core 与载体分离：Supervisor 是唯一租约持有者（`app.lock` 的 `edition="supervisor"`），
+  载体经附着协议接入；关闭任一载体不影响其他载体（ADR-0003 S1/S5，特性开关默认关）。
 
 ## 4. 变更流程
 

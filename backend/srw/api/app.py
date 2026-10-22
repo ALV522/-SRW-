@@ -108,6 +108,7 @@ def create_v1_app(
     frontend_dist: str | Path | None = None,
     data_dir: str | Path | None = None,
     knowledge_dir: str | Path | None = None,
+    supervisor_service=None,
 ) -> Starlette:
     engine = create_v1_engine(database_url)
     create_v1_schema(engine)
@@ -177,7 +178,7 @@ def create_v1_app(
         }, status_code=200 if ready else 503)
 
     async def runtime_info(_request: Request) -> Response:
-        return JSONResponse({
+        body = {
             "apiVersion": "v1", "product": "SRW", "version": release["version"],
             "schemaVersion": V1_SCHEMA_REVISION, "runtime": runtime_mode, "edition": edition,
             "instanceId": instance_id, "releaseId": release_id, "sessionId": runtime_session_id,
@@ -191,7 +192,11 @@ def create_v1_app(
                 "lifecycleSessionTokenRequired": bool(runtime_session_token),
             },
             "readiness": {"status": "ready"},
-        })
+        }
+        supervisor_service = getattr(app.state, "supervisor_service", None)
+        if supervisor_service is not None:
+            body["supervisor"] = supervisor_service.status().public_view()
+        return JSONResponse(body)
 
     async def runtime_capabilities(_request: Request) -> Response:
         info = await runtime_info(_request)
@@ -636,6 +641,11 @@ def create_v1_app(
         Route("/api/v1/candidates/{candidate_id:str}/verifications", verify, methods=["POST"]),
         Route("/api/v1/candidates/{candidate_id:str}/decision", decide, methods=["POST"]),
     ]
+    if supervisor_service is not None:
+        # ADR-0003 S1: the Supervisor process publishes the attach protocol.
+        from srw.supervisor.runtime import supervisor_routes
+
+        routes.extend(supervisor_routes())
 
     def error_response(exc: Exception, *, status_code: int, code: str) -> Response:
         return JSONResponse({"detail": str(exc), "error": {"code": code}}, status_code=status_code)
@@ -682,6 +692,11 @@ def create_v1_app(
     )
 
     app.add_middleware(LocalBoundaryMiddleware)
+
+    # ADR-0003 S1: when this process is the Supervisor, publish the attach
+    # service on app.state so the protocol routes can reach it.
+    app.state.supervisor_service = supervisor_service
+    app.state.supervisor_mode = supervisor_service is not None
 
     from srw.api.fullworkbench import install_full_workbench_routes
     database_path = Path(str(engine.url.database)).resolve() if engine.url.database and str(engine.url.database) != ":memory:" else (resolved_data_dir / "srw_v1.db")

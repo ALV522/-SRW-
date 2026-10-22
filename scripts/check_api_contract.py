@@ -28,16 +28,21 @@ def collect_inventory() -> list[str]:
     """Build the v1 app in isolation and return sorted 'METHOD /path' lines."""
     sys.path.insert(0, str(ROOT / "backend"))
     from srw.api.app import create_v1_app
+    from srw.supervisor.service import SupervisorService
 
     with tempfile.TemporaryDirectory(prefix="srw-api-contract-") as tmp:
         root = Path(tmp)
         # In-memory SQLite: route registration never queries, and no file handle
         # can block temp-dir cleanup on Windows.
+        # The Supervisor attach routes are part of the reviewed surface (they are
+        # registered whenever this process is the Supervisor), so the inventory
+        # is collected with a supervisor service attached.
         app = create_v1_app(
             "sqlite+pysqlite:///:memory:",
             data_dir=root / "data",
             knowledge_dir=root / "knowledge" / "active",
             frontend_dist=FRONTEND_DIST,
+            supervisor_service=SupervisorService(idle_grace_seconds=300.0),
         )
         lines: list[str] = []
         for route in app.routes:

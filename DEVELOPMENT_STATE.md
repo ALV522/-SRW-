@@ -180,3 +180,16 @@ Chromium E2E 兜底下启动 app.js 按域拆分。2a 抽取三个低耦合叶�
 本地实测：`check_frontend_contract.py` 15 模块 / 185 符号 PASS；E2E 14/14 OK；源回归 293 OK（6 skipped，零失败）；治理三查 PASS。Schema v1_0014、VERSION 1.0.0-alpha.11 未变；GitHub CI = NOT RUN（仅本地执行）。
 
 **前端整合任务（药方 C）至此完成**：六代基建收敛 + app.js 按域拆分 + 三处跨 shim 缺陷 + 三处拆分期断链（renderPage 路由表/胶水层/offerNextStatuses/shell）全部修复并有静态+运行时双重守卫。
+## 2026-10-23: #43 ADR-0003 相位 1 实现 — Core Supervisor 按需分离 + 附着协议（本地实跑通过）
+
+按 ADR-0003 相位 1 实现 Supervisor 模式（特性开关默认关，开关关时行为与今天逐字一致）：
+
+- **`backend/srw/supervisor/service.py`**：附着协议纯逻辑——附着/重附/心跳/detach 四原语、引用计数生命周期（最后一个载体 detach 进入空闲宽限，默认 300s；宽限期内新附着即取消退出）、静默载体超时自动 detach（默认 90s 无心跳）、令牌每次附着独立（`secrets.token_hex`，仅存内存）、未知附着 `UnknownAttachment`/令牌不符 `InvalidToken` 显式拒绝。时钟可注入，全单测。
+- **`backend/srw/supervisor/runtime.py`**：分离进程入口（`python -m srw.supervisor.runtime`）——以 `edition="supervisor"` 持工作区租约（租约模块新增该 edition），在 loopback 服务 v1 API + 4 条附着路由，端口写入租约元数据供载体发现；宽限线程到点自退并释放租约。
+- **`backend/srw/supervisor/client.py`**：载体侧——探测租约：活跃 supervisor 租约→直接附着；缺失→派生**分离进程**（Windows DETACHED_PROCESS + NEW_PROCESS_GROUP，POSIX start_new_session）后附着；非 supervisor 载体持租约→按既有单写者语义拒绝。
+- **接线**：`create_v1_app(supervisor_service=...)` 条件挂载路由（`app.state.supervisor_service`，`runtime/info` 增 supervisor 块）；`scripts/start_local_web.py --supervisor` 载体路径（默认关，走原逻辑逐字不变）。
+- **测试 `convergence_tests/test_supervisor.py` 14 项**：单测 7（引用计数/宽限取消/保活/静默回收/拒绝/关闭拒附/视图不泄令牌）+ HTTP 边界 4（TestClient 全roundtrip、403/404、runtime/info 块有无）+ 租约 1（supervisor 持租约时 local-web 被拒 INSTANCE_ALREADY_RUNNING）+ 真实子进程 2（**T5/T7 实证**：双载体附着同一 Supervisor→A 关闭后 Supervisor 存续、B 心跳正常→B 关闭后宽限自退、租约释放；他载体持租约时拒绝派生）。
+- **契约**：路由基线 146→150（4 条 supervisor 路由进清单，漂移检测机制按设计拦截后 deliberate 重建）；`docs/contracts/API_V1.md` 增 Supervisor 域行与双载体说明；ADR-0003 记录相位 1 状态与已知缺口（旧 Portable `.srw-instance.lock` 兼容锁、pending-restore、CAS/一次性会话留相位 2/3）。
+- **启动器冒烟**：`--supervisor` 实跑通过（派生→附着→租约 edition=supervisor、版本 1.0.0-alpha.11、API 正常）。沙箱在命令结束强杀进程树，跨命令存活性无法在本环境演示；T5/T7 合同由单进程内的真实子进程测试实证。
+
+本地实测：源回归 307 OK（6 skipped，零失败，+14 新测试）；E2E 14/14 OK；治理五查 PASS（完整性 357 / release truth / G1 契约 / API 清单 150 / 前端契约）。Schema v1_0014、VERSION 1.0.0-alpha.11 未变；GitHub CI = NOT RUN（仅本地执行）。

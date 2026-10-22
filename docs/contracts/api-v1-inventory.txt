@@ -63,6 +63,7 @@ GET /api/v1/sources/{source_id:str}/content
 GET /api/v1/sources/{source_id:str}/file
 GET /api/v1/sources/{source_id:str}/page/{page_number:int}
 GET /api/v1/sources/{source_id:str}/scoring-view
+GET /api/v1/supervisor/status
 GET /api/v1/system/backups
 GET /api/v1/system/backups/{filename:str}
 GET /api/v1/system/diagnostics
@@ -139,6 +140,9 @@ POST /api/v1/protocol-revisions/{revision_id:str}/publish
 POST /api/v1/reevaluations/{draft_id:str}/apply
 POST /api/v1/runtime/shutdown
 POST /api/v1/settings/providers/{name:str}/test
+POST /api/v1/supervisor/attach
+POST /api/v1/supervisor/detach
+POST /api/v1/supervisor/heartbeat
 POST /api/v1/system/backups
 POST /api/v1/system/backups/{filename:str}/restore
 POST /api/v1/system/restore/cancel
