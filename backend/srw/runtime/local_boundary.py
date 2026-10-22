@@ -75,7 +75,23 @@ class LocalBoundaryMiddleware:
         if scope.get("type") != "http":
             await self.app(scope, receive, send)
             return
-        headers = {k.decode("latin1").lower(): v.decode("latin1") for k, v in scope.get("headers", [])}
+        # ASGI may carry repeated field names. Converting straight to a dict
+        # would let an attacker conceal a foreign Host/Origin behind a second
+        # local-looking value (or cause proxy and application disagreement).
+        headers = {}
+        counts = {}
+        for key, value in scope.get("headers", []):
+            name = key.decode("latin1").lower()
+            counts[name] = counts.get(name, 0) + 1
+            headers[name] = value.decode("latin1")
+        if counts.get("host") != 1:
+            response = JSONResponse({"detail": "请求 Host 不唯一或缺失"}, status_code=400)
+            await response(scope, receive, send)
+            return
+        if any(counts.get(name, 0) > 1 for name in ("origin", "referer", "sec-fetch-site")):
+            response = JSONResponse({"detail": "拒绝含歧义来源标记的写入请求"}, status_code=403)
+            await response(scope, receive, send)
+            return
         host = headers.get("host", "")
         if not is_local_host_header(host):
             response = JSONResponse({"detail": "仅允许通过本机地址访问工作台"}, status_code=400)
@@ -84,6 +100,15 @@ class LocalBoundaryMiddleware:
 
         method = str(scope.get("method") or "GET").upper()
         if method in _MUTATING_METHODS:
+            # Native WPF Host clients do not send browser Fetch Metadata.
+            # Genuine same-origin browsers send "same-origin"; cross-site and
+            # same-site-but-different-origin requests must not bypass the
+            # Origin/Referer check by withholding those optional headers.
+            site = headers.get("sec-fetch-site", "").strip().lower()
+            if site and site not in {"same-origin", "none"}:
+                response = JSONResponse({"detail": "拒绝跨站写入请求"}, status_code=403)
+                await response(scope, receive, send)
+                return
             origin = headers.get("origin")
             if origin and not _same_origin(host, origin):
                 response = JSONResponse({"detail": "拒绝跨站写入请求"}, status_code=403)
