@@ -99,3 +99,7 @@ Event creation rejects nonexistent source references (404) and sources owned by 
 现有 `POST /api/v1/offers/{offer_id}/status` 接受可选的 `expected_status` 字段。浏览器将其当前显示的 Offer 状态发给统一 Core；若另一个入口已改变状态，Core 在同一事务中执行带旧状态条件的 SQL UPDATE，以 `409 invariant_conflict` 拒绝过期写入，且不会新增虚假 `OFFER_STATUS_CHANGED` 审计。对无操作请求也先校验预期状态。旧客户端不提供字段时保留原有行为，未来全面强制 CAS 需要单独合同审核。
 
 `convergence_tests/test_offer_routes.py` 覆盖过期写入、无效预期、无额外审计与旧路径兼容；`browser_acceptance/test_flows.py::test_05` 验证真实 Chromium 通过现有 Offer 操作发送预期状态并拒绝陈旧 HTTP 写入。精确 SHA CI 结果独立记录；该增量不构成 Windows Native GUI 或双载体 Supervisor/CAS 的整体 PASS。
+
+## #41 收件失败请求不得持久化无引用 Blob
+
+单个候选人上传文件前验证候选人是否存在；批量收件先完整验证所有项目/文件输入、数量及累计大小，再保存原始二进制与排队后台任务。未知 candidate/project、无效的第二个文件等拒绝结果不得留下未引用的申请人二进制。`convergence_tests/test_candidate_file_prevalidation.py` 在隔离 SQLite/Blob 工作区对这些异常请求做真实 HTTP API 测试，并验证合法批次仍会保存原始字节与排队。该修复仅控制**输入参数拒绝时**的 Blob 写入顺序；并不自动清理历史遗留孤儿文件，也不能证明任意磁盘写入故障或数据库事务失败后的跨存储原子性。未经明确审计，不执行历史 Blob 垃圾回收或用户数据删除。准确的 Ubuntu/Windows CI 结果以修复 PR HEAD 为准，Native WPF 仍需独立实机验收。
