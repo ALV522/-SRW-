@@ -195,6 +195,14 @@ backend/srw/api/
 
 **过程事故（已修复，值得记录）**：本刀第一次用"区间删除"移除了 `add_candidate → ingest_file` 之间的全部内容，连带删掉未计划迁移的 `archive_project`、`restore_project`、`_queue_media_task`、`_ingest_candidate_file`。contract test 立刻以 `NameError` 报警，说明路由冻结网捕捉到了模块级损坏。处理：回退整文件，改为按函数名精确删除（每个名字删后断言 `^def <name>` 不再匹配）。**结论：多函数搬迁一律按名删除，禁止按区间删除。**
 
+**R2 进度（2026-10-22，第八刀）**：`projects` 生命周期与标准 8 条路由（status / archive / restore / job-setup / job-setup-suggest / audit / contact-queue / contact-list.csv）迁出到 `backend/srw/api/routes/projects.py`。
+
+**刻意不迁**：`pipeline`、`cockpit`、`candidates.csv`、`brief`、`handoff` 属读模型与报表面，共享 `_brief_payload` 与评估投影，应随"报表切片"整体迁移，而不是被实体维度切碎。
+
+`fullworkbench.py` 1108 → **1037 行**；累计从 1723 降至 1037（−686，**−39.8%**）。写操作归类 28/73（38%），棘轮 50 → 45。新增 `test_project_routes.py`（7 项），其中 CSV 公式前缀中和已抽为模块级 `csv_safe_cell` 并单测。
+
+**第二次删除事故（同类问题的新形态）**：按名删除最后一个函数时，若其后没有下一个 `def`，边界回退到文件末尾，把整个 `routes=[...]` 表一起删掉。已加硬边界：删除终点取 `min(下一个 def, "\\n    routes=[")`。**结论：任何"删除到下一个 def"的实现都必须显式指定终点上限。**
+
 ### R3 · Application Use-case Layer
 
 目标：把“一个用户动作需要串联多个模块”的逻辑从 route/UI 中提取到应用层。
