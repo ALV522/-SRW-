@@ -143,3 +143,8 @@ py -3.12 .\scripts\rebuild_native_from_prepared.py --source . --host .\windows-h
 ## SOURCE_REBUILD 严格工件验证与真正 WPF 验收入口
 
 现在有独立的 [source-rebuilt Native 验收流程](SOURCE_REBUILT_NATIVE_ACCEPTANCE.md)：`scripts/verify_rebuilt_native.py` 针对完整原始 ZIP/解压目录分别校验准确源码、Host、Runtime、五套 Knowledge 与来源声明；在真实 Windows 还可执行独立嵌入式后端测试。`scripts/accept_rebuilt_native_gui.py` 则以一次性工作区真正启动 WPF/WebView2，并检查同次启动和关闭/释放锁的日志；可要求两次循环。验收程序通过只表示该准确工件的有限 GUI 生命周期通过，不代表正式发布或全招聘业务通过。
+
+## Windows Host 子进程租约的同 SHA 门禁（#42）
+
+
+修改 `run_local.py`、`workspace_lease.py` 或对应安全回归时，Windows Host 工作流会重新执行：不仅编译 WPF Host，还通过实际 Windows Python 父子进程（合成临时工作区）验证 schema-v2 租约的正常匹配和伪造 session 拒绝。运行前均不打开用户数据库，且测试结束释放合成锁。该门禁**并不运行真正 WPF GUI**，也不包含独立完整 Runtime/生产五库，因此 Host 编译和 Source+Host kit 仍只能声明为 `COMPILED_ONLY_UNVERIFIED_GUI`；完整 Native ZIP、实机启动与招聘操作须另行验收。
