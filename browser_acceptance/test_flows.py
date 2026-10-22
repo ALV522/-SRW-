@@ -869,5 +869,74 @@ class RecruitmentBrowserAcceptance(unittest.TestCase):
         self.assertFalse(self.console_errors, self.console_errors)
 
 
+    def test_13_reevaluation_preview_cancel_and_explicit_apply(self) -> None:
+        pid = self.new_project("复评确认")
+        self.page.locator(".tabs").get_by_role("button", name="建岗与标准").click()
+        self.page.get_by_role("button", name="＋ 添加标准").click()
+        self.page.locator(".criterion-row .c-name").fill("合成经验")
+        self.save_criteria(pid)
+        key = self.get_json(f"/api/v1/projects/{pid}/protocol-workspace")["draft"]["criteria"][0]["criterion_key"]
+        self.page.once("dialog", lambda dialog: dialog.accept())
+        self.page.get_by_role("button", name="发布当前标准").click()
+        cid = self.new_candidate(pid, "模拟复评候选人")
+        self.page.locator("#paste-material").fill("合成材料：参与过研究。")
+        with self.page.expect_response(lambda r: r.url.endswith(f"/candidates/{cid}/sources/text") and r.request.method == "POST"):
+            self.page.get_by_role("button", name="保存并发布材料版本").click()
+        # Structured proposals currently require the real API; preview and apply
+        # below are actual operator UI actions, not a claim of a UI editor.
+        proposal = {"summary": "合成差异", "proposal": {"note": "<b>不可执行的说明</b>", "judgments": [
+            {"criterion_key": key, "status": "met", "evidence_level": "weak",
+             "reason": "<img src=x onerror=alert(1)>", "gap": "待进一步核实", "claim_ids": []}]}}
+        response = self.context.request.post(self.base + f"/api/v1/candidates/{cid}/reevaluations", data=proposal)
+        self.assertEqual(response.status, 200, response.text())
+        draft_id = response.json()["draft_id"]
+        before = self.get_json(f"/api/v1/candidates/{cid}/workspace")
+        decisions = self.get_json(f"/api/v1/candidates/{cid}/decision-history")
+        writes = []
+        self.page.on("request", lambda r: writes.append(r.url) if r.method == "POST" else None)
+        self.page.get_by_role("button", name="流程与跟进").click()
+        self.page.get_by_role("button", name="查看/应用差异").click()
+        dialog = self.page.locator("#modal-root")
+        expect(dialog.get_by_role("heading", name="复评差异确认")).to_be_visible()
+        expect(dialog).to_contain_text("应用前")
+        expect(dialog).to_contain_text("应用后")
+        expect(dialog).to_contain_text("待进一步核实")
+        expect(dialog).to_contain_text("<img src=x onerror=alert(1)>")
+        expect(dialog.locator("img")).to_have_count(0)
+        dialog.get_by_role("button", name="取消", exact=True).click()
+        self.assertEqual(writes, [])
+        self.assertEqual(self.get_json(f"/api/v1/candidates/{cid}/workspace"), before)
+        self.assertEqual(self.get_json(f"/api/v1/candidates/{cid}/reevaluations")["drafts"][0]["state"], "draft")
+        self.page.get_by_role("button", name="查看/应用差异").click()
+        with self.page.expect_response(lambda r: r.url.endswith(f"/reevaluations/{draft_id}/apply")) as applied:
+            dialog.get_by_role("button", name="确认应用", exact=True).click()
+        self.assertEqual(applied.value.status, 200, applied.value.text())
+        self.assertEqual(applied.value.json()["applied_changes"], 1)
+        self.assertEqual(len(writes), 1)
+        self.assertEqual(self.get_json(f"/api/v1/candidates/{cid}/reevaluations")["drafts"][0]["state"], "applied")
+        self.assertEqual(self.get_json(f"/api/v1/candidates/{cid}/decision-history"), decisions)
+        # Cover the project-flow entry too, including a context change after preview.
+        response = self.context.request.post(self.base + f"/api/v1/candidates/{cid}/reevaluations",
+                                             data={"summary": "过期说明草案", "proposal": {"note": "仅说明"}})
+        self.assertEqual(response.status, 200, response.text())
+        stale_id = response.json()["draft_id"]
+        expect(dialog.get_by_role("button", name="确认应用", exact=True)).not_to_be_visible()
+        self.page.get_by_role("button", name="项目级招聘流程").click()
+        self.page.get_by_role("button", name="查看/应用差异").click()
+        expect(dialog).to_contain_text("无判断差异")
+        changed = self.context.request.post(self.base + f"/api/v1/candidates/{cid}/sources/text",
+            data={"text_content": "另一窗口发布的新合成材料", "filename": "synthetic.txt",
+                  "source_kind": "resume", "publish_material": True})
+        self.assertEqual(changed.status, 200, changed.text())
+        with self.page.expect_response(lambda r: r.url.endswith(f"/reevaluations/{stale_id}/apply")) as rejected:
+            dialog.get_by_role("button", name="确认应用", exact=True).click()
+        self.assertEqual(rejected.value.status, 409, rejected.value.text())
+        expect(dialog.get_by_role("button", name="确认应用", exact=True)).to_be_enabled()
+        drafts = self.get_json(f"/api/v1/candidates/{cid}/reevaluations")["drafts"]
+        self.assertEqual(next(d["state"] for d in drafts if d["draft_id"] == stale_id), "stale")
+        self.assertEqual(self.get_json(f"/api/v1/candidates/{cid}/decision-history"), decisions)
+        self.assertFalse(self.console_errors, self.console_errors)
+
+
 if __name__ == "__main__":
     unittest.main()
