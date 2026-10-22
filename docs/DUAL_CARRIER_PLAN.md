@@ -115,3 +115,23 @@ T10 同一候选人的 Source/Claim/Judgment/Decision 历史和导出在两端�
 ## 重要记录
 
 实验详情：explore/html-site-prototype/explorations/html-site/README.md；Windows First Acceptance：docs/WINDOWS_GUI_FIRST_ACCEPTANCE.md；Native Upgrade：docs/C11_NATIVE_CANDIDATE_UPGRADE.md；发行规程：docs/RELEASE_PROCESS.md。
+
+### D5: local HTTP Fetch Metadata / ambiguous forwarding fail-closed (#43)
+
+The shared `LocalBoundaryMiddleware` now rejects browser write requests (`POST`,
+`PUT`, `PATCH`, `DELETE`) with `Sec-Fetch-Site: cross-site` or `same-site`,
+**even when Origin and Referer are omitted**. Same-origin browser requests and
+WPF native API requests without Fetch Metadata retain their existing behavior;
+explicit non-local Host and mismatched Origin/Referer continue to be rejected.
+Ambiguous duplicate Host, Origin, Referer and Fetch Metadata headers fail closed,
+preventing intermediary/application disagreement about request provenance.
+
+The regression `test_convergence09.py` first demonstrated that these synthetic
+requests previously **created projects successfully**, then checks that Core
+now rejects them without changing legitimate same-origin/native writes.
+This is a narrowly scoped browser boundary hardening increment: the local
+browser does **not** yet have a supervisor-issued bearer session, authenticated
+attachment/revocation, or full CSRF token flow; it does **not** protect against
+an already-malicious process running as the same OS user. The existing
+workspace single-writer lease and eventual Supervisor/Session/CAS track remain
+separate release gates; real WPF GUI acceptance is still NOT RUN.
