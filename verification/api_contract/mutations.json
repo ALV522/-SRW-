@@ -1,9 +1,9 @@
 {
   "schema": "srw.api-mutation-classification.v1",
-  "status": "R1 ratchet plus R2 classification for offers, interviews, operations, system, providers, reevaluations, candidate CRUD, project lifecycle and evidence.",
+  "status": "R1 ratchet plus R2 classification for offers, interviews, operations, system, providers, reevaluations, candidate CRUD, project lifecycle, evidence and runtime lifecycle.",
   "frozen_at": "main e385adfb868baf5173f98d6119f253dd9d072b41",
   "rule": "live_mutations - classified MUST NOT exceed baseline_unclassified. Adding a mutation route therefore fails the contract test until it is classified or this baseline is raised in review.",
-  "baseline_unclassified": 42,
+  "baseline_unclassified": 41,
   "classified": [
     {
       "method": "POST",
@@ -438,6 +438,20 @@
       "human_actor": "yes - actor defaults to human and is recorded as the confirming authority",
       "invariants": "accepted must be a boolean (422); unknown claim 404",
       "side_effects": "sets confirmation_state and authority on the claim"
+    },
+    {
+      "domain": "system",
+      "owner": "srw.api.routes.runtime",
+      "method": "POST",
+      "path": "/api/v1/runtime/shutdown",
+      "use_case": "RequestHostShutdown",
+      "request": "header X-SRW-Session when the host issued a lifecycle token",
+      "response": "status shutting_down (202)",
+      "concurrency": "none - the callback runs in a background task after the response",
+      "audit": "none written by the route",
+      "human_actor": "implicit - only a supervised host registers the callback",
+      "invariants": "403 when a lifecycle token exists and the header does not match; 409 when no shutdown callback is registered, so an unsupervised server cannot be stopped from a browser",
+      "side_effects": "schedules the host callback in a BackgroundTask; the process exits only if the host agrees"
     }
   ]
 }

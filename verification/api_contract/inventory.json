@@ -1196,7 +1196,7 @@
     {
       "method": "GET",
       "path": "/api/v1/runtime/capabilities",
-      "owner": "srw.api.app",
+      "owner": "srw.api.routes.runtime",
       "domain": "system",
       "mutation": false,
       "signals": null
@@ -1204,7 +1204,7 @@
     {
       "method": "GET",
       "path": "/api/v1/runtime/info",
-      "owner": "srw.api.app",
+      "owner": "srw.api.routes.runtime",
       "domain": "system",
       "mutation": false,
       "signals": null
@@ -1212,7 +1212,7 @@
     {
       "method": "GET",
       "path": "/api/v1/runtime/live",
-      "owner": "srw.api.app",
+      "owner": "srw.api.routes.runtime",
       "domain": "system",
       "mutation": false,
       "signals": null
@@ -1220,7 +1220,7 @@
     {
       "method": "GET",
       "path": "/api/v1/runtime/ready",
-      "owner": "srw.api.app",
+      "owner": "srw.api.routes.runtime",
       "domain": "system",
       "mutation": false,
       "signals": null
@@ -1228,7 +1228,7 @@
     {
       "method": "POST",
       "path": "/api/v1/runtime/shutdown",
-      "owner": "srw.api.app",
+      "owner": "srw.api.routes.runtime",
       "domain": "system",
       "mutation": true,
       "signals": {
