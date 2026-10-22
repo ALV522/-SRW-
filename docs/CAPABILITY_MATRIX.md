@@ -120,3 +120,18 @@ normalization, snapshot lineage and invalid-reference rollback using synthetic
 SQLite/API inputs. Exact-SHA CI is reported in the PR; this is not new Chromium
 interaction, WPF or dual-carrier acceptance. Draft concurrency and historical
 snapshot backfill remain outside this change.
+
+## Issue #41: review before applying reevaluation
+
+Both candidate follow-up and project-flow entry points now fetch the Core draft
+and display its before/after status, evidence level, reason, gap and Claim IDs.
+Viewing or cancelling does not apply; an explicit confirmation submits the
+reviewed draft ID. Empty diffs are labelled, text is escaped, and concurrent
+context changes remain rejected by the existing Core guard.
+
+Chromium scenario 13 covers preview, cancellation without writes, escaped text,
+explicit apply without a HumanDecision, both entry points and stale rejection.
+Structured drafts and the concurrent material change use real API fixtures;
+this does not claim that the note-only draft form is a structured judgment editor.
+Exact-SHA results belong to the PR. Windows GUI and dual-carrier acceptance remain
+NOT RUN. Core/API, schema and release identity are unchanged.
