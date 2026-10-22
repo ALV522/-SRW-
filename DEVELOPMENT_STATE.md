@@ -162,3 +162,12 @@ Chromium E2E 兜底下启动 app.js 按域拆分。2a 抽取三个低耦合叶�
 **过程故障与修复（当日实录）**：首轮 E2E 14/14 全红——`renderPage` 路由表与第 9 行胶水层仍按裸名引用已迁走的页面函数（`dashboard:dashboardPage`、`window.settingsPage=settingsPage`），ES module 作用域不可达，整个应用启动即崩。修复后暴露出静态检查器盲区：对象字面量里的**值引用**与胶水赋值不在调用模式内。已将该规则固化——`check_frontend_contract.py` 新增跨模块裸引用检查（函数在 A 模块定义、B 模块裸引用且未挂 window 即失败），`test_frontend_contract.py` 增至 7 项（含正/反两例）。此后每个拆分子步都受此规则 + 契约 + E2E + 源回归四道守卫。
 
 本地实测：跨模块引用检查 CLEAN；`check_frontend_contract.py` 11 模块 / 176 符号 PASS；E2E 14/14 OK；源回归维持基线。Schema v1_0014、VERSION 1.0.0-alpha.11 未变；GitHub CI = NOT RUN（仅本地执行）。
+## 2026-10-23: 前端整合步骤 2b — app.js 抽出 protocol/candidates/events 三域（本地实跑通过）
+
+2b 抽取三个业务域：`protocol.js`（标准编辑：criteriaTab/criterionRow/collectCriteria/saveCriteria/publishCriteria/forkDraft，97 行）、`candidates.js`（候选人收件/抽屉/工作台 HTML/联系/阶段/Offer/材料/Claim/核实/决定 + 联系工作台/行动计划/电话脚本/Scorecard/交接，64 行）、`events.js`（流程页/面试事件/完成反馈/复评，10 行）。app.js 仅剩 60 行 / 29.7KB（core + 工作区外壳待 2c）。前端共 14 模块。
+
+**过程故障与修复（当日实录）**：E2E test_05（Offer 生命周期）超时——`openOfferStatus` 引用 `offerNextStatuses`，该 const 定义在 app.js 但未挂 window，ES module 作用域不可达。已按域归属将该 const 迁入 candidates.js（其唯一使用方）。这是继函数类之后的第二类断链（const 类）；一次性启发式扫描（本模块任何作用域有声明即安全 + 调用/属性形态 + 长度≥3 + 浏览器全局表）对全树复扫，6 个候选经上下文甄别全部为误报（URL 串、同行多声明符、函数参数、注释），const 类确已干净。该规则噪音水平不足以进永久检查器（函数类规则已进且零误报），const 类由 E2E + 拆分期一次性扫描覆盖，此取舍已记录。
+
+另修复 6 个源测试：`test_convergence11.py` 的 UI 结构断言原先只读 `app.js`，已改为读取 index.html 加载的全部模块合并源码（新增 `frontend_js()` helper）——断言描述的是前端产品面而非单文件。
+
+本地实测：跨模块函数引用检查 CLEAN；`check_frontend_contract.py` 14 模块 / 180 符号 PASS；E2E 14/14 OK；源回归 293 OK（6 skipped，零失败）；治理三查 PASS。Schema v1_0014、VERSION 1.0.0-alpha.11 未变；GitHub CI = NOT RUN（仅本地执行）。
