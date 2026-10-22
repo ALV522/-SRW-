@@ -72,6 +72,44 @@ def collect_module_bindings(modules: list[Path]) -> set[str]:
     return bindings
 
 
+def collect_function_homes(modules: list[Path]) -> dict[str, str]:
+    """function/const-arrow name -> defining module name (declarations and window assignments)."""
+    homes: dict[str, str] = {}
+    for path in modules:
+        text = path.read_text(encoding="utf-8")
+        for name in re.findall(r"(?:async\s+)?function\s+([A-Za-z_$][\w$]*)", text):
+            homes.setdefault(name, path.name)
+        for name in re.findall(r"window\.([A-Za-z_$][\w$]*)\s*=\s*(?:async\s*)?(?:function|\()", text):
+            homes.setdefault(name, path.name)
+    return homes
+
+
+def collect_cross_module_references(modules: list[Path]) -> list[str]:
+    """Bare references to functions defined in another module.
+
+    ES module top-level declarations are not global properties, so a bare
+    reference from module A to a function declared in module B throws
+    ReferenceError unless B publishes it on window. Same-module references and
+    window-published names are fine.
+    """
+    homes = collect_function_homes(modules)
+    published = set()
+    for path in modules:
+        published.update(WINDOW_DEF.findall(path.read_text(encoding="utf-8")))
+    problems: list[str] = []
+    for path in modules:
+        text = path.read_text(encoding="utf-8")
+        own = {name for name, home in homes.items() if home == path.name}
+        for name in sorted(set(BARE_IDENT.findall(text))):
+            home = homes.get(name)
+            if home is None or home == path.name or name in own or name in published:
+                continue
+            problems.append(
+                f"{path.name}: bare reference to `{name}` defined in {home} without a window assignment"
+            )
+    return problems
+
+
 def collect_references(modules: list[Path]) -> set[str]:
     used: set[str] = set()
     for path in modules:
@@ -137,6 +175,8 @@ def main(dist: Path | None = None, inventory: Path | None = None) -> int:
     for path in sorted(collect_api_paths(modules)):
         if path not in inventory_paths:
             problems.append(f"frontend calls an unregistered API path: {path}")
+
+    problems.extend(collect_cross_module_references(modules))
 
     if problems:
         print("frontend contract DRIFT detected:")

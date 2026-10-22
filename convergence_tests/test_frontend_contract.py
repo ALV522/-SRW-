@@ -88,6 +88,46 @@ class FrontendContractTests(unittest.TestCase):
             inventory.write_text("# empty\n", encoding="utf-8")
             self.assertEqual(frontend.main(dist=dist, inventory=inventory), 0)
 
+    def test_detects_cross_module_bare_reference(self):
+        # Module A referencing module B's function without a window assignment:
+        # ES module declarations are not global, so the call throws at runtime.
+        with tempfile.TemporaryDirectory() as tmp:
+            dist = Path(tmp) / "dist"
+            dist.mkdir()
+            (dist / "index.html").write_text(
+                '<script type="module" src="/v1/a.js"></script>\n'
+                '<script type="module" src="/v1/b.js"></script>',
+                encoding="utf-8",
+            )
+            (dist / "a.js").write_text(
+                "window.render=()=>{page()};\n", encoding="utf-8"
+            )
+            (dist / "b.js").write_text(
+                "function page(){}\n", encoding="utf-8"
+            )
+            inventory = Path(tmp) / "inventory.txt"
+            inventory.write_text("# empty\n", encoding="utf-8")
+            self.assertEqual(frontend.main(dist=dist, inventory=inventory), 1)
+
+    def test_cross_module_reference_with_window_assignment_passes(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            dist = Path(tmp) / "dist"
+            dist.mkdir()
+            (dist / "index.html").write_text(
+                '<script type="module" src="/v1/a.js"></script>\n'
+                '<script type="module" src="/v1/b.js"></script>',
+                encoding="utf-8",
+            )
+            (dist / "a.js").write_text(
+                "window.render=()=>{window.page()};\n", encoding="utf-8"
+            )
+            (dist / "b.js").write_text(
+                "function page(){}\nwindow.page=page;\n", encoding="utf-8"
+            )
+            inventory = Path(tmp) / "inventory.txt"
+            inventory.write_text("# empty\n", encoding="utf-8")
+            self.assertEqual(frontend.main(dist=dist, inventory=inventory), 0)
+
 
 if __name__ == "__main__":
     unittest.main()

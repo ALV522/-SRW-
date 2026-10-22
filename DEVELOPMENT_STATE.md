@@ -155,3 +155,10 @@ Schema v1_0014、VERSION 1.0.0-alpha.11 未变；GitHub CI = NOT RUN（仅本地
 ## 2026-10-23: 前端整合步骤 1 — 六代基建收敛为 shared.js + 3 处跨 shim 缺陷修复（本地实跑通过）
 
 Chromium E2E 环境就绪后启动前端整合。步骤 1：新建 `frontend/dist/shared.js`（`$/esc/fmt/api/toast/modal/modalWide/closeModal` 单一实现挂 window，行为取并集——toast 带根节点守卫与 3600ms、modal 标题转义、modalWide 保留 shim 的宽型 `min(1120px,94vw)`），`index.html` 首个加载（module 按文档序执行）；app.js 删 6 处私有定义改解构；convergence03–08 删各自 `cNN` 私有副本（共 22 处定义）并改写全部调用点。**借此发现并修复 3 处真实潜在缺陷**：c06/c07 在模块作用域调用 c05 的 `c05toast`/`c05modal`、c07 调用 c06 的 `c06api`——ES module 顶层声明不挂全局，这些 handler 一旦点击即 ReferenceError（运营学习页签的渠道观测保存/激活/回滚、ATS CSV 导入预览/提交全线断裂，且无任何 E2E 覆盖）；修复后全部经 window 全局解析。新增 test_14（渠道观测端到端：填漏斗→保存→toast→面板刷新→API 断言含 human_confirmed）本地 PASS。静态校验：全部裸调用可解析（模块定义 + window 全局），`check_frontend_contract.py` 8 模块 / 159 符号 PASS；本地实测：E2E 14/14 OK、源回归 291 OK（6 skipped，零失败）。Schema v1_0014、VERSION 1.0.0-alpha.11 未变；GitHub CI = NOT RUN（仅本地执行）。
+## 2026-10-23: 前端整合步骤 2a — app.js 抽出 dashboard/pages/jobsetup 三域（本地实跑通过）
+
+Chromium E2E 兜底下启动 app.js 按域拆分。2a 抽取三个低耦合叶子域：`dashboard.js`（工作台总览）、`pages.js`（岗位模板/知识库/后台任务/系统设置四页及全部处理器）、`jobsetup.js`（四步建岗向导）。app.js 126KB→93KB（280→228 行），保留 core（state/路由/shell/启动/核心助手）。跨模块引用统一 `window.X()` 形式（与加载顺序解耦）；核心助手与页面渲染器按“谁定义谁发布”原则挂 window。
+
+**过程故障与修复（当日实录）**：首轮 E2E 14/14 全红——`renderPage` 路由表与第 9 行胶水层仍按裸名引用已迁走的页面函数（`dashboard:dashboardPage`、`window.settingsPage=settingsPage`），ES module 作用域不可达，整个应用启动即崩。修复后暴露出静态检查器盲区：对象字面量里的**值引用**与胶水赋值不在调用模式内。已将该规则固化——`check_frontend_contract.py` 新增跨模块裸引用检查（函数在 A 模块定义、B 模块裸引用且未挂 window 即失败），`test_frontend_contract.py` 增至 7 项（含正/反两例）。此后每个拆分子步都受此规则 + 契约 + E2E + 源回归四道守卫。
+
+本地实测：跨模块引用检查 CLEAN；`check_frontend_contract.py` 11 模块 / 176 符号 PASS；E2E 14/14 OK；源回归维持基线。Schema v1_0014、VERSION 1.0.0-alpha.11 未变；GitHub CI = NOT RUN（仅本地执行）。
