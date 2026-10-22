@@ -151,6 +151,78 @@ class ReevaluationRouteTests(unittest.TestCase):
         with self.factory() as session:
             self.assertEqual(session.get(ReevaluationDraft, draft["draft_id"]).state, "stale")
 
+    def seed_evidence_assessment(self):
+        from srw.modules.candidate.models import Source, Claim
+        from srw.modules.decision.commands import record_assessment
+        with self.factory.begin() as session:
+            source = Source(candidate_id=self.cid, source_kind='text', content_hash='s'*64,
+                            text_content='Synthetic evidence')
+            session.add(source)
+            session.flush()
+            claims = [Claim(candidate_id=self.cid, source_id=source.id,
+                            normalized_text=f'Synthetic claim {i}', claim_hash=str(i)*64)
+                      for i in range(2)]
+            session.add_all(claims)
+            session.flush()
+            ids = [c.id for c in claims]
+            record_assessment(session, self.cid, CRITERION, status='met', evidence_level='strong',
+                              reason='', gap='', claim_ids=[ids[0]], actor='human',
+                              evaluation_policy_revision="policy.v1")
+        return ids
+
+    def test_evidence_only_change_is_applied_and_snapshots_keep_lineage(self):
+        from srw.modules.decision.models import CriterionJudgmentEvidence, HumanDecision
+        old, new = self.seed_evidence_assessment()
+        created = self.create_draft(claim_ids=[new])
+        self.assertEqual(created.status_code, 200, created.text)
+        draft = created.json()
+        self.assertEqual(len(draft['diff']), 1)
+        self.assertEqual(draft['diff'][0]['before']['claim_ids'], [old])
+        response = self.client.post(f"/api/v1/reevaluations/{draft['draft_id']}/apply")
+        self.assertEqual(response.status_code, 200, response.text)
+        with self.factory() as session:
+            self.assertEqual(list(session.scalars(select(CriterionJudgmentEvidence.claim_id))), [new])
+            snapshots = {s.snapshot_kind: json.loads(s.payload_json)['judgments'][0]['claim_ids']
+                         for s in session.scalars(select(EvaluationSnapshot))}
+            self.assertEqual(snapshots, {'pre_reevaluation': [old], 'post_reevaluation': [new]})
+            self.assertEqual(list(session.scalars(select(HumanDecision))), [])
+        again = self.client.post(f"/api/v1/reevaluations/{draft['draft_id']}/apply")
+        self.assertTrue(again.json()['idempotent'])
+
+    def test_duplicate_claim_references_are_not_a_change(self):
+        old, _ = self.seed_evidence_assessment()
+        response = self.create_draft(claim_ids=[old, old])
+        self.assertEqual(response.status_code, 200, response.text)
+        self.assertEqual(response.json()['diff'], [])
+
+    def test_removing_evidence_is_an_explicit_change(self):
+        from srw.modules.decision.models import CriterionJudgmentEvidence
+        self.seed_evidence_assessment()
+        draft = self.create_draft(claim_ids=[]).json()
+        self.assertEqual(len(draft['diff']), 1)
+        response = self.client.post(f"/api/v1/reevaluations/{draft['draft_id']}/apply")
+        self.assertEqual(response.status_code, 200, response.text)
+        with self.factory() as session:
+            self.assertEqual(list(session.scalars(select(CriterionJudgmentEvidence))), [])
+
+    def test_invalid_evidence_apply_rolls_back_snapshots_and_assessment(self):
+        from srw.modules.decision.models import CriterionJudgmentEvidence
+        old, _ = self.seed_evidence_assessment()
+        draft = self.create_draft(claim_ids=['nonexistent-claim']).json()
+        response = self.client.post(f"/api/v1/reevaluations/{draft['draft_id']}/apply")
+        self.assertEqual(response.status_code, 404, response.text)
+        with self.factory() as session:
+            self.assertEqual(list(session.scalars(select(CriterionJudgmentEvidence.claim_id))), [old])
+            self.assertEqual(list(session.scalars(select(EvaluationSnapshot))), [])
+            self.assertEqual(session.get(ReevaluationDraft, draft['draft_id']).state, 'draft')
+
+
+    def test_omitted_evidence_keeps_legacy_unchanged_proposal_noop(self):
+        self.seed_evidence_assessment()
+        response = self.create_draft()
+        self.assertEqual(response.status_code, 200, response.text)
+        self.assertEqual(response.json()['diff'], [])
+
 
 if __name__ == "__main__":
     unittest.main()

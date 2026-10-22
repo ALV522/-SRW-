@@ -33,7 +33,7 @@ from srw.modules.audit.repository import append_audit_event
 from srw.modules.candidate.models import Candidate
 from srw.modules.decision.commands import record_assessment
 from srw.modules.decision.context import get_current_decision_context
-from srw.modules.decision.models import CriterionJudgment
+from srw.modules.decision.models import CriterionJudgment, CriterionJudgmentEvidence
 from srw.modules.fullworkbench import EvaluationSnapshot, ReevaluationDraft
 from srw.modules.protocol.repository import ProtocolRepository
 from srw.runtime.db.session import v1_session_scope
@@ -42,9 +42,12 @@ JUDGMENT_STATUSES = {"met", "partial", "missing", "conflict", "not_met"}
 EVIDENCE_LEVELS = {"strong", "medium", "weak", "none"}
 
 
-def judgment_payload(row) -> dict:
+def judgment_payload(session, row) -> dict:
+    claim_ids = sorted(session.scalars(select(CriterionJudgmentEvidence.claim_id).where(
+        CriterionJudgmentEvidence.judgment_id == row.id)).all())
     return {"criterion_key": row.criterion_key, "status": row.status,
-            "evidence_level": row.evidence_level, "reason": row.reason, "gap": row.gap}
+            "evidence_level": row.evidence_level, "reason": row.reason, "gap": row.gap,
+            "claim_ids": claim_ids}
 
 
 def reevaluation_routes(*, factory, evaluation_policy_revision: str) -> list[Route]:
@@ -107,23 +110,27 @@ def reevaluation_routes(*, factory, evaluation_policy_revision: str) -> list[Rou
                 if not key or key not in known:
                     raise V1InvariantError(f"unknown criterion_key: {key}")
                 before = baseline.get(key)
-                before_view = judgment_payload(before) if before else {
+                before_view = judgment_payload(session, before) if before else {
                     "criterion_key": key, "status": "missing",
-                    "evidence_level": "none", "reason": "", "gap": ""}
+                    "evidence_level": "none", "reason": "", "gap": "", "claim_ids": []}
                 after = {
                     "criterion_key": key,
                     "status": str(item.get("status") or "missing"),
                     "evidence_level": str(item.get("evidence_level") or "none"),
                     "reason": str(item.get("reason") or ""),
                     "gap": str(item.get("gap") or ""),
-                    "claim_ids": [str(x) for x in (item.get("claim_ids") or [])],
+                    "claim_ids": sorted({str(x) for x in (item.get("claim_ids") or [])}),
                 }
                 if after["status"] not in JUDGMENT_STATUSES:
                     raise V1InvariantError("invalid reevaluation status")
                 if after["evidence_level"] not in EVIDENCE_LEVELS:
                     raise V1InvariantError("invalid reevaluation evidence_level")
-                if any(before_view.get(k) != after.get(k)
-                       for k in ("status", "evidence_level", "reason", "gap")):
+                # Omission retains the legacy no-op contract for unchanged text;
+                # only an explicit reference set requests an evidence-only edit.
+                fields = ("status", "evidence_level", "reason", "gap")
+                if "claim_ids" in item:
+                    fields += ("claim_ids",)
+                if any(before_view.get(k) != after.get(k) for k in fields):
                     diff.append({"criterion_key": key, "before": before_view, "after": after})
             draft = ReevaluationDraft(
                 candidate_id=cid, summary=s_field(body, "summary"),
@@ -172,7 +179,7 @@ def reevaluation_routes(*, factory, evaluation_policy_revision: str) -> list[Rou
                     CriterionJudgment.candidate_id == draft.candidate_id,
                     CriterionJudgment.decision_context_hash == context.hash)
             ).all()
-            before_payload = [judgment_payload(row) for row in before_rows]
+            before_payload = [judgment_payload(session, row) for row in before_rows]
             session.add(EvaluationSnapshot(
                 candidate_id=draft.candidate_id, project_id=context.project_id,
                 decision_context_hash=context.hash, reevaluation_id=draft.id,
@@ -201,7 +208,7 @@ def reevaluation_routes(*, factory, evaluation_policy_revision: str) -> list[Rou
                 candidate_id=draft.candidate_id, project_id=context.project_id,
                 decision_context_hash=context.hash, reevaluation_id=draft.id,
                 snapshot_kind="post_reevaluation",
-                payload_json=json.dumps({"judgments": [judgment_payload(row) for row in after_rows]},
+                payload_json=json.dumps({"judgments": [judgment_payload(session, row) for row in after_rows]},
                                         ensure_ascii=False, separators=(",", ":")),
             ))
             draft.state = "applied"
