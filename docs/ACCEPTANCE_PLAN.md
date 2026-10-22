@@ -100,3 +100,19 @@ Gate must prove it at the exact PR HEAD. It does **not** establish actual WPF
 GUI, embedded Windows Runtime, production Knowledge, physical disk crash/power
 loss safety, user-data migration, or finished Native ZIP acceptance. All
 inputs are generated under a temporary synthetic workspace and cleaned up.
+
+## Browser real-PDF candidate intake: source-level document fidelity (#41)
+
+`browser_acceptance/test_flows.py::test_12_operator_uploads_real_pdf_resume_with_source_provenance`
+uses a generated, single-page **actual PDF** (not a renamed text file) in a fully synthetic
+workspace. It clicks the existing candidate file selector and “上传并处理”, then verifies
+that the extracted text becomes a **current** Source/MaterialRevision, Source metadata
+retains the PDF filename and `rich_document` importer identity, and the original
+binary is retrievable byte-for-byte from the authorized Source endpoint. Uploading
+this resume alone **must not** create an authoritative HumanDecision; text-bearing PDF
+must not spuriously require an OCR Provider task.
+
+The CI result is a **Chromium + real Core/SQLite/PyMuPDF** acceptance for text-bearing
+PDF only. It does not prove image-only PDF OCR, OCR accuracy, actual user data quality,
+Provider, ASR, Windows WPF GUI or full v0.8.12-R2 parity. These remain separately
+blocked/not verified until exact-artifact acceptance evidence exists.
