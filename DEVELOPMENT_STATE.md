@@ -141,3 +141,13 @@ test_13 实证并深修了一类真实缺陷：app.js 四个页面入口函数�
 产出 `docs/development/BUSINESS_CODE_MAP.md`：12 个业务域逐一映射 modules/surfaces/api 落点、测试与载体覆盖；登记 6 个臃肿靶点（fullworkbench 余量 1485 行、两个 fullworkbench.py 同名、capability_recovery* 名不副实、前端六代重复、app.js 126KB）与 5 个覆盖缺口（身份合并/备份恢复/招聘智能 UI E2E、OCR/ASR 真实链路、双端并发），并立 5 条防再臃肿维护规则（新能力落 modules/surfaces、路由基线 CI 强制、前端处理器守卫、新场景必须真实 Chromium、状态只用证据）。
 
 产出 `docs/decisions/ADR-0003-core-supervisor.md`（Proposed，待负责人批准）：S1 按需分离 Supervisor + 引用计数生命周期（载体永不持租约）；S2 Schema v1_0015 + If-Match 事务级 CAS（412 不产假审计）；S3 一次性会话附着 + CSRF/Origin + 撤销；S4 Job Engine 唯一所有权（复用现有 worker 租约与 idempotency_key）；S5 生命周期四原语；T1–T10 逐条落法；三相位实施与回滚。实现未启动——按负责人指令待 #41 E2E 补缺完成（已完成）后先设计，批准再动代码。
+
+## 2026-10-23: #42 Windows 实机验收（本地执行，d8d032d prepared ZIP）
+
+输入核验：`SRW_C11_Windows_Native_PREPARED_UNVERIFIED_GUI_d8d032d.zip` SHA-256 与固定值 `27ae4765…b2cb` 精确匹配；全新目录解压（2629 成员，与文档一致，未碰 10-19 旧解压）。`verify_prepared_native.py` 全量实机验证通过：2332 Runtime / 5 知识库 / 15 Host / 13 依赖文件在册，嵌入式 Python 3.12.10 全量导入成功，loopback 后端就绪，身份核验 true，合成工作区 true，证据落在候选包外；历史上“重跑出现未登记文件”的疑点未复现（全新解压 + `-B` 修复生效）。
+
+**环境发现（非二进制缺陷）**：本机代理客户端环境下，Host 的 readiness 探测 URL 被双重编码（`http%3A//127.0.0.1%3A<port>/…`）→ 404 → force-kill 重试循环（两个候选 ZIP 均复现）；剥离代理变量后零 404、启动序列完整。源码侧无此模式：desktop 全树无 `EscapeDataString`，`RuntimeApiClient` 自 C08 起即 BaseAddress + 相对路径；c8431ca7 ZIP 内 Host 与 upgrade-kit 的 CI 编译 Host 字节一致（`f95b9b56…`）且干净环境下正常启动。结论：旧二进制健康，故障为本地代理环境干扰；运维注记——启动 Host 前剥离代理环境变量。
+
+脚本化 GUI 验收（`D:/SRW/acceptance-20261021/scripted_gui_acceptance.py`）**PASS**：干净环境启动 → `backend_ready`（5.9s，Uvicorn loopback）→ 经宿主后端完成真实业务写入（建项目 200 / 建候选人 200 / 列表 200 / 候选人持久化 true）→ 优雅关闭链完整（shutdown_requested → backend_stopped → workspace_released → host_closed），后端随宿主级联退出无泄漏。日志审计：`project_created_http_200=1`、`host_shutdown_clean=true`、fatal=0、malformed=0；`wpf_window_and_frontend_loaded=false`——无头会话中 WebView2 无法初始化，GUI 级（点击级）验收按预案交负责人执行，规程见 `D:/SRW/acceptance-20261021/GUI-ACCEPTANCE-RUNBOOK.md`（精确 PowerShell、预期输出、失败处理、脱敏要求）。工件身份注记：该工件报告 `release_id=1.0.0-alpha10-convergence11`（构建于 C11 代码基线，早于本地 alpha.11 迁移，属预期）。
+
+Schema v1_0014、VERSION 1.0.0-alpha.11 未变；GitHub CI = NOT RUN（仅本地执行）。
