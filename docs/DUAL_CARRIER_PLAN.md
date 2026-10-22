@@ -26,6 +26,14 @@
 
 这仅补齐此前 #59 中的独立 backend 入口例外，不改变核心身份、SQLite Schema、Host 权威进程或 Legacy 的历史行为。该合同以 `convergence_tests/test_standalone_backend_lease.py` 的纯合成测试验证；并不代表单独 Supervisor、CAS、Origin/CSRF、Web+EXE 同时共用同一 Core 的正式验收，仍需 #43 后续工作。
 
+### M1 安全增量：直接 Core 启动的本地边界与 WPF Host 身份
+
+`run_local.py` 直接启动的 C11 Core 不再接受 `0.0.0.0`、外部网卡、主机名或 IPv6 wildcard，HTTP 只能在 `127.0.0.1` 的 1024–65535 端口绑定；输入不合规时必须在创建工作区、恢复备份或打开 SQLite 之前拒绝。
+
+`--workspace-lock host` 是**仅供真正 WPF Host 子进程使用**的例外：除需要 instance/session/token 环境身份外，还需看到活跃的 schema-v2 `data/app.lock`，其 edition、父 PID、instance_id、session_id、端口与工作区路径必须与启动上下文匹配。单靠伪造三个环境变量不得绕过工作区单写者租约。WPF Host 在启动 backend 前已获取租约并更新端口，故不需要在 backend 二次获取。此检查限制误配置或不受支持的独立进程，不能替代针对同一 OS 用户下恶意进程的完整认证。
+
+`convergence_tests/test_standalone_backend_lease.py` 使用完全合成的临时文件夹、伪 Uvicorn 测试这些拒绝/合法路径；仅为 Source/API 合同验证。**本增量不代表** Windows GUI 实机通过，亦不替代 #43 正式 Origin/CSRF/会话撤销、CAS、独立 Core Supervisor 或同一 Core 双载体联调。
+
 ## 现有基础及不可过度外推的证据
 
 隔离分支 explore/html-site-prototype 已有 E0 静态展示、E1 真实只读 API、E2 代理条件写入、E3 SQLite 事务级 CAS、E4 独立 Core owner、E5 本地受保护附着。Native SOURCE Lab 真实 WPF EXE + 浏览器读同一个合成 Core/SQLite，但 Core 仍由 WPF Host 拥有、外部 Python Runtime、合成 Knowledge，尚非 Portable/生产写入。

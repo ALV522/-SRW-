@@ -38,6 +38,12 @@ def _required_host_identity() -> None:
 
 def main() -> int:
     args = parse_args()
+    # A local recruitment Core is never an unauthenticated LAN/public server.
+    # Exact numeric loopback prevents DNS resolution and wildcard surprises.
+    if args.host != "127.0.0.1":
+        raise SystemExit("LOCAL_ONLY_BIND_REQUIRED: bind to 127.0.0.1 only")
+    if not isinstance(args.port, int) or isinstance(args.port, bool) or not 1024 <= args.port <= 65535:
+        raise SystemExit("LOCAL_PORT_INVALID: port must be 1024..65535")
     if args.workspace_lock == "host":
         if args.edition != "windows":
             raise SystemExit("HOST_WORKSPACE_INVALID: host-owned workspace requires windows edition")
@@ -48,6 +54,16 @@ def main() -> int:
     knowledge = Path(os.environ.get("RECRUITMENT_KNOWLEDGE_DIR", str(ROOT / "knowledge"))).expanduser().resolve()
     if (knowledge / "active").is_dir():
         knowledge = knowledge / "active"
+    if args.workspace_lock == "host":
+        from srw.workspace_lease import WorkspaceLeaseError, require_parent_host_lease
+        try:
+            require_parent_host_lease(
+                data_dir, port=args.port,
+                instance_id=os.environ["RECRUITMENT_INSTANCE_ID"],
+                session_id=os.environ["RECRUITMENT_SESSION_ID"],
+            )
+        except WorkspaceLeaseError as exc:
+            raise SystemExit(str(exc)) from None
     data_dir.mkdir(parents=True, exist_ok=True)
     db = data_dir / "srw_v1.db"
 
