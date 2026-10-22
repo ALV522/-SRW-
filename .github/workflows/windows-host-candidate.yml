@@ -12,6 +12,10 @@ on:
       - 'scripts/package_native_upgrade_kit.py'
       - 'convergence_tests/test_native_rebuild_from_prepared.py'
       - 'convergence_tests/test_native_upgrade_kit.py'
+      - 'scripts/run_local.py'
+      - 'backend/srw/workspace_lease.py'
+      - 'convergence_tests/test_standalone_backend_lease.py'
+      - 'convergence_tests/test_host_parent_subprocess.py'
   push:
     branches: [main]
   workflow_dispatch:
@@ -75,6 +79,12 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
+      - name: Verify real Python child/parent workspace lease on Windows (not WPF GUI)
+        shell: pwsh
+        run: |
+          $env:PYTHONPATH = 'backend'
+          python -m unittest convergence_tests.test_host_parent_subprocess -v
+          if ($LASTEXITCODE -ne 0) { throw 'Windows parent-child Host lease contract failed' }
       - name: Package same-commit C11 source and WPF Host into a single upgrade kit
         shell: pwsh
         run: |
