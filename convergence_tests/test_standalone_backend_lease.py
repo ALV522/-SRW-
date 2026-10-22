@@ -5,6 +5,7 @@ no user SQLite, real WPF window, Provider or production Knowledge is opened.
 """
 from __future__ import annotations
 
+import json
 import os
 import tempfile
 import unittest
@@ -154,6 +155,23 @@ class StandaloneBackendLeaseTests(unittest.TestCase):
             with patch("os.getppid", return_value=os.getpid()):
                 with self.assertRaises(SystemExit) as rejected:
                     self.launch_with_fakes(args=args, on_restore=lambda: self.fail("wrong port caused restore"))
+                self.assertIn("HOST_WORKSPACE_INVALID", str(rejected.exception))
+                self.assertEqual(inspect_lease(self.data).state, ACTIVE)
+
+    def test_host_mode_rejects_lease_record_for_different_data_root(self):
+        args = Namespace(host="127.0.0.1", port=8791, edition="windows", workspace_lock="host")
+        self.environment.update({"RECRUITMENT_INSTANCE_ID": "synthetic-host-id",
+                                 "RECRUITMENT_SESSION_ID": "synthetic-session-id",
+                                 "RECRUITMENT_SESSION_TOKEN": "synthetic-token-not-real"})
+        with WorkspaceLease(self.data, edition="windows", port=8791,
+                            instance_id="synthetic-host-id", session_id="synthetic-session-id"):
+            marker = self.data / "app.lock" / "instance.json"
+            payload = json.loads(marker.read_text(encoding="utf-8"))
+            payload["data_dir"] = str(Path(self.tmp.name) / "a-different-workspace" / "data")
+            marker.write_text(json.dumps(payload), encoding="utf-8")
+            with patch("os.getppid", return_value=os.getpid()):
+                with self.assertRaises(SystemExit) as rejected:
+                    self.launch_with_fakes(args=args, on_restore=lambda: self.fail("foreign root caused restore"))
                 self.assertIn("HOST_WORKSPACE_INVALID", str(rejected.exception))
                 self.assertEqual(inspect_lease(self.data).state, ACTIVE)
 
