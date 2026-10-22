@@ -864,7 +864,7 @@ class RecruitmentBrowserAcceptance(unittest.TestCase):
         self.assertEqual(details["metadata"]["intake_method"], "rich_document")
         downloaded = self.context.request.get(self.base + f"/api/v1/sources/{sid}/file")
         self.assertEqual(downloaded.status, 200)
-        self.assertEqual(hashlib.sha256(downloaded.body).hexdigest(), hashlib.sha256(pdf).hexdigest())
+        self.assertEqual(hashlib.sha256(downloaded.body()).hexdigest(), hashlib.sha256(pdf).hexdigest())
         self.assertFalse(workspace["decision_ready"], "Uploaded resume alone is not a human judgment")
         self.assertFalse(self.console_errors, self.console_errors)
 
