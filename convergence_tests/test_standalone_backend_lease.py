@@ -89,13 +89,83 @@ class StandaloneBackendLeaseTests(unittest.TestCase):
         self.assertEqual(result, 0)
         self.assertEqual(inspect_lease(self.data).state, ABSENT)
 
+    def test_non_loopback_bind_is_rejected_before_workspace_mutation(self):
+        for host in ("0.0.0.0", "::", "localhost", "192.0.2.1"):
+            with self.subTest(host=host):
+                args = Namespace(host=host, port=8791, edition="web", workspace_lock="backend")
+                with self.assertRaises(SystemExit) as rejected:
+                    self.launch_with_fakes(args=args, on_restore=lambda: self.fail("remote bind caused restore"))
+                self.assertIn("LOCAL_ONLY_BIND_REQUIRED", str(rejected.exception))
+                self.assertFalse(self.data.exists())
+
+    def test_invalid_port_is_rejected_before_workspace_mutation(self):
+        for port in (0, 80, -1, 65536):
+            with self.subTest(port=port):
+                args = Namespace(host="127.0.0.1", port=port, edition="web", workspace_lock="backend")
+                with self.assertRaises(SystemExit) as rejected:
+                    self.launch_with_fakes(args=args, on_restore=lambda: self.fail("bad port caused restore"))
+                self.assertIn("LOCAL_PORT_INVALID", str(rejected.exception))
+                self.assertFalse(self.data.exists())
+
+    def test_host_mode_cannot_spoof_session_for_existing_owner(self):
+        args = Namespace(host="127.0.0.1", port=8791, edition="windows", workspace_lock="host")
+        self.environment.update({"RECRUITMENT_INSTANCE_ID": "different-instance",
+                                 "RECRUITMENT_SESSION_ID": "different-session",
+                                 "RECRUITMENT_SESSION_TOKEN": "synthetic-token-not-real"})
+        with WorkspaceLease(self.data, edition="windows", port=8791,
+                            instance_id="legitimate-host", session_id="legitimate-session"):
+            with patch("os.getppid", return_value=os.getpid()):
+                with self.assertRaises(SystemExit) as rejected:
+                    self.launch_with_fakes(args=args, on_restore=lambda: self.fail("spoof caused restore"))
+                self.assertIn("HOST_WORKSPACE_INVALID", str(rejected.exception))
+                self.assertEqual(inspect_lease(self.data).state, ACTIVE)
+
+    def test_host_mode_requires_parent_process_to_own_the_lease(self):
+        args = Namespace(host="127.0.0.1", port=8791, edition="windows", workspace_lock="host")
+        self.environment.update({"RECRUITMENT_INSTANCE_ID": "synthetic-host-id",
+                                 "RECRUITMENT_SESSION_ID": "synthetic-session-id",
+                                 "RECRUITMENT_SESSION_TOKEN": "synthetic-token-not-real"})
+        with WorkspaceLease(self.data, edition="windows", port=8791,
+                            instance_id="synthetic-host-id", session_id="synthetic-session-id"):
+            with patch("os.getppid", return_value=os.getpid() + 10000):
+                with self.assertRaises(SystemExit) as rejected:
+                    self.launch_with_fakes(args=args, on_restore=lambda: self.fail("non-parent caused restore"))
+                self.assertIn("HOST_WORKSPACE_INVALID", str(rejected.exception))
+                self.assertEqual(inspect_lease(self.data).state, ACTIVE)
+
+    def test_host_mode_rejects_absent_lease_before_creating_data_dir(self):
+        args = Namespace(host="127.0.0.1", port=8791, edition="windows", workspace_lock="host")
+        self.environment.update({"RECRUITMENT_INSTANCE_ID": "synthetic-host-id",
+                                 "RECRUITMENT_SESSION_ID": "synthetic-session-id",
+                                 "RECRUITMENT_SESSION_TOKEN": "synthetic-token-not-real"})
+        with patch("os.getppid", return_value=os.getpid()):
+            with self.assertRaises(SystemExit) as rejected:
+                self.launch_with_fakes(args=args, on_restore=lambda: self.fail("no lease caused restore"))
+            self.assertIn("HOST_WORKSPACE_INVALID", str(rejected.exception))
+            self.assertFalse(self.data.exists())
+
+    def test_host_mode_rejects_wrong_lease_port_before_restore(self):
+        args = Namespace(host="127.0.0.1", port=8792, edition="windows", workspace_lock="host")
+        self.environment.update({"RECRUITMENT_INSTANCE_ID": "synthetic-host-id",
+                                 "RECRUITMENT_SESSION_ID": "synthetic-session-id",
+                                 "RECRUITMENT_SESSION_TOKEN": "synthetic-token-not-real"})
+        with WorkspaceLease(self.data, edition="windows", port=8791,
+                            instance_id="synthetic-host-id", session_id="synthetic-session-id"):
+            with patch("os.getppid", return_value=os.getpid()):
+                with self.assertRaises(SystemExit) as rejected:
+                    self.launch_with_fakes(args=args, on_restore=lambda: self.fail("wrong port caused restore"))
+                self.assertIn("HOST_WORKSPACE_INVALID", str(rejected.exception))
+                self.assertEqual(inspect_lease(self.data).state, ACTIVE)
+
     def test_host_owned_mode_does_not_try_second_lease(self):
         args = Namespace(host="127.0.0.1", port=8791, edition="windows", workspace_lock="host")
         self.environment.update({"RECRUITMENT_INSTANCE_ID": "synthetic-host-id",
                                  "RECRUITMENT_SESSION_ID": "synthetic-session-id",
                                  "RECRUITMENT_SESSION_TOKEN": "synthetic-token-not-real"})
-        with WorkspaceLease(self.data, edition="windows", port=8791):
-            result, restore, app = self.launch_with_fakes(args=args,
+        with WorkspaceLease(self.data, edition="windows", port=8791,
+                            instance_id="synthetic-host-id", session_id="synthetic-session-id"):
+            with patch("os.getppid", return_value=os.getpid()):
+                result, restore, app = self.launch_with_fakes(args=args,
                 on_restore=lambda: self.assertEqual(inspect_lease(self.data).state, ACTIVE),
                 on_run=lambda: self.assertEqual(inspect_lease(self.data).state, ACTIVE))
             self.assertEqual(result, 0)
