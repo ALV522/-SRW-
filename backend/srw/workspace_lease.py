@@ -211,8 +211,11 @@ def require_parent_host_lease(data_dir: Path | str, *, port: int,
         metadata = json.loads((lease_directory(data_dir) / LEASE_METADATA_NAME).read_text(encoding="utf-8"))
     except (OSError, ValueError) as exc:
         raise WorkspaceLeaseError("HOST_WORKSPACE_INVALID: WPF lease metadata unavailable") from exc
-    expected_root = os.path.normcase(os.path.abspath(str(data_dir)))
-    actual_root = os.path.normcase(os.path.abspath(str(metadata.get("data_dir") or "")))
+    # The Windows Host may record the path before .resolve() expands a junction
+    # or long/short path alias. Canonicalise *both* filesystem paths first;
+    # comparing two lexical abspath strings would reject its legitimate child.
+    expected_root = os.path.normcase(os.path.realpath(os.fspath(data_dir)))
+    actual_root = os.path.normcase(os.path.realpath(str(metadata.get("data_dir") or "")))
     if (metadata.get("session_id") != session_id or
             metadata.get("instance_id") != instance_id or
             actual_root != expected_root):
