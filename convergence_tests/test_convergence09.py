@@ -87,6 +87,34 @@ class Convergence09Test(unittest.TestCase):
         self.assertEqual(blocked.status_code, 403)
         self.assertEqual(other_port.status_code, 403)
 
+    def test_fetch_metadata_blocks_cross_site_mutation_without_origin_or_referer(self):
+        """Browser-generated Fetch Metadata is authoritative even without Origin."""
+        payload = {"title": "fetch metadata safety", "role_title": "analyst", "brief_summary": ""}
+        with TestClient(self._app()) as client:
+            for site in ("cross-site", "same-site"):
+                with self.subTest(site=site):
+                    blocked = client.post("/api/v1/projects", json=payload,
+                                          headers={"Sec-Fetch-Site": site})
+                    self.assertEqual(blocked.status_code, 403, blocked.text)
+            same_origin = client.post("/api/v1/projects", json=payload,
+                                      headers={"Sec-Fetch-Site": "same-origin"})
+            native_host = client.post("/api/v1/projects", json=payload)
+            self.assertEqual(same_origin.status_code, 200, same_origin.text)
+            self.assertEqual(native_host.status_code, 200, native_host.text)
+
+    def test_conflicting_duplicate_host_or_origin_headers_fail_closed(self):
+        payload = {"title": "ambiguous host should fail", "role_title": "analyst", "brief_summary": ""}
+        with TestClient(self._app()) as client:
+            duplicate_host = client.post("/api/v1/projects", json=payload, headers=[
+                ("host", "attacker.example"), ("host", "testserver"),
+            ])
+            duplicate_origin = client.post("/api/v1/projects", json=payload, headers=[
+                ("host", "testserver"), ("origin", "https://attacker.example"),
+                ("origin", "http://testserver"),
+            ])
+            self.assertEqual(duplicate_host.status_code, 400, duplicate_host.text)
+            self.assertEqual(duplicate_origin.status_code, 403, duplicate_origin.text)
+
     def test_startup_cleanup_removes_only_known_stale_backup_artifacts(self):
         self.data.mkdir(parents=True)
         backups = self.data / "backups"
