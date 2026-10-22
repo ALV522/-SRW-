@@ -63,7 +63,7 @@
     {
       "method": "GET",
       "path": "/api/v1/candidates/compare",
-      "owner": "srw.api.fullworkbench",
+      "owner": "srw.api.routes.reporting",
       "domain": "candidates",
       "mutation": false,
       "signals": null
@@ -121,7 +121,7 @@
     {
       "method": "GET",
       "path": "/api/v1/candidates/{candidate_id:str}/brief",
-      "owner": "srw.api.fullworkbench",
+      "owner": "srw.api.routes.reporting",
       "domain": "projects",
       "mutation": false,
       "signals": null
@@ -784,7 +784,7 @@
     {
       "method": "GET",
       "path": "/api/v1/projects/{project_id:str}/candidates.csv",
-      "owner": "srw.api.fullworkbench",
+      "owner": "srw.api.routes.reporting",
       "domain": "projects",
       "mutation": false,
       "signals": null
@@ -818,7 +818,7 @@
     {
       "method": "GET",
       "path": "/api/v1/projects/{project_id:str}/cockpit",
-      "owner": "srw.api.fullworkbench",
+      "owner": "srw.api.routes.reporting",
       "domain": "projects",
       "mutation": false,
       "signals": null
@@ -892,7 +892,7 @@
     {
       "method": "GET",
       "path": "/api/v1/projects/{project_id:str}/handoff",
-      "owner": "srw.api.fullworkbench",
+      "owner": "srw.api.routes.reporting",
       "domain": "projects",
       "mutation": false,
       "signals": null
@@ -976,7 +976,7 @@
     {
       "method": "GET",
       "path": "/api/v1/projects/{project_id:str}/pipeline",
-      "owner": "srw.api.fullworkbench",
+      "owner": "srw.api.routes.reporting",
       "domain": "projects",
       "mutation": false,
       "signals": null

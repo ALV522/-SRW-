@@ -39,13 +39,13 @@
 | GET | `/api/v1/ai-runs/{run_id:str}` | providers | `srw.api.operations` | — | — | — |
 | POST | `/api/v1/calibration/anchors/{anchor_id:str}/promote` | decisions | `srw.api.governance` | · | · | yes |
 | POST | `/api/v1/calibration/reviews/{review_id:str}/resolve` | decisions | `srw.api.governance` | · | · | yes |
-| GET | `/api/v1/candidates/compare` | candidates | `srw.api.fullworkbench` | — | — | — |
+| GET | `/api/v1/candidates/compare` | candidates | `srw.api.routes.reporting` | — | — | — |
 | GET | `/api/v1/candidates/{candidate_id:str}/action-plan` | candidates | `srw.api.fullworkbench` | — | — | — |
 | PATCH | `/api/v1/candidates/{candidate_id:str}/action-plan` | candidates | `srw.api.fullworkbench` | · | · | yes |
 | GET | `/api/v1/candidates/{candidate_id:str}/ai-runs` | providers | `srw.api.operations` | — | — | — |
 | POST | `/api/v1/candidates/{candidate_id:str}/archive` | candidates | `srw.api.routes.candidates` | · | · | yes |
 | GET | `/api/v1/candidates/{candidate_id:str}/assessment` | decisions | `srw.api.app` | — | — | — |
-| GET | `/api/v1/candidates/{candidate_id:str}/brief` | projects | `srw.api.fullworkbench` | — | — | — |
+| GET | `/api/v1/candidates/{candidate_id:str}/brief` | projects | `srw.api.routes.reporting` | — | — | — |
 | GET | `/api/v1/candidates/{candidate_id:str}/contact` | candidates | `srw.api.routes.candidates` | — | — | — |
 | PATCH | `/api/v1/candidates/{candidate_id:str}/contact` | candidates | `srw.api.routes.candidates` | · | · | yes |
 | POST | `/api/v1/candidates/{candidate_id:str}/decision` | decisions | `srw.api.app` | yes | · | yes |
@@ -106,10 +106,10 @@
 | GET | `/api/v1/projects/{project_id:str}/candidate-search` | projects | `srw.api.routes.candidates` | — | — | — |
 | GET | `/api/v1/projects/{project_id:str}/candidates` | candidates | `srw.api.routes.candidates` | — | — | — |
 | POST | `/api/v1/projects/{project_id:str}/candidates` | candidates | `srw.api.routes.candidates` | · | · | yes |
-| GET | `/api/v1/projects/{project_id:str}/candidates.csv` | projects | `srw.api.fullworkbench` | — | — | — |
+| GET | `/api/v1/projects/{project_id:str}/candidates.csv` | projects | `srw.api.routes.reporting` | — | — | — |
 | POST | `/api/v1/projects/{project_id:str}/candidates/batch-intake` | candidates | `srw.api.fullworkbench` | · | · | yes |
 | POST | `/api/v1/projects/{project_id:str}/candidates/stage` | candidates | `srw.api.fullworkbench` | · | · | yes |
-| GET | `/api/v1/projects/{project_id:str}/cockpit` | projects | `srw.api.fullworkbench` | — | — | — |
+| GET | `/api/v1/projects/{project_id:str}/cockpit` | projects | `srw.api.routes.reporting` | — | — | — |
 | GET | `/api/v1/projects/{project_id:str}/contact-list.csv` | projects | `srw.api.routes.projects` | — | — | — |
 | GET | `/api/v1/projects/{project_id:str}/contact-queue` | projects | `srw.api.routes.projects` | — | — | — |
 | GET | `/api/v1/projects/{project_id:str}/decision-actions` | decisions | `srw.api.capability_recovery` | — | — | — |
@@ -117,7 +117,7 @@
 | GET | `/api/v1/projects/{project_id:str}/export-package` | projects | `srw.api.project_portability` | — | — | — |
 | GET | `/api/v1/projects/{project_id:str}/feedback` | operations | `srw.api.capability_recovery` | — | — | — |
 | POST | `/api/v1/projects/{project_id:str}/feedback` | operations | `srw.api.capability_recovery` | · | · | yes |
-| GET | `/api/v1/projects/{project_id:str}/handoff` | projects | `srw.api.fullworkbench` | — | — | — |
+| GET | `/api/v1/projects/{project_id:str}/handoff` | projects | `srw.api.routes.reporting` | — | — | — |
 | GET | `/api/v1/projects/{project_id:str}/identity-reviews` | candidates | `srw.api.governance` | — | — | — |
 | POST | `/api/v1/projects/{project_id:str}/identity-reviews/scan` | candidates | `srw.api.governance` | · | · | yes |
 | PATCH | `/api/v1/projects/{project_id:str}/job-setup` | projects | `srw.api.routes.projects` | · | · | yes |
@@ -125,7 +125,7 @@
 | GET | `/api/v1/projects/{project_id:str}/knowledge-curation` | knowledge | `srw.api.capability_recovery` | — | — | — |
 | POST | `/api/v1/projects/{project_id:str}/knowledge/apply` | knowledge | `srw.api.fullworkbench` | yes | · | yes |
 | GET | `/api/v1/projects/{project_id:str}/operations-learning` | projects | `srw.api.capability_recovery` | — | — | — |
-| GET | `/api/v1/projects/{project_id:str}/pipeline` | projects | `srw.api.fullworkbench` | — | — | — |
+| GET | `/api/v1/projects/{project_id:str}/pipeline` | projects | `srw.api.routes.reporting` | — | — | — |
 | GET | `/api/v1/projects/{project_id:str}/planning` | projects | `srw.api.capability_recovery` | — | — | — |
 | PUT | `/api/v1/projects/{project_id:str}/planning` | projects | `srw.api.capability_recovery` | · | · | yes |
 | POST | `/api/v1/projects/{project_id:str}/protocol-drafts` | projects | `srw.api.app` | yes | · | yes |
