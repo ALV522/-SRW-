@@ -79,6 +79,11 @@ class NativeSourceKitTests(unittest.TestCase):
             cmd=z.read("BUILD_C11_CANDIDATE.cmd")
             self.assertIn(b"\r\n",cmd)
             self.assertNotIn(b"\r\r\n",cmd)
+            # cmd.exe expands %%~dp0 to a directory ending in backslash.
+            # In the Python/Windows argv parser a final backslash before the
+            # closing quote can escape it and swallow the --host argument.
+            self.assertIn(b'--source "%~dp0."', cmd)
+            self.assertNotIn(b'--source "%~dp0"', cmd)
             destination=self.base/"unpacked"
             z.extractall(destination)
         self.assertEqual(_source_sha(destination),self.COMMIT)
