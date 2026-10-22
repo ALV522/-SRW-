@@ -3,7 +3,7 @@ from __future__ import annotations
 from collections import Counter
 from typing import Iterable
 
-from sqlalchemy import func, select
+from sqlalchemy import func, select, update
 from sqlalchemy.orm import Session
 
 from srw.kernel.errors import V1InvariantError, V1NotFoundError
@@ -167,18 +167,40 @@ def create_offer(session: Session, candidate_id: str, *, title: str, compensatio
     return row
 
 
-def change_offer_status(session: Session, offer_id: str, status: str, *, actor: str, reason: str) -> OfferRecord:
+def change_offer_status(session: Session, offer_id: str, status: str, *, actor: str, reason: str,
+                        expected_status: str | None = None) -> OfferRecord:
     row = session.get(OfferRecord, offer_id)
     if row is None:
         raise V1NotFoundError(f"offer not found: {offer_id}")
     if status not in OFFER_STATES:
         raise V1InvariantError(f"unsupported offer status: {status}")
     current = row.status
+    # Conditional status is an additive, backwards-compatible CAS contract.
+    # A stale browser window must not silently apply the next transition.
+    if expected_status is not None:
+        if expected_status not in OFFER_STATES:
+            raise V1InvariantError("expected_status must be a valid offer state")
+        if current != expected_status:
+            raise V1InvariantError("offer status changed; refresh before updating")
     if status == current:
         return row
     if status not in _OFFER_TRANSITIONS.get(current, set()):
         raise V1InvariantError(f"offer status transition is not allowed: {current} -> {status}")
-    row.status = status
+    if expected_status is None:
+        # Older clients retain the historical transition behavior.
+        row.status = status
+    else:
+        # Do not rely only on the pre-read status: another session can update
+        # after the read. This guarded SQL UPDATE is atomic with the audit row.
+        changed = session.execute(
+            update(OfferRecord).where(
+                OfferRecord.id == offer_id,
+                OfferRecord.status == expected_status,
+            ).values(status=status)
+        ).rowcount
+        if changed != 1:
+            raise V1InvariantError("offer status changed; refresh before updating")
+        session.refresh(row)
     append_audit_event(
         session, event_type="OFFER_STATUS_CHANGED", entity_type="offer", entity_id=row.id,
         actor=actor or "human", reason=reason, payload={"from_status": current, "to_status": status, "candidate_id": row.candidate_id},
