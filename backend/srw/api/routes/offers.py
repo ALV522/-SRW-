@@ -63,6 +63,8 @@ def offer_routes(*, factory) -> list[Route]:
                 s_field(body, "status", required=True),
                 actor=s_field(body, "actor", default="human"),
                 reason=s_field(body, "reason"),
+                expected_status=(s_field(body, "expected_status", required=True)
+                                 if "expected_status" in body else None),
             )
             return JSONResponse(offer_view(row))
 
