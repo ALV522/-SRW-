@@ -277,10 +277,14 @@ def upgrade(
     root = root.resolve(strict=True)
     host = host.resolve(strict=True)
     out = out.resolve()
-    if out.exists() or out.is_symlink():
-        raise PayloadError("refusing to overwrite an existing candidate output")
-    if base_zip.resolve() == out or out.is_relative_to(root):
-        raise PayloadError("candidate output must be outside immutable source checkout")
+    # Read-only input verification neither creates nor replaces an output ZIP.
+    # A stale candidate path (or the CLI's temp default) must not block the
+    # audit; output path and no-overwrite checks apply only to real assembly.
+    if not verify_only:
+        if out.exists() or out.is_symlink():
+            raise PayloadError("refusing to overwrite an existing candidate output")
+        if base_zip.resolve() == out or out.is_relative_to(root):
+            raise PayloadError("candidate output must be outside immutable source checkout")
     sha = _source_sha(root)
     # A compiled Host from any other commit is not a valid replacement.
     _verify_host(host, sha)
