@@ -171,3 +171,12 @@ Chromium E2E 兜底下启动 app.js 按域拆分。2a 抽取三个低耦合叶�
 另修复 6 个源测试：`test_convergence11.py` 的 UI 结构断言原先只读 `app.js`，已改为读取 index.html 加载的全部模块合并源码（新增 `frontend_js()` helper）——断言描述的是前端产品面而非单文件。
 
 本地实测：跨模块函数引用检查 CLEAN；`check_frontend_contract.py` 14 模块 / 180 符号 PASS；E2E 14/14 OK；源回归 293 OK（6 skipped，零失败）；治理三查 PASS。Schema v1_0014、VERSION 1.0.0-alpha.11 未变；GitHub CI = NOT RUN（仅本地执行）。
+## 2026-10-23: 前端整合步骤 2c — app.js 拆分完成（本地实跑通过）
+
+2c 抽取项目工作区外壳（projectsPage/openProject/projectTabs/projectWorkspace/openProjectStatus/archiveProject/projectOverview/cockpitTab/qualityTab/auditTab/refreshProjects/ensureProjects/projectOptions，16 行）至 `workspace.js`。**app.js 拆分完成：126KB / 280 行 → 8KB / 44 行**，仅剩 core（state、路由 renderPage、shell、go/review 快捷入口、init、核心助手及其发布）。前端最终形态：15 个 ES 模块——shared（基建）+ app（core 8KB）+ dashboard/pages/jobsetup/protocol/candidates/events/workspace（七域）+ convergence03–08（六 shim）。
+
+过程实录：抽取脚本的头部模板遗漏 `.format()` 导致双括号语法错（node --check 即时捕获）；契约检查器同时抓到真断裂——workspace.js 裸引用 core 的 `shell` 未发布，已补 `window.shell=shell`。这正是 2a 固化的函数类规则的第二次实战命中。
+
+本地实测：`check_frontend_contract.py` 15 模块 / 185 符号 PASS；E2E 14/14 OK；源回归 293 OK（6 skipped，零失败）；治理三查 PASS。Schema v1_0014、VERSION 1.0.0-alpha.11 未变；GitHub CI = NOT RUN（仅本地执行）。
+
+**前端整合任务（药方 C）至此完成**：六代基建收敛 + app.js 按域拆分 + 三处跨 shim 缺陷 + 三处拆分期断链（renderPage 路由表/胶水层/offerNextStatuses/shell）全部修复并有静态+运行时双重守卫。

@@ -42,7 +42,7 @@ HTTP 契约层          backend/srw/api/*（app.py 核心 + fullworkbench.py + 8
 | 2 | 命名混淆：`modules/fullworkbench.py` 与 `api/fullworkbench.py` 同名并存 | 249 行 vs 1485 行，职责不同（共享设施 vs HTTP 路由） | 将 `modules/fullworkbench.py` 更名 `modules/shared_facilities.py`（纯文件移动 + import 更新，清单 diff 可审） | P2 |
 | 3 | `api/capability_recovery*.py` 三个文件名不副实 | 实际路由是 operations-learning/planning/intelligence/sourcing，与“恢复”无关（C08 时代命名） | 重命名为 `api/operations_routes.py` / `api/intelligence_routes.py` / `api/sourcing_routes.py` | P2 |
 | 4 | 前端六代重复基建 | convergence03–08 共 44KB，每代自带 api/toast/modal/esc；`__c05*` 跨代共享全局 | **已收敛（2026-10-23 步骤 1）**：`shared.js` 单一实现挂 window，7 模块全部改调共享；借此修复 3 处跨 shim 模块作用域调用断裂（c06/c07→c05toast/c05modal、c07→c06api，ES module 声明不挂全局，点击即 ReferenceError），test_14 回归兜底。app.js 按域拆分见下条 | 已关闭 |
-| 5 | `app.js` 单文件 126KB | 276 行致密代码承载全部 UI | **拆分中（2026-10-23 2a/2b）**：已抽出 dashboard/pages/jobsetup/protocol/candidates/events 六域，app.js 126KB→29.7KB（60 行），前端共 14 模块；workspace 外壳收尾中 | P1（进行中） |
+| 5 | `app.js` 单文件 126KB | 276 行致密代码承载全部 UI | **已完成（2026-10-23 2a–2c）**：拆为 shared + app(core 8KB) + dashboard/pages/jobsetup/protocol/candidates/events/workspace 七域 + 6 shim，共 15 模块；app.js 126KB→8KB（44 行）；跨模块引用经 window 全局，`check_frontend_contract.py` 函数类断链规则零误报守卫，E2E 14/14 兜底 | P1（进行中） |
 | 6 | 历史证据与现行代码混杂 | `verification/` 快照、`docs/history/`、旧收敛文档 | 保持只读不动（宪章：不覆盖历史）；仅在新文档中注明现状指针 | 不做 |
 
 ## 4. 缺口清单（“功能完整”的另一半）
