@@ -133,6 +133,7 @@ def create_v1_app(
     data_dir: str | Path | None = None,
     knowledge_dir: str | Path | None = None,
     supervisor_service=None,
+    enforce_carrier_sessions: bool = False,
 ) -> Starlette:
     engine = create_v1_engine(database_url)
     create_v1_schema(engine)
@@ -747,6 +748,13 @@ def create_v1_app(
     # service on app.state so the protocol routes can reach it.
     app.state.supervisor_service = supervisor_service
     app.state.supervisor_mode = supervisor_service is not None
+    # ADR-0003 S3: session enforcement is a phase-2 flag (off until the
+    # frontend carries the session/CSRF headers).
+    app.state.enforce_carrier_sessions = bool(enforce_carrier_sessions)
+    if supervisor_service is not None and enforce_carrier_sessions:
+        from srw.supervisor.sessions import CarrierSessionMiddleware
+
+        app.add_middleware(CarrierSessionMiddleware, service=supervisor_service)
 
     from srw.api.fullworkbench import install_full_workbench_routes
     database_path = Path(str(engine.url.database)).resolve() if engine.url.database and str(engine.url.database) != ":memory:" else (resolved_data_dir / "srw_v1.db")

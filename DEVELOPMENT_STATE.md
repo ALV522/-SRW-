@@ -204,3 +204,10 @@ Chromium E2E 兜底下启动 app.js 按域拆分。2a 抽取三个低耦合叶�
 本地实测：源回归 316 OK（6 skipped，零失败，+9 新测试）；E2E 14/14 OK；治理五查 PASS（完整性 359 / release truth / G1 / API 清单 150 / 前端契约）。Schema v1_0015、VERSION 1.0.0-alpha.11（VERSION 本身未变，仅 Schema 修订号迁移）；GitHub CI = NOT RUN（仅本地执行）。
 
 **相位 2 剩余**：S3 一次性会话/CSRF/Origin 白名单（carrier_session 表已就位）、offer/阶段等其余写入口的 If-Match、前端 api() 带头 + E2E 更新。
+## 2026-10-23: #43 ADR-0003 相位 2 第二部分 — S3 一次性会话 + CSRF/Origin 强制（本地实跑通过）
+
+S3 落地：`SessionRegistry`（内存一会话签发/校验/CSRF 校验/撤销，`persist` 钩子只收无密投影——令牌永不落盘）；`SupervisorService` 全链路接线（attach 签发会话、detach/静默超时/`begin_shutdown` 全部撤销）；`CarrierSessionMiddleware`（纯 ASGI：仅 loopback Origin/Referer 放行；所有 `/api/v1` 变更请求须带 `X-SRW-Session`+`X-SRW-Token`+匹配的 `X-SRW-CSRF`，缺会话 401、CSRF 不符 403、非 loopback 403；attach/heartbeat/detach 与健康探针以附着令牌自主认证而豁免——该豁免名单在测试中按真实语义修正：detach 若被会话规则拦截将导致撤销链路自锁）。运行时持久化：Supervisor 进程以独立 engine 写 `carrier_session` 表（issue 建行、revoke 记 revoked_at/reason，持久化失败只记日志不中断协议）；`--enforce-sessions` 开关默认关（前端带头后随相位 2 收尾翻转）；client 句柄暴露 `session_headers()` 供载体请求使用。`convergence_tests/test_carrier_sessions.py` 13 项：注册表（签发/校验/CSRF/撤销/attach 级与全量撤销/持久化投影无密）、服务生命周期（附着签发→detach 撤销、静默撤销、退出全撤）、中间件矩阵（无会话 401、错 CSRF 403、正确放行、坏 Origin 403、读与协议端点豁免、撤销后 401）。
+
+本地实测：源回归 329 OK（6 skipped，零失败，+13 新测试）；E2E 14/14 OK；治理五查 PASS（完整性 360 / release truth / G1 / API 清单 150 / 前端契约）。Schema v1_0015、VERSION 1.0.0-alpha.11 未变；GitHub CI = NOT RUN（仅本地执行）。
+
+**相位 2 剩余（收尾项）**：前端 `api()` 带 If-Match 与会话头 + E2E 更新；offer/阶段等其余写入口 If-Match；`--enforce-sessions` 默认翻转前的双端联验。

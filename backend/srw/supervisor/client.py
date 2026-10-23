@@ -41,6 +41,19 @@ class SupervisorHandle:
     token: str
     instance_id: str
     spawned: bool
+    session_id: str = ""
+    session_token: str = ""
+    csrf_token: str = ""
+
+    def session_headers(self) -> dict[str, str]:
+        """Headers a carrier sends on every mutating request (ADR-0003 S3)."""
+        if not self.session_id:
+            return {}
+        return {
+            "X-SRW-Session": self.session_id,
+            "X-SRW-Token": self.session_token,
+            "X-SRW-CSRF": self.csrf_token,
+        }
 
     def heartbeat(self) -> dict:
         return _post(self.base_url + _HEARTBEAT_PATH, {"attach_id": self.attach_id, "token": self.token})
@@ -143,6 +156,9 @@ def _attach(base_url: str, *, carrier: str, edition: str) -> SupervisorHandle:
         token=str(payload.get("token") or ""),
         instance_id=str(payload.get("instance_id") or ""),
         spawned=False,
+        session_id=str(payload.get("session_id") or ""),
+        session_token=str(payload.get("session_token") or ""),
+        csrf_token=str(payload.get("csrf_token") or ""),
     )
 
 
@@ -201,4 +217,7 @@ def ensure_supervisor(
         token=handle.token,
         instance_id=handle.instance_id,
         spawned=True,
+        session_id=handle.session_id,
+        session_token=handle.session_token,
+        csrf_token=handle.csrf_token,
     )

@@ -30,6 +30,9 @@
 - 本地 HTTP 仅绑定 loopback；远程访问、云端登录不在本期范围。
 - Supervisor 模式下 Core 与载体分离：Supervisor 是唯一租约持有者（`app.lock` 的 `edition="supervisor"`），
   载体经附着协议接入；关闭任一载体不影响其他载体（ADR-0003 S1/S5，特性开关默认关）。
+- 会话强制开启时（Supervisor `--enforce-sessions`，相位 2 开关）：仅 loopback Origin/Referer 可访问；
+  所有变更请求须携带一次性会话 `X-SRW-Session` + `X-SRW-Token` 与匹配的 `X-SRW-CSRF`（附着时下发，
+  detach/静默/Supervisor 退出即撤销）；attach/heartbeat/detach 与健康探针以附着令牌自主认证，豁免会话规则。
 
 ## 4. 变更流程
 

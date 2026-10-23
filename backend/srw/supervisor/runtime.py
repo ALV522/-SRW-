@@ -52,12 +52,16 @@ async def attach_endpoint(request: Request) -> JSONResponse:
         )
     except SupervisorShuttingDown as exc:
         return JSONResponse({"error": {"code": "supervisor_shutting_down", "detail": str(exc)}}, status_code=409)
+    session = attachment.session
     return JSONResponse(
         {
             "attach_id": attachment.attach_id,
             "token": attachment.token,
             "instance_id": service.instance_id,
             "idle_grace_seconds": service.idle_grace_seconds,
+            "session_id": session.session_id,
+            "session_token": session.session_token,
+            "csrf_token": session.csrf_token,
         }
     )
 
@@ -117,6 +121,8 @@ def _parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser.add_argument("--knowledge-root", type=Path, default=None)
     parser.add_argument("--idle-grace-seconds", type=float, default=300.0)
     parser.add_argument("--attach-timeout-seconds", type=float, default=90.0)
+    parser.add_argument("--enforce-sessions", action="store_true",
+                        help="ADR-0003 S3: require a valid carrier session + CSRF token on mutations")
     return parser.parse_args(argv)
 
 
@@ -150,6 +156,44 @@ def main(argv: list[str] | None = None) -> int:
 
     version, release_id = _release_identity()
 
+    # Session RECORDS are persisted (tokens never are): the store shares the
+    # workspace database file with the Core engine.
+    from srw.kernel.clock import utc_now
+    from srw.runtime.db.base import V1Base
+    from srw.runtime.db.models_registry import import_v1_models
+    from srw.runtime.db.session import create_v1_engine, create_v1_session_factory
+    from srw.supervisor.models import CarrierSession
+
+    import_v1_models()
+    store_engine = create_v1_engine(f"sqlite+pysqlite:///{database.as_posix()}")
+    V1Base.metadata.create_all(store_engine)
+    store_factory = create_v1_session_factory(store_engine)
+
+    def _persist_session(action: str, record: dict) -> None:
+        try:
+            with store_factory() as store:
+                if action == "issue":
+                    store.add(
+                        CarrierSession(
+                            session_id=record["session_id"],
+                            attach_id=record["attach_id"],
+                            supervisor_instance_id=record["supervisor_instance_id"],
+                            edition=record["edition"],
+                            carrier=record["carrier"],
+                            created_at=utc_now(),
+                            last_seen_at=utc_now(),
+                        )
+                    )
+                else:
+                    row = store.get(CarrierSession, record["session_id"])
+                    if row is not None:
+                        row.revoked_at = utc_now()
+                        row.revoked_reason = record["revoked_reason"]
+                        row.last_seen_at = utc_now()
+                store.commit()
+        except Exception as exc:  # persistence must never break the protocol
+            print(json.dumps({"event": "supervisor_session_persist_failed", "detail": str(exc)}), flush=True)
+
     lease = WorkspaceLease(data_dir, edition="supervisor", port=args.port, version=version, release_id=release_id)
     try:
         lease.acquire()
@@ -160,6 +204,7 @@ def main(argv: list[str] | None = None) -> int:
     service = SupervisorService(
         idle_grace_seconds=args.idle_grace_seconds,
         attach_timeout_seconds=args.attach_timeout_seconds,
+        session_persist=_persist_session,
     )
     app = create_v1_app(
         f"sqlite+pysqlite:///{database.as_posix()}",
@@ -167,6 +212,7 @@ def main(argv: list[str] | None = None) -> int:
         data_dir=data_dir,
         knowledge_dir=args.knowledge_root,
         supervisor_service=service,
+        enforce_carrier_sessions=args.enforce_sessions,
     )
 
     config = uvicorn.Config(app, host="127.0.0.1", port=args.port, log_level="info", access_log=False)
@@ -203,6 +249,7 @@ def main(argv: list[str] | None = None) -> int:
     finally:
         stop.set()
         lease.release()
+        store_engine.dispose()
         print(json.dumps({"event": "supervisor_stopped", "instance_id": service.instance_id}), flush=True)
     return 0
 

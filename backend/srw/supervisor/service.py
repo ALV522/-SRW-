@@ -57,6 +57,39 @@ class Attachment:
 
 
 @dataclass(frozen=True)
+class CarrierSession:
+    """One issued carrier session (ADR-0003 S3). The token never leaves memory."""
+
+    session_id: str
+    attach_id: str
+    supervisor_instance_id: str
+    edition: str
+    carrier: str
+    session_token: str
+    csrf_token: str
+    issued_at: float
+    last_seen_at: float
+    revoked_reason: str = ""
+
+    @property
+    def revoked(self) -> bool:
+        return bool(self.revoked_reason)
+
+    def record_view(self) -> dict:
+        """The persistable projection (no secrets)."""
+        return {
+            "session_id": self.session_id,
+            "attach_id": self.attach_id,
+            "supervisor_instance_id": self.supervisor_instance_id,
+            "edition": self.edition,
+            "carrier": self.carrier,
+            "issued_at": self.issued_at,
+            "last_seen_at": self.last_seen_at,
+            "revoked_reason": self.revoked_reason,
+        }
+
+
+@dataclass(frozen=True)
 class SupervisorStatus:
     instance_id: str
     attachments: int
@@ -74,6 +107,81 @@ class SupervisorStatus:
         }
 
 
+class SessionRegistry:
+    """In-memory one-time carrier sessions with an optional persistence hook.
+
+    ``persist`` receives the persistable projection on issue and on revocation;
+    the Supervisor runtime wires it to the carrier_session table so revocation
+    is auditable without any token ever touching disk.
+    """
+
+    def __init__(self, *, persist=None, clock=time.monotonic) -> None:
+        self._persist = persist
+        self._clock = clock
+        self._lock = threading.RLock()
+        self._sessions: dict[str, CarrierSession] = {}
+
+    def issue(self, *, attach_id: str, supervisor_instance_id: str, edition: str, carrier: str) -> CarrierSession:
+        with self._lock:
+            now = self._clock()
+            session = CarrierSession(
+                session_id=uuid.uuid4().hex,
+                attach_id=attach_id,
+                supervisor_instance_id=supervisor_instance_id,
+                edition=str(edition or "")[:40],
+                carrier=str(carrier or "")[:120],
+                session_token=secrets.token_hex(24),
+                csrf_token=secrets.token_hex(24),
+                issued_at=now,
+                last_seen_at=now,
+            )
+            self._sessions[session.session_id] = session
+            if self._persist is not None:
+                self._persist("issue", session.record_view())
+            return session
+
+    def validate(self, session_id: str, session_token: str) -> CarrierSession | None:
+        with self._lock:
+            session = self._sessions.get(str(session_id or ""))
+            if session is None or session.revoked:
+                return None
+            if not secrets.compare_digest(session.session_token, str(session_token or "")):
+                return None
+            object.__setattr__(session, "last_seen_at", self._clock())
+            return session
+
+    def csrf_ok(self, session: CarrierSession, csrf_token: str) -> bool:
+        return secrets.compare_digest(session.csrf_token, str(csrf_token or ""))
+
+    def revoke(self, session_id: str, reason: str) -> bool:
+        with self._lock:
+            session = self._sessions.get(str(session_id or ""))
+            if session is None or session.revoked:
+                return False
+            object.__setattr__(session, "revoked_reason", str(reason)[:120])
+            if self._persist is not None:
+                self._persist("revoke", session.record_view())
+            return True
+
+    def revoke_attach(self, attach_id: str, reason: str) -> int:
+        with self._lock:
+            return sum(
+                1
+                for session in list(self._sessions.values())
+                if session.attach_id == str(attach_id) and self.revoke(session.session_id, reason)
+            )
+
+    def revoke_all(self, reason: str) -> int:
+        with self._lock:
+            return sum(
+                1 for session_id in list(self._sessions) if self.revoke(session_id, reason)
+            )
+
+    def active_views(self) -> list[dict]:
+        with self._lock:
+            return [s.record_view() for s in self._sessions.values() if not s.revoked]
+
+
 class SupervisorService:
     """In-memory attach registry with refcounted idle lifecycle."""
 
@@ -83,6 +191,7 @@ class SupervisorService:
         instance_id: str | None = None,
         idle_grace_seconds: float = DEFAULT_IDLE_GRACE_SECONDS,
         attach_timeout_seconds: float = DEFAULT_ATTACH_TIMEOUT_SECONDS,
+        session_persist=None,
         clock=time.monotonic,
     ) -> None:
         if idle_grace_seconds < 0:
@@ -95,6 +204,7 @@ class SupervisorService:
         self._attachments: dict[str, Attachment] = {}
         self._idle_deadline: float | None = None
         self._shutting_down = False
+        self.sessions = SessionRegistry(persist=session_persist, clock=clock)
 
     # -- lifecycle ------------------------------------------------------
     def attach(self, *, carrier: str, edition: str = "") -> Attachment:
@@ -113,6 +223,14 @@ class SupervisorService:
             self._attachments[attachment.attach_id] = attachment
             # A live attachment cancels any pending idle exit.
             self._idle_deadline = None
+            # ADR-0003 S3: every attach also issues one one-time session.
+            session = self.sessions.issue(
+                attach_id=attachment.attach_id,
+                supervisor_instance_id=self.instance_id,
+                edition=attachment.edition,
+                carrier=attachment.carrier,
+            )
+            object.__setattr__(attachment, "session", session)
             return attachment
 
     def heartbeat(self, attach_id: str, token: str) -> SupervisorStatus:
@@ -125,6 +243,7 @@ class SupervisorService:
         with self._lock:
             self._require(attach_id, token)
             del self._attachments[attach_id]
+            self.sessions.revoke_attach(attach_id, "detached")
             if not self._attachments and not self._shutting_down:
                 self._idle_deadline = self._clock() + self.idle_grace_seconds
             return self.status()
@@ -140,6 +259,7 @@ class SupervisorService:
             ]
             for attach_id in stale:
                 del self._attachments[attach_id]
+                self.sessions.revoke_attach(attach_id, "carrier_silent")
             if stale and not self._attachments and self._idle_deadline is None and not self._shutting_down:
                 self._idle_deadline = now + self.idle_grace_seconds
             return stale
@@ -148,6 +268,7 @@ class SupervisorService:
         with self._lock:
             self._shutting_down = True
             self._idle_deadline = None
+            self.sessions.revoke_all("supervisor_exit")
 
     # -- queries --------------------------------------------------------
     def status(self) -> SupervisorStatus:
