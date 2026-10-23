@@ -377,3 +377,7 @@ Windows Host 只保留：Core lifecycle、workspace/session、WebView2、native 
 **R2 进度（2026-10-23，第十三刀）**：候选人决策面 4 条路由（workspace / assessment / verifications / decision）迁出到 `backend/srw/api/routes/candidate_decision.py`。`app.py` 318 → **271 行**。
 
 写操作归类 38/73（52%），棘轮 37 → 35。新增 `test_candidate_decision_routes.py`（9 项）。写测试前先用探针核对真实行为，纠正了两处直觉：`verifications` 接受任意 criterion_key（它记录的是备注，不是绑定协议的判断），且决策后 workspace 不回显 decision_label。断言按事实写，不按猜测写。
+
+**R2 进度（2026-10-23，第十四刀）**：settings 3 条路由（设置读取 / provider 连接 / 能力策略）迁出到 `backend/srw/api/routes/settings.py`。`app.py` 271 → **232 行**。
+
+`_choice` 上提为 `request_fields.body_choice` 并从 `app.py` 删除本地定义——它是 422 封套的一部分，与已上提的 `_body/_string/_object/_bool` 同源。写操作归类 40/73（55%），棘轮 35 → 33。新增 `test_settings_routes.py`（5 项），其中"设置面永不回显 API key"与"禁用能力后策略持久为 disabled"是两条安全/一致性断言。

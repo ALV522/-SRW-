@@ -1241,7 +1241,7 @@
     {
       "method": "GET",
       "path": "/api/v1/settings",
-      "owner": "srw.api.app",
+      "owner": "srw.api.routes.settings",
       "domain": "system",
       "mutation": false,
       "signals": null
@@ -1249,7 +1249,7 @@
     {
       "method": "PATCH",
       "path": "/api/v1/settings/capabilities/{name:str}",
-      "owner": "srw.api.app",
+      "owner": "srw.api.routes.settings",
       "domain": "system",
       "mutation": true,
       "signals": {
@@ -1262,7 +1262,7 @@
     {
       "method": "PATCH",
       "path": "/api/v1/settings/provider",
-      "owner": "srw.api.app",
+      "owner": "srw.api.routes.settings",
       "domain": "providers",
       "mutation": true,
       "signals": {
