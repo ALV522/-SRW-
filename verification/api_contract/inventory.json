@@ -637,7 +637,7 @@
     {
       "method": "GET",
       "path": "/api/v1/projects",
-      "owner": "srw.api.app",
+      "owner": "srw.api.routes.project_authoring",
       "domain": "projects",
       "mutation": false,
       "signals": null
@@ -645,7 +645,7 @@
     {
       "method": "POST",
       "path": "/api/v1/projects",
-      "owner": "srw.api.app",
+      "owner": "srw.api.routes.project_authoring",
       "domain": "projects",
       "mutation": true,
       "signals": {
@@ -1005,7 +1005,7 @@
     {
       "method": "POST",
       "path": "/api/v1/projects/{project_id:str}/protocol-drafts",
-      "owner": "srw.api.app",
+      "owner": "srw.api.routes.project_authoring",
       "domain": "projects",
       "mutation": true,
       "signals": {
@@ -1018,7 +1018,7 @@
     {
       "method": "GET",
       "path": "/api/v1/projects/{project_id:str}/protocol-workspace",
-      "owner": "srw.api.app",
+      "owner": "srw.api.routes.project_authoring",
       "domain": "projects",
       "mutation": false,
       "signals": null
@@ -1149,7 +1149,7 @@
     {
       "method": "PATCH",
       "path": "/api/v1/protocol-revisions/{revision_id:str}",
-      "owner": "srw.api.app",
+      "owner": "srw.api.routes.project_authoring",
       "domain": "projects",
       "mutation": true,
       "signals": {
@@ -1162,7 +1162,7 @@
     {
       "method": "POST",
       "path": "/api/v1/protocol-revisions/{revision_id:str}/publish",
-      "owner": "srw.api.app",
+      "owner": "srw.api.routes.project_authoring",
       "domain": "projects",
       "mutation": true,
       "signals": {

@@ -45,6 +45,7 @@ from srw.surfaces.workbench import get_workbench
 from srw.kernel.errors import V1RequestValidationError  # re-exported for callers
 from srw.api.routes.evidence import evidence_routes
 from srw.api.routes.runtime import RuntimeIdentity, runtime_routes
+from srw.api.routes.project_authoring import project_authoring_routes
 from srw.api.request_fields import (
     body_boolean as _bool,
     body_dict as _body,
@@ -118,27 +119,6 @@ def create_v1_app(
         with factory() as session:
             return JSONResponse(_json(get_workbench(session, evaluation_policy_revision=evaluation_policy_revision)))
 
-    async def projects(_request: Request) -> Response:
-        with factory() as session:
-            return JSONResponse(_json(get_projects_surface(session)))
-
-    async def create_project(request: Request) -> Response:
-        body = await _body(request)
-        with v1_session_scope(factory) as session:
-            result = create_project_with_draft(
-                session,
-                title=_string(body, "title", required=True),
-                role_title=_string(body, "role_title", required=True),
-                brief_summary=_string(body, "brief_summary", default=""),
-            )
-            return JSONResponse(_json(result))
-
-    async def fork_protocol_draft(request: Request) -> Response:
-        project_id = request.path_params["project_id"]
-        with v1_session_scope(factory) as session:
-            row = ProtocolRepository(session).fork_current_to_draft(project_id)
-            return JSONResponse({"revision_id": row.id, "revision": row.revision, "state": row.state})
-
     async def settings(_request: Request) -> Response:
         with factory() as session:
             return JSONResponse(_json(get_settings_surface(session, registry=registry, secrets=secrets)))
@@ -169,25 +149,6 @@ def create_v1_app(
             if policy == "disabled":
                 registry.unload(name)
             return JSONResponse(_json(get_settings_surface(session, registry=registry, secrets=secrets)))
-
-    async def protocol_workspace(request: Request) -> Response:
-        with factory() as session:
-            return JSONResponse(_json(get_protocol_workspace(session, request.path_params["project_id"])))
-
-    async def update_protocol(request: Request) -> Response:
-        body = await _body(request)
-        with v1_session_scope(factory) as session:
-            row = ProtocolRepository(session).update_draft(
-                request.path_params["revision_id"],
-                _object(body, "payload"),
-                _object(body, "provenance", default={}),
-            )
-            return JSONResponse({"revision_id": row.id, "revision": row.revision, "state": row.state})
-
-    async def publish_protocol(request: Request) -> Response:
-        with v1_session_scope(factory) as session:
-            row = ProtocolRepository(session).publish(request.path_params["revision_id"])
-            return JSONResponse({"revision_id": row.id, "revision": row.revision, "state": row.state})
 
     async def candidate_workspace(request: Request) -> Response:
         with factory() as session:
@@ -246,15 +207,10 @@ def create_v1_app(
         Route("/api/v1/info", v1_info, methods=["GET"]),
         *runtime_routes(factory=factory, identity=runtime_identity),
         Route("/api/v1/workbench", workbench, methods=["GET"]),
-        Route("/api/v1/projects", projects, methods=["GET"]),
-        Route("/api/v1/projects", create_project, methods=["POST"]),
-        Route("/api/v1/projects/{project_id:str}/protocol-drafts", fork_protocol_draft, methods=["POST"]),
+        *project_authoring_routes(factory=factory),
         Route("/api/v1/settings", settings, methods=["GET"]),
         Route("/api/v1/settings/provider", update_provider_settings, methods=["PATCH"]),
         Route("/api/v1/settings/capabilities/{name:str}", update_capability_policy, methods=["PATCH"]),
-        Route("/api/v1/projects/{project_id:str}/protocol-workspace", protocol_workspace, methods=["GET"]),
-        Route("/api/v1/protocol-revisions/{revision_id:str}", update_protocol, methods=["PATCH"]),
-        Route("/api/v1/protocol-revisions/{revision_id:str}/publish", publish_protocol, methods=["POST"]),
         *evidence_routes(factory=factory, registry=registry, secrets=secrets, data_dir=resolved_data_dir),
         Route("/api/v1/candidates/{candidate_id:str}/workspace", candidate_workspace, methods=["GET"]),
         Route("/api/v1/candidates/{candidate_id:str}/assessment", candidate_assessment, methods=["GET"]),
