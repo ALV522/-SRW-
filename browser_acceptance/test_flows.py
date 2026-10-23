@@ -785,6 +785,35 @@ class RecruitmentBrowserAcceptance(unittest.TestCase):
         self.assertFalse(self.console_errors, self.console_errors)
 
 
+    def test_15_criteria_editor_writes_carry_if_match(self) -> None:
+        # ADR-0003 phase 2: the protocol editor sends the draft token as If-Match
+        # and refreshes it from the write response, so a second save in the same
+        # session still succeeds (a stale token would 412).
+        pid = self.new_project("标准编辑 CAS")
+        self.page.locator(".tabs").get_by_role("button", name="建岗与标准").click()
+        expect(self.page.locator("#crit-title")).to_be_visible()
+
+        # First save: the editor carries the token fetched with the workspace.
+        self.page.locator("#crit-title").fill("标准编辑 CAS 岗位")
+        self.page.get_by_role("button", name="保存草案").click()
+        expect(self.page.locator("#toast-root")).to_contain_text("草案已保存")
+
+        # Second save without any reload: the refreshed token must still match.
+        self.page.locator("#crit-summary").fill("第二轮保存验证 If-Match 刷新")
+        self.page.get_by_role("button", name="保存草案").click()
+        expect(self.page.locator("#toast-root")).to_contain_text("草案已保存")
+
+        # Publish through the same guarded path (the confirmation dialog is accepted).
+        self.page.on("dialog", lambda dialog: dialog.accept())
+        self.page.get_by_role("button", name="发布当前标准").click()
+        expect(self.page.locator("#toast-root")).to_contain_text("招聘标准已发布")
+
+        workspace = self.get_json(f"/api/v1/projects/{pid}/protocol-workspace")
+        self.assertEqual(workspace["current"]["brief"]["title"], "标准编辑 CAS 岗位")
+        self.assertEqual(workspace["current"]["brief"]["summary"], "第二轮保存验证 If-Match 刷新")
+        self.assertTrue(workspace["current"]["token"])
+        self.assertFalse(self.console_errors, self.console_errors)
+
 
 if __name__ == "__main__":
     unittest.main()

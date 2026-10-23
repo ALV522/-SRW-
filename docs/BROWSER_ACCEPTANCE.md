@@ -19,7 +19,9 @@ provenance; test_11 project handoff JSON download completeness; test_12 candidat
 export formula-injection guard; test_13 inline page handlers resolve in the browser
 (regression guard for the ES-module scope defect fixed 2026-10-21); test_14 channel-effect
 observation flows through the ops panel end to end (regression guard for the cross-shim
-module-scope call defects fixed 2026-10-23).
+module-scope call defects fixed 2026-10-23); test_15 the criteria editor carries the draft
+token as If-Match and refreshes it from each write response, so consecutive saves and the
+publish stay guarded (ADR-0003 phase 2 frontend wiring).
 
 The initial real-browser acceptance covered:
 

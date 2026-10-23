@@ -211,3 +211,10 @@ S3 落地：`SessionRegistry`（内存一会话签发/校验/CSRF 校验/撤销�
 本地实测：源回归 329 OK（6 skipped，零失败，+13 新测试）；E2E 14/14 OK；治理五查 PASS（完整性 360 / release truth / G1 / API 清单 150 / 前端契约）。Schema v1_0015、VERSION 1.0.0-alpha.11 未变；GitHub CI = NOT RUN（仅本地执行）。
 
 **相位 2 剩余（收尾项）**：前端 `api()` 带 If-Match 与会话头 + E2E 更新；offer/阶段等其余写入口 If-Match；`--enforce-sessions` 默认翻转前的双端联验。
+## 2026-10-23: #43 相位 2 收尾 — 前端 If-Match/会话头接线 + test_15（本地实跑通过）
+
+相位 2 前端接线（ADR-0003 S2/S3 客户端侧）：`shared.js` 的 `api()` 合并载体会话头（`X-SRW-Session`/`X-SRW-Token`/`X-SRW-CSRF`，有会话才发），新增 `ensureCarrierSession()`（启动时尽力附着；非 Supervisor 的 Core 返回 404 即正常无头路径）；`app.js` init 先附着再渲染，state 增 `criteriaDraftToken`/`decisionContextHash`；`protocol.js` 的 saveCriteria/publishCriteria 带 `If-Match: <draft.token>` 并从写响应刷新令牌（连续两次保存 + 发布全程有守卫）；`candidates.js` 从候选人工作台跟踪 `decision_context_hash`，saveDecision/saveVerify 带 If-Match。后端写响应（协议更新/发布）新增 `token` 字段供前端刷新。新增 test_15（标准编辑器 If-Match 全链路：两轮保存 + 发布 + API 断言，含 confirm 对话框处理）。
+
+本地实测：E2E 15/15 OK；源回归 329 OK（6 skipped，零失败）；治理五查 PASS（完整性 362 / release truth / G1 / API 清单 150 / 前端契约 187 符号 / 13 静态 API 路径）。Schema v1_0015、VERSION 1.0.0-alpha.11 未变；GitHub CI = NOT RUN（仅本地执行）。
+
+**相位 2 至此后端+前端+E2E 齐备**；剩余收尾项：offer/阶段等其余写入口 If-Match、`--enforce-sessions` 默认翻转前的双端联验（属相位 3 双载体验收范围）。

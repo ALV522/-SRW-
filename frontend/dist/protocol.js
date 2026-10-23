@@ -17,6 +17,7 @@ function criterionStageKeys(key){
 async function criteriaTab(el,p){
   const d=await api(`/api/v1/projects/${state.projectId}/protocol-workspace`);
   const active=d.draft||d.current||{};
+  state.criteriaDraftToken=active.token||'';
   const criteria=active.criteria||[];
   state.criteriaOriginalByKey=Object.fromEntries(criteria.filter(x=>x&&typeof x==='object').map(x=>[String(x.criterion_key||x.key||''),{...x}]).filter(([k])=>k));
   state.criteriaBrief={...(active.brief||{})};
@@ -92,11 +93,11 @@ window.saveCriteria=async rid=>{
       decision_policy:{...state.criteriaDecisionPolicy,human_final:true},
       recruitment_context:{...state.criteriaRecruitmentContext}
     };
-    await api(`/api/v1/protocol-revisions/${rid}`,{method:'PATCH',body:JSON.stringify({payload,provenance:{ui:'business-convergence11-product-workflow'}})});
+    const saved=await api(`/api/v1/protocol-revisions/${rid}`,{method:'PATCH',headers:{...(state.criteriaDraftToken?{'If-Match':state.criteriaDraftToken}:{})},body:JSON.stringify({payload,provenance:{ui:'business-convergence11-product-workflow'}})});if(saved&&saved.token)state.criteriaDraftToken=saved.token;
     toast('草案已保存；建岗上下文、阶段分配与决策策略已保留');
     await projectWorkspace()
   }catch(e){toast(e.message,true)}
 };
 
-window.publishCriteria=async rid=>{if(!confirm('发布后将成为候选人评价的当前标准，确认发布？'))return;try{await api(`/api/v1/protocol-revisions/${rid}/publish`,{method:'POST'});toast('招聘标准已发布');await refreshProjects();await projectWorkspace()}catch(e){toast(e.message,true)}};
+window.publishCriteria=async rid=>{if(!confirm('发布后将成为候选人评价的当前标准，确认发布？'))return;try{const published=await api(`/api/v1/protocol-revisions/${rid}/publish`,{method:'POST',headers:{...(state.criteriaDraftToken?{'If-Match':state.criteriaDraftToken}:{})}});if(published&&published.token)state.criteriaDraftToken=published.token;toast('招聘标准已发布');await refreshProjects();await projectWorkspace()}catch(e){toast(e.message,true)}};
 window.forkDraft=async()=>{try{await api(`/api/v1/projects/${state.projectId}/protocol-drafts`,{method:'POST'});toast('已创建新草案');await projectWorkspace()}catch(e){toast(e.message,true)}};

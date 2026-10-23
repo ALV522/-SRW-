@@ -1,5 +1,5 @@
 const {$,esc,fmt,api,toast,modal,closeModal}=window;
-const state={page:'dashboard',projects:[],projectId:null,projectTab:'overview',candidateId:null,candidateSection:'evidence',candidateReturnTab:'candidates',providers:null,health:false,candidateQuery:'',candidateArchive:'active',candidateMaterial:'all',candidateStage:'all',candidatePage:0,candidateLimit:25,candidateRows:[],taskStatus:'',taskType:'',taskPage:0,taskLimit:50,cockpitPage:0,cockpitLimit:25,auditOffset:0,flowQuery:'',handoffPayload:null,jobSetupStep:1,jobSetupDraft:null,jobSetupSuggestions:[],criteriaStageDefs:[],criteriaRecruitmentContext:{},criteriaDecisionPolicy:{},criteriaBrief:{},criteriaOriginalByKey:{}};
+const state={page:'dashboard',projects:[],projectId:null,projectTab:'overview',candidateId:null,candidateSection:'evidence',candidateReturnTab:'candidates',providers:null,health:false,candidateQuery:'',candidateArchive:'active',candidateMaterial:'all',candidateStage:'all',candidatePage:0,candidateLimit:25,candidateRows:[],taskStatus:'',taskType:'',taskPage:0,taskLimit:50,cockpitPage:0,cockpitLimit:25,auditOffset:0,flowQuery:'',handoffPayload:null,jobSetupStep:1,jobSetupDraft:null,jobSetupSuggestions:[],criteriaStageDefs:[],criteriaRecruitmentContext:{},criteriaDecisionPolicy:{},criteriaBrief:{},criteriaOriginalByKey:{},criteriaDraftToken:'',decisionContextHash:''};
 // Ephemeral drafts survive in-flight workbench redraws but never leave this browser session.
 const materialDrafts=new Map();
 window.state=state;window.materialDrafts=materialDrafts;
@@ -32,7 +32,7 @@ window.go=async p=>{state.page=p;state.candidateId=null;state.candidateSection='
   const button=target.querySelector('button');
   if(button)button.focus({preventScroll:true});
 };
-async function init(){document.body.innerHTML=shell()+`<div id="modal-root"></div><div id="toast-root"></div>`;try{await api('/health/ready');state.health=true}catch{}await renderPage();}
+async function init(){await ensureCarrierSession();document.body.innerHTML=shell()+`<div id="modal-root"></div><div id="toast-root"></div>`;try{await api('/health/ready');state.health=true}catch{}await renderPage();}
 async function renderPage(){const t={dashboard:'工作台总览',projects:'招聘项目',templates:'岗位模板',knowledge:'知识库',tasks:'后台任务',settings:'系统设置'}[state.page]||'工作台';$('#top-title').textContent=t;if($('#side-health'))$('#side-health').textContent=state.health?'服务已就绪 · 本地数据':'服务状态待确认';const healthText=$('#service-health-text'),healthDot=$('#service-health-dot');if(healthText)healthText.textContent=state.health?'服务正常':'服务检查中';if(healthDot)healthDot.classList.toggle('good',Boolean(state.health));const fn={dashboard:window.dashboardPage,projects:projectsPage,templates:window.templatesPage,knowledge:window.knowledgePage,tasks:window.tasksPage,settings:window.settingsPage}[state.page];try{await fn()}catch(e){$('#content').innerHTML=`<div class="panel"><div class="panel-body empty"><strong>页面加载失败</strong>${esc(e.message)}</div></div>`}}
 function head(title,desc,actions=''){return `<div class="page-head"><div><h1>${title}</h1><p>${desc}</p></div><div class="actions">${actions}</div></div>`}
 

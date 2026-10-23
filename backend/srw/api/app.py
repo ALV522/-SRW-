@@ -314,7 +314,10 @@ def create_v1_app(
                 _object(body, "payload"),
                 _object(body, "provenance", default={}),
             )
-            return JSONResponse({"revision_id": row.id, "revision": row.revision, "state": row.state})
+            return JSONResponse(
+                {"revision_id": row.id, "revision": row.revision, "state": row.state,
+                 "token": f"{row.id}:{row.content_hash}"}
+            )
 
     async def publish_protocol(request: Request) -> Response:
         expected = _if_match_token(request)
@@ -323,7 +326,10 @@ def create_v1_app(
             if expected is not None:
                 _enforce_if_match(expected, repo.current_token(request.path_params["revision_id"]))
             row = repo.publish(request.path_params["revision_id"])
-            return JSONResponse({"revision_id": row.id, "revision": row.revision, "state": row.state})
+            return JSONResponse(
+                {"revision_id": row.id, "revision": row.revision, "state": row.state,
+                 "token": f"{row.id}:{row.content_hash}"}
+            )
 
     async def add_text_candidate_source(request: Request) -> Response:
         body = await _body(request)
