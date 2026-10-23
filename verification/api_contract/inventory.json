@@ -113,7 +113,7 @@
     {
       "method": "GET",
       "path": "/api/v1/candidates/{candidate_id:str}/assessment",
-      "owner": "srw.api.app",
+      "owner": "srw.api.routes.candidate_decision",
       "domain": "decisions",
       "mutation": false,
       "signals": null
@@ -150,7 +150,7 @@
     {
       "method": "POST",
       "path": "/api/v1/candidates/{candidate_id:str}/decision",
-      "owner": "srw.api.app",
+      "owner": "srw.api.routes.candidate_decision",
       "domain": "decisions",
       "mutation": true,
       "signals": {
@@ -357,7 +357,7 @@
     {
       "method": "POST",
       "path": "/api/v1/candidates/{candidate_id:str}/verifications",
-      "owner": "srw.api.app",
+      "owner": "srw.api.routes.candidate_decision",
       "domain": "candidates",
       "mutation": true,
       "signals": {
@@ -370,7 +370,7 @@
     {
       "method": "GET",
       "path": "/api/v1/candidates/{candidate_id:str}/workspace",
-      "owner": "srw.api.app",
+      "owner": "srw.api.routes.candidate_decision",
       "domain": "candidates",
       "mutation": false,
       "signals": null

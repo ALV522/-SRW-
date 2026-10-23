@@ -44,11 +44,11 @@
 | PATCH | `/api/v1/candidates/{candidate_id:str}/action-plan` | candidates | `srw.api.fullworkbench` | · | · | yes |
 | GET | `/api/v1/candidates/{candidate_id:str}/ai-runs` | providers | `srw.api.operations` | — | — | — |
 | POST | `/api/v1/candidates/{candidate_id:str}/archive` | candidates | `srw.api.routes.candidates` | · | · | yes |
-| GET | `/api/v1/candidates/{candidate_id:str}/assessment` | decisions | `srw.api.app` | — | — | — |
+| GET | `/api/v1/candidates/{candidate_id:str}/assessment` | decisions | `srw.api.routes.candidate_decision` | — | — | — |
 | GET | `/api/v1/candidates/{candidate_id:str}/brief` | projects | `srw.api.routes.reporting` | — | — | — |
 | GET | `/api/v1/candidates/{candidate_id:str}/contact` | candidates | `srw.api.routes.candidates` | — | — | — |
 | PATCH | `/api/v1/candidates/{candidate_id:str}/contact` | candidates | `srw.api.routes.candidates` | · | · | yes |
-| POST | `/api/v1/candidates/{candidate_id:str}/decision` | decisions | `srw.api.app` | yes | · | yes |
+| POST | `/api/v1/candidates/{candidate_id:str}/decision` | decisions | `srw.api.routes.candidate_decision` | yes | · | yes |
 | GET | `/api/v1/candidates/{candidate_id:str}/decision-history` | candidates | `srw.api.operations` | — | — | — |
 | POST | `/api/v1/candidates/{candidate_id:str}/decisions/reaffirm` | decisions | `srw.api.operations` | yes | · | yes |
 | GET | `/api/v1/candidates/{candidate_id:str}/events` | interviews | `srw.api.routes.interviews` | — | — | — |
@@ -67,8 +67,8 @@
 | POST | `/api/v1/candidates/{candidate_id:str}/sources/text` | evidence | `srw.api.routes.evidence` | yes | · | yes |
 | POST | `/api/v1/candidates/{candidate_id:str}/stage` | candidates | `srw.api.fullworkbench` | · | · | yes |
 | GET | `/api/v1/candidates/{candidate_id:str}/summary` | candidates | `srw.api.routes.candidates` | — | — | — |
-| POST | `/api/v1/candidates/{candidate_id:str}/verifications` | candidates | `srw.api.app` | yes | · | yes |
-| GET | `/api/v1/candidates/{candidate_id:str}/workspace` | candidates | `srw.api.app` | — | — | — |
+| POST | `/api/v1/candidates/{candidate_id:str}/verifications` | candidates | `srw.api.routes.candidate_decision` | yes | · | yes |
+| GET | `/api/v1/candidates/{candidate_id:str}/workspace` | candidates | `srw.api.routes.candidate_decision` | — | — | — |
 | GET | `/api/v1/claims/{claim_id:str}/grounding` | evidence | `srw.api.routes.evidence` | — | — | — |
 | POST | `/api/v1/claims/{claim_id:str}/review` | evidence | `srw.api.routes.evidence` | · | · | yes |
 | GET | `/api/v1/dashboard` | operations | `srw.api.fullworkbench` | — | — | — |

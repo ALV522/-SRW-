@@ -373,3 +373,7 @@ Windows Host 只保留：Core lifecycle、workspace/session、WebView2、native 
 **R2 进度（2026-10-23，第十二刀）**：项目与协议创作 6 条路由（项目列表/创建、草案 fork、协议工作区、草案编辑、发布）迁出到 `backend/srw/api/routes/project_authoring.py`。`app.py` 362 → **318 行**。
 
 写操作归类 36/73（49%），棘轮 41 → 37。新增 `test_project_authoring_routes.py`（7 项）。写测试时修正了自己两个错误假设：`fork` 是**幂等**的（复用已有草案，不叠加修订），且新建项目的空标准草案**可以**发布——真实不变量是"已发布修订不可再次发布、不可原地编辑"，测试已按此固化。
+
+**R2 进度（2026-10-23，第十三刀）**：候选人决策面 4 条路由（workspace / assessment / verifications / decision）迁出到 `backend/srw/api/routes/candidate_decision.py`。`app.py` 318 → **271 行**。
+
+写操作归类 38/73（52%），棘轮 37 → 35。新增 `test_candidate_decision_routes.py`（9 项）。写测试前先用探针核对真实行为，纠正了两处直觉：`verifications` 接受任意 criterion_key（它记录的是备注，不是绑定协议的判断），且决策后 workspace 不回显 decision_label。断言按事实写，不按猜测写。
