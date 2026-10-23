@@ -46,6 +46,7 @@ from srw.kernel.errors import V1RequestValidationError  # re-exported for caller
 from srw.api.routes.evidence import evidence_routes
 from srw.api.routes.runtime import RuntimeIdentity, runtime_routes
 from srw.api.routes.project_authoring import project_authoring_routes
+from srw.api.routes.candidate_decision import candidate_decision_routes
 from srw.api.request_fields import (
     body_boolean as _bool,
     body_dict as _body,
@@ -150,51 +151,6 @@ def create_v1_app(
                 registry.unload(name)
             return JSONResponse(_json(get_settings_surface(session, registry=registry, secrets=secrets)))
 
-    async def candidate_workspace(request: Request) -> Response:
-        with factory() as session:
-            value = get_candidate_workspace(
-                session,
-                request.path_params["candidate_id"],
-                evaluation_policy_revision=evaluation_policy_revision,
-            )
-            return JSONResponse(_json(value))
-
-    async def candidate_assessment(request: Request) -> Response:
-        with factory() as session:
-            return JSONResponse(get_candidate_assessment(session,request.path_params["candidate_id"],evaluation_policy_revision=evaluation_policy_revision))
-
-    async def verify(request: Request) -> Response:
-        body = await _body(request)
-        candidate_id = request.path_params["candidate_id"]
-        with v1_session_scope(factory) as session:
-            record_verification_note(
-                session,
-                candidate_id,
-                _string(body, "criterion_key", required=True),
-                note=_string(body, "note", required=True),
-                status=_string(body, "status", required=True),
-                evidence_level=_string(body, "evidence_level", required=True),
-                reason=_string(body, "reason", required=True),
-                gap=_string(body, "gap", default=""),
-                actor=_string(body, "actor", default="human"),
-                evaluation_policy_revision=evaluation_policy_revision,
-            )
-            return JSONResponse(_json(get_candidate_workspace(session, candidate_id, evaluation_policy_revision=evaluation_policy_revision)))
-
-    async def decide(request: Request) -> Response:
-        body = await _body(request)
-        candidate_id = request.path_params["candidate_id"]
-        with v1_session_scope(factory) as session:
-            make_human_decision(
-                session,
-                candidate_id,
-                decision=_string(body, "decision", required=True),
-                reason=_string(body, "reason", required=True),
-                actor=_string(body, "actor", default="human"),
-                evaluation_policy_revision=evaluation_policy_revision,
-            )
-            return JSONResponse(_json(get_candidate_workspace(session, candidate_id, evaluation_policy_revision=evaluation_policy_revision)))
-
     runtime_identity = RuntimeIdentity(
         release=release, instance_id=instance_id, release_id=release_id,
         runtime_session_id=runtime_session_id, runtime_mode=runtime_mode,
@@ -212,10 +168,7 @@ def create_v1_app(
         Route("/api/v1/settings/provider", update_provider_settings, methods=["PATCH"]),
         Route("/api/v1/settings/capabilities/{name:str}", update_capability_policy, methods=["PATCH"]),
         *evidence_routes(factory=factory, registry=registry, secrets=secrets, data_dir=resolved_data_dir),
-        Route("/api/v1/candidates/{candidate_id:str}/workspace", candidate_workspace, methods=["GET"]),
-        Route("/api/v1/candidates/{candidate_id:str}/assessment", candidate_assessment, methods=["GET"]),
-        Route("/api/v1/candidates/{candidate_id:str}/verifications", verify, methods=["POST"]),
-        Route("/api/v1/candidates/{candidate_id:str}/decision", decide, methods=["POST"]),
+        *candidate_decision_routes(factory=factory, evaluation_policy_revision=evaluation_policy_revision),
     ]
 
     def error_response(exc: Exception, *, status_code: int, code: str) -> Response:

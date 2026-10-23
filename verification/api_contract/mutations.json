@@ -1,9 +1,9 @@
 {
   "schema": "srw.api-mutation-classification.v1",
-  "status": "R1 ratchet plus R2 classification through the runtime and project-authoring slices.",
+  "status": "R1 ratchet plus R2 classification through the project-authoring and candidate-decision slices.",
   "frozen_at": "main e385adfb868baf5173f98d6119f253dd9d072b41",
   "rule": "live_mutations - classified MUST NOT exceed baseline_unclassified. Adding a mutation route therefore fails the contract test until it is classified or this baseline is raised in review.",
-  "baseline_unclassified": 37,
+  "baseline_unclassified": 35,
   "classified": [
     {
       "method": "POST",
@@ -508,6 +508,34 @@
       "human_actor": "implicit - publishing is an explicit operator action",
       "invariants": "only draft revisions can be published (409); payload validation runs before the state flip",
       "side_effects": "marks the revision published and its predecessor superseded"
+    },
+    {
+      "domain": "candidates",
+      "owner": "srw.api.routes.candidate_decision",
+      "method": "POST",
+      "path": "/api/v1/candidates/{candidate_id:str}/verifications",
+      "use_case": "RecordVerificationNote",
+      "request": "criterion_key, note, status, evidence_level, reason (all required), gap, actor",
+      "response": "recomputed candidate workspace",
+      "concurrency": "none - no If-Match; the note is attributed to the actor",
+      "audit": "recorded through the decision command with actor attribution",
+      "human_actor": "yes - actor defaults to human",
+      "invariants": "required fields are 422 at the boundary; a candidate without a published material revision is 409; an arbitrary criterion key is accepted because this records a note, not a protocol-bound judgement",
+      "side_effects": "writes a CriterionJudgment for the current decision context and returns the recomputed workspace"
+    },
+    {
+      "domain": "decisions",
+      "owner": "srw.api.routes.candidate_decision",
+      "method": "POST",
+      "path": "/api/v1/candidates/{candidate_id:str}/decision",
+      "use_case": "RecordHumanDecision",
+      "request": "decision (required), reason (required), actor",
+      "response": "recomputed candidate workspace",
+      "concurrency": "none - no If-Match; the decision binds to the current decision context hash",
+      "audit": "HumanDecision persisted with actor and reason",
+      "human_actor": "yes - this is the product's human-decision gate",
+      "invariants": "an empty or missing reason is refused as 422 rather than recorded; a candidate without a published material revision is 409",
+      "side_effects": "writes a HumanDecision and returns the recomputed workspace"
     }
   ]
 }
