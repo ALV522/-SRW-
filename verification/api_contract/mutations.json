@@ -1,9 +1,9 @@
 {
   "schema": "srw.api-mutation-classification.v1",
-  "status": "R1 ratchet plus R2 classification for offers, interviews, operations, system, providers, reevaluations, candidate CRUD, project lifecycle, evidence and runtime lifecycle.",
+  "status": "R1 ratchet plus R2 classification through the runtime and project-authoring slices.",
   "frozen_at": "main e385adfb868baf5173f98d6119f253dd9d072b41",
   "rule": "live_mutations - classified MUST NOT exceed baseline_unclassified. Adding a mutation route therefore fails the contract test until it is classified or this baseline is raised in review.",
-  "baseline_unclassified": 41,
+  "baseline_unclassified": 37,
   "classified": [
     {
       "method": "POST",
@@ -452,6 +452,62 @@
       "human_actor": "implicit - only a supervised host registers the callback",
       "invariants": "403 when a lifecycle token exists and the header does not match; 409 when no shutdown callback is registered, so an unsupervised server cannot be stopped from a browser",
       "side_effects": "schedules the host callback in a BackgroundTask; the process exits only if the host agrees"
+    },
+    {
+      "domain": "projects",
+      "owner": "srw.api.routes.project_authoring",
+      "method": "POST",
+      "path": "/api/v1/projects",
+      "use_case": "CreateProjectWithDraft",
+      "request": "title (required), role_title (required), brief_summary",
+      "response": "project_id, draft_revision_id",
+      "concurrency": "none",
+      "audit": "domain service records project creation",
+      "human_actor": "implicit",
+      "invariants": "title and role_title required (422); a project is always created with a draft revision",
+      "side_effects": "inserts Project plus its initial draft ProtocolRevision"
+    },
+    {
+      "domain": "projects",
+      "owner": "srw.api.routes.project_authoring",
+      "method": "POST",
+      "path": "/api/v1/projects/{project_id:str}/protocol-drafts",
+      "use_case": "ForkProtocolDraft",
+      "request": "path project_id only",
+      "response": "revision_id, revision, state",
+      "concurrency": "idempotent - an open draft is reused rather than stacked",
+      "audit": "none written by the route",
+      "human_actor": "implicit",
+      "invariants": "unknown project 404; the returned revision is always state=draft",
+      "side_effects": "creates a draft revision only when none is open"
+    },
+    {
+      "domain": "projects",
+      "owner": "srw.api.routes.project_authoring",
+      "method": "PATCH",
+      "path": "/api/v1/protocol-revisions/{revision_id:str}",
+      "use_case": "UpdateProtocolDraft",
+      "request": "payload (object, required), provenance (object)",
+      "response": "revision_id, revision, state",
+      "concurrency": "none on the row; state guard is authoritative",
+      "audit": "provenance stored with the revision",
+      "human_actor": "implicit",
+      "invariants": "payload must be an object (422); only drafts are editable (409); payload validation happens in the repository before state changes",
+      "side_effects": "rewrites the draft payload and content hash"
+    },
+    {
+      "domain": "projects",
+      "owner": "srw.api.routes.project_authoring",
+      "method": "POST",
+      "path": "/api/v1/protocol-revisions/{revision_id:str}/publish",
+      "use_case": "PublishProtocol",
+      "request": "path revision_id only",
+      "response": "revision_id, revision, state=published",
+      "concurrency": "one-way transition: a second publish returns 409",
+      "audit": "protocol revision state and publish timestamp persist",
+      "human_actor": "implicit - publishing is an explicit operator action",
+      "invariants": "only draft revisions can be published (409); payload validation runs before the state flip",
+      "side_effects": "marks the revision published and its predecessor superseded"
     }
   ]
 }

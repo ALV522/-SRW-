@@ -369,3 +369,7 @@ Windows Host 只保留：Core lifecycle、workspace/session、WebView2、native 
 依赖不是 session factory，而是 9 个工作区/进程标识字段，因此引入 `RuntimeIdentity` 冻结 dataclass，在 `create_v1_app` 构造一次后整体传入——比 10 个位置参数更难误用。`/health/*` 与 `/api/v1/info` 别名刻意留在 `app.py`：它们是 app 自身的存活面，不应依赖子模块。
 
 `app.py` 421 → **362 行**。写操作归类 32/73（44%），棘轮 42 → 41。新增 `test_runtime_routes.py`（6 项），其中"知识库缺失时 ready 必须 503 且带 issues"与"无回调时 shutdown 必须 409 且进程存活"是两条防退化断言。
+
+**R2 进度（2026-10-23，第十二刀）**：项目与协议创作 6 条路由（项目列表/创建、草案 fork、协议工作区、草案编辑、发布）迁出到 `backend/srw/api/routes/project_authoring.py`。`app.py` 362 → **318 行**。
+
+写操作归类 36/73（49%），棘轮 41 → 37。新增 `test_project_authoring_routes.py`（7 项）。写测试时修正了自己两个错误假设：`fork` 是**幂等**的（复用已有草案，不叠加修订），且新建项目的空标准草案**可以**发布——真实不变量是"已发布修订不可再次发布、不可原地编辑"，测试已按此固化。
