@@ -239,3 +239,8 @@ S3 落地：`SessionRegistry`（内存一会话签发/校验/CSRF 校验/撤销�
 本地实测：源回归 339 OK（6 skipped，零失败）；E2E 15/15 OK；治理五查 PASS（完整性 365 / release truth / G1 / API 清单 150 / 前端契约）。Schema v1_0015、VERSION 1.0.0-alpha.11 未变；GitHub CI = NOT RUN（仅本地执行）。
 
 **至此 ADR-0003 三相位本地可跑部分全部闭环**：相位 1（Supervisor + 附着协议）、相位 2（CAS + Schema v1_0015 + 会话/CSRF + 前端带头）、相位 3（T1–T10 本地验收 + Owner 文档）。分支领先 main 21 提交；main/origin 未动、未 push。
+## 2026-10-23: #43 更正记录 — capability_recovery* 正名撤回（BLOCKED，本地实跑通过）
+
+对上一条目（正名）的**如实更正**：`82c9cd0` 的三个文件正名当日撤回。根因：`SOURCE_RECOVERY_MANIFEST.sha256` 是 C08 不可变基线，锁定了 `capability_recovery*.py` 三个路径；`check_source_integrity.py` 要求当前清单必须是历史清单的超集——正名后要么丢失历史项（门禁失败，实测 exit=1），要么改写冻结基线（治理违规）。按宪章第 5 条（清单纪律）选择撤回：文件与安装函数名、app.py 接线全部还原（内容本就没动），BUSINESS_CODE_MAP 第 3 项登记为 **BLOCKED 并附域准确名备查**（decision-operations / intelligence / sourcing-import），供未来基线解冻或负责人裁决时使用。`82c9cd0` 中的 DUAL_CARRIER_PLAN M3.1 Owner 文档部分**保留有效**（与正名无关）。
+
+本地实测（撤回后）：源回归 339 OK（6 skipped，零失败）；E2E 15/15 OK；治理五查 PASS（完整性 364 / release truth / G1 / API 清单 150 / 前端契约）。Schema v1_0015、VERSION 1.0.0-alpha.11 未变；GitHub CI = NOT RUN（仅本地执行）。

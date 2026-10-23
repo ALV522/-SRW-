@@ -23,7 +23,7 @@ def _text(body: dict, key: str, default: str='') -> str:
     return value
 
 
-def install_sourcing_import_http_routes(app, factory):
+def install_capability_recovery07_routes(app, factory):
     async def import_preview(request: Request):
         body = await _body(request)
         return JSONResponse(preview_csv(_text(body, 'content')))
