@@ -47,6 +47,7 @@ from srw.api.routes.evidence import evidence_routes
 from srw.api.routes.runtime import RuntimeIdentity, runtime_routes
 from srw.api.routes.project_authoring import project_authoring_routes
 from srw.api.routes.candidate_decision import candidate_decision_routes
+from srw.api.routes.settings import settings_routes
 from srw.api.request_fields import (
     body_boolean as _bool,
     body_dict as _body,
@@ -56,13 +57,6 @@ from srw.api.request_fields import (
 
 
 from srw.api.serialization import jsonable as _json
-
-
-def _choice(body: dict[str, Any], key: str, allowed: set[str], *, default: str) -> str:
-    value = _string(body, key, default=default)
-    if value not in allowed:
-        raise V1RequestValidationError(f"{key} must be one of: {', '.join(sorted(allowed))}")
-    return value
 
 
 def create_v1_app(
@@ -120,37 +114,6 @@ def create_v1_app(
         with factory() as session:
             return JSONResponse(_json(get_workbench(session, evaluation_policy_revision=evaluation_policy_revision)))
 
-    async def settings(_request: Request) -> Response:
-        with factory() as session:
-            return JSONResponse(_json(get_settings_surface(session, registry=registry, secrets=secrets)))
-
-    async def update_provider_settings(request: Request) -> Response:
-        body = await _body(request)
-        provider_type = _choice(body, "provider_type", {"deepseek", "openai_compatible"}, default="deepseek")
-        reasoning_effort = _choice(body, "reasoning_effort", {"low", "medium", "high"}, default="medium")
-        with v1_session_scope(factory) as session:
-            RuntimeSettingsRepository(session).update_provider(
-                provider_type=provider_type,
-                model=_string(body, "model", default=""),
-                base_url=_string(body, "base_url", default=""),
-                reasoning_effort=reasoning_effort,
-            )
-            if "api_key" in body:
-                secrets.set("provider_api_key", _string(body, "api_key", default=""))
-            return JSONResponse(_json(get_settings_surface(session, registry=registry, secrets=secrets)))
-
-    async def update_capability_policy(request: Request) -> Response:
-        name = request.path_params["name"]
-        if name not in {"ocr", "asr"}:
-            raise HTTPException(status_code=404, detail="unknown capability")
-        body = await _body(request)
-        policy = _choice(body, "policy", {"on_demand", "disabled"}, default="on_demand")
-        with v1_session_scope(factory) as session:
-            RuntimeSettingsRepository(session).set_capability_policy(name, policy)
-            if policy == "disabled":
-                registry.unload(name)
-            return JSONResponse(_json(get_settings_surface(session, registry=registry, secrets=secrets)))
-
     runtime_identity = RuntimeIdentity(
         release=release, instance_id=instance_id, release_id=release_id,
         runtime_session_id=runtime_session_id, runtime_mode=runtime_mode,
@@ -164,9 +127,7 @@ def create_v1_app(
         *runtime_routes(factory=factory, identity=runtime_identity),
         Route("/api/v1/workbench", workbench, methods=["GET"]),
         *project_authoring_routes(factory=factory),
-        Route("/api/v1/settings", settings, methods=["GET"]),
-        Route("/api/v1/settings/provider", update_provider_settings, methods=["PATCH"]),
-        Route("/api/v1/settings/capabilities/{name:str}", update_capability_policy, methods=["PATCH"]),
+        *settings_routes(factory=factory, registry=registry, secrets=secrets),
         *evidence_routes(factory=factory, registry=registry, secrets=secrets, data_dir=resolved_data_dir),
         *candidate_decision_routes(factory=factory, evaluation_policy_revision=evaluation_policy_revision),
     ]

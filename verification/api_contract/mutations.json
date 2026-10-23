@@ -1,9 +1,9 @@
 {
   "schema": "srw.api-mutation-classification.v1",
-  "status": "R1 ratchet plus R2 classification through the project-authoring and candidate-decision slices.",
+  "status": "R1 ratchet plus R2 classification through the candidate-decision and settings slices.",
   "frozen_at": "main e385adfb868baf5173f98d6119f253dd9d072b41",
   "rule": "live_mutations - classified MUST NOT exceed baseline_unclassified. Adding a mutation route therefore fails the contract test until it is classified or this baseline is raised in review.",
-  "baseline_unclassified": 35,
+  "baseline_unclassified": 33,
   "classified": [
     {
       "method": "POST",
@@ -536,6 +536,34 @@
       "human_actor": "yes - this is the product's human-decision gate",
       "invariants": "an empty or missing reason is refused as 422 rather than recorded; a candidate without a published material revision is 409",
       "side_effects": "writes a HumanDecision and returns the recomputed workspace"
+    },
+    {
+      "domain": "system",
+      "owner": "srw.api.routes.settings",
+      "method": "PATCH",
+      "path": "/api/v1/settings/provider",
+      "use_case": "UpdateProviderConnection",
+      "request": "provider_type, model, base_url, reasoning_effort, api_key",
+      "response": "settings surface with api_key_configured, never the key",
+      "concurrency": "none - no If-Match",
+      "audit": "none written by this route",
+      "human_actor": "implicit - local operator only",
+      "invariants": "provider_type and reasoning_effort are whitelisted (422); the key is written to SecretStore and never returned",
+      "side_effects": "updates the provider profile row and, when api_key is present, writes the secret"
+    },
+    {
+      "domain": "system",
+      "owner": "srw.api.routes.settings",
+      "method": "PATCH",
+      "path": "/api/v1/settings/capabilities/{name:str}",
+      "use_case": "SetCapabilityPolicy",
+      "request": "policy = on_demand | disabled",
+      "response": "settings surface",
+      "concurrency": "none",
+      "audit": "none written by this route",
+      "human_actor": "implicit",
+      "invariants": "only ocr/asr exist (404 otherwise, plain-text detail); policy is whitelisted (422)",
+      "side_effects": "persists the policy and, when disabled, unloads the capability from the registry so it stops serving from memory"
     }
   ]
 }

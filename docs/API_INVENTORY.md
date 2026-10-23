@@ -150,9 +150,9 @@
 | GET | `/api/v1/runtime/live` | system | `srw.api.routes.runtime` | — | — | — |
 | GET | `/api/v1/runtime/ready` | system | `srw.api.routes.runtime` | — | — | — |
 | POST | `/api/v1/runtime/shutdown` | system | `srw.api.routes.runtime` | · | · | · |
-| GET | `/api/v1/settings` | system | `srw.api.app` | — | — | — |
-| PATCH | `/api/v1/settings/capabilities/{name:str}` | system | `srw.api.app` | · | · | yes |
-| PATCH | `/api/v1/settings/provider` | providers | `srw.api.app` | · | · | yes |
+| GET | `/api/v1/settings` | system | `srw.api.routes.settings` | — | — | — |
+| PATCH | `/api/v1/settings/capabilities/{name:str}` | system | `srw.api.routes.settings` | · | · | yes |
+| PATCH | `/api/v1/settings/provider` | providers | `srw.api.routes.settings` | · | · | yes |
 | GET | `/api/v1/settings/providers` | providers | `srw.api.routes.providers` | — | — | — |
 | PATCH | `/api/v1/settings/providers/{name:str}` | providers | `srw.api.routes.providers` | · | · | yes |
 | POST | `/api/v1/settings/providers/{name:str}/test` | providers | `srw.api.routes.providers` | · | · | yes |
