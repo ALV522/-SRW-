@@ -780,12 +780,12 @@ def create_v1_app(
     install_governance_routes(app, factory)
     install_ranking_routes(app, factory, evaluation_policy_revision=evaluation_policy_revision)
     install_operations_routes(app, factory, evaluation_policy_revision=evaluation_policy_revision)
-    from srw.api.capability_recovery import install_capability_recovery_routes
-    install_capability_recovery_routes(app, factory, data_dir=resolved_data_dir, evaluation_policy_revision=evaluation_policy_revision)
-    from srw.api.capability_recovery06 import install_capability_recovery06_routes
-    install_capability_recovery06_routes(app, factory, data_dir=resolved_data_dir, knowledge_dir=resolved_knowledge_dir)
-    from srw.api.capability_recovery07 import install_capability_recovery07_routes
-    install_capability_recovery07_routes(app, factory)
+    from srw.api.decision_operations_http import install_decision_operations_http_routes
+    install_decision_operations_http_routes(app, factory, data_dir=resolved_data_dir, evaluation_policy_revision=evaluation_policy_revision)
+    from srw.api.intelligence_http import install_intelligence_http_routes
+    install_intelligence_http_routes(app, factory, data_dir=resolved_data_dir, knowledge_dir=resolved_knowledge_dir)
+    from srw.api.sourcing_import_http import install_sourcing_import_http_routes
+    install_sourcing_import_http_routes(app, factory)
     from srw.api.project_portability import install_project_portability_routes
     install_project_portability_routes(app, factory, data_dir=resolved_data_dir)
 

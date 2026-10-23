@@ -44,7 +44,7 @@ def _job_context(session,project_id):
             except Exception:pass
     return role,location
 
-def install_capability_recovery06_routes(app,factory,*,data_dir:Path,knowledge_dir:Path):
+def install_intelligence_http_routes(app,factory,*,data_dir:Path,knowledge_dir:Path):
     packages=ControlledKnowledgePackages(data_dir=Path(data_dir),active_dir=Path(knowledge_dir))
     async def intel(request):
         pid=request.path_params['project_id']

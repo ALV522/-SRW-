@@ -231,3 +231,11 @@ S3 落地：`SessionRegistry`（内存一会话签发/校验/CSRF 校验/撤销�
 本地实测：双载体 10/10 OK；源回归 339 OK（6 skipped，零失败，+10 新测试）；E2E 15/15 OK；治理五查 PASS（完整性 364 / release truth / G1 / API 清单 150 / 前端契约）。Schema v1_0015、VERSION 1.0.0-alpha.11 未变；GitHub CI = NOT RUN（仅本地执行）。
 
 **相位 3 剩余**：T1/T2 的真实 WPF Host 载体对（需负责人 Windows 机器）；Owner Guide 更新；`DUAL_CARRIER_ACCEPTED` 申报条件待双端齐备后评估。
+## 2026-10-23: #43 收尾 — Owner 文档更新 + capability_recovery* 正名（本地实跑通过）
+
+- **Owner 文档**：`docs/DUAL_CARRIER_PLAN.md` 新增 M3.1「Core Supervisor 落地状态」——运行方式（`python -m srw.supervisor.runtime` / 启动器 `--supervisor`）、已闭环的 T1–T10 本地验收索引（含各测试文件与项数）、仍需负责人 Windows 机器的两项（真实 WPF Host 第二载体、GUI 点击级）、显式缺口（旧 Portable 兼容锁、pending-restore、`--enforce-sessions` 默认翻转）。
+- **`capability_recovery*` 正名**（臃肿登记第 3 项，P2）：`git mv` 三文件为域准确名——`decision_operations_http.py`（运营学习/规划/决策动作/反馈，10 路由）、`intelligence_http.py`（招聘智能/渠道观测/知识包/策展，7 路由）、`sourcing_import_http.py`（渠道观测导入，2 路由）；安装函数同名变更，**内容逐字保留**（不为拆而拆）；app.py 三处导入/调用同步；BUSINESS_CODE_MAP 登记行与两处域索引刷新。
+
+本地实测：源回归 339 OK（6 skipped，零失败）；E2E 15/15 OK；治理五查 PASS（完整性 365 / release truth / G1 / API 清单 150 / 前端契约）。Schema v1_0015、VERSION 1.0.0-alpha.11 未变；GitHub CI = NOT RUN（仅本地执行）。
+
+**至此 ADR-0003 三相位本地可跑部分全部闭环**：相位 1（Supervisor + 附着协议）、相位 2（CAS + Schema v1_0015 + 会话/CSRF + 前端带头）、相位 3（T1–T10 本地验收 + Owner 文档）。分支领先 main 21 提交；main/origin 未动、未 push。

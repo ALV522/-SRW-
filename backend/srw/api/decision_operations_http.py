@@ -41,7 +41,7 @@ def _knowledge_feedback(session,project_id):
         out.append({'id':x.id,'project_id':x.project_id,'candidate_id':x.candidate_id,'decision_action_id':x.decision_action_id,'status':x.status,'feedback_type':x.feedback_type,'title':x.title,'summary':x.summary,'evidence_refs':json.loads(x.evidence_refs_json or '[]'),'decision_context_hash':x.decision_context_hash,'reviewed_by':x.reviewed_by,'created_at':x.created_at.isoformat() if x.created_at else None})
     return out
 
-def install_capability_recovery_routes(app,factory,*,data_dir:Path,evaluation_policy_revision:str):
+def install_decision_operations_http_routes(app,factory,*,data_dir:Path,evaluation_policy_revision:str):
     export_root=Path(data_dir)/'knowledge_curation_exports'
 
     async def project_operations(request):

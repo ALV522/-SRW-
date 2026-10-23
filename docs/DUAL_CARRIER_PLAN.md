@@ -56,6 +56,15 @@ Core：正式事务 CAS、独立 Supervisor、工作区锁、一次性会话、�
 Windows + Web：同时读写相同 Candidate 和联系计划；冲突拒绝、修改标准后另一端旧 Decision 失效；关闭任一 UI 不误杀另一个；重复操作不重复 Job。
 共同退出：同一机器同时运行、跨端冲突及异常退出测试 PASS。
 
+### M3.1 Core Supervisor 落地状态（2026-10-23，本地执行，未同步 GitHub）
+
+ADR-0003 的 S1/S2/S3/S5/S6 本地可跑部分已实现并全部本地验证通过：
+
+- **运行方式**：`python -m srw.supervisor.runtime --data-root <workspace> --port <loopback> [--idle-grace-seconds 300] [--enforce-sessions]`（Supervisor 是唯一租约持有者，`app.lock` 的 `edition="supervisor"`，空闲宽限自退）；本地 Web 启动器加 `--supervisor` 开关即走附着路径（默认关，行为与今天逐字一致）。
+- **已闭环的验收**：附着/重附/心跳/detach、引用计数空闲生命周期、崩溃重派生（T5/T7）、双端并发冲突一 200 一 412 且无假审计（T3）、协议重发布后旧决定两端失效（T4）、双端同任务只执行一次（T6）、备份互斥（T8）、Origin/会话/CSRF 访问控制（T9）、交接导出两端一致（T10）、跨端双向读写（T1/T2 协议级）。详见 ADR-0003 与 `convergence_tests/test_dual_carrier_acceptance.py`（10 项）、`test_supervisor.py`（14 项）、`test_revision_cas.py`（5 项）、`test_carrier_sessions.py`（13 项）。
+- **仍需负责人 Windows 机器**：T1/T2 的真实 WPF Host 作为第二载体与 Local Web 同时对写；GUI 点击级验收（runbook 见 acceptance-20261021）。此前提的代理环境注意同样适用于本机：loopback 探测请确认无代理拦截。
+- **未做（相位 3 范围外或显式缺口）**：Supervisor 不持旧 Portable 的 `.srw-instance.lock` 兼容锁、pending-restore 未接入 Supervisor、`--enforce-sessions` 默认翻转待双端联验后执行。
+
 ### M4 包装与交付（并行）
 Windows：同 SHA 完整 Native ZIP，包括审计过的 Runtime/Knowledge/Host，验证 OS 依赖。
 Local Web：本机 Core 启动器+浏览器 UI 完整自洽包，记录 Python/依赖/端口前提；可考虑与 Windows 合包。
