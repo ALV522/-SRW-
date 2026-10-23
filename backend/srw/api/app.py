@@ -44,6 +44,7 @@ from srw.surfaces.workbench import get_workbench
 
 from srw.kernel.errors import V1RequestValidationError  # re-exported for callers
 from srw.api.routes.evidence import evidence_routes
+from srw.api.routes.runtime import RuntimeIdentity, runtime_routes
 from srw.api.request_fields import (
     body_boolean as _bool,
     body_dict as _body,
@@ -112,68 +113,6 @@ def create_v1_app(
             "instance_id": instance_id,
             "data_dir_identity": data_dir_identity,
         })
-
-    async def runtime_live(_request: Request) -> Response:
-        return JSONResponse({
-            "status": "live", "product": "SRW", "version": release["version"],
-            "instanceId": instance_id, "releaseId": release_id, "sessionId": runtime_session_id,
-        })
-
-    async def runtime_ready(_request: Request) -> Response:
-        issues: list[str] = []
-        try:
-            with factory() as session:
-                session.connection()
-        except Exception as exc:
-            issues.append(f"database_not_ready:{type(exc).__name__}")
-        knowledge_ready = all((resolved_knowledge_dir / name / "knowledge.db").is_file() for name in ("taxonomy","job_info","competency","market_reference","reference"))
-        if not knowledge_ready:
-            issues.append("knowledge_not_ready")
-        ready = not issues
-        return JSONResponse({
-            "status": "ready" if ready else "not_ready",
-            "version": release["version"],
-            "schemaVersion": V1_SCHEMA_REVISION,
-            "databaseReady": not any(x.startswith("database_not_ready") for x in issues),
-            "knowledgeReady": knowledge_ready,
-            "issues": issues,
-        }, status_code=200 if ready else 503)
-
-    async def runtime_info(_request: Request) -> Response:
-        return JSONResponse({
-            "apiVersion": "v1", "product": "SRW", "version": release["version"],
-            "schemaVersion": V1_SCHEMA_REVISION, "runtime": runtime_mode, "edition": edition,
-            "instanceId": instance_id, "releaseId": release_id, "sessionId": runtime_session_id,
-            "dataScopeId": data_dir_identity,
-            "frontend": {"mode": "static_dist"},
-            "capabilities": {
-                "desktop": runtime_mode == "desktop", "nativeFileDialogs": False,
-                "secureSecretStore": False, "notifications": False, "clipboard": True,
-                "downloads": True, "externalNavigation": True,
-                "gracefulShutdown": True, "lifecycleSessionTokenSupported": True,
-                "lifecycleSessionTokenRequired": bool(runtime_session_token),
-            },
-            "readiness": {"status": "ready"},
-        })
-
-    async def runtime_capabilities(_request: Request) -> Response:
-        info = await runtime_info(_request)
-        # Avoid reparsing Response internals: keep a concise capability contract.
-        return JSONResponse({
-            "runtime": runtime_mode, "edition": edition, "desktop": runtime_mode == "desktop",
-            "nativeFileDialogs": False, "secureSecretStore": False, "notifications": False,
-            "clipboard": True, "downloads": True, "externalNavigation": True,
-            "gracefulShutdown": True, "lifecycleSessionTokenSupported": True,
-            "lifecycleSessionTokenRequired": bool(runtime_session_token),
-        })
-
-    async def runtime_shutdown(request: Request) -> Response:
-        if runtime_session_token and request.headers.get("X-SRW-Session", "") != runtime_session_token:
-            return JSONResponse({"detail": "运行时会话令牌无效"}, status_code=403)
-        callback = getattr(request.app.state, "shutdown_callback", None)
-        if callback is None:
-            return JSONResponse({"detail": "当前启动方式不支持 Host 安全退出"}, status_code=409)
-        return JSONResponse({"status": "shutting_down"}, status_code=202, background=BackgroundTask(callback))
 
     async def workbench(_request: Request) -> Response:
         with factory() as session:
@@ -295,15 +234,17 @@ def create_v1_app(
             )
             return JSONResponse(_json(get_candidate_workspace(session, candidate_id, evaluation_policy_revision=evaluation_policy_revision)))
 
+    runtime_identity = RuntimeIdentity(
+        release=release, instance_id=instance_id, release_id=release_id,
+        runtime_session_id=runtime_session_id, runtime_mode=runtime_mode,
+        edition=edition, runtime_session_token=runtime_session_token,
+        data_dir_identity=data_dir_identity, knowledge_dir=resolved_knowledge_dir,
+    )
     routes = [
         Route("/health/live", health_live, methods=["GET"]),
         Route("/health/ready", health_ready, methods=["GET"]),
         Route("/api/v1/info", v1_info, methods=["GET"]),
-        Route("/api/v1/runtime/live", runtime_live, methods=["GET"]),
-        Route("/api/v1/runtime/ready", runtime_ready, methods=["GET"]),
-        Route("/api/v1/runtime/info", runtime_info, methods=["GET"]),
-        Route("/api/v1/runtime/capabilities", runtime_capabilities, methods=["GET"]),
-        Route("/api/v1/runtime/shutdown", runtime_shutdown, methods=["POST"]),
+        *runtime_routes(factory=factory, identity=runtime_identity),
         Route("/api/v1/workbench", workbench, methods=["GET"]),
         Route("/api/v1/projects", projects, methods=["GET"]),
         Route("/api/v1/projects", create_project, methods=["POST"]),

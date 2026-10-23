@@ -363,3 +363,9 @@ Windows Host 只保留：Core lifecycle、workspace/session、WebView2、native 
 本刀第一次动 `app.py`——它此前持有 33 条路由、737 行，是 R2 之后新的最大聚合点。同时把三个 app 私有请求助手（`_body`/`_string`/`_bool`）上提为 `api/request_fields.py`，它们使用 **422 `invalid_request` 封套**，与 `api/http_utils` 的 409 `invariant_conflict` 是两套不同契约，不能合并；`V1RequestValidationError` 随之移入 `kernel/errors.py`，避免新模块反向依赖 app。`_json` 序列化助手移入 `api/serialization.py`。
 
 `app.py` 737 → **424 行**（−313，−42.5%）。写操作归类 31/73（42%），棘轮 45 → 42。新增 `test_evidence_routes.py`（8 项），其中"缺少必填字段必须仍是 422"是撤防式断言：一旦有人把两套封套合并，该测试立即失败。
+
+**R2 进度（2026-10-23，第十一刀）**：`app.py` 的 runtime 身份与生命周期 5 条路由（live / ready / info / capabilities / shutdown）迁出到 `backend/srw/api/routes/runtime.py`。
+
+依赖不是 session factory，而是 9 个工作区/进程标识字段，因此引入 `RuntimeIdentity` 冻结 dataclass，在 `create_v1_app` 构造一次后整体传入——比 10 个位置参数更难误用。`/health/*` 与 `/api/v1/info` 别名刻意留在 `app.py`：它们是 app 自身的存活面，不应依赖子模块。
+
+`app.py` 421 → **362 行**。写操作归类 32/73（44%），棘轮 42 → 41。新增 `test_runtime_routes.py`（6 项），其中"知识库缺失时 ready 必须 503 且带 issues"与"无回调时 shutdown 必须 409 且进程存活"是两条防退化断言。

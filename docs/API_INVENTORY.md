@@ -145,11 +145,11 @@
 | POST | `/api/v1/protocol-revisions/{revision_id:str}/publish` | projects | `srw.api.app` | yes | · | yes |
 | GET | `/api/v1/ranked-shortlists/{publication_id:str}` | candidates | `srw.api.ranking` | — | — | — |
 | POST | `/api/v1/reevaluations/{draft_id:str}/apply` | decisions | `srw.api.routes.decisions` | yes | · | yes |
-| GET | `/api/v1/runtime/capabilities` | system | `srw.api.app` | — | — | — |
-| GET | `/api/v1/runtime/info` | system | `srw.api.app` | — | — | — |
-| GET | `/api/v1/runtime/live` | system | `srw.api.app` | — | — | — |
-| GET | `/api/v1/runtime/ready` | system | `srw.api.app` | — | — | — |
-| POST | `/api/v1/runtime/shutdown` | system | `srw.api.app` | · | · | · |
+| GET | `/api/v1/runtime/capabilities` | system | `srw.api.routes.runtime` | — | — | — |
+| GET | `/api/v1/runtime/info` | system | `srw.api.routes.runtime` | — | — | — |
+| GET | `/api/v1/runtime/live` | system | `srw.api.routes.runtime` | — | — | — |
+| GET | `/api/v1/runtime/ready` | system | `srw.api.routes.runtime` | — | — | — |
+| POST | `/api/v1/runtime/shutdown` | system | `srw.api.routes.runtime` | · | · | · |
 | GET | `/api/v1/settings` | system | `srw.api.app` | — | — | — |
 | PATCH | `/api/v1/settings/capabilities/{name:str}` | system | `srw.api.app` | · | · | yes |
 | PATCH | `/api/v1/settings/provider` | providers | `srw.api.app` | · | · | yes |
