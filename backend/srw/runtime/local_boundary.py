@@ -84,6 +84,17 @@ class LocalBoundaryMiddleware:
 
         method = str(scope.get("method") or "GET").upper()
         if method in _MUTATING_METHODS:
+            # ADR-0003 T8: a running backup/restore refuses other-carrier writes.
+            # The Starlette instance is on the scope, not on the wrapped app.
+            starlette_app = scope.get("app")
+            guard = getattr(getattr(starlette_app, "state", None), "backup_guard", None)
+            if guard is not None and guard.active:
+                response = JSONResponse(
+                    {"detail": "备份或恢复进行中，暂不接受写入", "error": {"code": "backup_in_progress"}},
+                    status_code=409,
+                )
+                await response(scope, receive, send)
+                return
             origin = headers.get("origin")
             if origin and not _same_origin(host, origin):
                 response = JSONResponse({"detail": "拒绝跨站写入请求"}, status_code=403)

@@ -754,6 +754,10 @@ def create_v1_app(
     # service on app.state so the protocol routes can reach it.
     app.state.supervisor_service = supervisor_service
     app.state.supervisor_mode = supervisor_service is not None
+    # ADR-0003 T8: backup/restore mutex consulted by the boundary middleware.
+    from srw.runtime.backup_guard import BackupGuard
+
+    app.state.backup_guard = BackupGuard()
     # ADR-0003 S3: session enforcement is a phase-2 flag (off until the
     # frontend carries the session/CSRF headers).
     app.state.enforce_carrier_sessions = bool(enforce_carrier_sessions)

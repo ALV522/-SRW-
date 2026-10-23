@@ -61,6 +61,13 @@
    **状态：后端已实现（2026-10-23 本地提交，未同步 GitHub）**。If-Match CAS 覆盖协议草稿更新/发布与人工决定/核实记录（412 不产假审计，无 If-Match 时行为逐字不变）；Schema v1_0015 含 carrier_session 表（会话记录持久化、令牌永不落盘）；S3 一次性会话 + Origin 白名单 + X-SRW-CSRF 强制（`--enforce-sessions` 开关，默认关——前端带头后随相位 2 收尾翻转）。
    **剩余**：前端 api() 带 If-Match/会话头 + E2E 更新；offer/阶段等其余写入口 If-Match；开关默认翻转前的双端联验。
 3. **相位 3**：双载体并发验收（T1–T10 全量）+ 文档与 Owner Guide 更新。通过后才具备 DUAL_CARRIER_ACCEPTED 申报条件。
+   **状态：本地可跑部分已完成（2026-10-23 本地提交，未同步 GitHub）**。`convergence_tests/test_dual_carrier_acceptance.py` 10 项全过：
+   - T1/T2 跨端读写（双向，两个独立附着客户端）；T3 并发冲突（同令牌双线程 PATCH → 一 200 一 412、被拒写入无痕迹）；
+   - T4 协议重发布后旧决定在两端均 stale；T5 关 A 后 Supervisor 存续、B 继续读写；
+   - T6 双端同源抽取只建一个任务/job（`_find_or_queue_task` 内容级去重）；T7 杀 Supervisor 后重派生、两端重附、数据保留、旧会话失效；
+   - T8 备份互锁（端点持锁证明 + 持锁期间写入/新附着 409、放行后恢复）；T9 跨站 Origin/无会话/错令牌/未知附着全拒；T10 交接导出两端一致。
+   - 工程修复：loopback 载体流量禁走代理（无代理 opener，与 Windows 验收轮代理干扰同源）；Windows 存活探测复用 `process_alive`。
+   **仍需负责人 Windows 机器**：T1/T2 的真实 WPF Host 载体对；其余 T 项已本地闭环。
 
 回滚：特性开关 + 独立 Schema 迁移回退脚本；任何相位失败不影响已发布载体行为。
 

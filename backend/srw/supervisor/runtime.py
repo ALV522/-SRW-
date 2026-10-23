@@ -39,6 +39,13 @@ LEASE_READY_TIMEOUT_SECONDS = 30.0
 
 async def attach_endpoint(request: Request) -> JSONResponse:
     service: SupervisorService = request.app.state.supervisor_service
+    # T8 (ADR-0003): no new attachments while a backup/restore runs.
+    guard = getattr(request.app.state, "backup_guard", None)
+    if guard is not None and guard.active:
+        return JSONResponse(
+            {"error": {"code": "backup_in_progress", "detail": "备份或恢复进行中，暂不接受新附着"}},
+            status_code=409,
+        )
     try:
         payload = await request.json()
     except Exception:

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import base64, json, mimetypes, threading, time, uuid
+from contextlib import nullcontext as _nullcontext
 from time import perf_counter
 from pathlib import Path
 from typing import Any
@@ -450,15 +451,42 @@ def install_full_workbench_routes(app, factory, registry, secrets, *, data_dir: 
         task.job_id = job.id
         return job
 
+    _OPEN_TASK_STATUSES = ("queued", "running")
+
+    def _find_or_queue_task(s, *, task_type: str, candidate_id: str, source_id: str, payload: dict) -> tuple:
+        """T6 (ADR-0003): the same extraction triggered from two carriers runs once.
+
+        An open task with the same content identity (type + candidate + source)
+        is returned as-is instead of creating a second task/job pair, so dual
+        carriers cannot double-execute one extraction.
+        """
+        existing = s.scalar(
+            select(TaskRecord)
+            .where(
+                TaskRecord.task_type == task_type,
+                TaskRecord.candidate_id == candidate_id,
+                TaskRecord.source_id == source_id,
+                TaskRecord.status.in_(_OPEN_TASK_STATUSES),
+            )
+            .limit(1)
+        )
+        if existing is not None:
+            job = s.get(Job, existing.job_id) if existing.job_id else None
+            return existing, job
+        task = TaskRecord(
+            task_type=task_type, status="queued", candidate_id=candidate_id, source_id=source_id,
+            payload_json=json.dumps(payload, ensure_ascii=False),
+        )
+        return task, _queue_task_job(s, task)
+
     async def extract_evidence_task(r):
         cid=r.path_params["candidate_id"]; body=await _json_body(r); source_id=_s(body,"source_id",required=True)
         with v1_session_scope(factory) as s:
             source=s.get(Source,source_id)
             if not source: raise V1NotFoundError(f"source not found: {source_id}")
             if source.candidate_id != cid: raise V1InvariantError("source belongs to another candidate")
-            task=TaskRecord(task_type="evidence_extract",status="queued",candidate_id=cid,source_id=source_id,payload_json=json.dumps({"source_id":source_id},ensure_ascii=False))
-            job=_queue_task_job(s,task)
-            return JSONResponse({"task_id":task.id,"job_id":job.id,"task_status":"queued"})
+            task,job=_find_or_queue_task(s,task_type="evidence_extract",candidate_id=cid,source_id=source_id,payload={"source_id":source_id})
+            return JSONResponse({"task_id":task.id,"job_id":job.id if job else None,"task_status":task.status})
 
     async def list_candidates(r):
         pid=r.path_params["project_id"]
@@ -577,8 +605,7 @@ def install_full_workbench_routes(app, factory, registry, secrets, *, data_dir: 
         return MaterialRepository(s).publish_revision(cid,ids,provenance)
 
     def _queue_media_task(s, *, task_type: str, candidate_id: str, source_id: str, payload: dict[str,Any]) -> TaskRecord:
-        task=TaskRecord(task_type=task_type,status="queued",candidate_id=candidate_id,source_id=source_id,payload_json=json.dumps(payload,ensure_ascii=False,separators=(",",":")))
-        _queue_task_job(s,task)
+        task,_job=_find_or_queue_task(s,task_type=task_type,candidate_id=candidate_id,source_id=source_id,payload=payload)
         return task
 
     def _ingest_candidate_file(s, cid: str, *, raw: bytes, filename: str, media: str, source_kind: str = "resume") -> dict[str, Any]:
@@ -1389,7 +1416,12 @@ def install_full_workbench_routes(app, factory, registry, secrets, *, data_dir: 
         return PlainTextResponse(text,media_type="text/csv; charset=utf-8",headers={"Content-Disposition":f'attachment; filename="contact-list-{pid}.csv"'})
 
     async def backups(_r):
-        p=create_backup(data_dir,database_path);return JSONResponse({"filename":p.name,"size_bytes":p.stat().st_size})
+        # T8 (ADR-0003): hold the backup guard for the whole file operation so
+        # the other carrier's writes are refused instead of racing the copy.
+        guard=getattr(_r.app.state,"backup_guard",None)
+        with (guard.hold("backup") if guard is not None else _nullcontext()):
+            p=create_backup(data_dir,database_path)
+            return JSONResponse({"filename":p.name,"size_bytes":p.stat().st_size})
     async def backup_list(_r):
         root=data_dir/"backups"; root.mkdir(parents=True,exist_ok=True);return JSONResponse({"backups":[{"filename":p.name,"size_bytes":p.stat().st_size} for p in sorted(root.glob("*.zip"),reverse=True)]})
     async def backup_download(r):

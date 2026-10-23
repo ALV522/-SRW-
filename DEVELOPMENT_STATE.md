@@ -218,3 +218,16 @@ S3 落地：`SessionRegistry`（内存一会话签发/校验/CSRF 校验/撤销�
 本地实测：E2E 15/15 OK；源回归 329 OK（6 skipped，零失败）；治理五查 PASS（完整性 362 / release truth / G1 / API 清单 150 / 前端契约 187 符号 / 13 静态 API 路径）。Schema v1_0015、VERSION 1.0.0-alpha.11 未变；GitHub CI = NOT RUN（仅本地执行）。
 
 **相位 2 至此后端+前端+E2E 齐备**；剩余收尾项：offer/阶段等其余写入口 If-Match、`--enforce-sessions` 默认翻转前的双端联验（属相位 3 双载体验收范围）。
+## 2026-10-23: #43 相位 3 本地可跑部分 — 双载体 T1–T10 验收闭环（本地实跑通过）
+
+按 ADR-0003 S6 落地双载体并发验收的本地可跑子集，并补齐两项产品能力：
+
+- **T6 内容级任务去重**：`_find_or_queue_task`（fullworkbench）——同 (类型, 候选人, 源) 的开放任务直接复用，双端触发同一抽取只建一个任务/job（此前键为 `task:{id}`，跨载体不去重）。
+- **T8 备份互锁**：新增 `runtime/backup_guard.py`（可重入持有/释放 + 原因）；备份端点全程持锁；`LocalBoundaryMiddleware` 对变更请求检查持锁状态 → 409 `backup_in_progress`；attach 端点同样拒绝新附着。中间件经 `scope["app"]` 取 Starlette 实例（首版误用 `self.app.state` 拿到内层 ExceptionMiddleware，500——已修）。
+- **loopback 禁走代理**：载体客户端与验收测试统一无代理 opener——本机代理会把已停止的 Core 变成 502 而非连接拒绝（与 #42 Windows 验收轮的代理干扰同源，产品侧一并加固）。
+- **`convergence_tests/test_dual_carrier_acceptance.py` 10 项全过**：T1/T2 跨端双向读写；T3 同令牌双线程并发写 → 一 200 一 412、被拒写入内容与审计无痕；T4 协议重发布后旧决定两端均 stale；T5 关 A 后 Supervisor 存续且 B 继续读写（A 重附）；T6 双端同源抽取单任务单 job；T7 杀 Supervisor → 重派生 → 两端重附、数据保留、旧 Core 不可达；T8 端点持锁证明 + 持锁期间写入/新附着 409、释放后恢复；T9 跨站 Origin/无会话/错令牌(403)/未知附着(404) 全拒；T10 交接导出两端一致（生成时间戳除外）。
+- 测试工程修复：unittest 每方法新实例——跨方法保留的载体句柄必须挂类属性（曾致 T6/T9 用已撤销会话）；Windows 存活探测复用 `workspace_lease.process_alive`（`os.kill(pid,0)` 在 Windows 不可靠）。
+
+本地实测：双载体 10/10 OK；源回归 339 OK（6 skipped，零失败，+10 新测试）；E2E 15/15 OK；治理五查 PASS（完整性 364 / release truth / G1 / API 清单 150 / 前端契约）。Schema v1_0015、VERSION 1.0.0-alpha.11 未变；GitHub CI = NOT RUN（仅本地执行）。
+
+**相位 3 剩余**：T1/T2 的真实 WPF Host 载体对（需负责人 Windows 机器）；Owner Guide 更新；`DUAL_CARRIER_ACCEPTED` 申报条件待双端齐备后评估。

@@ -29,6 +29,10 @@ _STATUS_PATH = "/api/v1/supervisor/status"
 _HEARTBEAT_PATH = "/api/v1/supervisor/heartbeat"
 _DETACH_PATH = "/api/v1/supervisor/detach"
 
+# Loopback traffic must never traverse a corporate proxy: a proxy-aware client
+# turns a dead Supervisor into a confusing 502 instead of connection refused.
+_NO_PROXY_OPENER = urllib.request.build_opener(urllib.request.ProxyHandler({}))
+
 
 class SupervisorUnavailable(RuntimeError):
     """The workspace cannot be served through a Supervisor."""
@@ -76,7 +80,7 @@ def _post(url: str, payload: dict, timeout: float = 10.0) -> dict:
     data = json.dumps(payload).encode("utf-8")
     request = urllib.request.Request(url, data=data, method="POST", headers={"Content-Type": "application/json"})
     try:
-        with urllib.request.urlopen(request, timeout=timeout) as response:
+        with _NO_PROXY_OPENER.open(request, timeout=timeout) as response:
             return json.loads(response.read().decode("utf-8") or "{}")
     except urllib.error.HTTPError as exc:
         detail = exc.read().decode("utf-8", errors="replace")[:200]
@@ -87,7 +91,7 @@ def _post(url: str, payload: dict, timeout: float = 10.0) -> dict:
 
 def _get(url: str, timeout: float = 5.0) -> dict:
     try:
-        with urllib.request.urlopen(url, timeout=timeout) as response:
+        with _NO_PROXY_OPENER.open(url, timeout=timeout) as response:
             return json.loads(response.read().decode("utf-8") or "{}")
     except (urllib.error.URLError, OSError, ValueError) as exc:
         raise SupervisorUnavailable(f"{url} unreachable: {exc}") from exc
@@ -107,6 +111,7 @@ def _spawn_detached(
     frontend_dist: Path | None,
     knowledge_root: Path | None,
     idle_grace_seconds: float,
+    enforce_sessions: bool = False,
 ) -> subprocess.Popen:
     backend_dir = Path(__file__).resolve().parents[2]
     command = [
@@ -126,6 +131,8 @@ def _spawn_detached(
         command += ["--frontend-dist", str(frontend_dist)]
     if knowledge_root is not None:
         command += ["--knowledge-root", str(knowledge_root)]
+    if enforce_sessions:
+        command += ["--enforce-sessions"]
     env = dict(os.environ)
     existing = env.get("PYTHONPATH", "")
     env["PYTHONPATH"] = str(backend_dir) + (os.pathsep + existing if existing else "")
@@ -172,6 +179,7 @@ def ensure_supervisor(
     knowledge_root: Path | None = None,
     idle_grace_seconds: float = 300.0,
     spawn_timeout: float = DEFAULT_SPAWN_TIMEOUT_SECONDS,
+    enforce_sessions: bool = False,
 ) -> SupervisorHandle:
     """Attach to the workspace Supervisor, deriving a detached one when absent.
 
@@ -208,6 +216,7 @@ def ensure_supervisor(
         frontend_dist=frontend_dist,
         knowledge_root=knowledge_root,
         idle_grace_seconds=idle_grace_seconds,
+        enforce_sessions=enforce_sessions,
     )
     _wait_until_ready(base_url, timeout=spawn_timeout)
     handle = _attach(base_url, carrier=carrier, edition=edition)
