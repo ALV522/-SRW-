@@ -14,7 +14,7 @@ from starlette.responses import FileResponse, JSONResponse, Response
 from starlette.background import BackgroundTask
 from starlette.routing import Route
 
-from srw.kernel.errors import V1InvariantError, V1NotFoundError
+from srw.kernel.errors import V1InvariantError, V1NotFoundError, V1RevisionConflict
 from srw.evidence.pipeline import extract_source_claims, persist_source_claims
 from srw.intake.service import CandidateIntakeService
 from srw.modules.candidate.commands import confirm_claim
@@ -23,6 +23,7 @@ from srw.modules.candidate.models import Candidate, Claim, Source
 from srw.modules.candidate.repository import MaterialRepository, get_current_source_ids
 from srw.release import get_release_state
 from srw.modules.decision.commands import make_human_decision, record_verification_note
+from srw.modules.decision.context import get_current_decision_context
 from srw.modules.decision.assessment import get_candidate_assessment
 from srw.modules.protocol.repository import ProtocolRepository
 from srw.runtime.capabilities import CapabilityRegistry
@@ -97,6 +98,29 @@ def _bool(body: dict[str, Any], key: str, *, default: bool = False, required: bo
     if not isinstance(value, bool):
         raise V1RequestValidationError(f"{key} must be a boolean")
     return value
+
+
+def _if_match_token(request: Request) -> str | None:
+    """Optional If-Match precondition (ADR-0003 S2).
+
+    Returns the opaque revision token the client based its edit on, or None
+    when the client sent no precondition. The token is compared with the
+    current token inside the write transaction; a mismatch raises
+    V1RevisionConflict -> HTTP 412 with nothing written.
+    """
+    header = request.headers.get("if-match") or ""
+    token = header.strip()
+    if token.startswith('"') and token.endswith('"') and len(token) >= 2:
+        token = token[1:-1]
+    return token.strip() or None
+
+
+def _enforce_if_match(expected: str | None, current: str) -> None:
+    """Transaction-scoped precondition check: refuse stale writes before any mutation."""
+    if expected is not None and expected != current:
+        raise V1RevisionConflict(
+            f"if-match {expected!r} does not match current revision {current!r}; reload and retry"
+        )
 
 
 def create_v1_app(
@@ -279,8 +303,12 @@ def create_v1_app(
 
     async def update_protocol(request: Request) -> Response:
         body = await _body(request)
+        expected = _if_match_token(request)
         with v1_session_scope(factory) as session:
-            row = ProtocolRepository(session).update_draft(
+            repo = ProtocolRepository(session)
+            if expected is not None:
+                _enforce_if_match(expected, repo.current_token(request.path_params["revision_id"]))
+            row = repo.update_draft(
                 request.path_params["revision_id"],
                 _object(body, "payload"),
                 _object(body, "provenance", default={}),
@@ -288,8 +316,12 @@ def create_v1_app(
             return JSONResponse({"revision_id": row.id, "revision": row.revision, "state": row.state})
 
     async def publish_protocol(request: Request) -> Response:
+        expected = _if_match_token(request)
         with v1_session_scope(factory) as session:
-            row = ProtocolRepository(session).publish(request.path_params["revision_id"])
+            repo = ProtocolRepository(session)
+            if expected is not None:
+                _enforce_if_match(expected, repo.current_token(request.path_params["revision_id"]))
+            row = repo.publish(request.path_params["revision_id"])
             return JSONResponse({"revision_id": row.id, "revision": row.revision, "state": row.state})
 
     async def add_text_candidate_source(request: Request) -> Response:
@@ -580,7 +612,13 @@ def create_v1_app(
     async def verify(request: Request) -> Response:
         body = await _body(request)
         candidate_id = request.path_params["candidate_id"]
+        expected = _if_match_token(request)
         with v1_session_scope(factory) as session:
+            if expected is not None:
+                current = get_current_decision_context(
+                    session, candidate_id, evaluation_policy_revision=evaluation_policy_revision
+                ).hash
+                _enforce_if_match(expected, current)
             record_verification_note(
                 session,
                 candidate_id,
@@ -598,7 +636,13 @@ def create_v1_app(
     async def decide(request: Request) -> Response:
         body = await _body(request)
         candidate_id = request.path_params["candidate_id"]
+        expected = _if_match_token(request)
         with v1_session_scope(factory) as session:
+            if expected is not None:
+                current = get_current_decision_context(
+                    session, candidate_id, evaluation_policy_revision=evaluation_policy_revision
+                ).hash
+                _enforce_if_match(expected, current)
             make_human_decision(
                 session,
                 candidate_id,
@@ -659,6 +703,11 @@ def create_v1_app(
     async def validation_handler(_request: Request, exc: Exception) -> Response:
         return error_response(exc, status_code=422, code="invalid_request")
 
+    async def revision_conflict_handler(_request: Request, exc: Exception) -> Response:
+        # ADR-0003 S2: 412 means the If-Match precondition failed. Nothing was
+        # written and no audit event was produced; the client must reload state.
+        return error_response(exc, status_code=412, code="revision_conflict")
+
     async def provider_not_ready_handler(_request: Request, exc: Exception) -> Response:
         return error_response(exc, status_code=409, code="provider_not_ready")
 
@@ -685,6 +734,7 @@ def create_v1_app(
             V1NotFoundError: not_found_handler,
             V1InvariantError: invariant_handler,
             V1RequestValidationError: validation_handler,
+            V1RevisionConflict: revision_conflict_handler,
             ProviderNotReadyError: provider_not_ready_handler,
             ProviderFailureError: provider_failure_handler,
             ProviderOutputInvalidError: provider_output_handler,

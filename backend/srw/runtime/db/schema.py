@@ -9,7 +9,7 @@ from srw.kernel.clock import utc_now
 from srw.runtime.db.base import V1Base
 from srw.runtime.db.models_registry import import_v1_models
 
-V1_SCHEMA_REVISION = "v1_0014"
+V1_SCHEMA_REVISION = "v1_0015"
 
 
 class V1SchemaMeta(V1Base):
@@ -168,7 +168,7 @@ def create_v1_schema(engine: Engine) -> None:
             session.add(V1SchemaMeta(schema_revision=V1_SCHEMA_REVISION))
             session.commit()
             return
-        if existing.schema_revision in {"v1_0001", "v1_0002", "v1_0003", "v1_0004", "v1_0005", "v1_0006", "v1_0007", "v1_0008", "v1_0009", "v1_0010", "v1_0011", "v1_0012", "v1_0013"}:
+        if existing.schema_revision in {"v1_0001", "v1_0002", "v1_0003", "v1_0004", "v1_0005", "v1_0006", "v1_0007", "v1_0008", "v1_0009", "v1_0010", "v1_0011", "v1_0012", "v1_0013", "v1_0014"}:
             _ensure_v1_0003_columns(engine)
             _ensure_v1_0004_columns(engine)
             _ensure_v1_0006_task_columns(engine)

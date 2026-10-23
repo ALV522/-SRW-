@@ -41,7 +41,7 @@ class LocalWebLauncherTests(unittest.TestCase):
         (self.workspace / "data").mkdir(parents=True)
         with closing(sqlite3.connect(self.workspace / "data" / "srw_v1.db")) as conn:
             conn.execute("CREATE TABLE v1_schema_meta (schema_revision TEXT)")
-            conn.execute("INSERT INTO v1_schema_meta VALUES ('v1_0014')")
+            conn.execute("INSERT INTO v1_schema_meta VALUES ('v1_0015')")
             conn.commit()
         self.assertTrue(self.check())
         self.assertEqual(self.check(reuse=True), [])

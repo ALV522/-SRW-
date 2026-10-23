@@ -17,6 +17,7 @@ from srw.modules.recruitment_intelligence import models as recruitment_intellige
 from srw.modules.work import models as work_models  # noqa: F401
 from srw.modules import fullworkbench as fullworkbench_models  # noqa: F401
 from srw.runtime.jobs import models as job_models  # noqa: F401
+from srw.supervisor import models as supervisor_models  # noqa: F401
 from srw.runtime import settings as runtime_settings  # noqa: F401
 
 

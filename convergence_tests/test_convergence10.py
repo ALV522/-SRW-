@@ -99,7 +99,7 @@ class Convergence10DiagnosticBundleTest(unittest.TestCase):
         with zipfile.ZipFile(io.BytesIO(response.content)) as archive:
             summary = json.loads(archive.read("summary.json"))
         self.assertIn(summary["overall_status"], {"ok", "warning"})
-        self.assertEqual(summary["release"]["schema_revision"], "v1_0014")
+        self.assertEqual(summary["release"]["schema_revision"], "v1_0015")
         self.assertTrue(summary["local_only"])
 
     def test_bundle_does_not_embed_database_or_blob_bytes(self):
@@ -113,7 +113,7 @@ class Convergence10DiagnosticBundleTest(unittest.TestCase):
             "knowledge": [],
         }
         raw = build_privacy_safe_diagnostic_bundle(
-            diagnostics, {"version": "x", "schema_revision": "v1_0014"}
+            diagnostics, {"version": "x", "schema_revision": "v1_0015"}
         )
         with zipfile.ZipFile(io.BytesIO(raw)) as archive:
             summary = json.loads(archive.read("summary.json"))

@@ -1,7 +1,7 @@
 {
   "schema": "srw.v1.release-state.v1",
   "version": "1.0.0-alpha.11",
-  "schema_revision": "v1_0014",
+  "schema_revision": "v1_0015",
   "artifact_profile": "business_convergence_11_source",
   "parent": {
     "version": "1.0.0-alpha10-convergence11",

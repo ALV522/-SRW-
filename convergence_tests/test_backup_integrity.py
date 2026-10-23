@@ -36,7 +36,7 @@ class BackupRestoreIntegrityTest(unittest.TestCase):
         # Windows requires explicit close before unlink, rename and temp cleanup.
         with closing(sqlite3.connect(path)) as db:
             db.execute("CREATE TABLE v1_schema_meta (schema_revision TEXT NOT NULL)")
-            db.execute("INSERT INTO v1_schema_meta VALUES ('v1_0014')")
+            db.execute("INSERT INTO v1_schema_meta VALUES ('v1_0015')")
             db.execute("CREATE TABLE workload (value TEXT NOT NULL)")
             db.execute("INSERT INTO workload VALUES (?)", (value,))
             db.commit()
@@ -62,7 +62,7 @@ class BackupRestoreIntegrityTest(unittest.TestCase):
         blobs.mkdir(parents=True)
         (blobs / "payload").write_bytes(b"private local content")
         archive = create_backup(self.data, source)
-        truth = validate_backup_archive(archive, expected_schema="v1_0014")
+        truth = validate_backup_archive(archive, expected_schema="v1_0015")
         self.assertTrue(truth["manifest_present"])
         self.assertEqual(truth["blob_count"], 1)
         with tempfile.TemporaryDirectory() as td:
@@ -108,14 +108,14 @@ class BackupRestoreIntegrityTest(unittest.TestCase):
         marker = self.data / "pending_restore.json"
         marker.write_text(json.dumps({
             "backup": archive.name, "sha256": hashlib.sha256(archive.read_bytes()).hexdigest(),
-            "schema_revision": "v1_0014",
+            "schema_revision": "v1_0015",
         }))
         with zipfile.ZipFile(archive, "a") as z:
             z.writestr("data/unrelated.txt", "unsafe")
         # Keep outer ZIP hash current; internal allowlist still must reject member.
         marker.write_text(json.dumps({
             "backup": archive.name, "sha256": hashlib.sha256(archive.read_bytes()).hexdigest(),
-            "schema_revision": "v1_0014",
+            "schema_revision": "v1_0015",
         }))
         with patch.object(launcher, "DATA", self.data), patch.object(launcher, "DB", self.live):
             with self.assertRaises(BackupTruthError):
@@ -132,7 +132,7 @@ class BackupRestoreIntegrityTest(unittest.TestCase):
         marker = self.data / "pending_restore.json"
         marker.write_text(json.dumps({
             "backup": archive.name, "sha256": hashlib.sha256(archive.read_bytes()).hexdigest(),
-            "schema_revision": "v1_0014",
+            "schema_revision": "v1_0015",
         }))
         with patch.object(launcher, "DATA", self.data), patch.object(launcher, "DB", self.live):
             restored = launcher.apply_pending_restore()

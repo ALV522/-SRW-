@@ -193,3 +193,14 @@ Chromium E2E 兜底下启动 app.js 按域拆分。2a 抽取三个低耦合叶�
 - **启动器冒烟**：`--supervisor` 实跑通过（派生→附着→租约 edition=supervisor、版本 1.0.0-alpha.11、API 正常）。沙箱在命令结束强杀进程树，跨命令存活性无法在本环境演示；T5/T7 合同由单进程内的真实子进程测试实证。
 
 本地实测：源回归 307 OK（6 skipped，零失败，+14 新测试）；E2E 14/14 OK；治理五查 PASS（完整性 357 / release truth / G1 契约 / API 清单 150 / 前端契约）。Schema v1_0014、VERSION 1.0.0-alpha.11 未变；GitHub CI = NOT RUN（仅本地执行）。
+## 2026-10-23: #43 ADR-0003 相位 2 第一部分 — 事务级 If-Match CAS + Schema v1_0015（本地实跑通过）
+
+按 ADR-0003 相位 2 落地 S2 前半与 Schema 迁移：
+
+**事务级 If-Match CAS（S2）**：新增 `V1RevisionConflict` → HTTP 412 `revision_conflict`（`v1_session_scope` 异常即回滚，结构上保证 412 不产假审计、不写任何状态）。覆盖 4 个重要写入口：协议草稿更新与发布（令牌 = `draft.token`，即修订标识+内容哈希，由协议工作台视图新增 `token` 字段暴露）、人工决定与核实记录（令牌 = 候选人工作台已暴露的 `decision_context_hash`，随协议/材料/策略修订移动）。语义：**发送 If-Match 即事务内强制校验，不发送则行为与今天逐字一致**（前端全量带头属相位 2 收尾，E2E 更新随后）。`convergence_tests/test_revision_cas.py` 5 项：更新生命周期（成功→令牌移动→陈旧 412→内容不变→无 If-Match 放行→垃圾令牌 412）、发布陈旧拒绝、决定的上下文追踪（新材料发布后旧令牌 412）、核实记录 412、以及**412 不产审计**专项断言。
+
+**Schema v1_0015**：新增 `carrier_session` 表（S3 会话记录：attach_id/supervisor_instance_id/edition/carrier/created/last_seen/revoked——令牌永不落盘，只存记录使撤销可审计）；`V1_SCHEMA_REVISION` v1_0014→v1_0015，v1_0014 进入迁移集合，`create_all` 在新旧库上建表；五处权威身份（VERSION_POLICY/PORTABLE_MANIFEST/VERIFICATION_TRUTH/VERIFICATION_INVENTORY/release_state）原子同步；`launch_alpha10.py` 硬编码 `EXPECTED_SCHEMA` 同步（该处曾导致备份恢复测试拒绝新备份，已修）；三处镜像夹具与两处当前状态文档同步。`convergence_tests/test_schema_migration_0015.py` 4 项：v1_0014 旧库迁移后 revision=v1_0015 且新表存在、未知修订仍拒绝、新库直接建表。
+
+本地实测：源回归 316 OK（6 skipped，零失败，+9 新测试）；E2E 14/14 OK；治理五查 PASS（完整性 359 / release truth / G1 / API 清单 150 / 前端契约）。Schema v1_0015、VERSION 1.0.0-alpha.11（VERSION 本身未变，仅 Schema 修订号迁移）；GitHub CI = NOT RUN（仅本地执行）。
+
+**相位 2 剩余**：S3 一次性会话/CSRF/Origin 白名单（carrier_session 表已就位）、offer/阶段等其余写入口的 If-Match、前端 api() 带头 + E2E 更新。

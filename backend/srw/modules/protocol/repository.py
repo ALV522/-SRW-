@@ -136,6 +136,17 @@ class ProtocolRepository:
             {"origin": "fork-current", "forked_from_revision_id": current.id},
         )
 
+    def current_token(self, revision_id: str) -> str:
+        """Opaque If-Match token for ADR-0003 S2: revision identity plus content hash.
+
+        Any successful edit changes the content hash, so a stale token (the
+        draft moved on) is detected without touching the write path.
+        """
+        row = self.session.get(ProtocolRevision, revision_id)
+        if row is None:
+            raise V1NotFoundError(f"protocol revision not found: {revision_id}")
+        return f"{row.id}:{row.content_hash}"
+
     def update_draft(self, revision_id: str, payload: dict, provenance: dict | None = None) -> ProtocolRevision:
         payload = normalize_protocol_payload(payload)
         validate_protocol_payload(payload)

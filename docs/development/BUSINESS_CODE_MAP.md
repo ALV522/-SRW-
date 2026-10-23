@@ -10,7 +10,7 @@
 HTTP 契约层          backend/srw/api/*（app.py 核心 + fullworkbench.py + 8 个辅路由模块，146 条 /api/v1 路由）
 载体 A（Windows）    desktop/SRW.Desktop（WPF/WebView2 Host：派生后端进程、loopback HTTP、工作区租约、日志脱敏）
 载体 B（Browser）    frontend/dist（index.html + app.js + convergence03–08，ES module + window 总线）
-数据                 SQLite（Schema v1_0014）+ Source Blobs + 5×Knowledge + 审计流（modules/audit）
+数据                 SQLite（Schema v1_0015）+ Source Blobs + 5×Knowledge + 审计流（modules/audit）
 ```
 
 宪法约束：业务判断只发生在 Core（D2）；载体不得自建第二套真相（A6）；HTTP 层只做校验/序列化/错误映射（ADR-0002）。

@@ -26,7 +26,7 @@ DB = DATA / "srw_v1.db"
 FRONTEND = ROOT / "frontend" / "dist"
 KNOWLEDGE = ROOT / "knowledge" / "active"
 EXPECTED_VERSION = (ROOT / "VERSION").read_text(encoding="utf-8").strip()
-EXPECTED_SCHEMA = "v1_0014"
+EXPECTED_SCHEMA = "v1_0015"
 
 
 def _sha256(path: Path) -> str:

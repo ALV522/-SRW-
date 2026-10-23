@@ -14,6 +14,7 @@ from srw.modules.protocol.models import Project, ProtocolRevision
 class ProtocolWorkspaceView:
     revision_id: str
     revision: int
+    token: str
     title: str
     brief: dict
     criteria: tuple[dict, ...]
@@ -47,6 +48,7 @@ def _view(row: ProtocolRevision | None) -> ProtocolWorkspaceView | None:
     return ProtocolWorkspaceView(
         row.id,
         row.revision,
+        f"{row.id}:{row.content_hash}",
         str(brief.get("title") or ""),
         brief,
         tuple(payload.get("criteria") or []),
