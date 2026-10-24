@@ -140,6 +140,97 @@ def _ephemeral_port() -> int:
         return sock.getsockname()[1]
 
 
+def _smoke_host_owned_core(root: Path, *, python: Path, env: dict[str, str],
+                           port: int, instance: str, session: str,
+                           token: str, startup_timeout: int) -> None:
+    """Run the actual Host-mode Core with a real *parent-owned* synthetic lease.
+
+    Modern run_local.py deliberately refuses --workspace-lock host when the
+    immediate parent does not own the exact schema-v2 lease. A verifier cannot
+    bypass that security check merely by setting Host identity variables.
+    This parent process stands in for WPF only inside a disposable workspace.
+    """
+    import importlib.util
+
+    lease_path = (root / "backend" / "srw" / "workspace_lease.py").resolve(strict=True)
+    # Load the exact already-manifest-verified source from the candidate,
+    # independent of any site-packages or an external verifier's sys.modules.
+    # This is a standalone module with no package-relative dependencies.
+    spec = importlib.util.spec_from_file_location("_srw_native_candidate_host_lease", lease_path)
+    if spec is None or spec.loader is None:
+        raise PayloadError("embedded backend lease source unavailable")
+    lease_module = importlib.util.module_from_spec(spec)
+    sys.modules[spec.name] = lease_module  # dataclasses resolves __module__ here
+    write_bytecode_before = sys.dont_write_bytecode
+    sys.dont_write_bytecode = True  # NEVER dirty the immutable Native candidate
+    try:
+        spec.loader.exec_module(lease_module)
+    finally:
+        sys.modules.pop(spec.name, None)
+        sys.dont_write_bytecode = write_bytecode_before
+    data = Path(env["RECRUITMENT_DATA_DIR"]).resolve()
+    command = [str(python), "-B", str(root / "scripts" / "run_local.py"),
+               "--host", "127.0.0.1", "--port", str(port),
+               "--edition", "windows", "--workspace-lock", "host"]
+    # The lease owner and Popen parent MUST be the same real process. Do not
+    # synthesize another PID or permit a child to set its own WPF lease.
+    with lease_module.WorkspaceLease(
+        data, edition="windows", port=port,
+        instance_id=instance, session_id=session,
+    ):
+        with tempfile.TemporaryFile(mode="w+b") as stderr:
+            with subprocess.Popen(command, cwd=root, env=env,
+                                  stdin=subprocess.DEVNULL,
+                                  stdout=subprocess.DEVNULL, stderr=stderr) as process:
+                try:
+                    deadline = time.monotonic() + startup_timeout
+                    last_error = None
+                    while time.monotonic() < deadline:
+                        if process.poll() is not None:
+                            # No raw stderr or tokens in public acceptance
+                            # reports. Emit only the recognized failure type.
+                            stderr.seek(0)
+                            diagnostic = stderr.read(16384).decode("utf-8", "replace")
+                            category = ("HOST_WORKSPACE_INVALID" if "HOST_WORKSPACE_INVALID" in diagnostic
+                                        else "BACKEND_STARTUP_ERROR")
+                            raise PayloadError(
+                                f"embedded Windows backend exited before readiness "
+                                f"(exit_code={process.returncode}, category={category})"
+                            )
+                        try:
+                            ready = _probe(f"http://127.0.0.1:{port}/api/v1/runtime/ready", 1)
+                            if ready.get("status") == "ready":
+                                break
+                        except (OSError, URLError, ValueError) as exc:
+                            last_error = type(exc).__name__
+                        time.sleep(0.2)
+                    else:
+                        raise PayloadError("Windows backend did not become ready: " + str(last_error))
+                    info = _probe(f"http://127.0.0.1:{port}/api/v1/runtime/info", 3)
+                    if (info.get("instanceId") != instance or
+                        info.get("sessionId") != session or
+                        info.get("edition") != "windows" or
+                        info.get("runtime") != "desktop"):
+                        raise PayloadError("embedded backend Host ABI identity mismatch")
+                    try:
+                        request = Request(
+                            f"http://127.0.0.1:{port}/api/v1/runtime/shutdown",
+                            data=b"", method="POST", headers={"X-SRW-Session": token},
+                        )
+                        with urlopen(request, timeout=3):
+                            pass
+                    except OSError:
+                        pass
+                finally:
+                    if process.poll() is None:
+                        process.terminate()
+                        try:
+                            process.wait(timeout=6)
+                        except subprocess.TimeoutExpired:
+                            process.kill()
+                            process.wait(timeout=6)
+
+
 def smoke_windows(root: Path, *, startup_timeout: int = 45) -> dict:
     if os.name != "nt":
         raise PayloadError("Windows embedded Python and WPF Host require a real Windows x64 runner")
@@ -180,61 +271,21 @@ def smoke_windows(root: Path, *, startup_timeout: int = 45) -> dict:
             "SRW_BACKGROUND_WORKER": "0",
             "PYTHONDONTWRITEBYTECODE": "1",
         })
-        # The backend is started precisely as the native Host starts it.
-        command = [str(python), "-B", str(root / "scripts" / "run_local.py"),
-                   "--host", "127.0.0.1", "--port", str(port),
-                   "--edition", "windows", "--workspace-lock", "host"]
-        with subprocess.Popen(command, cwd=root, env=env,
-                              stdin=subprocess.DEVNULL,
-                              stdout=subprocess.DEVNULL,
-                              stderr=subprocess.DEVNULL) as process:
-            try:
-                deadline = time.monotonic() + startup_timeout
-                last_error = None
-                while time.monotonic() < deadline:
-                    if process.poll() is not None:
-                        raise PayloadError("embedded Windows backend exited before readiness")
-                    try:
-                        ready = _probe(f"http://127.0.0.1:{port}/api/v1/runtime/ready", 1)
-                        if ready.get("status") == "ready":
-                            break
-                    except (OSError, URLError, ValueError) as exc:
-                        last_error = str(exc)
-                    time.sleep(0.2)
-                else:
-                    raise PayloadError("Windows backend did not become ready: " + str(last_error))
-                info = _probe(f"http://127.0.0.1:{port}/api/v1/runtime/info", 3)
-                if (info.get("instanceId") != instance or
-                    info.get("sessionId") != session or
-                    info.get("edition") != "windows" or
-                    info.get("runtime") != "desktop"):
-                    raise PayloadError("embedded backend Host ABI identity mismatch")
-                try:
-                    request = Request(
-                        f"http://127.0.0.1:{port}/api/v1/runtime/shutdown",
-                        data=b"", method="POST",
-                        headers={"X-SRW-Session": token},
-                    )
-                    with urlopen(request, timeout=3) as response:
-                        pass
-                except OSError:
-                    pass
-                return {
-                    "status": "EMBEDDED_PYTHON_AND_LOOPBACK_BACKEND_SMOKE_PASS",
-                    "python": module_truth["python"],
-                    "modules_imported": sorted(paths),
-                    "backend_identity_verified": True,
-                    "synthetic_workspace": True,
-                    "wpf_webview2_gui_accepted": False,
-                }
-            finally:
-                if process.poll() is None:
-                    process.terminate()
-                    try:
-                        process.wait(timeout=6)
-                    except subprocess.TimeoutExpired:
-                        process.kill()
-                        process.wait(timeout=6)
+        # Stand in for the WPF parent using an actual schema-v2 lease held
+        # across real child startup, HTTP readiness and shutdown. This keeps
+        # the production Host-parent single-writer contract fully enforced.
+        _smoke_host_owned_core(
+            root, python=python, port=port, env=env, instance=instance,
+            session=session, token=token, startup_timeout=startup_timeout,
+        )
+        return {
+            "status": "EMBEDDED_PYTHON_AND_LOOPBACK_BACKEND_SMOKE_PASS",
+            "python": module_truth["python"],
+            "modules_imported": sorted(paths),
+            "backend_identity_verified": True,
+            "synthetic_workspace": True,
+            "wpf_webview2_gui_accepted": False,
+        }
 
 
 def main() -> int:
