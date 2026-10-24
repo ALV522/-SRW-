@@ -12,6 +12,12 @@ import json
 import os
 import subprocess
 import sys
+
+# GUI acceptance verifies an immutable Native extraction. Its own imports must
+# never create unreviewed __pycache__ members before the strict allowlist audit.
+if __name__ == "__main__":
+    sys.dont_write_bytecode = True
+
 import tempfile
 import time
 import zipfile
