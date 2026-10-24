@@ -158,6 +158,72 @@ class PreparedNativeSmokeGateTests(unittest.TestCase):
             verify.assert_not_called()
         self.assertIn("GUI_PENDING", evidence.read_text())
 
+    def test_host_owned_backend_smoke_acquires_parent_lease_and_releases_it(self):
+        """Real OS child / real Core / synthetic DB; no WPF or customer data."""
+        from scripts.verify_prepared_native import _ephemeral_port, _smoke_host_owned_core
+        from knowledge_fixture import create_minimal_knowledge_tree
+        from srw.workspace_lease import ABSENT, inspect_lease
+        source_root = Path(__file__).resolve().parents[1]
+        knowledge = create_minimal_knowledge_tree(self.root / "fixture" / "knowledge" / "active")
+        data = self.root / "synthetic" / "data"
+        port = _ephemeral_port()
+        env = os.environ.copy()
+        env.update({
+            "RECRUITMENT_DATA_DIR": str(data),
+            "RECRUITMENT_KNOWLEDGE_DIR": str(knowledge),
+            "RECRUITMENT_FRONTEND_DIST": str(source_root / "frontend" / "dist"),
+            "RECRUITMENT_EDITION": "windows", "RECRUITMENT_RUNTIME_MODE": "desktop",
+            "RECRUITMENT_INSTANCE_ID": "synthetic-host-smoke",
+            "RECRUITMENT_SESSION_ID": "synthetic-session-smoke",
+            "RECRUITMENT_SESSION_TOKEN": "synthetic-token-not-production",
+            "SRW_BACKGROUND_WORKER": "0", "PYTHONDONTWRITEBYTECODE": "1",
+        })
+        _smoke_host_owned_core(
+            source_root, python=Path(sys.executable), port=port,
+            env=env, instance="synthetic-host-smoke", session="synthetic-session-smoke",
+            token="synthetic-token-not-production", startup_timeout=30,
+        )
+        self.assertEqual(inspect_lease(data).state, ABSENT)
+
+    def test_host_smoke_failure_releases_lease_without_leaking_backend_stderr(self):
+        """A failed real child is BLOCKED and never leaks a private diagnostic."""
+        import subprocess
+        from scripts.verify_prepared_native import _ephemeral_port, _smoke_host_owned_core
+        from srw.workspace_lease import ABSENT, inspect_lease
+        data = self.root / "failure" / "data"
+        original_popen = subprocess.Popen
+
+        def fail_child(_command, **kwargs):
+            return original_popen([
+                sys.executable, "-B", "-c",
+                "import sys;print('PROVIDER_SECRET_DO_NOT_PRINT',file=sys.stderr);sys.exit(41)",
+            ], **kwargs)
+
+        with mock.patch("scripts.verify_prepared_native.subprocess.Popen", side_effect=fail_child):
+            with self.assertRaisesRegex(PayloadError, "exit_code=41") as caught:
+                _smoke_host_owned_core(
+                    Path(__file__).resolve().parents[1], python=Path(sys.executable),
+                    env={**os.environ, "RECRUITMENT_DATA_DIR": str(data)},
+                    port=_ephemeral_port(), instance="failure-instance",
+                    session="failure-session", token="fake-token", startup_timeout=5,
+                )
+        self.assertNotIn("PROVIDER_SECRET", str(caught.exception))
+        self.assertEqual(inspect_lease(data).state, ABSENT)
+
+    def test_host_smoke_process_creation_failure_releases_lease(self):
+        from scripts.verify_prepared_native import _ephemeral_port, _smoke_host_owned_core
+        from srw.workspace_lease import ABSENT, inspect_lease
+        data = self.root / "no-executable" / "data"
+        with mock.patch("scripts.verify_prepared_native.subprocess.Popen", side_effect=OSError("synthetic spawn failure")):
+            with self.assertRaises(OSError):
+                _smoke_host_owned_core(
+                    Path(__file__).resolve().parents[1], python=Path(sys.executable),
+                    env={**os.environ, "RECRUITMENT_DATA_DIR": str(data)},
+                    port=_ephemeral_port(), instance="failure-instance",
+                    session="failure-session", token="fake-token", startup_timeout=5,
+                )
+        self.assertEqual(inspect_lease(data).state, ABSENT)
+
     def _rewrite_runtime_manifest(self):
         (self.root / "PRODUCTION_RUNTIME.sha256").write_text(
             "".join(f"{sha(p)}  {p.relative_to(self.runtime).as_posix()}\n"
