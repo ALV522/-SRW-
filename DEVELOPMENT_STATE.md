@@ -109,7 +109,6 @@ Added E2E-07 against genuine Chromium/C11 API/disposable SQLite: project Protoco
 ## 2026-10-20: P0 #41 fail-closed decision history without active context
 
 A real SQLite and HTTP regression found historical HumanDecision entries falsely represented as both `is_current_context=false` and `stale=false` when no active published Protocol or MaterialRevision could supply a current context hash. The read-only lineage projection now marks those old decisions stale; existing decisions, audit and action permissions stay unchanged. Four synthetic source/API regressions cover both absence cases, active context and real HTTP history. Schema v1_0014 and VERSION unchanged. Base main SHA `54548ee29a78072ff036c5ac19b062e08452ef1e` Source Gate actually executed 174 tests; previous 146 count in inventory was stale, new expected source test count 178 subject to exact-head CI. Browser actual base main CI exercised eight synthetic scenarios, not the old stored seven. No new Windows Native or dual carrier GUI acceptance asserted.
-
 ## 2026-10-21: HTTP 层分解切片 1 — Provider 探测/OCR/ASR 归位 providers 域（本地执行）
 
 按 [ADR-0002](docs/decisions/ADR-0002-http-layer-decomposition.md)（负责人 2026-10-21 批准）启动 HTTP 层分解，首个切片把 `api/fullworkbench.py` 中内联的 Provider 配置投影、能力探测、OCR/ASR 字节处理提取为新域模块 `backend/srw/providers/probing.py`（185 行），HTTP 侧只留 thin adapters；`api/fullworkbench.py` 1714→1642 行，行为与请求/超时/错误映射逐字保持不变，`/api/v1` 路由契约零变更。新增 `convergence_tests/test_provider_probing.py` 16 项（fake secrets/settings + fake httpx 传输，无真实网络、无候选内容），含 GET `/api/v1/settings/providers` 的 HTTP 边界集成测试；此前无任何测试覆盖这三条 Provider 路由，属净增覆盖。Schema v1_0014、VERSION、发行状态不变。**执行方式：经负责人授权仅本地执行（任务分支 `dev/43-http-decomposition-slice1-providers`，不 push、不建 PR、不合入），GitHub CI = NOT RUN。** 本地实测：`python -m unittest discover -s convergence_tests` 252 项 = 247 PASS / 3 skipped（平台门禁）/ 2 FAIL；2 项 FAIL（`test_rejects_symlink_database`、`test_rejects_malicious_host_symlink`）在未改动 main 的干净 worktree 上原样复现，属本机 Windows 临时目录 symlink 权限环境问题，非本次引入。远端 CI 验证与合并待负责人指令，届时按无保护协议走完整 PR 门禁。
@@ -244,3 +243,14 @@ S3 落地：`SessionRegistry`（内存一会话签发/校验/CSRF 校验/撤销�
 对上一条目（正名）的**如实更正**：`82c9cd0` 的三个文件正名当日撤回。根因：`SOURCE_RECOVERY_MANIFEST.sha256` 是 C08 不可变基线，锁定了 `capability_recovery*.py` 三个路径；`check_source_integrity.py` 要求当前清单必须是历史清单的超集——正名后要么丢失历史项（门禁失败，实测 exit=1），要么改写冻结基线（治理违规）。按宪章第 5 条（清单纪律）选择撤回：文件与安装函数名、app.py 接线全部还原（内容本就没动），BUSINESS_CODE_MAP 第 3 项登记为 **BLOCKED 并附域准确名备查**（decision-operations / intelligence / sourcing-import），供未来基线解冻或负责人裁决时使用。`82c9cd0` 中的 DUAL_CARRIER_PLAN M3.1 Owner 文档部分**保留有效**（与正名无关）。
 
 本地实测（撤回后）：源回归 339 OK（6 skipped，零失败）；E2E 15/15 OK；治理五查 PASS（完整性 364 / release truth / G1 / API 清单 150 / 前端契约）。Schema v1_0015、VERSION 1.0.0-alpha.11 未变；GitHub CI = NOT RUN（仅本地执行）。
+
+## 2026-10-25: PR #58 本地 rebase 完成（未推送，仅本地分支）
+
+对已关闭未合并的 PR #58（`feat(P0 #41)` 访谈证据更正，head `50cf8145`，基于旧 main `a20ac8cd`，9 提交/6 文件）完成**本地 rebase**：新分支 `rebase/41-interview-evidence-correction`（基于当前 main `45abc4c`），8 个提交。
+
+- **通道**：本沙箱 git 传输被代理拦截（github.com CONNECT 502 / 直连重置，间歇性），按既有预案改走 GitHub API——逐提交拉取 patch（API patch 字段含标准 hunk 头）、按父子链重建应用顺序；git 对行尾敏感而工作树为 `eol=lf` 纯 LF，补丁保持 LF 即可 `git apply`（CRLF 转换反而失败，已回退）。
+- **保真**：9 个提交中 7 个原样重放（后端特性 1、单测 1、E2E 3、文档 1、清单再生成 1 合并为 manifest 刷新提交）；2 个时代清单提交（`9c5be3ad9a`/`50cf814512`，324-source 时代的 `SOURCE_MANIFEST`）不作文本重放，按工作流再生成（328 项）。净变更与 PR 的 6 文件一致：fullworkbench.py +9、test_event_source_revision.py +6、test_flows.py +41、CAPABILITY_MATRIX.md +6、app.js +8/-2、清单。
+- **本地实测（本分支）**：源回归 236 OK（6 skipped，零失败，含 PR 新增单测）；**Chromium E2E 10/10 OK**（含 PR 的访谈更正真浏览器验收）；release truth / G1 治理契约 PASS；完整性 328 PASS。`check_api_contract.py` 在本分支不存在（该脚本属前端整合后的 dev 分支，main 尚无），按预期跳过。
+- **未推送**（负责人指令：只在本地文件夹开发）。分支留在本地待处置。
+- **合并注意（已写入提交信息）**：本 rebase 以裸 main 为基线（宪章），前端补丁落在单体 `app.js`；与前端整合分支（dev/43-…，app.js 已拆为 15 模块）汇通时，更正 UI 需重映射到 `events.js`/`candidates.js`——已在对应提交信息中标注。
+

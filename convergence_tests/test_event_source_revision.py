@@ -63,6 +63,9 @@ class EventSourceRevisionTests(unittest.TestCase):
     def test_completed_structured_edit_creates_new_source_and_material_revision(self):
         initial = self.add_interview()
         event_id, old_source_id = initial["event_id"], initial["source_id"]
+        listing = self.client.get(f"/api/v1/candidates/{self.cid}/events")
+        self.assertEqual(listing.status_code, 200, listing.text)
+        self.assertTrue(listing.json()["events"][0]["editable_evidence_source"])
         with self.factory() as session:
             old_text = session.get(Source, old_source_id).text_content
             first_revision = session.get(Candidate, self.cid).current_material_revision_id
@@ -173,6 +176,9 @@ class EventSourceRevisionTests(unittest.TestCase):
         })
         self.assertEqual(response.status_code, 200, response.text)
         event_id = response.json()["event_id"]
+        listing = self.client.get(f"/api/v1/candidates/{self.cid}/events")
+        self.assertEqual(listing.status_code, 200, listing.text)
+        self.assertFalse(listing.json()["events"][0]["editable_evidence_source"])
         before = self.snapshot()
         updated = self.client.patch(f"/api/v1/events/{event_id}", json={"notes": "New event note"})
         self.assertEqual(updated.status_code, 200, updated.text)

@@ -1078,8 +1078,17 @@ def install_full_workbench_routes(app, factory, registry, secrets, *, data_dir: 
         cid=r.path_params["candidate_id"]
         with factory() as s:
             rows=s.scalars(select(RecruitmentEvent).where(RecruitmentEvent.candidate_id==cid).order_by(func.coalesce(RecruitmentEvent.scheduled_at,RecruitmentEvent.created_at).desc())).all()
+            linked_ids={x.source_id for x in rows if x.source_id}
+            linked_sources={x.id:x for x in s.scalars(select(Source).where(Source.id.in_(linked_ids))).all()} if linked_ids else {}
+            def editable_event_evidence(x):
+                source=linked_sources.get(x.source_id)
+                if source is None or source.candidate_id!=cid or x.event_state!="completed": return False
+                try: metadata=json.loads(source.metadata_json or "{}")
+                except (ValueError,TypeError): return False
+                return metadata.get("structured") is True and metadata.get("event_id")==x.id
             return JSONResponse({"events":[{
                 "event_id":x.id,"event_type":x.event_type,"title":x.title,"notes":x.notes,"source_id":x.source_id,
+                "editable_evidence_source":editable_event_evidence(x),
                 "metadata":json.loads(x.metadata_json or "{}"),
                 "scheduled_at":x.scheduled_at.isoformat() if x.scheduled_at else None,"duration_minutes":x.duration_minutes,
                 "interviewer":x.interviewer,"location":x.location,"event_state":x.event_state,"outcome":x.outcome,
