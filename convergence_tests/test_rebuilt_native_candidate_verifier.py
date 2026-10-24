@@ -7,6 +7,10 @@ from __future__ import annotations
 
 import hashlib
 import json
+import os
+import shutil
+import subprocess
+import sys
 import tempfile
 import unittest
 from pathlib import Path
@@ -153,6 +157,26 @@ class SourceRebuildVerifierTests(unittest.TestCase):
         self.assertEqual(r["source_git_sha"], self.SHA)
         self.assertFalse(r["wpf_webview2_gui_accepted"])
         self.assertEqual(r["embedded_backend_smoke"], "NOT_RUN")
+
+    def test_cli_imports_do_not_create_unreviewed_pycache_in_candidate(self):
+        """Verifier must not poison a pristine extracted Windows candidate itself.
+
+        Run without -B or PYTHONDONTWRITEBYTECODE, in a separate synthetic
+        source copy. This reproduces exactly five unexpected .pyc files on
+        the unpatched entry point and checks the normal CLI path.
+        """
+        original_scripts = Path(__file__).resolve().parents[1] / "scripts"
+        mirror = self.root.parent / "cli-mirror"
+        shutil.copytree(original_scripts, mirror / "scripts", ignore=shutil.ignore_patterns("__pycache__", "*.pyc"))
+        env = os.environ.copy()
+        env.pop("PYTHONDONTWRITEBYTECODE", None)
+        env.pop("PYTHONPYCACHEPREFIX", None)
+        for entrypoint in ("verify_rebuilt_native.py", "accept_rebuilt_native_gui.py"):
+            with self.subTest(entrypoint=entrypoint):
+                command = [sys.executable, str(mirror / "scripts" / entrypoint), "--help"]
+                outcome = subprocess.run(command, cwd=mirror, env=env, capture_output=True, text=True, timeout=20)
+                self.assertEqual(outcome.returncode, 0, outcome.stderr)
+                self.assertEqual(list(mirror.rglob("*.pyc")), [], "Acceptance scripts must not generate unreviewed members")
 
     def test_unreviewed_payload_file_is_rejected(self):
         (self.root / "secrets.txt").write_bytes(b"NEVER-EXFILTRATE")
