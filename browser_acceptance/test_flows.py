@@ -697,7 +697,7 @@ class RecruitmentBrowserAcceptance(unittest.TestCase):
         self.page.get_by_role("button", name="更正证据记录").click()
         expect(self.page.locator("#corr-notes")).to_have_value("原先面试记录")
         self.page.locator("#corr-notes").fill("更正后的面试记录")
-        self.page.locator("[data-corr-question='0'] .corr-answer").fill("实际为合成回答")
+        self.page.locator('[data-corr-answer="0"]').fill("实际为合成回答")
         self.page.get_by_role("button", name="保存更正并发布新证据").click()
         expect(self.page.locator("#modal-root .modal")).to_have_count(0)
         latest = self.get_json(f"/api/v1/candidates/{cid}/events")["events"][0]
