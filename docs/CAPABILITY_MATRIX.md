@@ -135,3 +135,27 @@ Structured drafts and the concurrent material change use real API fixtures;
 this does not claim that the note-only draft form is a structured judgment editor.
 Exact-SHA results belong to the PR. Windows GUI and dual-carrier acceptance remain
 NOT RUN. Core/API, schema and release identity are unchanged.
+
+## Issue #41: structured reevaluation authoring through the shared client
+
+The existing draft form now supports explicitly selected criteria, proposed
+status/evidence level/reason/gap, and Claim references from current material.
+Unchecked criteria are omitted; no checked criteria retains the note-only path.
+Selections create a draft only. Core computes the diff; the separate preview
+and explicit apply remain required and never create a HumanDecision.
+
+The client lives in `frontend/dist/reevaluation.js`, injected with the existing
+API/modal helpers, shared by Browser and WebView2. No new framework or second
+business rule engine is introduced. Core accepts optional `expected_context_hash`
+on create: supplied mismatches fail with 409 before draft/audit writes; old
+clients omitting it remain compatible. This guards material/protocol changes,
+not concurrent edits of judgments within an unchanged context (not full CAS).
+
+Chromium scenario 14 creates material, human verification and structured draft
+through UI, checks creation does not change the assessment, explicitly applies,
+and checks persisted judgment and unchanged HumanDecision history. It also covers
+stale-editor rejection with inputs retained and the note-only UI path. Only the
+concurrent second-client material change uses an API fixture. Scenario 13 retains
+preview/cancel/escape/both-entry-point coverage. API tests cover stale creation
+and existing legacy draft/apply semantics. Exact-SHA results are linked in the PR;
+Windows GUI, Native, live Providers and dual-carrier acceptance remain NOT RUN.

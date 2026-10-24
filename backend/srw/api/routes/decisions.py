@@ -82,6 +82,8 @@ def reevaluation_routes(*, factory, evaluation_policy_revision: str) -> list[Rou
                 raise V1NotFoundError(f"candidate not found: {cid}")
             context = get_current_decision_context(
                 session, cid, evaluation_policy_revision=evaluation_policy_revision)
+            if "expected_context_hash" in body and body["expected_context_hash"] != context.hash:
+                raise V1InvariantError("material or protocol changed; reopen reevaluation editor")
             current = {x.criterion_key: x for x in session.scalars(
                 select(CriterionJudgment).where(
                     CriterionJudgment.candidate_id == cid,
