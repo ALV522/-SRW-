@@ -87,3 +87,11 @@ py -3.12 .\scripts\accept_rebuilt_native_gui.py `
 GUI 运行中的提示轮询可以等待尚未写完的 JSONL；进程退出后的最终判定必须严格解析本轮日志，要求同一非空 Host session，拒绝损坏的 JSON/UTF-8、缺少身份、跨会话拼接、强制终止、启动重试、关闭请求失败、后端异常和 HTTP 5xx。旧原文日志及新 `backend_http` / `backend_exception` 脱敏格式都须识别。只返回固定错误类别，不输出原始日志内容或会话 ID。
 
 `convergence_tests/test_gui_evidence_fail_closed.py` 用合成 JSONL 验证上述拒绝行为与正常日志兼容性；这是验收器回归，**不是 Windows GUI 实机 PASS**。实际 WPF 工件、完整招聘、备份恢复与双端验收仍须分别执行。
+
+## 2026-10-25：原生候选 c325e8e1dd8d 的五个缓存文件验收阻断（#42）
+
+经操作者真实 Windows 日志确认：完整候选 ZIP 已装配，13 个嵌入式 Python 导入已经 PASS；独立 `VERIFY_BACKEND_WINDOWS.cmd` 第一次运行却得到 `candidate member allowlist mismatch: unexpected=5, missing=0`。使用该工件对应的 `verify_rebuilt_native.py` 在**干净临时目录**运行普通 Python CLI（没有 `-B`），可复现**恰好 5 个** `scripts/__pycache__/*.pyc`：导入 `build_native_from_source_host`、`check_embedded_runtime_compatibility`、`native_payload`、`portable_input_preflight`、`verify_prepared_native` 时 Python 写入缓存。它们并不属于签入的 Source Manifest，因而随后被正确的候选 allowlist 拒绝。
+
+修复：新版 `verify_rebuilt_native.py` 与 `accept_rebuilt_native_gui.py` 在**直接 CLI 执行时、加载任何本地 scripts 模块之前**设定 `sys.dont_write_bytecode=True`，防止验收程序自己污染被验收目录；调用方仍建议使用 `py -3.12 -B`。此修复**不修改** `inspect_rebuilt` 的严格文件白名单、来源哈希、任意 ZIP 内容、Embedded Runtime、Knowledge 或业务规则。专项回归在不传 `-B` 且未设置环境变量的真实子进程里运行两个入口，并要求零个 `.pyc`；对人为新增 `secrets.txt` 的原有拒绝测试仍必须 PASS。程序被导入为模块时不更改整个调用进程的字节码策略。
+
+**已经装配的 c325e8e1dd8d 候选原始 ZIP 不需要重新编译。** 当前离线交付包在修复前产生，操作者可只对旧目录中由首次失败验收生成的临时解压目录进行**保留式改名**（不要删原 ZIP/已有工作区），设置 `$env:PYTHONDONTWRITEBYTECODE = '1'`，再调用原来的 `VERIFY_BACKEND_WINDOWS.cmd`，脚本会从相同未修改 ZIP 解压到新的干净目录、重做完整静态审计与真实嵌入式后端烟测。若目录已经重新命名/不存在，须检查实际路径后再操作。随后 **仅在 backend PASS 时** 运行 `VERIFY_GUI_WINDOWS.cmd`；本项测试和修复绝不代表 WPF GUI 或完整招聘验收已经通过。

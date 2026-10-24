@@ -12,6 +12,12 @@ import os
 import re
 import sys
 import zipfile
+
+# Verification must never alter the audited extraction while importing local
+# scripts. Otherwise our own __pycache__ files fail the exact member allowlist.
+# Set this BEFORE importing any repository package, including scripts itself.
+if __name__ == "__main__":
+    sys.dont_write_bytecode = True
 from pathlib import Path
 
 if __package__ in (None, ""):
