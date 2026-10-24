@@ -109,3 +109,12 @@ Added E2E-07 against genuine Chromium/C11 API/disposable SQLite: project Protoco
 ## 2026-10-20: P0 #41 fail-closed decision history without active context
 
 A real SQLite and HTTP regression found historical HumanDecision entries falsely represented as both `is_current_context=false` and `stale=false` when no active published Protocol or MaterialRevision could supply a current context hash. The read-only lineage projection now marks those old decisions stale; existing decisions, audit and action permissions stay unchanged. Four synthetic source/API regressions cover both absence cases, active context and real HTTP history. Schema v1_0014 and VERSION unchanged. Base main SHA `54548ee29a78072ff036c5ac19b062e08452ef1e` Source Gate actually executed 174 tests; previous 146 count in inventory was stale, new expected source test count 178 subject to exact-head CI. Browser actual base main CI exercised eight synthetic scenarios, not the old stored seven. No new Windows Native or dual carrier GUI acceptance asserted.
+## 2026-10-25: PR #58 本地 rebase 完成（未推送，仅本地分支）
+
+对已关闭未合并的 PR #58（`feat(P0 #41)` 访谈证据更正，head `50cf8145`，基于旧 main `a20ac8cd`，9 提交/6 文件）完成**本地 rebase**：新分支 `rebase/41-interview-evidence-correction`（基于当前 main `45abc4c`），8 个提交。
+
+- **通道**：本沙箱 git 传输被代理拦截（github.com CONNECT 502 / 直连重置，间歇性），按既有预案改走 GitHub API——逐提交拉取 patch（API patch 字段含标准 hunk 头）、按父子链重建应用顺序；git 对行尾敏感而工作树为 `eol=lf` 纯 LF，补丁保持 LF 即可 `git apply`（CRLF 转换反而失败，已回退）。
+- **保真**：9 个提交中 7 个原样重放（后端特性 1、单测 1、E2E 3、文档 1、清单再生成 1 合并为 manifest 刷新提交）；2 个时代清单提交（`9c5be3ad9a`/`50cf814512`，324-source 时代的 `SOURCE_MANIFEST`）不作文本重放，按工作流再生成（328 项）。净变更与 PR 的 6 文件一致：fullworkbench.py +9、test_event_source_revision.py +6、test_flows.py +41、CAPABILITY_MATRIX.md +6、app.js +8/-2、清单。
+- **本地实测（本分支）**：源回归 236 OK（6 skipped，零失败，含 PR 新增单测）；**Chromium E2E 10/10 OK**（含 PR 的访谈更正真浏览器验收）；release truth / G1 治理契约 PASS；完整性 328 PASS。`check_api_contract.py` 在本分支不存在（该脚本属前端整合后的 dev 分支，main 尚无），按预期跳过。
+- **未推送**（负责人指令：只在本地文件夹开发）。分支留在本地待处置。
+- **合并注意（已写入提交信息）**：本 rebase 以裸 main 为基线（宪章），前端补丁落在单体 `app.js`；与前端整合分支（dev/43-…，app.js 已拆为 15 模块）汇通时，更正 UI 需重映射到 `events.js`/`candidates.js`——已在对应提交信息中标注。
