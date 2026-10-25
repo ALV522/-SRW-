@@ -43,6 +43,7 @@ class OfferRouteTests(unittest.TestCase):
             new = Candidate(project_id=project.id, display_name="Too early", pipeline_stage="new")
             session.add_all([ready, new])
             session.flush()
+            self.project_id = project.id
             self.ready_id = ready.id
             self.too_early_id = new.id
 
@@ -143,6 +144,71 @@ class OfferRouteTests(unittest.TestCase):
         noop = self.client.post(endpoint, json={"expected_status": "draft", "status": "draft"})
         self.assertEqual(noop.status_code, 200, noop.text)
         self.assertEqual(self.audit_events("OFFER_STATUS_CHANGED"), [])
+
+    def test_archived_candidate_rejects_new_offer_without_audit_or_row(self):
+        archived = self.client.post(f"/api/v1/candidates/{self.ready_id}/archive")
+        self.assertEqual(archived.status_code, 200, archived.text)
+        denied = self.create_offer(self.ready_id)
+        self.assertEqual(denied.status_code, 409, denied.text)
+        self.assertEqual(denied.json()["error"]["code"], "invariant_conflict")
+        self.assertEqual(self.client.get(f"/api/v1/candidates/{self.ready_id}/offers").json()["offers"], [])
+        self.assertEqual(self.audit_events("OFFER_CREATED"), [])
+        restored = self.client.post(f"/api/v1/candidates/{self.ready_id}/restore")
+        self.assertEqual(restored.status_code, 200, restored.text)
+        self.assertEqual(self.create_offer(self.ready_id).status_code, 200)
+
+    def test_archived_project_rejects_new_offer_and_restoration_allows_it(self):
+        response = self.client.post(f"/api/v1/projects/{self.project_id}/archive")
+        self.assertEqual(response.status_code, 200, response.text)
+        denied = self.create_offer(self.ready_id)
+        self.assertEqual(denied.status_code, 409, denied.text)
+        self.assertEqual(self.audit_events("OFFER_CREATED"), [])
+        restored = self.client.post(f"/api/v1/projects/{self.project_id}/restore")
+        self.assertEqual(restored.status_code, 200, restored.text)
+        self.assertEqual(self.create_offer(self.ready_id).status_code, 200)
+
+    def test_archiving_blocks_existing_offer_transition_but_preserves_history(self):
+        offer = self.create_offer(self.ready_id).json()
+        oid = offer["offer_id"]
+        archived = self.client.post(f"/api/v1/candidates/{self.ready_id}/archive")
+        self.assertEqual(archived.status_code, 200, archived.text)
+        denied = self.client.post(f"/api/v1/offers/{oid}/status", json={
+            "expected_status": "draft", "status": "approved", "reason": "synthetic"})
+        self.assertEqual(denied.status_code, 409, denied.text)
+        self.assertEqual(self.audit_events("OFFER_STATUS_CHANGED"), [])
+        listed = self.client.get(f"/api/v1/candidates/{self.ready_id}/offers").json()["offers"]
+        self.assertEqual([row["status"] for row in listed], ["draft"])
+        self.assertEqual(self.client.post(f"/api/v1/candidates/{self.ready_id}/restore").status_code, 200)
+        accepted = self.client.post(f"/api/v1/offers/{oid}/status", json={
+            "expected_status": "draft", "status": "approved", "reason": "synthetic"})
+        self.assertEqual(accepted.status_code, 200, accepted.text)
+        self.assertEqual(len(self.audit_events("OFFER_STATUS_CHANGED")), 1)
+
+    def test_archived_project_freezes_existing_offer_without_false_audit(self):
+        offer = self.create_offer(self.ready_id).json()
+        oid = offer["offer_id"]
+        archived = self.client.post(f"/api/v1/projects/{self.project_id}/archive")
+        self.assertEqual(archived.status_code, 200, archived.text)
+        rejected = self.client.post(f"/api/v1/offers/{oid}/status", json={
+            "expected_status": "draft", "status": "approved"})
+        self.assertEqual(rejected.status_code, 409, rejected.text)
+        self.assertEqual(self.audit_events("OFFER_STATUS_CHANGED"), [])
+        self.assertEqual(self.client.get(f"/api/v1/candidates/{self.ready_id}/offers")
+                         .json()["offers"][0]["status"], "draft")
+        self.assertEqual(self.client.post(f"/api/v1/projects/{self.project_id}/restore").status_code, 200)
+        advanced = self.client.post(f"/api/v1/offers/{oid}/status", json={
+            "expected_status": "draft", "status": "approved"})
+        self.assertEqual(advanced.status_code, 200, advanced.text)
+        self.assertEqual(len(self.audit_events("OFFER_STATUS_CHANGED")), 1)
+
+    def test_merged_source_candidate_cannot_issue_offer(self):
+        with self.factory.begin() as session:
+            row = session.get(Candidate, self.ready_id)
+            row.merged_into_candidate_id = self.too_early_id
+            row.archived = True
+        denied = self.create_offer(self.ready_id)
+        self.assertEqual(denied.status_code, 409, denied.text)
+        self.assertEqual(self.audit_events("OFFER_CREATED"), [])
 
     def test_unknown_ids_return_not_found(self):
         self.assertEqual(self.client.get("/api/v1/candidates/missing/offers").status_code, 404)
