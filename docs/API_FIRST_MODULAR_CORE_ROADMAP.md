@@ -381,3 +381,11 @@ Windows Host 只保留：Core lifecycle、workspace/session、WebView2、native 
 **R2 进度（2026-10-23，第十四刀）**：settings 3 条路由（设置读取 / provider 连接 / 能力策略）迁出到 `backend/srw/api/routes/settings.py`。`app.py` 271 → **232 行**。
 
 `_choice` 上提为 `request_fields.body_choice` 并从 `app.py` 删除本地定义——它是 422 封套的一部分，与已上提的 `_body/_string/_object/_bool` 同源。写操作归类 40/73（55%），棘轮 35 → 33。新增 `test_settings_routes.py`（5 项），其中"设置面永不回显 API key"与"禁用能力后策略持久为 disabled"是两条安全/一致性断言。
+
+**R4 incremental frontend boundary (#41 / #63)**: reevaluation creation and
+preview/apply move from `app.js` into `reevaluation.js`. The feature receives the
+existing API and UI helpers; it does not implement fetch, diff calculation or
+judgment persistence. Structured authoring uses the existing Core contract plus
+an optional create-time context precondition. Browser scenarios 13/14 protect the
+existing confirmation workflow and new operator input. This is one bounded
+feature extraction, not completion of the shared API-client/frontend roadmap.
