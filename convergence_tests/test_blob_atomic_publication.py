@@ -6,6 +6,9 @@ publication hooks. The actual backup writer (not a mocked ZIP) is exercised.
 from __future__ import annotations
 
 import hashlib
+import os
+import threading
+import time
 import sqlite3
 import tempfile
 import unittest
@@ -82,6 +85,43 @@ class BlobAtomicPublicationTests(unittest.TestCase):
         self.assertEqual(self.store.put(self.raw), self.digest)
         self.assertEqual(self.store.get(self.digest), self.raw)
         self.assertEqual([x for x in self.blobs.rglob("*") if x.is_file()], [self.dest])
+
+    def test_concurrent_same_digest_has_one_publication_and_no_overlapping_replace(self):
+        # Windows rename/open sharing violations surfaced when identical
+        # uploads ran concurrently. Hold the first publication at the final
+        # rename while another put begins. A per-digest lock must prevent
+        # the second writer from racing the check / rename / hash read.
+        first_entered = threading.Event()
+        release_first = threading.Event()
+        second_started = threading.Event()
+        original_replace = os.replace
+        published = []
+
+        def hold_replace(source, target):
+            published.append(Path(target))
+            first_entered.set()
+            if not release_first.wait(2):
+                raise AssertionError("synthetic publisher stalled")
+            return original_replace(source, target)
+
+        def concurrent_put():
+            second_started.set()
+            return self.store.put(self.raw)
+
+        with patch("srw.modules.fullworkbench.os.replace", side_effect=hold_replace):
+            with ThreadPoolExecutor(max_workers=2) as pool:
+                first = pool.submit(self.store.put, self.raw)
+                self.assertTrue(first_entered.wait(2))
+                second = pool.submit(concurrent_put)
+                self.assertTrue(second_started.wait(2))
+                # Old implementation reaches a second os.replace while the
+                # first is blocked; lock-striped code cannot enter it.
+                time.sleep(0.10)
+                release_first.set()
+                self.assertEqual(first.result(timeout=3), self.digest)
+                self.assertEqual(second.result(timeout=3), self.digest)
+        self.assertEqual(published, [self.dest])
+        self.assertEqual(self.dest.read_bytes(), self.raw)
 
     def test_same_content_concurrent_puts_publish_only_complete_bytes(self):
         with ThreadPoolExecutor(max_workers=3) as pool:

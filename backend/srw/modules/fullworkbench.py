@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-import base64, hashlib, json, os, shutil, sqlite3, tempfile, zipfile
+import base64, hashlib, json, os, shutil, sqlite3, tempfile, threading, zipfile
 from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
@@ -98,8 +98,16 @@ class BlobStore:
     def __init__(self, root: Path):
         self.root = Path(root)
         self.root.mkdir(parents=True, exist_ok=True)
+        # One authoritative Core owns one BlobStore for this workspace. A
+        # bounded array of locks serializes only colliding digest slots;
+        # independent resume files still upload in parallel. This prevents
+        # Windows sharing violations between same-digest check and rename.
+        self._publish_locks = tuple(threading.Lock() for _ in range(64))
     def put(self, raw: bytes) -> str:
         digest = hashlib.sha256(raw).hexdigest()
+        with self._publish_locks[int(digest[:2], 16) % len(self._publish_locks)]:
+            return self._put_locked(raw, digest)
+    def _put_locked(self, raw: bytes, digest: str) -> str:
         p = self.root / digest[:2] / digest
         p.parent.mkdir(parents=True, exist_ok=True)
         if p.is_symlink():
