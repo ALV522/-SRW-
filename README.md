@@ -1,5 +1,7 @@
 # SRW · 智能招聘工作台
 
+> **维护入口**：仓库目录职责与当前产品化优先级见 [仓库产品化地图](docs/REPOSITORY_PRODUCTIZATION_MAP.md)；Windows 外部 Runtime/生产 Knowledge 的可恢复性与供应链风险见 [Native 输入保全与独立重建](docs/NATIVE_ARTIFACT_CUSTODY_AND_REPRODUCIBILITY.md)。源码 CI、Native GUI 和正式发布为不同验收层级。
+
 SRW（Smart Recruitment Workbench）是一套 **local-first、evidence-centered、AI-assisted** 的招聘执行工具。它的目标不是把招聘判断自动化，而是把岗位标准、候选人材料、证据核实、面试、人工决定、Offer、联系跟进、Knowledge、AI/OCR/ASR 和备份恢复放进一个可追溯的本地工作区。
 
 当前架构方向已经明确：**一个权威 SRW Core，Windows 与 Local Browser/HTML 只是两个客户端/载体；所有业务能力先进入 Core/API，再由前端调用。** 后续采用 API-first modular monolith 的渐进式重构，不另起新业务内核，不拆微服务，不建立两套数据库，也不为重构更换整套前端框架。详细设计见 [ADR-0002](docs/decisions/ADR-0002-api-first-modular-monolith.md) 与 [API-first 模块化 Core 路线图](docs/API_FIRST_MODULAR_CORE_ROADMAP.md)。

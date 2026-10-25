@@ -95,6 +95,8 @@ AI/OCR/ASR/Knowledge/Parser/Export 等通过代码级 capability/provider abstra
 
 退出条件：一个**具体准确工件**在目标 Windows 上重复通过规定业务与恢复验收，才进入 RC 讨论。
 
+新增阻断：外部历史 Prepared ZIP 是可哈希但不自主供给的单点依赖；必须按 [Native 外部输入保全及独立重建](NATIVE_ARTIFACT_CUSTODY_AND_REPRODUCIBILITY.md) 分 G2 双份灾备、G3 上游独立构建、G4 当前 Windows GUI 与 G5 双端验收推进。公开 Git 不存储生产五库或原始 Runtime ZIP。
+
 ## 7. Track C · 一个 Core、两个正式载体（#43）
 
 此 Track 与 Track A 的 Application/API 边界直接耦合，但不另建 Web Core。
