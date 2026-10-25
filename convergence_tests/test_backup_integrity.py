@@ -71,6 +71,76 @@ class BackupRestoreIntegrityTest(unittest.TestCase):
             self.assertEqual(self.read_db(Path(td) / "data" / "srw_v1.db"), "business-state")
             self.assertEqual((Path(td) / "data" / "blobs" / "aa" / "payload").read_bytes(), b"private local content")
 
+    def test_content_addressed_source_backup_requires_filename_hash(self):
+        source = self.root / "content-address-source.db"
+        self.make_db(source, "correct")
+        raw = b"synthetic applicant resume content"
+        digest = hashlib.sha256(raw).hexdigest()
+        root = self.root / "content-address-blobs"
+        blob = root / digest[:2] / digest
+        blob.parent.mkdir(parents=True)
+        blob.write_bytes(raw)
+        good = self.root / "good-content-address.zip"
+        write_backup_archive(good, source, root)
+        self.assertEqual(validate_backup_archive(good)["blob_count"], 1)
+        # Simulate an interrupted legacy write/corruption before the next
+        # backup scan. The backup must refuse to proclaim new damaged bytes
+        # authoritative simply because it can record their own SHA.
+        blob.write_bytes(b"incomplete source file")
+        corrupt_backup = self.root / "corrupt-source-backup.zip"
+        with self.assertRaisesRegex(BackupTruthError, "content.address|hash mismatch"):
+            write_backup_archive(corrupt_backup, source, root)
+        self.assertFalse(corrupt_backup.exists())
+
+    def test_misplaced_modern_content_address_is_rejected_without_legacy_regression(self):
+        source = self.root / "shard-source.db"
+        self.make_db(source, "candidate evidence")
+        raw = b"synthetic immutable content"
+        digest = hashlib.sha256(raw).hexdigest()
+        wrong_shard = "ff" if digest[:2] != "ff" else "ee"
+        root = self.root / "misplaced-blobs"
+        p = root / wrong_shard / digest
+        p.parent.mkdir(parents=True)
+        p.write_bytes(raw)
+        with self.assertRaisesRegex(BackupTruthError, "shard mismatch"):
+            write_backup_archive(self.root / "wrong-shard.zip", source, root)
+        # Non-hash legacy names are not silently converted to a new format.
+        p.rename(p.with_name("legacy-evidence-attachment"))
+        legacy = self.root / "legacy-named-backup.zip"
+        write_backup_archive(legacy, source, root)
+        self.assertEqual(validate_backup_archive(legacy)["blob_count"], 1)
+
+    def test_self_consistent_forged_manifest_still_rejects_wrong_content_address(self):
+        source = self.root / "forged-source.db"
+        self.make_db(source, "correct")
+        valid_bytes = b"synthetic immutable Source"
+        bad_bytes = b"synthetic forged Source"
+        digest = hashlib.sha256(valid_bytes).hexdigest()
+        source_root = self.root / "sha-blobs"
+        canonical = source_root / digest[:2] / digest
+        canonical.parent.mkdir(parents=True)
+        canonical.write_bytes(valid_bytes)
+        archive = self.root / "valid-content-address.zip"
+        write_backup_archive(archive, source, source_root)
+        with zipfile.ZipFile(archive) as z:
+            original = {name: z.read(name) for name in z.namelist()}
+        target = "data/blobs/" + digest[:2] + "/" + digest
+        manifest = json.loads(original[BACKUP_MANIFEST_NAME])
+        self.assertEqual(len(manifest["blobs"]), 1)
+        manifest["blobs"][0]["sha256"] = hashlib.sha256(bad_bytes).hexdigest()
+        manifest["blobs"][0]["size_bytes"] = len(bad_bytes)
+        forged = self.root / "forged-content-address.zip"
+        with zipfile.ZipFile(forged, "w", zipfile.ZIP_DEFLATED) as z:
+            for name, body in original.items():
+                if name == target:
+                    body = bad_bytes
+                elif name == BACKUP_MANIFEST_NAME:
+                    body = json.dumps(manifest).encode("utf-8")
+                z.writestr(name, body)
+        # A match between member bytes and manifest digest alone is NOT enough.
+        with self.assertRaisesRegex(BackupTruthError, "content.address|hash mismatch"):
+            validate_backup_archive(forged)
+
     def test_modified_member_rejected_even_if_zip_is_valid(self):
         archive = self.make_archive()
         with zipfile.ZipFile(archive) as zip_in:
@@ -87,6 +157,8 @@ class BackupRestoreIntegrityTest(unittest.TestCase):
         legacy = self.backups / "legacy.zip"
         with zipfile.ZipFile(legacy, "w") as z:
             z.write(db, "data/srw_v1.db")
+            # A pre-manifest archive can include historically named sources.
+            z.writestr("data/blobs/ab/legacy-evidence", b"synthetic old source")
         self.assertEqual(validate_backup_archive(legacy)["integrity_level"], "legacy_unmanifested")
         with zipfile.ZipFile(legacy, "a") as z:
             z.writestr("data/private.json", b"not allowed")
