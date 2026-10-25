@@ -110,6 +110,29 @@ def _hash_zip_member(archive: zipfile.ZipFile, name: str) -> tuple[str, int]:
     return h.hexdigest(), size
 
 
+def _content_addressed_blob_digest(member: str) -> str | None:
+    """Recognize modern SHA-256 Source paths without banning legacy names.
+
+    Older SRW backup archives may contain arbitrary Blob filenames and must
+    still be restorable. Only the modern two-level xx/<64 hex> namespace
+    carries an enforceable filename-to-content integrity invariant.
+    """
+    prefix = "data/blobs/"
+    if not member.startswith(prefix):
+        return None
+    segments = member[len(prefix):].split("/")
+    if len(segments) != 2:
+        return None
+    shard, digest = segments
+    hexdigits = frozenset("0123456789abcdef")
+    if (len(shard) != 2 or len(digest) != 64
+            or any(ch not in hexdigits for ch in shard + digest)):
+        return None
+    if digest[:2] != shard:
+        raise BackupTruthError("backup content-addressed Source shard mismatch")
+    return digest
+
+
 def _blob_entries(blobs_root: Path) -> list[dict[str, Any]]:
     rows: list[dict[str, Any]] = []
     if not blobs_root.exists():
@@ -123,9 +146,13 @@ def _blob_entries(blobs_root: Path) -> list[dict[str, Any]]:
         archive_path = f"data/blobs/{relative}"
         if not _archive_path_is_safe(archive_path):
             raise BackupTruthError(f"unsafe blob archive path: {archive_path}")
+        actual_sha = sha256_path(path)
+        named_sha = _content_addressed_blob_digest(archive_path)
+        if named_sha is not None and actual_sha != named_sha:
+            raise BackupTruthError("backup content-addressed Source hash mismatch")
         rows.append({
             "path": archive_path,
-            "sha256": sha256_path(path),
+            "sha256": actual_sha,
             "size_bytes": path.stat().st_size,
         })
     return rows
@@ -236,6 +263,12 @@ def validate_backup_archive(
                     got_hash, got_size = _hash_zip_member(archive, member)
                     if got_hash != wanted_hash or got_size != wanted_size:
                         raise BackupTruthError(f"backup member digest mismatch: {member}")
+                    # A forged/self-consistent manifest must not launder an
+                    # incorrect immutable Source under a SHA-256 filename.
+                    # Arbitrarily named historical Blob files stay accepted.
+                    content_address = _content_addressed_blob_digest(member)
+                    if content_address is not None and got_hash != content_address:
+                        raise BackupTruthError("backup content-addressed Source hash mismatch")
 
             with tempfile.TemporaryDirectory(prefix="srw-backup-truth-") as directory:
                 candidate = Path(directory) / "srw_v1.db"
