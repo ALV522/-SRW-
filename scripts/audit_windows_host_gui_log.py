@@ -22,6 +22,14 @@ FATAL = {"webview_failed", "backend_start_non_retryable", "backend_force_kill",
          "backend_start_retry", "shutdown_request_failed", "backend_exception"}
 HTTP = re.compile(r'"(GET|POST|PATCH|PUT|DELETE) (/[^ ]+) HTTP/1\.[01]" (\d{3})')
 RELEASE_EVENTS = ("frontend_loaded", "host_closed")
+# Host versions since the privacy-preserving BackendOutputPrivacy classifier
+# emit only a route family, method and HTTP status. These labels are stable,
+# nonidentifying categories, NOT exact user actions or endpoint identities.
+REDACTED_MUTATION_METHODS = frozenset({"POST", "PUT", "PATCH", "DELETE"})
+REDACTED_API_FAMILIES = frozenset({
+    "candidate_api", "project_api", "protocol_api", "settings_api",
+    "runtime_api", "other_api",
+})
 
 
 def _status(line: str):
@@ -94,10 +102,29 @@ def inspect(log: Path) -> dict:
     failures: list[str] = []
     issues = set()
     success_requests = Counter()
+    # New WPF builds deliberately suppress all original URLs and applicant IDs
+    # in Host logs. Never claim a specific business endpoint from a route family.
+    # Prefer sanitized records when both old/new formats appear so one action
+    # cannot be double-counted across two log transport representations.
+    structured_http_present = any(row.get("event") == "backend_http" for row in latest)
+    redacted_write_counts = Counter()
     for row in latest:
         failure = record_failure(row)
         if failure:
             failures.append(failure)
+            continue
+        if row.get("event") == "backend_http":
+            details = row.get("details")
+            details = details if isinstance(details, dict) else {}
+            method = details.get("method")
+            route = details.get("route")
+            status = details.get("status")
+            if (isinstance(method, str) and isinstance(route, str)
+                    and method in REDACTED_MUTATION_METHODS
+                    and route in REDACTED_API_FAMILIES
+                    and type(status) is int and 200 <= status < 300):
+                redacted_write_counts[f"{method} {route}"] += 1
+            # No raw values, URIs, IDs or unrecognized route labels are emitted.
             continue
         if row.get("event") != "backend_stdout":
             continue
@@ -106,6 +133,10 @@ def inspect(log: Path) -> dict:
         if parsed is None:
             continue
         method, uri, code = parsed
+        if structured_http_present:
+            # Old Uvicorn access lines may coexist with the structured event.
+            # They are not a second proof of an independent business write.
+            continue
         if code >= 500:
             failures.append("HTTP 5xx in Host session")
         elif code == 404 and uri == "/favicon.ico":
@@ -140,6 +171,8 @@ def inspect(log: Path) -> dict:
         "fatal_log_count": len(failures),
         "malformed_log_lines": malformed,
         "business_operations_http_success": dict(success_requests),
+        "business_http_redacted_write_counts": dict(redacted_write_counts),
+        "redacted_http_family_evidence_only": structured_http_present,
         "nonblocking_issues": sorted(issues),
         "timing": durations,
         "wpf_window_and_frontend_loaded": "frontend_loaded" in events,
