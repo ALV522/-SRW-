@@ -21,6 +21,7 @@ Scope note: the async variant ``/evidence/extract-task`` stays in
 from __future__ import annotations
 
 import json
+import re
 from pathlib import Path
 from time import perf_counter
 
@@ -42,6 +43,7 @@ from srw.modules.ai_runs.service import fail_ai_run, finish_ai_run, start_ai_run
 from srw.modules.candidate.commands import confirm_claim
 from srw.modules.candidate.models import Candidate, Claim, Source
 from srw.modules.candidate.repository import MaterialRepository, get_current_source_ids
+from srw.modules.fullworkbench import BlobStore
 from srw.privacy.service import build_source_privacy_projection, rebind_privacy_safe_proposals
 from srw.providers.contracts import ProviderOutputInvalidError
 from srw.providers.runtime import ProviderRuntime
@@ -53,6 +55,48 @@ def evidence_routes(*, factory, registry, secrets, data_dir: Path) -> list[Route
     """Bind the evidence endpoints to one Core session factory and workspace."""
 
     resolved_data_dir = data_dir  # kept verbatim for the extracted handlers
+    blob_reader = BlobStore(resolved_data_dir / "blobs")
+    # Current file intake max is 20 MiB. Bound memory before reading a verified
+    # snapshot for PDF rendering or an HTTP response.
+    MAX_VERIFIED_SOURCE_BYTES = 20 * 1024 * 1024
+
+    def verified_source_bytes(digest: str) -> bytes:
+        path = resolved_data_dir / "blobs" / digest[:2] / digest
+        if not path.is_file():
+            raise V1NotFoundError("source binary file is missing")
+        try:
+            if path.stat().st_size > MAX_VERIFIED_SOURCE_BYTES:
+                raise V1InvariantError("source binary exceeds 20 MB intake limit")
+            # Return the already hash-checked bytes, not a mutable filename.
+            return blob_reader.get(digest)
+        except V1InvariantError:
+            raise
+        except OSError as exc:
+            raise V1InvariantError("source binary failed integrity check") from exc
+
+    def verified_file_response(request: Request, raw: bytes, media: str, filename: str, path: Path) -> Response:
+        disposition = FileResponse(path, filename=filename,
+                                   content_disposition_type="inline").headers["content-disposition"]
+        headers = {"Content-Disposition": disposition, "Cache-Control": "no-store",
+                   "Accept-Ranges": "bytes"}
+        requested = request.headers.get("range", "")
+        if requested:
+            match = re.fullmatch(r"bytes=(\d*)-(\d*)", requested)
+            if match is None or not any(match.groups()) or not raw:
+                return Response(status_code=416, headers={**headers, "Content-Range": f"bytes */{len(raw)}"})
+            lower, upper = match.groups()
+            if lower:
+                start = int(lower)
+                end = min(int(upper), len(raw) - 1) if upper else len(raw) - 1
+            else:
+                count = int(upper)
+                start = max(0, len(raw) - count)
+                end = len(raw) - 1
+            if start >= len(raw) or start > end:
+                return Response(status_code=416, headers={**headers, "Content-Range": f"bytes */{len(raw)}"})
+            headers["Content-Range"] = f"bytes {start}-{end}/{len(raw)}"
+            return Response(raw[start:end + 1], media_type=media, headers=headers, status_code=206)
+        return Response(raw, media_type=media, headers=headers)
 
     async def add_text_candidate_source(request: Request) -> Response:
         body = await _body(request)
@@ -182,20 +226,17 @@ def evidence_routes(*, factory, registry, secrets, data_dir: Path) -> list[Route
             digest = source.blob_hash.strip().lower()
             if len(digest) != 64 or any(ch not in "0123456789abcdef" for ch in digest):
                 raise V1InvariantError("source blob hash is invalid")
+            raw = verified_source_bytes(digest)
             path = resolved_data_dir / "blobs" / digest[:2] / digest
-            if not path.is_file():
-                raise V1NotFoundError("source binary file is missing")
             import json
             try:
                 metadata = json.loads(source.metadata_json or "{}")
             except Exception:
                 metadata = {}
             filename = str(metadata.get("filename") or metadata.get("original_filename") or source_id) if isinstance(metadata, dict) else source_id
-            return FileResponse(
-                path,
-                media_type=source.media_type or "application/octet-stream",
-                filename=Path(filename).name or source_id,
-                content_disposition_type="inline",
+            return verified_file_response(
+                request, raw, source.media_type or "application/octet-stream",
+                Path(filename).name or source_id, path,
             )
 
     async def source_page_render(request: Request) -> Response:
@@ -221,9 +262,7 @@ def evidence_routes(*, factory, registry, secrets, data_dir: Path) -> list[Route
             digest = source.blob_hash.strip().lower()
             if len(digest) != 64 or any(ch not in "0123456789abcdef" for ch in digest):
                 raise V1InvariantError("source blob hash is invalid")
-            path = resolved_data_dir / "blobs" / digest[:2] / digest
-            if not path.is_file():
-                raise V1NotFoundError("source binary file is missing")
+            raw = verified_source_bytes(digest)
             locator = None
             if claim_id:
                 claim = session.get(Claim, claim_id)
@@ -246,7 +285,7 @@ def evidence_routes(*, factory, registry, secrets, data_dir: Path) -> list[Route
             except ImportError as exc:
                 raise V1InvariantError("PyMuPDF is unavailable for PDF page rendering") from exc
             try:
-                with fitz.open(path) as document:
+                with fitz.open(stream=raw, filetype="pdf") as document:
                     if page_number > len(document):
                         raise V1NotFoundError(f"PDF page not found: {page_number}")
                     page = document.load_page(page_number - 1)
