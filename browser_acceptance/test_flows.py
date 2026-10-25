@@ -970,7 +970,6 @@ class RecruitmentBrowserAcceptance(unittest.TestCase):
         self.assertEqual(self.get_json(f"/api/v1/candidates/{cid}/decision-history"), decisions)
         self.assertFalse(self.console_errors, self.console_errors)
 
-
     def test_14_structured_reevaluation_created_and_applied_through_ui(self) -> None:
         pid = self.new_project("结构化复评")
         self.page.locator(".tabs").get_by_role("button", name="建岗与标准").click()
