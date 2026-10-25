@@ -53,3 +53,21 @@ py -3.12 D:\SRW\source\scripts\audit_windows_host_gui_log.py `
 审计器现增加 `business_http_redacted_write_counts`：仅按固定白名单的 HTTP **写方法 × 脱敏路由族**统计 2xx 成功记录；若同一会话还包含旧访问行，优先使用结构化事件、**不重复计数**。其他未识别字段/方法/路由均不可直接写入验收 JSON，从而避免恶意或异常日志内容泄露。历史 `business_operations_http_success` 仅在无结构化记录时保留精确已知旧端点统计，用于历史日志兼容。
 
 **严格限制**：`POST candidate_api` 等分类不能区分新增候选人、上传简历或其它业务动作，`PATCH protocol_api` 也不能单独证明发布、Decision stale 或人工复核；这些计数不能算作完整招聘流程 PASS。尤其 Native GUI 的基础导航/正常退出与招聘业务完整执行属于不同验收层级，仍需要真实窗口操作、持续化结果、重启、备份恢复及独立人工证据。
+
+## Native embedded Python 的合成业务回归（#42；独立于 WPF UI 验收）
+
+新增 `scripts/accept_native_business.py` 为 **Native 已装配候选** 的独立源代码/嵌入式 Python 回归工具。它先通过 `inspect_rebuilt` 严格核对完整候选目录及原始 ZIP 的指定 SHA-256，再使用该 ZIP 内的 `runtime/python.exe -I -B` 执行六组现有 Core 回归：岗位与准则、候选人/人工决定、面试/独立 Scorecard、Offer 人工转换、复评上下文 CAS、真实 Core 关闭/重启/损坏恢复拒绝。所有测试只处理其自建的临时 SQLite/Source/Knowledge 合成数据，输出仅含固定测试组名、通过数和候选 SHA 的聚合 JSON。
+
+**不同证据等级**：脚本的状态 `NATIVE_EMBEDDED_BUSINESS_SOURCE_REGRESSIONS_PASS_UI_NOT_EVALUATED` 只说明 *当前 ZIP 自带* 的内嵌 Windows Python 执行了被选定的业务 Core 测试且所有结果成功。它**不操作真实 WPF 控件**，不证明 Windows WebView2 实际招聘全过程、人类点击路径、真实 Provider/OCR/ASR、工作区升级、双端同时写入或发行质量。不能因为这个脚本通过而改写已有 GUI 验收报告或宣布 RC。
+
+在目标 Windows x64 电脑运行时，使用**本次候选 ZIP 对应源码或受审查的独立验证脚本**，将证据文件放在候选根目录之外，且必须为从未存在的新路径：
+
+```powershell
+& py -3.12 'D:\SRW\reviewed-source\scripts\accept_native_business.py' `
+  --root 'D:\SRW\synthetic-accept-0cbd-001\candidate-extracted' `
+  --zip 'D:\SRW\synthetic-accept-0cbd-001\SRW_C11_0cbd_UNVERIFIED_GUI.zip' `
+  --expected-zip-sha256 'f01a5da88ba5c306608bcbe0a50b0a3cfa1a40cf52d62a40534a5e75e55f4962' `
+  --evidence 'D:\SRW\synthetic-accept-0cbd-001\synthetic-evidence\business-unique.json'
+```
+
+以上路径仅为该次已核验的 0cbd 候选的**示例**，运行前须确认目录、哈希和验证器来源准确匹配。验证器与相关 `scripts/` 依赖必须来自受审查的同一源码快照，不得直接复制进正在被验证的 `candidate-extracted` 目录，否则破坏严格文件白名单。CLI 仅 Windows 可执行 Native 验收；Linux/Ubuntu Source CI 的同套回归只记为源码级合同测试，不会输出 Native Windows 通过声明。脚本按组失败关闭：缺少/跳过/失败用例、篡改或更换 ZIP、损坏输出以及已有验收文件都会被拒绝。
