@@ -157,6 +157,8 @@ class BackupRestoreIntegrityTest(unittest.TestCase):
         legacy = self.backups / "legacy.zip"
         with zipfile.ZipFile(legacy, "w") as z:
             z.write(db, "data/srw_v1.db")
+            # A pre-manifest archive can include historically named sources.
+            z.writestr("data/blobs/ab/legacy-evidence", b"synthetic old source")
         self.assertEqual(validate_backup_archive(legacy)["integrity_level"], "legacy_unmanifested")
         with zipfile.ZipFile(legacy, "a") as z:
             z.writestr("data/private.json", b"not allowed")
