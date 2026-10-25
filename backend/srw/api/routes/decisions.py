@@ -21,7 +21,7 @@ from __future__ import annotations
 
 import json
 
-from sqlalchemy import select
+from sqlalchemy import func, select
 from starlette.requests import Request
 from starlette.responses import JSONResponse
 from starlette.routing import Route
@@ -29,6 +29,7 @@ from starlette.routing import Route
 from srw.api.http_utils import json_body, s_field
 from srw.kernel.clock import utc_now
 from srw.kernel.errors import V1InvariantError, V1NotFoundError
+from srw.modules.audit.models import AuditEvent
 from srw.modules.audit.repository import append_audit_event
 from srw.modules.candidate.models import Candidate
 from srw.modules.decision.commands import record_assessment
@@ -48,6 +49,25 @@ def judgment_payload(session, row) -> dict:
     return {"criterion_key": row.criterion_key, "status": row.status,
             "evidence_level": row.evidence_level, "reason": row.reason, "gap": row.gap,
             "claim_ids": claim_ids}
+
+
+def judgment_revision(session, row) -> dict | None:
+    """Durable per-criterion edit token, including same-value ABA writes.
+
+    The audit event count advances every time record_assessment writes an
+    assessment, even if all visible fields return to the previous values.
+    The row identity and timestamp additionally reject recreation and edits
+    made outside the usual write path. These are not HTTP authentication tokens.
+    """
+    if row is None:
+        return None
+    count = session.scalar(select(func.count(AuditEvent.id)).where(
+        AuditEvent.entity_type == "criterion_judgment",
+        AuditEvent.entity_id == row.id,
+        AuditEvent.event_type == "CRITERION_JUDGMENT_RECORDED",
+    )) or 0
+    return {"judgment_id": row.id, "updated_at": row.updated_at.isoformat(),
+            "write_count": int(count)}
 
 
 def reevaluation_routes(*, factory, evaluation_policy_revision: str) -> list[Route]:
@@ -133,7 +153,12 @@ def reevaluation_routes(*, factory, evaluation_policy_revision: str) -> list[Rou
                 if "claim_ids" in item:
                     fields += ("claim_ids",)
                 if any(before_view.get(k) != after.get(k) for k in fields):
-                    diff.append({"criterion_key": key, "before": before_view, "after": after})
+                    # Persist the server-observed CURRENT-context revision, not
+                    # the cross-context display baseline. An absent current row
+                    # is itself a precondition; any concurrent first write
+                    # makes this draft stale even if its visible value matches.
+                    diff.append({"criterion_key": key, "before": before_view, "after": after,
+                                 "expected_current_revision": judgment_revision(session, current.get(key))})
             draft = ReevaluationDraft(
                 candidate_id=cid, summary=s_field(body, "summary"),
                 proposal_json=json.dumps(proposal, ensure_ascii=False),
@@ -156,6 +181,10 @@ def reevaluation_routes(*, factory, evaluation_policy_revision: str) -> list[Rou
     async def reevaluation_apply(request: Request) -> JSONResponse:
         did = request.path_params["draft_id"]
         with v1_session_scope(factory) as session:
+            # Reserve the one SQLite writer BEFORE reading the draft and its
+            # judgment revisions. This prevents two clients from interleaving
+            # a revision check and the authoritative assessment update.
+            session.connection().exec_driver_sql("BEGIN IMMEDIATE")
             draft = session.get(ReevaluationDraft, did)
             if not draft:
                 raise V1NotFoundError(f"draft not found: {did}")
@@ -181,6 +210,16 @@ def reevaluation_routes(*, factory, evaluation_policy_revision: str) -> list[Rou
                     CriterionJudgment.candidate_id == draft.candidate_id,
                     CriterionJudgment.decision_context_hash == context.hash)
             ).all()
+            current_by_key = {row.criterion_key: row for row in before_rows}
+            for change in diff:
+                if ("expected_current_revision" not in change
+                        or judgment_revision(session, current_by_key.get(change["criterion_key"]))
+                        != change["expected_current_revision"]):
+                    draft.state = "stale"
+                    return JSONResponse({
+                        "draft_id": draft.id, "state": "stale",
+                        "detail": "judgment changed since the reevaluation draft; recreate draft",
+                    }, status_code=409)
             before_payload = [judgment_payload(session, row) for row in before_rows]
             session.add(EvaluationSnapshot(
                 candidate_id=draft.candidate_id, project_id=context.project_id,
