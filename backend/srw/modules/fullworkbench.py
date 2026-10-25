@@ -142,7 +142,19 @@ class BlobStore:
             Path(pending).unlink(missing_ok=True)
         return digest
     def get(self, digest: str) -> bytes:
-        return (self.root/digest[:2]/digest).read_bytes()
+        # The digest, not a caller-supplied filename, is Source identity.
+        # In particular, an OCR/ASR job must never consume bytes altered
+        # after the original evidence was recorded in the database.
+        if (not isinstance(digest, str) or len(digest) != 64
+                or any(ch not in "0123456789abcdef" for ch in digest)):
+            raise OSError("invalid Source blob content address")
+        p = self.root / digest[:2] / digest
+        if p.is_symlink():
+            raise OSError("corrupt Source blob: symbolic-link content address")
+        raw = p.read_bytes()
+        if hashlib.sha256(raw).hexdigest() != digest:
+            raise OSError("corrupt Source blob: content hash mismatch")
+        return raw
 
 
 class KnowledgeService:

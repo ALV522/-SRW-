@@ -80,6 +80,16 @@ class BlobAtomicPublicationTests(unittest.TestCase):
             self.store.put(self.raw)
         self.assertEqual(self.dest.read_bytes(), b"truncated legacy partial")
 
+    def test_read_rejects_corrupt_existing_source_before_downstream_provider(self):
+        # OCR/ASR/Evidence read through BlobStore.get. A tampered Source must
+        # never be returned as if it still matched the immutable digest.
+        self.assertEqual(self.store.put(self.raw), self.digest)
+        self.assertEqual(self.store.get(self.digest), self.raw)
+        self.dest.write_bytes(b"tampered synthetic source")
+        with self.assertRaisesRegex(OSError, "corrupt|mismatch"):
+            self.store.get(self.digest)
+        self.assertEqual(self.dest.read_bytes(), b"tampered synthetic source")
+
     def test_duplicate_put_is_idempotent_and_matches_content_hash(self):
         self.assertEqual(self.store.put(self.raw), self.digest)
         self.assertEqual(self.store.put(self.raw), self.digest)
