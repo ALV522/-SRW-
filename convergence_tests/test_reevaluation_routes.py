@@ -234,5 +234,93 @@ class ReevaluationRouteTests(unittest.TestCase):
         self.assertEqual(response.json()['diff'], [])
 
 
+
+    def test_same_context_judgment_edit_rejects_stale_draft_without_false_audit(self):
+        from srw.modules.audit.models import AuditEvent
+        from srw.modules.decision.models import CriterionJudgment
+        from srw.modules.decision.commands import record_assessment
+        old, newer = self.seed_evidence_assessment()
+        draft = self.create_draft(status='partial', reason='operator A proposal', claim_ids=[newer]).json()
+        self.assertEqual(len(draft['diff']), 1)
+        with self.factory.begin() as session:
+            record_assessment(session, self.cid, CRITERION, status='not_met', evidence_level='weak',
+                              reason='operator B concurrent update', gap='real gap', claim_ids=[old],
+                              actor='human:B', evaluation_policy_revision='policy.v1')
+        result = self.client.post(f"/api/v1/reevaluations/{draft['draft_id']}/apply")
+        self.assertEqual(result.status_code, 409, result.text)
+        with self.factory() as session:
+            row = session.scalar(select(CriterionJudgment).where(CriterionJudgment.candidate_id == self.cid))
+            self.assertEqual((row.status, row.reason), ('not_met', 'operator B concurrent update'))
+            self.assertEqual(session.get(ReevaluationDraft, draft['draft_id']).state, 'stale')
+            self.assertEqual(session.scalars(select(EvaluationSnapshot)).all(), [])
+            self.assertEqual(session.scalars(select(AuditEvent).where(
+                AuditEvent.event_type == 'REEVALUATION_APPLIED')).all(), [])
+
+    def test_same_value_aba_mutation_invalidates_old_draft(self):
+        from srw.modules.decision.models import CriterionJudgment
+        from srw.modules.decision.commands import record_assessment
+        old, newer = self.seed_evidence_assessment()
+        draft = self.create_draft(status='partial', reason='new proposal', claim_ids=[newer]).json()
+        for status in ('not_met', 'met'):
+            with self.factory.begin() as session:
+                record_assessment(session, self.cid, CRITERION, status=status, evidence_level='strong',
+                                  reason='', gap='', claim_ids=[old], actor='human:B',
+                                  evaluation_policy_revision='policy.v1')
+        result = self.client.post(f"/api/v1/reevaluations/{draft['draft_id']}/apply")
+        self.assertEqual(result.status_code, 409, result.text)
+        with self.factory() as session:
+            row = session.scalar(select(CriterionJudgment).where(CriterionJudgment.candidate_id == self.cid))
+            self.assertEqual(row.status, 'met')
+            self.assertEqual(session.scalars(select(EvaluationSnapshot)).all(), [])
+
+    def test_new_current_context_judgment_after_draft_invalidates_it(self):
+        from srw.modules.decision.commands import record_assessment
+        from srw.modules.decision.models import CriterionJudgment
+        draft = self.create_draft(reason='first proposal').json()
+        with self.factory.begin() as session:
+            record_assessment(session, self.cid, CRITERION, status='conflict', evidence_level='none',
+                              reason='new separate judgment', gap='', claim_ids=[], actor='human:B',
+                              evaluation_policy_revision='policy.v1')
+        result = self.client.post(f"/api/v1/reevaluations/{draft['draft_id']}/apply")
+        self.assertEqual(result.status_code, 409, result.text)
+        with self.factory() as session:
+            row = session.scalar(select(CriterionJudgment).where(CriterionJudgment.candidate_id == self.cid))
+            self.assertEqual(row.status, 'conflict')
+
+
+
+    def test_legacy_diff_without_revision_guard_fails_closed(self):
+        from srw.modules.decision.models import CriterionJudgment
+        draft = self.create_draft(reason='old client proposal').json()
+        with self.factory.begin() as session:
+            saved = session.get(ReevaluationDraft, draft['draft_id'])
+            changes = json.loads(saved.diff_json)
+            self.assertIn('expected_current_revision', changes[0])
+            del changes[0]['expected_current_revision']
+            saved.diff_json = json.dumps(changes)
+        result = self.client.post(f"/api/v1/reevaluations/{draft['draft_id']}/apply")
+        self.assertEqual(result.status_code, 409, result.text)
+        with self.factory() as session:
+            self.assertEqual(session.get(ReevaluationDraft, draft['draft_id']).state, 'stale')
+            self.assertEqual(session.scalars(select(CriterionJudgment)).all(), [])
+            self.assertEqual(session.scalars(select(EvaluationSnapshot)).all(), [])
+
+    def test_note_only_draft_remains_compatible_after_other_judgment_edit(self):
+        from srw.modules.decision.commands import record_assessment
+        from srw.modules.decision.models import CriterionJudgment
+        draft = self.client.post(f'/api/v1/candidates/{self.cid}/reevaluations',
+                                 json={'summary': 'note-only', 'proposal': {'note': 'no judgment edits'}}).json()
+        with self.factory.begin() as session:
+            record_assessment(session, self.cid, CRITERION, status='conflict', evidence_level='none',
+                              reason='separate update', gap='', claim_ids=[], actor='human:B',
+                              evaluation_policy_revision='policy.v1')
+        result = self.client.post(f"/api/v1/reevaluations/{draft['draft_id']}/apply")
+        self.assertEqual(result.status_code, 200, result.text)
+        self.assertEqual(result.json()['applied_changes'], 0)
+        with self.factory() as session:
+            row = session.scalar(select(CriterionJudgment))
+            self.assertEqual(row.reason, 'separate update')
+
+
 if __name__ == "__main__":
     unittest.main()
