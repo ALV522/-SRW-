@@ -28,10 +28,15 @@ class BlobAtomicPublicationTests(unittest.TestCase):
         self.digest = hashlib.sha256(self.raw).hexdigest()
         self.dest = self.blobs / self.digest[:2] / self.digest
         self.db = self.root / "snapshot.db"
-        with sqlite3.connect(self.db) as connection:
+        connection = sqlite3.connect(self.db)
+        try:
             connection.execute("CREATE TABLE v1_schema_meta (schema_revision TEXT NOT NULL)")
             connection.execute("INSERT INTO v1_schema_meta VALUES ('v1_0014')")
             connection.commit()
+        finally:
+            # sqlite3's transaction context manager does not close the handle;
+            # Windows must release it before TemporaryDirectory.cleanup().
+            connection.close()
 
     def test_backup_during_publication_cannot_observe_half_blob_or_staging(self):
         import os
