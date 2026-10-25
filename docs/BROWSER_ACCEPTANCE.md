@@ -81,3 +81,20 @@ Stabilisation direction (not yet implemented, needs its own PR with a browser re
 - Where a count assertion is unavoidable, first wait for the request that creates the row to settle, then assert the count.
 
 Until that PR lands, treat a lone `1 != 2` on this test as a known flake **only after** confirming the same tree passed on the PR head or on a rerun; never fold it into a PASS claim without that evidence.
+
+## Same test, second occurrence — and the fix (2026-10-25)
+
+`test_07` reddened main `e663a383fe5e73571244ac0f990dd91fac7d6631` again with `AssertionError: 1 != 2`, this time on a **docs-only PR (#102, +89/−1)**, so the merge provably introduced no behavioural change.
+
+Root cause is different from the 2026-10-21 occurrence and worth separating:
+
+- the failing assertions were `len(draft.criteria) == 2` and `len(current.criteria) == 2`, read through the test process immediately after a UI save;
+- the test deliberately installs a fetch shim that **delays the next draft PATCH by 300 ms** to prove the publish button is usable while a write is in flight. That delay widens exactly the window in which a single read can sample pre-write state;
+- Playwright's `expect(...).to_have_count()` retries, so row-count assertions were never the problem here; plain `assertEqual` on a freshly fetched JSON body does not retry.
+
+Fix shipped in the same PR as this note: `wait_for_json(path, predicate, timeout=8s)` polls the durable server state and fails with the last payload when the state never arrives. The assertion is not relaxed — a draft that permanently holds one criterion still fails, but the failure now says so explicitly instead of printing `1 != 2`.
+
+Verification on the exact patch: `test_07` 3/3 consecutive passes; full browser suite 13/13 in 24.7 s locally.
+
+Rule for future acceptance steps: **after a mutating UI action, never sample a JSON body once and assert a count.** Either await the specific response, or poll the durable state with a bounded timeout that reports the payload.
+
