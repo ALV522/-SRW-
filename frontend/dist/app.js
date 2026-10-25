@@ -226,7 +226,7 @@ function restoreBannerHtml(){
   if(status==='pending'){
     return `<div class="restore-banner" id="restore-banner"><div class="restore-banner-title">已排程下次启动恢复</div><div class="restore-banner-body">重启时会用所选备份覆盖当前数据库，<strong>排程之后录入或修改的内容可能全部丢失</strong>。</div><div class="actions"><button class="btn small danger" onclick="cancelPendingRestore()">取消待恢复计划</button><button class="btn small" onclick="go('settings')">查看设置</button></div></div>`;
   }
-  return `<div class="restore-banner" id="restore-banner"><div class="restore-banner-title">无法确认恢复状态</div><div class="restore-banner-body">诊断接口不可用，<strong>不要假定当前没有待恢复计划</strong>。</div><div class="actions"><button class="btn small" onclick="refreshRestoreStatus()">重试</button></div></div>`;
+  return `<div class="restore-banner" id="restore-banner"><div class="restore-banner-title">无法确认恢复状态</div><div class="restore-banner-body">诊断接口不可用或返回异常，<strong>不要假定当前没有待恢复计划</strong>。</div><div class="actions"><button class="btn small" onclick="refreshRestoreStatus()">重试</button></div></div>`;
 }
 function paintRestoreBanner(){
   const host=$('#restore-banner-host'); if(!host)return;
@@ -234,10 +234,17 @@ function paintRestoreBanner(){
   if(!$('#restore-banner'))host.innerHTML='';
 }
 async function refreshRestoreStatus(){
+  // Fail-closed classification. Only a literal boolean may clear the warning:
+  // a 200 that omits the field, returns null, or sends a truthy string must not
+  // be read as "safe", because "clear" hides the one alert protecting the user
+  // from a restart that overwrites their recent work.
+  let next='unknown';
   try{
     const d=await api('/api/v1/system/diagnostics');
-    state.restoreStatus=d.pending_restore?'pending':'clear';
-  }catch(e){ state.restoreStatus='unknown'; }
+    if(d&&d.pending_restore===true)next='pending';
+    else if(d&&d.pending_restore===false)next='clear';
+  }catch(e){ next='unknown'; }
+  state.restoreStatus=next;
   paintRestoreBanner();
 }
 window.cancelPendingRestore=async()=>{
