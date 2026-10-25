@@ -171,10 +171,3 @@ concurrent second-client material change uses an API fixture. Scenario 13 retain
 preview/cancel/escape/both-entry-point coverage. API tests cover stale creation
 and existing legacy draft/apply semantics. Exact-SHA results are linked in the PR;
 Windows GUI, Native, live Providers and dual-carrier acceptance remain NOT RUN.
-
-
-## #112 · Content-addressed Source Blob atomic publication (Track A, 2026-10-25)
-
-Source/简历附件的 `BlobStore.put` 必须先在 Blob 根目录之外的同文件系统暂存区完成写入和 fsync，再通过原子替换发布到以 SHA-256 命名的最终路径。备份遍历 `data/blobs` 时不得读取部分写入的暂存文件。已有相同哈希路径若内容损坏，必须显式失败，不能把它冒充已保存成功；本修复不会自动修复历史损坏文件或保障任意历史备份已完整。
-
-`convergence_tests/test_blob_atomic_publication.py` 使用临时合成字节、真实备份归档和确定性注入，覆盖发布窗口、失败清理、旧损坏条目、重复存储以及并行同哈希写入。此次不新增备份全局锁、不改变 pending_restore 的现有契约、不更改 Schema/版本/Windows Host；实际 Windows Native 新工件和真实双载体验收须独立提供证据。
