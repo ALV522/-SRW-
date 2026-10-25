@@ -3,7 +3,7 @@ const state={page:'dashboard',projects:[],projectId:null,projectTab:'overview',c
 const materialDrafts=new Map();
 const $=s=>document.querySelector(s); const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const fmt=n=>new Intl.NumberFormat('zh-CN').format(Number(n||0));
-async function api(path,opts={}){const r=await fetch(path,{headers:{'Content-Type':'application/json',...(opts.headers||{})},...opts});let body;const ct=r.headers.get('content-type')||'';body=ct.includes('json')?await r.json():await r.text();if(!r.ok){const msg=body?.detail||body?.error?.code||String(body);throw new Error(msg)}return body}
+const api=(path,opts)=>window.srwApi(path,opts); /* R4: implementation lives in api-client.js */
 function toast(msg,err=false){const root=$('#toast-root');root.innerHTML=`<div class="toast ${err?'error':''}">${esc(msg)}</div>`;setTimeout(()=>root.innerHTML='',3200)}
 function modal(title,body,foot=''){const root=$('#modal-root');root.innerHTML=`<div class="modal-backdrop"><div class="modal"><div class="modal-head"><h3>${title}</h3><button class="x" onclick="closeModal()">×</button></div><div class="modal-body">${body}</div>${foot?`<div class="modal-foot">${foot}</div>`:''}</div></div>`}
 window.closeModal=()=>{$('#modal-root').innerHTML=''};
