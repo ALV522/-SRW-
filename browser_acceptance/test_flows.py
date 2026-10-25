@@ -730,6 +730,93 @@ class RecruitmentBrowserAcceptance(unittest.TestCase):
         self.assertFalse(self.console_errors, self.console_errors)
 
 
+    def test_17_pending_restore_is_visible_everywhere_and_cancellable(self) -> None:
+        """A scheduled restore must never be silent, and must be cancellable.
+
+        Covers the gap Track A called out: the Core only exposed pending_restore as
+        one line inside Settings, the schedule confirmation did not say that later
+        edits are lost, and no UI entry existed for the cancel route.
+        """
+        self.page.goto(self.base + "/v1", wait_until="domcontentloaded")
+        expect(self.page.locator("#restore-banner")).to_have_count(0)
+
+        created = self.context.request.post(self.base + "/api/v1/system/backups")
+        self.assertEqual(created.status, 200, created.text())
+        filename = created.json()["filename"]
+
+        scheduled = self.context.request.post(
+            self.base + f"/api/v1/system/backups/{filename}/restore")
+        self.assertEqual(scheduled.status, 200, scheduled.text())
+
+        # Reload: the warning must survive navigation, not just the settings page.
+        self.page.reload(wait_until="domcontentloaded")
+        banner = self.page.locator("#restore-banner")
+        expect(banner).to_be_visible()
+        expect(banner).to_contain_text("排程之后录入或修改的内容可能全部丢失")
+
+        # The warning must survive navigating to another page, not only a reload:
+        # shell() re-renders on every page change, so this is the real proof that
+        # it is global rather than a Settings-only line.
+        self.page.get_by_role("button", name="系统设置").click()
+        expect(self.page.locator("#top-title")).to_have_text("系统设置")
+        expect(self.page.locator("#restore-banner")).to_be_visible()
+
+        self.page.once("dialog", lambda dialog: dialog.accept())
+        self.page.get_by_role("button", name="取消待恢复计划").click()
+        expect(self.page.locator("#restore-banner")).to_have_count(0)
+
+        diagnostics = self.get_json("/api/v1/system/diagnostics")
+        self.assertFalse(diagnostics["pending_restore"], "cancel must clear the marker")
+
+        # Only a literal boolean may clear the warning. A 200 that omits the field,
+        # sends null, or sends a truthy string must render "unknown" - reading those
+        # as "clear" would hide the alert that protects the user from a restart
+        # overwriting recent work. Each case runs against the real page.
+        def serve(payload):
+            return lambda route: route.fulfill(status=200, json=payload)
+
+        for payload in ({}, {"pending_restore": None}, {"pending_restore": "false"}):
+            self.page.route("**/api/v1/system/diagnostics", serve(payload))
+            try:
+                self.page.reload(wait_until="domcontentloaded")
+                expect(self.page.locator("#restore-banner")).to_contain_text(
+                    "无法确认恢复状态")
+            finally:
+                self.page.unroute("**/api/v1/system/diagnostics")
+
+        # Positive control: a literal true still raises the pending warning, so the
+        # strict comparison above is not simply degrading everything to unknown.
+        self.page.route("**/api/v1/system/diagnostics",
+                        serve({"pending_restore": True}))
+        try:
+            self.page.reload(wait_until="domcontentloaded")
+            expect(self.page.locator("#restore-banner")).to_contain_text(
+                "已排程下次启动恢复")
+        finally:
+            self.page.unroute("**/api/v1/system/diagnostics")
+
+        # A literal false is the one answer allowed to clear the banner.
+        self.page.route("**/api/v1/system/diagnostics",
+                        serve({"pending_restore": False}))
+        try:
+            self.page.reload(wait_until="domcontentloaded")
+            expect(self.page.locator("#restore-banner")).to_have_count(0)
+        finally:
+            self.page.unroute("**/api/v1/system/diagnostics")
+
+        # Transport failure is still unknown, not clear.
+        self.page.route("**/api/v1/system/diagnostics", lambda route: route.abort())
+        try:
+            self.page.reload(wait_until="domcontentloaded")
+            expect(self.page.locator("#restore-banner")).to_contain_text("无法确认恢复状态")
+        finally:
+            self.page.unroute("**/api/v1/system/diagnostics")
+
+        # Back to the real endpoint: the marker is cancelled, so nothing is shown.
+        self.page.reload(wait_until="domcontentloaded")
+        expect(self.page.locator("#restore-banner")).to_have_count(0)
+        self.assertFalse(self.console_errors, self.console_errors)
+
     def test_09_windows_first_use_health_and_unmaterialized_candidate(self) -> None:
         """Real browser: readiness indicator agrees with backend; new intake has no spurious assessment 409."""
         self.page.goto(self.base + "/v1", wait_until="domcontentloaded")

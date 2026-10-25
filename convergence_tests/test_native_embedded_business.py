@@ -49,7 +49,7 @@ class NativeBusinessAcceptanceTests(unittest.TestCase):
         groups = {"project_protocol": native.SUITES["project_protocol"],
                   "candidate_decision": native.SUITES["candidate_decision"]}
         with patch.object(native, "SUITES", groups), patch.object(native, "MIN_TESTS", {k:1 for k in groups}):
-            suites = native.run_embedded_regressions(ROOT, Path(sys.executable), timeout=180)
+            suites = native.run_embedded_regressions(ROOT, Path(sys.executable).resolve(strict=True), timeout=180)
         self.assertEqual(set(x["suite"] for x in suites), set(groups))
         self.assertTrue(all(x["tests"] >= 1 for x in suites))
 
