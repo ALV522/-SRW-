@@ -87,6 +87,16 @@ class ReevaluationRouteTests(unittest.TestCase):
             {"criterion_key": CRITERION, "status": "met", "evidence_level": "strong", **judgment}]}}
         return self.client.post(f"/api/v1/candidates/{self.cid}/reevaluations", json=payload)
 
+    def test_creation_rejects_stale_editor_context_without_writing(self):
+        current = self.client.get(f"/api/v1/candidates/{self.cid}/workspace").json()["decision_context_hash"]
+        payload = {"expected_context_hash": "outdated", "proposal": {"note": "synthetic"}}
+        rejected = self.client.post(f"/api/v1/candidates/{self.cid}/reevaluations", json=payload)
+        self.assertEqual(rejected.status_code, 409, rejected.text)
+        self.assertEqual(self.client.get(f"/api/v1/candidates/{self.cid}/reevaluations").json()["drafts"], [])
+        payload["expected_context_hash"] = current
+        accepted = self.client.post(f"/api/v1/candidates/{self.cid}/reevaluations", json=payload)
+        self.assertEqual(accepted.status_code, 200, accepted.text)
+
     def test_routes_are_owned_by_the_extracted_module(self):
         owners = {}
         for route in self.app.routes:

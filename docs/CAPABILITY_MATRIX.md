@@ -147,3 +147,27 @@ Offer 的创建与状态推进必须由 Core 检查其所关联的 **Candidate �
 单人及批量 Pipeline 阶段更新，须与 Offer 一样由 Core 校验候选人未归档、未合并到其他身份、项目未归档。无效对象不得改变 Pipeline、创建 CandidateStageTransition 或虚假审计；批量操作应逐人报告 failed，同时允许其他有效候选人按原合同正常推进。历史阶段/Offer 记录保留只读可见；归档身份或项目显式恢复后才允许重新推进。
 
 `convergence_tests/test_candidate_stage_archival.py` 通过真实 C11 HTTP 与临时 SQLite 验证归档候选人、归档项目、批量部分失败、合并身份四种情况及历史记录不污染。此变更复用已审查的 Core 有效招聘对象守卫，不改 API、Schema、VERSION 或前端。业务逻辑的 Source Gate 成功与旧 c325 实机验收不能互相替代，必须分别注明工件 SHA。
+
+## Issue #41: structured reevaluation authoring through the shared client
+
+The existing draft form now supports explicitly selected criteria, proposed
+status/evidence level/reason/gap, and Claim references from current material.
+Unchecked criteria are omitted; no checked criteria retains the note-only path.
+Selections create a draft only. Core computes the diff; the separate preview
+and explicit apply remain required and never create a HumanDecision.
+
+The client lives in `frontend/dist/reevaluation.js`, injected with the existing
+API/modal helpers, shared by Browser and WebView2. No new framework or second
+business rule engine is introduced. Core accepts optional `expected_context_hash`
+on create: supplied mismatches fail with 409 before draft/audit writes; old
+clients omitting it remain compatible. This guards material/protocol changes,
+not concurrent edits of judgments within an unchanged context (not full CAS).
+
+Chromium scenario 14 creates material, human verification and structured draft
+through UI, checks creation does not change the assessment, explicitly applies,
+and checks persisted judgment and unchanged HumanDecision history. It also covers
+stale-editor rejection with inputs retained and the note-only UI path. Only the
+concurrent second-client material change uses an API fixture. Scenario 13 retains
+preview/cancel/escape/both-entry-point coverage. API tests cover stale creation
+and existing legacy draft/apply semantics. Exact-SHA results are linked in the PR;
+Windows GUI, Native, live Providers and dual-carrier acceptance remain NOT RUN.
