@@ -16,6 +16,8 @@
 9. **docs/NO_BRANCH_PROTECTION_PROTOCOL.md** — binding temporary workflow without server-side protection.
 10. **docs/OWNER_GUIDE.md** — user-facing owner handoff and decision escalation protocol.
 
+Read **docs/AGENT_WORKSTREAM_CHARTER.md** before any parallel-agent or `dev/43`-related work; its explicit file ownership and safe PR split are binding unless superseded by a documented owner/PR decision. The task handoff is **docs/DEV43_BRANCH_AUTHOR_HANDOFF.md**.
+
 Read **DEVELOPMENT_STATE.md**, **README.md** and the exact recent CI/artifact evidence for the task's target SHA. For Windows packaging also read **docs/C11_NATIVE_CANDIDATE_UPGRADE.md** and **docs/WINDOWS_GUI_FIRST_ACCEPTANCE.md**. For HTML experiments read the isolated **explore/html-site-prototype** documentation; exploration PASS is not product PASS.
 
 ## Temporary enforcement while main has NO GitHub branch protection (ACTIVE)
