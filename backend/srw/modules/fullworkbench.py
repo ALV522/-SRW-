@@ -12,7 +12,7 @@ from sqlalchemy.orm import Mapped, Session, mapped_column
 from srw.kernel.clock import utc_now
 from srw.kernel.ids import new_id
 from srw.runtime.db.base import V1Base
-from srw.runtime.backup_truth import write_backup_archive
+from srw.runtime.backup_truth import sha256_path, write_backup_archive
 
 
 class RoleTemplate(V1Base):
@@ -99,10 +99,39 @@ class BlobStore:
         self.root = Path(root)
         self.root.mkdir(parents=True, exist_ok=True)
     def put(self, raw: bytes) -> str:
-        digest=hashlib.sha256(raw).hexdigest()
-        p=self.root/digest[:2]/digest
+        digest = hashlib.sha256(raw).hexdigest()
+        p = self.root / digest[:2] / digest
         p.parent.mkdir(parents=True, exist_ok=True)
-        if not p.exists(): p.write_bytes(raw)
+        if p.is_symlink():
+            raise OSError("corrupt Source blob: content address is a symlink")
+        if p.exists():
+            if not p.is_file() or sha256_path(p) != digest:
+                raise OSError("corrupt Source blob: existing content hash mismatch")
+            return digest
+
+        # The backup writer enumerates self.root without holding a global lock.
+        # Staging under blobs/ would expose an incomplete private Source file to
+        # that traversal. A sibling directory shares the filesystem but is
+        # intentionally outside the published content-address namespace.
+        staging = self.root.parent / ".blobs-staging"
+        staging.mkdir(parents=True, exist_ok=True)
+        fd, pending = tempfile.mkstemp(prefix="source-", suffix=".tmp", dir=staging)
+        try:
+            with os.fdopen(fd, "wb") as stream:
+                stream.write(raw)
+                stream.flush()
+                os.fsync(stream.fileno())
+            # Another writer may have published these *same* content-addressed
+            # bytes in the meantime. Never adopt a malformed existing blob.
+            if p.is_symlink():
+                raise OSError("corrupt Source blob: content address is a symlink")
+            if p.exists():
+                if not p.is_file() or sha256_path(p) != digest:
+                    raise OSError("corrupt Source blob: existing content hash mismatch")
+            else:
+                os.replace(pending, p)
+        finally:
+            Path(pending).unlink(missing_ok=True)
         return digest
     def get(self, digest: str) -> bytes:
         return (self.root/digest[:2]/digest).read_bytes()
