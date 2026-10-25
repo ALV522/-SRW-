@@ -38,3 +38,8 @@ button,input,textarea,select{font:inherit}.app-shell{display:grid;grid-template-
 
 /* Deep-linked human review record: highlight only the exact target. */
 .review-item-focused{outline:2px solid #3d63db;outline-offset:2px;background:#edf3ff;scroll-margin-top:140px}
+
+.restore-banner{margin:10px 12px;padding:10px 12px;border:1px solid #d97706;background:#fffbeb;border-radius:10px;font-size:12px;line-height:1.5}
+.restore-banner-title{font-weight:700;color:#92400e;margin-bottom:4px}
+.restore-banner-body{color:#78350f;margin-bottom:8px}
+.restore-banner strong{color:#b91c1c}
