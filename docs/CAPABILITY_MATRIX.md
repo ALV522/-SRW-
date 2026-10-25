@@ -135,3 +135,9 @@ Structured drafts and the concurrent material change use real API fixtures;
 this does not claim that the note-only draft form is a structured judgment editor.
 Exact-SHA results belong to the PR. Windows GUI and dual-carrier acceptance remain
 NOT RUN. Core/API, schema and release identity are unchanged.
+
+## #41 · 归档/身份合并后的 Offer 决策写入隔离（2026-10-25）
+
+Offer 的创建与状态推进必须由 Core 检查其所关联的 **Candidate 是否已归档、是否已合并到另一个候选身份，以及 Project 是否已归档**。上述任意条件成立时，新建或变更 Offer 返回 409，不产出 Offer 写入或虚假 `OFFER_CREATED`/`OFFER_STATUS_CHANGED` 审计。旧 Offer 和审计必须保持只读可见；只有通过现有项目/候选人恢复流程后，才允许继续合法的 Draft→Approved→Sent 等人工状态操作。已合并源身份禁止重新发 Offer，必须操作规范候选身份。
+
+`convergence_tests/test_offer_routes.py` 使用真实 C11 HTTP+合成 SQLite 验证四种拒绝情况、两种显式恢复后的正向行为、以及 Offer 历史/审计不污染。该变更不涉及 Schema、前端 DOM/按钮可见性、AI 自动决策、WPF/Browser 载体差异或旧数据迁移；`GET offers` 仍可查历史。**本条仅是 API 行为合同，准确 CI PASS 以该 PR HEAD 为准；c325 已通过的 Windows Native 基础 GUI 和四步基础业务，不代表此新 Core 改动已在该旧 EXE 工件执行。**
