@@ -141,3 +141,9 @@ NOT RUN. Core/API, schema and release identity are unchanged.
 Offer 的创建与状态推进必须由 Core 检查其所关联的 **Candidate 是否已归档、是否已合并到另一个候选身份，以及 Project 是否已归档**。上述任意条件成立时，新建或变更 Offer 返回 409，不产出 Offer 写入或虚假 `OFFER_CREATED`/`OFFER_STATUS_CHANGED` 审计。旧 Offer 和审计必须保持只读可见；只有通过现有项目/候选人恢复流程后，才允许继续合法的 Draft→Approved→Sent 等人工状态操作。已合并源身份禁止重新发 Offer，必须操作规范候选身份。
 
 `convergence_tests/test_offer_routes.py` 使用真实 C11 HTTP+合成 SQLite 验证四种拒绝情况、两种显式恢复后的正向行为、以及 Offer 历史/审计不污染。该变更不涉及 Schema、前端 DOM/按钮可见性、AI 自动决策、WPF/Browser 载体差异或旧数据迁移；`GET offers` 仍可查历史。**本条仅是 API 行为合同，准确 CI PASS 以该 PR HEAD 为准；c325 已通过的 Windows Native 基础 GUI 和四步基础业务，不代表此新 Core 改动已在该旧 EXE 工件执行。**
+
+## #41 · 归档/合并身份的 Pipeline 阶段更新冻结（2026-10-25）
+
+单人及批量 Pipeline 阶段更新，须与 Offer 一样由 Core 校验候选人未归档、未合并到其他身份、项目未归档。无效对象不得改变 Pipeline、创建 CandidateStageTransition 或虚假审计；批量操作应逐人报告 failed，同时允许其他有效候选人按原合同正常推进。历史阶段/Offer 记录保留只读可见；归档身份或项目显式恢复后才允许重新推进。
+
+`convergence_tests/test_candidate_stage_archival.py` 通过真实 C11 HTTP 与临时 SQLite 验证归档候选人、归档项目、批量部分失败、合并身份四种情况及历史记录不污染。此变更复用已审查的 Core 有效招聘对象守卫，不改 API、Schema、VERSION 或前端。业务逻辑的 Source Gate 成功与旧 c325 实机验收不能互相替代，必须分别注明工件 SHA。
