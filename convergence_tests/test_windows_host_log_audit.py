@@ -49,6 +49,47 @@ class NativeHostLogAuditTests(unittest.TestCase):
         self.assertNotIn("D:/private/path", json.dumps(out))
         self.assertEqual(out["timing"]["seconds_to_frontend_loaded"], 6)
 
+    def test_modern_redacted_host_http_records_operator_route_families_not_exact_actions(self):
+        rows = self._write()
+        rows.extend({
+            "ts": "2026-10-19T03:12:20+00:00", "event": "backend_http",
+            "identity": {"host_session_id": "session-synthetic"},
+            "details": details,
+        } for details in (
+            {"method": "POST", "status": 200, "route": "project_api"},
+            {"method": "PATCH", "status": 200, "route": "protocol_api"},
+            {"method": "POST", "status": 201, "route": "candidate_api"},
+            {"method": "POST", "status": 409, "route": "candidate_api"},
+            {"method": "POST", "status": 200, "route": "private-SYNTHETIC_SECRET"},
+            {"method": ["POST", "SYNTHETIC_SECRET"], "status": 200, "route": "candidate_api"},
+            {"method": "POST", "status": 200, "route": ["candidate_api", "SYNTHETIC_SECRET"]},
+            {"method": "GET", "status": 200, "route": "candidate_api"},
+        ))
+        self.file.write_text("\n".join(json.dumps(row) for row in rows) + "\n")
+        out = inspect(self.file)
+        self.assertEqual(out["status"], "WINDOWS_GUI_BASELINE_HOST_LOG_PASS")
+        self.assertEqual(out["business_http_redacted_write_counts"], {
+            "POST project_api": 1, "PATCH protocol_api": 1, "POST candidate_api": 1,
+        })
+        # Route FAMILY cannot prove a specific candidate create / protocol
+        # publish. Do not elevate these counts to complete workflow acceptance.
+        self.assertEqual(out["business_operations_http_success"], {})
+        self.assertFalse(out["full_recruitment_business_accepted"])
+        self.assertNotIn("SYNTHETIC_SECRET", json.dumps(out))
+        self.assertNotIn("session-synthetic", json.dumps(out))
+
+    def test_mixed_legacy_and_redacted_events_use_one_nonduplicating_source(self):
+        rows = self._write(additional=(("POST", "/api/v1/projects", 200),))
+        rows.append({
+            "ts": "2026-10-19T03:12:20+00:00", "event": "backend_http",
+            "identity": {"host_session_id": "session-synthetic"},
+            "details": {"method": "POST", "status": 200, "route": "project_api"},
+        })
+        self.file.write_text("\n".join(json.dumps(row) for row in rows) + "\n")
+        out = inspect(self.file)
+        self.assertEqual(out["business_http_redacted_write_counts"], {"POST project_api": 1})
+        self.assertEqual(out["business_operations_http_success"], {})
+
     def test_missing_frontend_load_fails_despite_backend_ready(self):
         self._write(events=tuple(x for x in REQUIRED if x != "frontend_loaded"))
         out = inspect(self.file)

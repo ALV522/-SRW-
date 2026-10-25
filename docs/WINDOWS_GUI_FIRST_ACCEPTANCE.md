@@ -45,3 +45,11 @@ py -3.12 D:\SRW\source\scripts\audit_windows_host_gui_log.py `
 - AI Provider 密钥、OCR/ASR、语义检索、面试 Scorecard、Decision、Offer、运营队列、Knowledge 维护、备份与恢复等完整业务场景尚未在这次 Windows GUI 会话证明。
 - 是否存在 GUI 自动化层面问题（显示缩放、WebView2 再启动、长时运行、崩溃恢复、资源释放）需要进一步测试。
 - 仅将 `Windows Native GUI 基础启动和退出` 以及实际日志明确证明的业务写入列为 PASS。**不得将整个 SRW C11 提升为正式 RC/GA 发行状态。**
+
+## 后续 Native Host 脱敏 HTTP 证据的判定边界（2026-10-25，#42）
+
+新版 WPF Host 在 `BackendOutputPrivacy` 中将后端访问日志映射为不含 URL、候选人 ID、项目 ID、源文件名和凭据的结构化 `backend_http` 事件，仅保留 `method`、`status`、`route`（路由族）。此前的 `audit_windows_host_gui_log.py` 仅从历史的 `backend_stdout` 解析 HTTP 成功动作，因此可能在真正执行过业务请求的新版 Host 会话里报告空白业务计数。
+
+审计器现增加 `business_http_redacted_write_counts`：仅按固定白名单的 HTTP **写方法 × 脱敏路由族**统计 2xx 成功记录；若同一会话还包含旧访问行，优先使用结构化事件、**不重复计数**。其他未识别字段/方法/路由均不可直接写入验收 JSON，从而避免恶意或异常日志内容泄露。历史 `business_operations_http_success` 仅在无结构化记录时保留精确已知旧端点统计，用于历史日志兼容。
+
+**严格限制**：`POST candidate_api` 等分类不能区分新增候选人、上传简历或其它业务动作，`PATCH protocol_api` 也不能单独证明发布、Decision stale 或人工复核；这些计数不能算作完整招聘流程 PASS。尤其 Native GUI 的基础导航/正常退出与招聘业务完整执行属于不同验收层级，仍需要真实窗口操作、持续化结果、重启、备份恢复及独立人工证据。
