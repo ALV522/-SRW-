@@ -73,6 +73,7 @@ def change_candidate_stage(session: Session, candidate_id: str, stage: str, *, a
     row = session.get(Candidate, candidate_id)
     if row is None:
         raise V1NotFoundError(f"candidate not found: {candidate_id}")
+    _require_active_recruitment_subject(session, row)
     current = row.pipeline_stage or "new"
     if stage not in PIPELINE_STAGES:
         raise V1InvariantError(f"unsupported candidate pipeline stage: {stage}")
@@ -147,29 +148,29 @@ def project_funnel(session: Session, project_id: str) -> dict:
     return {"project_id": project_id, "total_candidates": sum(counts.values()), "stages": counts}
 
 
-def _require_live_offer_subject(session: Session, candidate: Candidate) -> None:
-    """Protect hiring authority against archived or merged identity writes.
+def _require_active_recruitment_subject(session: Session, candidate: Candidate) -> None:
+    """Protect stage and Offer authority against inactive identities.
 
-    Archiving is reversible, but should freeze new Offer decisions until an
+    Archiving is reversible, but should freeze recruitment writes until an
     explicit restore. A merged source identity is never eligible; the owner
     must use the canonical candidate. Read-only history remains available.
     """
     if candidate.merged_into_candidate_id:
-        raise V1InvariantError("merged candidate identity cannot issue or advance offers")
+        raise V1InvariantError("merged candidate identity cannot advance recruitment")
     if candidate.archived:
-        raise V1InvariantError("archived candidate must be restored before an offer action")
+        raise V1InvariantError("archived candidate must be restored before recruitment changes")
     project = session.get(Project, candidate.project_id)
     if project is None:
         raise V1NotFoundError(f"project not found: {candidate.project_id}")
     if project.status == "archived":
-        raise V1InvariantError("archived project must be restored before an offer action")
+        raise V1InvariantError("archived project must be restored before recruitment changes")
 
 
 def create_offer(session: Session, candidate_id: str, *, title: str, compensation_note: str, target_start_date: str, terms: str, actor: str) -> OfferRecord:
     candidate = session.get(Candidate, candidate_id)
     if candidate is None:
         raise V1NotFoundError(f"candidate not found: {candidate_id}")
-    _require_live_offer_subject(session, candidate)
+    _require_active_recruitment_subject(session, candidate)
     if candidate.pipeline_stage not in {"interview", "offer"}:
         raise V1InvariantError("offer can be created only for a candidate in interview or offer stage")
     row = OfferRecord(
@@ -196,7 +197,7 @@ def change_offer_status(session: Session, offer_id: str, status: str, *, actor: 
     candidate = session.get(Candidate, row.candidate_id)
     if candidate is None:
         raise V1NotFoundError(f"candidate not found: {row.candidate_id}")
-    _require_live_offer_subject(session, candidate)
+    _require_active_recruitment_subject(session, candidate)
     current = row.status
     # Conditional status is an additive, backwards-compatible CAS contract.
     # A stale browser window must not silently apply the next transition.
