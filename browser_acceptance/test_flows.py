@@ -124,6 +124,30 @@ class RecruitmentBrowserAcceptance(unittest.TestCase):
             self.page.get_by_role("button", name="保存草案").click()
         self.assertEqual(saved.value.status, 200, saved.value.text())
 
+    def wait_for_json(self, path: str, predicate, *, timeout: float = 8.0,
+                      interval: float = 0.1, label: str = ""):
+        """Poll a read endpoint until it satisfies `predicate`, then return it.
+
+        Steps that follow a UI action read the server from the test process, which
+        is a different connection from the browser. Polling for the durable
+        business state removes that ordering assumption without weakening the
+        assertion: a state that never arrives still fails, and the failure now
+        carries the last payload instead of a bare "1 != 2".
+        """
+        deadline = time.time() + timeout
+        last = None
+        while True:
+            last = self.get_json(path)
+            if predicate(last):
+                return last
+            if time.time() >= deadline:
+                self.fail(
+                    f"{label or path} did not reach the expected state within "
+                    f"{timeout}s; last payload: "
+                    f"{json.dumps(last, ensure_ascii=False)[:800]}"
+                )
+            time.sleep(interval)
+
     def new_project(self, label: str) -> str:
         title = label + "-" + uuid.uuid4().hex[:8]
         self.page.goto(self.base + "/v1", wait_until="domcontentloaded")
@@ -648,8 +672,14 @@ class RecruitmentBrowserAcceptance(unittest.TestCase):
         }""")
         self.save_criteria(pid)
         expect(self.page.get_by_role("button", name="发布当前标准")).to_be_visible()
-        second_protocol = self.get_json(f"/api/v1/projects/{pid}/protocol-workspace")
-        self.assertEqual(len(second_protocol["draft"]["criteria"]), 2)
+        # The publish button can already be visible while the save is still in
+        # flight (that is what the delayed fetch above proves), so wait for the
+        # durable draft instead of sampling it exactly once.
+        second_protocol = self.wait_for_json(
+            f"/api/v1/projects/{pid}/protocol-workspace",
+            lambda w: len(w["draft"]["criteria"]) == 2,
+            label="draft with two criteria",
+        )
         self.page.once("dialog", lambda dialog: dialog.accept())
         with self.page.expect_response(
             lambda response: "/api/v1/protocol-revisions/" in response.url
@@ -659,8 +689,11 @@ class RecruitmentBrowserAcceptance(unittest.TestCase):
             self.page.get_by_role("button", name="发布当前标准").click()
         self.assertEqual(second_publish.value.status, 200, second_publish.value.text())
 
-        protocol_v2 = self.get_json(f"/api/v1/projects/{pid}/protocol-workspace")
-        self.assertEqual(len(protocol_v2["current"]["criteria"]), 2)
+        protocol_v2 = self.wait_for_json(
+            f"/api/v1/projects/{pid}/protocol-workspace",
+            lambda w: len(w["current"]["criteria"]) == 2,
+            label="published revision with two criteria",
+        )
         self.assertNotEqual(
             protocol_v1["current_revision_id"],
             protocol_v2["current_revision_id"],
