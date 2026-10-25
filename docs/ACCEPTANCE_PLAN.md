@@ -116,3 +116,31 @@ The CI result is a **Chromium + real Core/SQLite/PyMuPDF** acceptance for text-b
 PDF only. It does not prove image-only PDF OCR, OCR accuracy, actual user data quality,
 Provider, ASR, Windows WPF GUI or full v0.8.12-R2 parity. These remain separately
 blocked/not verified until exact-artifact acceptance evidence exists.
+
+## Cancelled restore across a real restart: no overwrite (#41)
+
+`browser_acceptance/test_restore_cancel_restart.py` pairs two scenarios against a
+real `scripts/run_local.py` Core and a real Chromium page, each in its own
+disposable workspace:
+
+1. **Cancelled** - create project A through the UI, back up, schedule a restore
+   through Settings (the confirmation must still warn that post-schedule edits are
+   lost), then create project B with a candidate and a published text Source.
+   Cancel from the sidebar banner, shut the Core down gracefully (the workspace
+   lease must be released), restart the same workspace, and verify through the
+   public API that B, its candidate, the `CANDIDATE_CREATED` / `SOURCE_ADDED` audit
+   events **and the Source payload itself** survived: `GET /sources/{id}/content`
+   must still return the original `candidate_id`, `has_text=true` and the exact
+   synthetic text, not merely an audit row. The UI must still list both projects.
+2. **Not cancelled (control)** - the same flow without cancelling. The restart must
+   actually overwrite: only A survives, B is gone, the Source content endpoint
+   returns 404, the pending marker is cleared and one `pre_restore-*.zip` exists.
+
+The control is what gives the first scenario meaning: without it, a cancel button
+that did nothing would still pass. Asserting the audit row alone would also be
+insufficient - an audit entry can outlive the row it describes - so the content
+endpoint is read directly after the restart.
+
+Level: **real process + real HTTP + real Chromium + real SQLite/blobs**, synthetic
+data only. It does not prove WPF/WebView2 GUI, embedded Windows Runtime, production
+Knowledge, power-loss durability or dual-carrier concurrency.
