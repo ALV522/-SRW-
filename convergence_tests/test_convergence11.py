@@ -26,6 +26,20 @@ from srw.runtime.db.session import create_v1_engine, create_v1_session_factory
 ROOT = Path(__file__).resolve().parents[1]
 
 
+def frontend_js() -> str:
+    """Every shipped front-end module, concatenated.
+
+    R4 splits app.js into feature modules (api-client.js, reevaluation.js,
+    jobsetup.js, ...), so source-level invariants must be checked against the
+    whole shipped bundle instead of one file. The assertions themselves are
+    unchanged: a symbol must still exist somewhere the browser actually loads.
+    """
+    return "\n".join(
+        path.read_text(encoding="utf-8")
+        for path in sorted((ROOT / "frontend" / "dist").glob("*.js"))
+    )
+
+
 class Convergence11BusinessWorkflowTest(unittest.TestCase):
     def setUp(self):
         self.tmp = tempfile.TemporaryDirectory()
@@ -409,7 +423,7 @@ class Convergence11BusinessWorkflowTest(unittest.TestCase):
             self.assertEqual(open_rows.json()["reviews"], [])
 
     def test_candidate_workspace_is_full_page_product_surface(self):
-        app_js = (ROOT / "frontend" / "dist" / "app.js").read_text(encoding="utf-8")
+        app_js = frontend_js()
         styles = (ROOT / "frontend" / "dist" / "styles.css").read_text(encoding="utf-8")
         self.assertIn("candidate-workspace-page", app_js)
         self.assertIn("candidate-workspace-tabs", app_js)
@@ -421,7 +435,7 @@ class Convergence11BusinessWorkflowTest(unittest.TestCase):
         self.assertIn("candidate-workspace-head", styles)
 
     def test_candidate_process_workspace_contains_interview_and_reevaluation_actions(self):
-        app_js = (ROOT / "frontend" / "dist" / "app.js").read_text(encoding="utf-8")
+        app_js = frontend_js()
         self.assertIn("candidateEventsHtml", app_js)
         self.assertIn("candidateReevaluationHtml", app_js)
         self.assertIn("电话筛选与面试", app_js)
@@ -431,7 +445,7 @@ class Convergence11BusinessWorkflowTest(unittest.TestCase):
         self.assertIn("＋ 复评草案", app_js)
 
     def test_job_setup_is_a_real_four_step_draft_wizard(self):
-        app_js = (ROOT / "frontend" / "dist" / "app.js").read_text(encoding="utf-8")
+        app_js = frontend_js()
         styles = (ROOT / "frontend" / "dist" / "styles.css").read_text(encoding="utf-8")
         self.assertIn("jobSetupProgress", app_js)
         self.assertIn("jobSetupMove", app_js)
@@ -513,7 +527,7 @@ class Convergence11BusinessWorkflowTest(unittest.TestCase):
             self.assertEqual(result["decision_policy"]["custom_policy"], "keep")
 
     def test_criteria_editor_preserves_protocol_fields_instead_of_rebuilding_them(self):
-        app_js = (ROOT / "frontend" / "dist" / "app.js").read_text(encoding="utf-8")
+        app_js = frontend_js()
         styles = (ROOT / "frontend" / "dist" / "styles.css").read_text(encoding="utf-8")
         self.assertIn("criteriaOriginalByKey", app_js)
         self.assertIn("criteriaRecruitmentContext", app_js)
@@ -608,7 +622,7 @@ class Convergence11BusinessWorkflowTest(unittest.TestCase):
         self.assertTrue(all(x["project_id"] == project_id for x in wb["items"]))
 
     def test_review_shortcuts_target_the_exact_record_not_just_the_page(self):
-        app_js = (ROOT / "frontend" / "dist" / "app.js").read_text(encoding="utf-8")
+        app_js = frontend_js()
         styles = (ROOT / "frontend" / "dist" / "styles.css").read_text(encoding="utf-8")
         self.assertIn("openReviewItem=async(kind,pid,cid,reviewId='',claimId='')", app_js)
         self.assertIn("'srw-review-'+reviewId", app_js)
@@ -619,7 +633,7 @@ class Convergence11BusinessWorkflowTest(unittest.TestCase):
         self.assertIn("review-item-focused", styles)
 
     def test_frontend_exposes_actionable_queue_and_safe_diagnostic_export(self):
-        app_js = (ROOT / "frontend" / "dist" / "app.js").read_text(encoding="utf-8")
+        app_js = frontend_js()
         self.assertIn("今日业务队列", app_js)
         self.assertIn("openWorkbenchItem", app_js)
         self.assertIn("每位候选人只显示当前最高优先级动作", app_js)
