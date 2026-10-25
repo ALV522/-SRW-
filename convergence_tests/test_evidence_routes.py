@@ -8,6 +8,8 @@ by accident, this test fails.
 """
 from __future__ import annotations
 
+import base64
+import hashlib
 import tempfile
 import unittest
 from pathlib import Path
@@ -106,6 +108,50 @@ class EvidenceRouteTests(unittest.TestCase):
         self.assertIn("redaction_counts", payload)
         self.assertIn("redaction_spans", payload)
         self.assertIn("length_preserved", payload)
+
+    def test_pdf_download_and_page_render_reject_tampered_content_address(self):
+        import fitz
+        doc = fitz.open()
+        page = doc.new_page()
+        page.insert_text((50, 50), "Synthetic 0.8x evidence must be immutable")
+        raw = doc.tobytes()
+        doc.close()
+        digest = hashlib.sha256(raw).hexdigest()
+        uploaded = self.client.post(
+            f"/api/v1/candidates/{self.cid}/files",
+            json={"filename": "synthetic.pdf", "media_type": "application/pdf",
+                  "base64": base64.b64encode(raw).decode("ascii")},
+        )
+        self.assertEqual(uploaded.status_code, 200, uploaded.text)
+        source_id = uploaded.json()["source_id"]
+        file_url = f"/api/v1/sources/{source_id}/file"
+        page_url = f"/api/v1/sources/{source_id}/page/1"
+        binary = self.client.get(file_url)
+        self.assertEqual(binary.status_code, 200, binary.text[:120])
+        self.assertEqual(binary.content, raw)
+        self.assertTrue(binary.headers["content-disposition"].startswith("inline"))
+        partial = self.client.get(file_url, headers={"Range": "bytes=0-9"})
+        self.assertEqual(partial.status_code, 206)
+        self.assertEqual(partial.content, raw[:10])
+        self.assertEqual(partial.headers["content-range"], f"bytes 0-9/{len(raw)}")
+        suffix = self.client.get(file_url, headers={"Range": "bytes=-10"})
+        self.assertEqual(suffix.status_code, 206)
+        self.assertEqual(suffix.content, raw[-10:])
+        invalid_range = self.client.get(file_url, headers={"Range": "bytes=999999-"})
+        self.assertEqual(invalid_range.status_code, 416)
+        render = self.client.get(page_url)
+        self.assertEqual(render.status_code, 200, render.text[:100])
+        self.assertTrue(render.content.startswith(b"\x89PNG\r\n\x1a\n"))
+
+        blob = self.data / "blobs" / digest[:2] / digest
+        self.assertEqual(blob.read_bytes(), raw)
+        blob.write_bytes(b"synthetic corrupt source")
+        for url in (file_url, page_url):
+            bad = self.client.get(url)
+            self.assertEqual(bad.status_code, 409, (url, bad.text[:150]))
+            self.assertNotIn("synthetic corrupt source", bad.text)
+        # The verifier must never rewrite damaged material to 'repair' it.
+        self.assertEqual(blob.read_bytes(), b"synthetic corrupt source")
 
     def test_binary_endpoints_reject_sources_without_blobs(self):
         source_id = self.add_source().json()["source_id"]
