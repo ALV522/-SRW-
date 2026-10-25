@@ -90,6 +90,14 @@ class BlobAtomicPublicationTests(unittest.TestCase):
             self.store.get(self.digest)
         self.assertEqual(self.dest.read_bytes(), b"tampered synthetic source")
 
+    def test_legacy_named_blob_read_remains_compatible_but_unsafe_names_fail(self):
+        legacy = self.blobs / "ab" / "abc"
+        legacy.parent.mkdir(parents=True, exist_ok=True)
+        legacy.write_bytes(b"synthetic legacy blob content")
+        self.assertEqual(self.store.get("abc"), b"synthetic legacy blob content")
+        with self.assertRaisesRegex(OSError, "invalid"):
+            self.store.get("../outside")
+
     def test_duplicate_put_is_idempotent_and_matches_content_hash(self):
         self.assertEqual(self.store.put(self.raw), self.digest)
         self.assertEqual(self.store.put(self.raw), self.digest)

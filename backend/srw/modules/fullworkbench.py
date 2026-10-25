@@ -145,14 +145,21 @@ class BlobStore:
         # The digest, not a caller-supplied filename, is Source identity.
         # In particular, an OCR/ASR job must never consume bytes altered
         # after the original evidence was recorded in the database.
-        if (not isinstance(digest, str) or len(digest) != 64
-                or any(ch not in "0123456789abcdef" for ch in digest)):
+        # Older snapshots can contain short, arbitrary *safe* legacy names.
+        # Preserve their read contract: they never promised SHA-256 identity.
+        # Do not let such names become paths outside this BlobStore.
+        safe_chars = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789._-"
+        if (not isinstance(digest, str) or not 1 <= len(digest) <= 128
+                or digest[0] not in safe_chars[:52] + "0123456789"
+                or any(ch not in safe_chars for ch in digest)):
             raise OSError("invalid Source blob content address")
+        modern_digest = (len(digest) == 64
+                         and all(ch in "0123456789abcdef" for ch in digest))
         p = self.root / digest[:2] / digest
         if p.is_symlink():
             raise OSError("corrupt Source blob: symbolic-link content address")
         raw = p.read_bytes()
-        if hashlib.sha256(raw).hexdigest() != digest:
+        if modern_digest and hashlib.sha256(raw).hexdigest() != digest:
             raise OSError("corrupt Source blob: content hash mismatch")
         return raw
 
