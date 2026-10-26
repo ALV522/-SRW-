@@ -128,6 +128,8 @@ def collect(client, repository: str, number: int) -> dict:
     if not REPO.fullmatch(repository) or not 1 <= number <= 1000000:
         raise ValueError("invalid repository or PR number")
     owner, repo = repository.split("/", 1)
+    if owner in {".", ".."} or repo in {".", ".."}:
+        raise ValueError("unsafe GitHub repository path segment")
     prefix = f"/repos/{owner}/{repo}"
     first_main = _sha(client.request(prefix + "/branches/main"), "commit", "sha")
     first_pr = client.request(prefix + f"/pulls/{number}")
