@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import errno
 import hashlib
 import json
 import sqlite3
@@ -108,6 +109,38 @@ class BackupRestoreIntegrityTest(unittest.TestCase):
         self.assertEqual(validate_backup_archive(dest)["schema_revision"], "v1_0014")
         self.assertEqual(list(self.backups.glob("*.partial")), [])
         self.assertEqual(list(self.backups.glob(".srw-staging-*")), [])
+
+    def test_hard_link_unsupported_does_not_publish_and_explains_recovery(self):
+        source = self.root / "unsupported-fs.db"
+        self.make_db(source, "original")
+        archive = self.backups / "unsupported-fs.zip"
+        with patch("srw.runtime.backup_truth.os.link",
+                   side_effect=OSError(errno.EOPNOTSUPP, "hard links unsupported")):
+            with self.assertRaisesRegex(BackupTruthError, "filesystem"):
+                write_backup_archive(archive, source, self.root / "none")
+        self.assertFalse(archive.exists())
+        self.assertFalse(list(self.backups.glob(".srw-staging-*")))
+
+    def test_post_publication_staging_cleanup_failure_does_not_report_failure(self):
+        source = self.root / "cleanup-fs.db"
+        self.make_db(source, "original")
+        archive = self.backups / "cleanup-fs.zip"
+        real_unlink = Path.unlink
+        simulated = []
+
+        def flaky_unlink(path, *args, **kwargs):
+            if path.name.startswith(".srw-staging-") and not simulated:
+                simulated.append(True)
+                raise PermissionError("simulated antivirus staging lock")
+            return real_unlink(path, *args, **kwargs)
+
+        with patch.object(Path, "unlink", flaky_unlink):
+            written = write_backup_archive(archive, source, self.root / "none")
+        self.assertEqual(written, archive)
+        self.assertEqual(len(simulated), 1)
+        self.assertTrue(validate_backup_archive(archive)["manifest_present"])
+        for staging in self.backups.glob(".srw-staging-*"):
+            staging.unlink()
 
     def test_source_mutated_during_zip_write_never_publishes_backup(self):
         source = self.root / "changing-source.db"

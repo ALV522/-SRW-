@@ -7,11 +7,13 @@ served by the extracted module, plus a thin transport round trip per surface.
 """
 from __future__ import annotations
 
+import errno
 import tempfile
 import unittest
 import zipfile
 import io
 from pathlib import Path
+from unittest.mock import patch
 
 from starlette.testclient import TestClient
 
@@ -72,6 +74,14 @@ class SystemRouteTests(unittest.TestCase):
         self.assertIn(name, downloaded.headers["content-disposition"])
 
         self.assertEqual(self.client.get("/api/v1/system/backups/missing.zip").status_code, 404)
+
+    def test_unsupported_backup_filesystem_is_actionable_instead_of_500(self):
+        with patch("srw.runtime.backup_truth.os.link",
+                   side_effect=OSError(errno.EOPNOTSUPP, "unsupported")):
+            response = self.client.post("/api/v1/system/backups")
+        self.assertEqual(response.status_code, 409, response.text)
+        self.assertIn("filesystem", response.json()["detail"])
+        self.assertEqual(self.client.get("/api/v1/system/backups").json()["backups"], [])
 
     def test_restore_cancel_is_idempotent_and_reports_state(self):
         first = self.client.post("/api/v1/system/restore/cancel")

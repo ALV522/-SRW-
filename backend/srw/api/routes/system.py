@@ -34,7 +34,12 @@ def system_routes(*, factory, data_dir: Path, knowledge_dir: Path,
     """Bind the system endpoints to one Core workspace."""
 
     async def backups(_r: Request) -> JSONResponse:
-        path = create_backup(data_dir, database_path)
+        try:
+            path = create_backup(data_dir, database_path)
+        except BackupTruthError as exc:
+            # Surface unsupported atomic filesystems as an actionable
+            # invariant error, rather than an unhandled HTTP 500.
+            raise V1InvariantError(str(exc)) from exc
         return JSONResponse({"filename": path.name, "size_bytes": path.stat().st_size})
 
     def is_published_backup_name(name: str) -> bool:

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import errno
 import hashlib
 import json
 import os
@@ -192,6 +193,7 @@ def write_backup_archive(
     )
     os.close(fd)
     staging = Path(staging_name)
+    published = False
     try:
         with zipfile.ZipFile(staging, "w", zipfile.ZIP_DEFLATED) as archive:
             archive.write(db, "data/srw_v1.db")
@@ -217,8 +219,21 @@ def write_backup_archive(
         # Atomic no-clobber publish on NTFS/POSIX. os.replace could silently
         # overwrite an existing valid backup on filename collision.
         # Unsupported hard-link filesystems fail closed without partial ZIPs.
-        os.link(staging, dest)
-        staging.unlink()
+        try:
+            os.link(staging, dest)
+        except OSError as exc:
+            unsupported = {
+                errno.EPERM, errno.EACCES, errno.EXDEV, errno.ENOSYS,
+                getattr(errno, "ENOTSUP", -1),
+                getattr(errno, "EOPNOTSUPP", -1),
+            }
+            if exc.errno in unsupported:
+                raise BackupTruthError(
+                    "atomic backup publication is unavailable on this filesystem; "
+                    "use a local workspace volume supporting hard links (for example NTFS)"
+                ) from exc
+            raise
+        published = True
         if os.name != "nt":
             directory_fd = os.open(
                 dest.parent, os.O_RDONLY | getattr(os, "O_DIRECTORY", 0),
@@ -229,7 +244,15 @@ def write_backup_archive(
                 os.close(directory_fd)
         return dest
     finally:
-        staging.unlink(missing_ok=True)
+        try:
+            staging.unlink(missing_ok=True)
+        except OSError:
+            # A validated, linked ZIP is already published. Its existence
+            # must not be reported as a failed backup merely because an AV
+            # scanner temporarily holds the hidden .partial staging name.
+            # An unpublished failed staging file is not safe to conceal.
+            if not published:
+                raise
 
 
 def validate_backup_archive(
