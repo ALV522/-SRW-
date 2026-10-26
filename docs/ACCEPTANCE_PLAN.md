@@ -144,3 +144,32 @@ endpoint is read directly after the restart.
 Level: **real process + real HTTP + real Chromium + real SQLite/blobs**, synthetic
 data only. It does not prove WPF/WebView2 GUI, embedded Windows Runtime, production
 Knowledge, power-loss durability or dual-carrier concurrency.
+
+## Interrupted backup creation never publishes a usable-looking archive (#41)
+
+`write_backup_archive` used to open the final `srw-backup-*.zip` path directly, so
+failing in the middle of `ZipFile.write` left a truncated archive under a normal
+backup name. `GET /api/v1/system/backups` listed it by name and size only, so the
+operator saw a backup that was only discovered to be unusable at restore time.
+`convergence_tests/test_backup_atomicity.py` pins the repaired contract with two
+deterministic fault-injection cases (the interruption is injected on the Nth
+`ZipFile.write`; nothing is timing dependent):
+
+1. **Interrupted publish** - the attempt raises, no `*.zip` appears under a normal
+   name, the previously valid archive keeps its exact bytes and still validates.
+2. **Half-product visibility** - a `.srw-staging-*.partial` staging file and a
+   dot-prefixed `.tmp-*.zip` are both absent from the listing, the real published
+   backup is still listed, a legally named but truncated archive is refused
+   (`>= 400`) at scheduling time and leaves no `pending_restore.json`.
+
+The list deliberately stays a cheap naming filter (`is_published_backup_name`:
+non-empty, no dot prefix, `.zip` suffix, no path separators) rather than an
+unbounded per-request SHA scan of every archive; cryptographic validation happens
+when a restore is scheduled and again at startup. Staging is created in the
+destination directory with a `.partial` suffix because `Path.glob("*.zip")`
+matches dotfiles, unlike a shell glob.
+
+Level: **synthetic fault injection against the real `create_backup` /
+`write_backup_archive` / HTTP routes**. It does not prove power-loss durability of
+the directory entry, Windows AV/indexer interference after `os.link`, restoring a
+backup produced by an interrupted process, or WPF/Native acceptance.
