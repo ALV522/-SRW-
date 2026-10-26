@@ -137,6 +137,21 @@ raise SystemExit(98)
                          b"replacement synthetic blob")
         self._assert_single_undo_and_finish()
 
+    def test_restore_with_unchanged_blob_tree_is_not_falsely_blocked(self):
+        # A restore can legitimately revert only SQLite rows. If no new
+        # candidate material was saved after the snapshot, the live Blobs
+        # already match the target and should remain authoritative.
+        self.old_blob.unlink()
+        self.old_blob.parent.rmdir()
+        target_blob = self.data / "blobs" / "new" / "replacement"
+        target_blob.parent.mkdir(parents=True)
+        target_blob.write_bytes(b"replacement synthetic blob")
+        self.assertEqual(self._restart(), "target.zip")
+        self.assertEqual(self._read_db(), "AFTER")
+        self.assertEqual(target_blob.read_bytes(), b"replacement synthetic blob")
+        self.assertFalse(self.journal.exists())
+        self.assertFalse(self.marker.exists())
+
     def test_inconsistent_journal_fails_closed_before_any_unowned_cleanup(self):
         journal = self.journal
         journal.write_text('{"schema":"unknown-restore-journal"}', encoding="utf-8")

@@ -212,15 +212,18 @@ def _publish(data: Path, db: Path, marker: Path, journal: Path, state: dict,
             if not already_new_db and db.exists():
                 raise RuntimeError("unknown DB occupies transaction's published path")
         else:
-            if not db.is_file() or already_new_db:
+            if not db.is_file():
                 raise RuntimeError("original DB missing before journal-owned rollback rename")
-            _checkpoint_wal(db)
-            for suffix, old_name in (("-wal", OLD_WAL), ("-shm", OLD_SHM)):
-                live_sidecar = Path(str(db) + suffix)
-                _safe_path(live_sidecar)
-                if live_sidecar.exists():
-                    os.replace(live_sidecar, data / old_name)
-            os.replace(db, old_db)
+            # The requested archive may already equal the live DB exactly.
+            # In that case no destructive rename or extra rollback file is needed.
+            if not already_new_db:
+                _checkpoint_wal(db)
+                for suffix, old_name in (("-wal", OLD_WAL), ("-shm", OLD_SHM)):
+                    live_sidecar = Path(str(db) + suffix)
+                    _safe_path(live_sidecar)
+                    if live_sidecar.exists():
+                        os.replace(live_sidecar, data / old_name)
+                os.replace(db, old_db)
     elif old_db.exists():
         raise RuntimeError("unexpected old DB in no-original-DB transaction")
     elif already_new_db:
@@ -238,9 +241,12 @@ def _publish(data: Path, db: Path, marker: Path, journal: Path, state: dict,
             if not blobs_are_new and live_blobs.exists():
                 raise RuntimeError("unknown Blob content alongside journal-owned original")
         else:
-            if not live_blobs.exists() or blobs_are_new:
+            if not live_blobs.exists():
                 raise RuntimeError("original Blob tree missing before ownership transfer")
-            os.replace(live_blobs, old_blobs)
+            # DB-only restore is valid: unchanged Source Blob bytes must not
+            # be misclassified as absent original material or deleted.
+            if not blobs_are_new:
+                os.replace(live_blobs, old_blobs)
     elif old_blobs.exists():
         raise RuntimeError("unexpected old Blobs in no-original-Blobs transaction")
     elif live_blobs.exists() and not blobs_are_new:
