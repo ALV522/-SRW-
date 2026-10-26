@@ -209,7 +209,9 @@ def write_backup_archive(
                     raise BackupTruthError("backup inputs changed during archive creation")
             if written.read(BACKUP_MANIFEST_NAME) != manifest_raw:
                 raise BackupTruthError("backup manifest changed during archive creation")
-        with staging.open("rb") as handle:
+        # Windows _commit() requires a writable descriptor for fsync.
+        # The ZIP is closed; this handle changes no payload bytes.
+        with staging.open("r+b") as handle:
             os.fsync(handle.fileno())
 
         # Atomic no-clobber publish on NTFS/POSIX. os.replace could silently
