@@ -92,6 +92,46 @@ class BackupRestoreIntegrityTest(unittest.TestCase):
             write_backup_archive(corrupt_backup, source, root)
         self.assertFalse(corrupt_backup.exists())
 
+    def test_publish_collision_preserves_existing_valid_backup_bytes(self):
+        source = self.root / "collision.db"
+        self.make_db(source, "old")
+        dest = self.backups / "same-name.zip"
+        write_backup_archive(dest, source, self.root / "empty-blobs")
+        old_bytes = dest.read_bytes()
+        # A new archive must not overwrite a previous, valid same-name backup.
+        with closing(sqlite3.connect(source)) as db:
+            db.execute("UPDATE workload SET value = 'new'")
+            db.commit()
+        with self.assertRaises(FileExistsError):
+            write_backup_archive(dest, source, self.root / "empty-blobs")
+        self.assertEqual(dest.read_bytes(), old_bytes)
+        self.assertEqual(validate_backup_archive(dest)["schema_revision"], "v1_0014")
+        self.assertEqual(list(self.backups.glob("*.partial")), [])
+        self.assertEqual(list(self.backups.glob(".srw-staging-*")), [])
+
+    def test_source_mutated_during_zip_write_never_publishes_backup(self):
+        source = self.root / "changing-source.db"
+        self.make_db(source, "unchanged")
+        root = self.root / "changing-blobs"
+        raw = b"original synthetic source"
+        digest = hashlib.sha256(raw).hexdigest()
+        blob = root / digest[:2] / digest
+        blob.parent.mkdir(parents=True)
+        blob.write_bytes(raw)
+        dest = self.backups / "changing-source.zip"
+        real_write = zipfile.ZipFile.write
+
+        def mutate_at_blob_write(archive, filename, arcname=None, *args, **kwargs):
+            if arcname == f"data/blobs/{digest[:2]}/{digest}":
+                blob.write_bytes(b"changed after the backup manifest was computed")
+            return real_write(archive, filename, arcname, *args, **kwargs)
+
+        with patch.object(zipfile.ZipFile, "write", mutate_at_blob_write):
+            with self.assertRaisesRegex(BackupTruthError, "inputs changed"):
+                write_backup_archive(dest, source, root)
+        self.assertFalse(dest.exists())
+        self.assertEqual(list(self.backups.glob(".srw-staging-*")), [])
+
     def test_misplaced_modern_content_address_is_rejected_without_legacy_regression(self):
         source = self.root / "shard-source.db"
         self.make_db(source, "candidate evidence")
