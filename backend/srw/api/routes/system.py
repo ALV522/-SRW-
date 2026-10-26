@@ -34,8 +34,18 @@ def system_routes(*, factory, data_dir: Path, knowledge_dir: Path,
     """Bind the system endpoints to one Core workspace."""
 
     async def backups(_r: Request) -> JSONResponse:
-        path = create_backup(data_dir, database_path)
+        try:
+            path = create_backup(data_dir, database_path)
+        except BackupTruthError as exc:
+            # Surface unsupported atomic filesystems as an actionable
+            # invariant error, rather than an unhandled HTTP 500.
+            raise V1InvariantError(str(exc)) from exc
         return JSONResponse({"filename": path.name, "size_bytes": path.stat().st_size})
+
+    def is_published_backup_name(name: str) -> bool:
+        # Preserve legacy named ZIPs; dot-prefixed staging/private files
+        # are never operator-visible backup archives.
+        return bool(name) and not name.startswith(".") and name.endswith(".zip") and Path(name).name == name
 
     async def backup_list(_r: Request) -> JSONResponse:
         root = data_dir / "backups"
@@ -43,19 +53,20 @@ def system_routes(*, factory, data_dir: Path, knowledge_dir: Path,
         return JSONResponse({"backups": [
             {"filename": p.name, "size_bytes": p.stat().st_size}
             for p in sorted(root.glob("*.zip"), reverse=True)
+            if is_published_backup_name(p.name) and p.is_file() and not p.is_symlink()
         ]})
 
     async def backup_download(request: Request) -> FileResponse:
         name = Path(request.path_params["filename"]).name
         path = data_dir / "backups" / name
-        if not path.is_file():
+        if not is_published_backup_name(name) or not path.is_file() or path.is_symlink():
             raise HTTPException(404)
         return FileResponse(path, filename=name)
 
     async def schedule_restore(request: Request) -> JSONResponse:
         name = Path(request.path_params["filename"]).name
         path = data_dir / "backups" / name
-        if not path.is_file():
+        if not is_published_backup_name(name) or not path.is_file() or path.is_symlink():
             raise HTTPException(404)
         try:
             # Share startup's manifest/member validation before accepting a plan.

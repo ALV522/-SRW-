@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import errno
 import hashlib
 import json
 import os
@@ -186,13 +187,72 @@ def write_backup_archive(
         manifest, ensure_ascii=False, sort_keys=True, separators=(",", ":")
     ).encode("utf-8")
     dest.parent.mkdir(parents=True, exist_ok=True)
-    with zipfile.ZipFile(dest, "w", zipfile.ZIP_DEFLATED) as archive:
-        archive.write(db, "data/srw_v1.db")
-        for row in manifest["blobs"]:
-            relative = str(row["path"])[len("data/blobs/"):]
-            archive.write(blob_root / PurePosixPath(relative), row["path"])
-        archive.writestr(BACKUP_MANIFEST_NAME, manifest_raw)
-    return dest
+    # Build next to the destination: no partial archive is ever named *.zip.
+    fd, staging_name = tempfile.mkstemp(
+        prefix=".srw-staging-", suffix=".partial", dir=dest.parent,
+    )
+    os.close(fd)
+    staging = Path(staging_name)
+    published = False
+    try:
+        with zipfile.ZipFile(staging, "w", zipfile.ZIP_DEFLATED) as archive:
+            archive.write(db, "data/srw_v1.db")
+            for row in manifest["blobs"]:
+                relative = str(row["path"])[len("data/blobs/"):]
+                archive.write(blob_root / PurePosixPath(relative), row["path"])
+            archive.writestr(BACKUP_MANIFEST_NAME, manifest_raw)
+
+        # Compare archived bytes against the pre-write manifest, so mutated
+        # Source input cannot yield an internally valid but incorrect backup.
+        with zipfile.ZipFile(staging, "r") as written:
+            for row in [manifest["database"], *manifest["blobs"]]:
+                actual_sha, actual_size = _hash_zip_member(written, row["path"])
+                if actual_sha != row["sha256"] or actual_size != row["size_bytes"]:
+                    raise BackupTruthError("backup inputs changed during archive creation")
+            if written.read(BACKUP_MANIFEST_NAME) != manifest_raw:
+                raise BackupTruthError("backup manifest changed during archive creation")
+        # Windows _commit() requires a writable descriptor for fsync.
+        # The ZIP is closed; this handle changes no payload bytes.
+        with staging.open("r+b") as handle:
+            os.fsync(handle.fileno())
+
+        # Atomic no-clobber publish on NTFS/POSIX. os.replace could silently
+        # overwrite an existing valid backup on filename collision.
+        # Unsupported hard-link filesystems fail closed without partial ZIPs.
+        try:
+            os.link(staging, dest)
+        except OSError as exc:
+            unsupported = {
+                errno.EPERM, errno.EACCES, errno.EXDEV, errno.ENOSYS,
+                getattr(errno, "ENOTSUP", -1),
+                getattr(errno, "EOPNOTSUPP", -1),
+            }
+            if exc.errno in unsupported:
+                raise BackupTruthError(
+                    "atomic backup publication is unavailable on this filesystem; "
+                    "use a local workspace volume supporting hard links (for example NTFS)"
+                ) from exc
+            raise
+        published = True
+        if os.name != "nt":
+            directory_fd = os.open(
+                dest.parent, os.O_RDONLY | getattr(os, "O_DIRECTORY", 0),
+            )
+            try:
+                os.fsync(directory_fd)
+            finally:
+                os.close(directory_fd)
+        return dest
+    finally:
+        try:
+            staging.unlink(missing_ok=True)
+        except OSError:
+            # A validated, linked ZIP is already published. Its existence
+            # must not be reported as a failed backup merely because an AV
+            # scanner temporarily holds the hidden .partial staging name.
+            # An unpublished failed staging file is not safe to conceal.
+            if not published:
+                raise
 
 
 def validate_backup_archive(
