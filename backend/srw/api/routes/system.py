@@ -37,25 +37,31 @@ def system_routes(*, factory, data_dir: Path, knowledge_dir: Path,
         path = create_backup(data_dir, database_path)
         return JSONResponse({"filename": path.name, "size_bytes": path.stat().st_size})
 
+    def is_published_backup_name(name: str) -> bool:
+        # Preserve legacy named ZIPs; dot-prefixed staging/private files
+        # are never operator-visible backup archives.
+        return bool(name) and not name.startswith(".") and name.endswith(".zip") and Path(name).name == name
+
     async def backup_list(_r: Request) -> JSONResponse:
         root = data_dir / "backups"
         root.mkdir(parents=True, exist_ok=True)
         return JSONResponse({"backups": [
             {"filename": p.name, "size_bytes": p.stat().st_size}
             for p in sorted(root.glob("*.zip"), reverse=True)
+            if is_published_backup_name(p.name) and p.is_file() and not p.is_symlink()
         ]})
 
     async def backup_download(request: Request) -> FileResponse:
         name = Path(request.path_params["filename"]).name
         path = data_dir / "backups" / name
-        if not path.is_file():
+        if not is_published_backup_name(name) or not path.is_file() or path.is_symlink():
             raise HTTPException(404)
         return FileResponse(path, filename=name)
 
     async def schedule_restore(request: Request) -> JSONResponse:
         name = Path(request.path_params["filename"]).name
         path = data_dir / "backups" / name
-        if not path.is_file():
+        if not is_published_backup_name(name) or not path.is_file() or path.is_symlink():
             raise HTTPException(404)
         try:
             # Share startup's manifest/member validation before accepting a plan.

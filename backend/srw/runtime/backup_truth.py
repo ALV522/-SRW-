@@ -186,13 +186,48 @@ def write_backup_archive(
         manifest, ensure_ascii=False, sort_keys=True, separators=(",", ":")
     ).encode("utf-8")
     dest.parent.mkdir(parents=True, exist_ok=True)
-    with zipfile.ZipFile(dest, "w", zipfile.ZIP_DEFLATED) as archive:
-        archive.write(db, "data/srw_v1.db")
-        for row in manifest["blobs"]:
-            relative = str(row["path"])[len("data/blobs/"):]
-            archive.write(blob_root / PurePosixPath(relative), row["path"])
-        archive.writestr(BACKUP_MANIFEST_NAME, manifest_raw)
-    return dest
+    # Build next to the destination: no partial archive is ever named *.zip.
+    fd, staging_name = tempfile.mkstemp(
+        prefix=".srw-staging-", suffix=".partial", dir=dest.parent,
+    )
+    os.close(fd)
+    staging = Path(staging_name)
+    try:
+        with zipfile.ZipFile(staging, "w", zipfile.ZIP_DEFLATED) as archive:
+            archive.write(db, "data/srw_v1.db")
+            for row in manifest["blobs"]:
+                relative = str(row["path"])[len("data/blobs/"):]
+                archive.write(blob_root / PurePosixPath(relative), row["path"])
+            archive.writestr(BACKUP_MANIFEST_NAME, manifest_raw)
+
+        # Compare archived bytes against the pre-write manifest, so mutated
+        # Source input cannot yield an internally valid but incorrect backup.
+        with zipfile.ZipFile(staging, "r") as written:
+            for row in [manifest["database"], *manifest["blobs"]]:
+                actual_sha, actual_size = _hash_zip_member(written, row["path"])
+                if actual_sha != row["sha256"] or actual_size != row["size_bytes"]:
+                    raise BackupTruthError("backup inputs changed during archive creation")
+            if written.read(BACKUP_MANIFEST_NAME) != manifest_raw:
+                raise BackupTruthError("backup manifest changed during archive creation")
+        with staging.open("rb") as handle:
+            os.fsync(handle.fileno())
+
+        # Atomic no-clobber publish on NTFS/POSIX. os.replace could silently
+        # overwrite an existing valid backup on filename collision.
+        # Unsupported hard-link filesystems fail closed without partial ZIPs.
+        os.link(staging, dest)
+        staging.unlink()
+        if os.name != "nt":
+            directory_fd = os.open(
+                dest.parent, os.O_RDONLY | getattr(os, "O_DIRECTORY", 0),
+            )
+            try:
+                os.fsync(directory_fd)
+            finally:
+                os.close(directory_fd)
+        return dest
+    finally:
+        staging.unlink(missing_ok=True)
 
 
 def validate_backup_archive(
