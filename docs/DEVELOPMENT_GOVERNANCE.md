@@ -81,3 +81,16 @@ P0：数据、证据、人工决策错误/泄露、无法启动或丢失主线�
 - 需要负责人决定的事情（如果无则注明无）。
 
 如没有真实新增进展，不得用“功能更加完善”作结论。
+
+## 11. G1.1 独立审查、冲突域与复核（#132）
+
+- 对所有 Core/API、备份恢复、数据模型、会话安全、Native 发布类 PR，必须由**非作者轨道**作准确 HEAD 的正式 Review，指出代码边界、至少一条负例、跨端差异和 SOURCE_MANIFEST 变化，并标明 `ACCEPT/NEEDS_CHANGES/BLOCK`。新 HEAD 使旧审查过期；缺审查则 `REVIEW BLOCKED`，哪怕 CI 全绿。
+- 当前 A/B/C 使用同一 GitHub 账号时，COMMENTED review 是**过程层**分工，不是平台能证明的另一个人审核；不得伪称 Ruleset/Branch protection 已经强制审查。
+- P0/P1 修复优先“合成确定性 RED → Core 修复 → RED 变 GREEN → 正反例回归 → Ubuntu/Windows Source 与 Chromium、必要 Native → 独立 Review”；无法自动复现的故障必须说明人工/进程杀死 oracle。
+- `os.fsync`、`os.link`、`os.replace`、Windows 文件共享、SQLite WAL、路径/权限/大小写和崩溃窗口都属于系统级风险，**设计前**写双 OS 兼容表，不能等 Windows 绿灯失败才分析。
+- 使用[事件驱动、风险优先的合并队列](INTEGRATION_QUEUE.md)：重叠文件一次只允许一名集成人，main/PR HEAD 实时复核；午晚可作巡检但不是强制等待窗口，紧急 P0 不得延迟。
+- 源码清单继续执行“**提交的字节与提交的 SHA 清单一致**”，CI 禁止自动写回清单并盖章。分域清单属于[独立迁移研究](SOURCE_MANIFEST_MIGRATION.md)，未生效。
+- 六字段交接优先少于 300 字：`main/head | 变更 | 实证 | 下一件 | 决策 | 阻断`，细节归 PR/Issue；先读最新评论，系统真实 ISO-8601 带时区时间，不手填 `xx`。
+- B/C 暂时无法回应不授权 A 自审合并其所需签字的高风险 PR；A 可继续非重叠治理、风险回归和 README 文档工作。PR pre-edit preflight 未真实运行时仍 BLOCKED，不能事后倒填。
+
+权威风险条目见 [风险地图](ENGINEERING_RISK_REGISTER.md)，四道 alpha.11 准备度见 #132。新版本必须独立原子迁移 PR，本文不变更产品 A1–A8。

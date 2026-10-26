@@ -6,11 +6,19 @@ SRW（Smart Recruitment Workbench）是一套 **local-first、evidence-centered�
 
 > **Agent / 协作者必读**：开始任何修改前先读 [AGENTS.md](AGENTS.md)，并按其顺序阅读产品宪章、开发治理、版本政策、能力矩阵、双载体计划、验收计划和无保护开发协议。`main` 当前未启用 GitHub Branch Protection；必须从最新 main 建任务分支、运行 `python scripts/agent_preflight.py --issue <Issue号> --acknowledge-reading`、走 PR，并以同一 PR Head SHA 的适用 CI 为合并依据。
 
+## 当前开发入口（2026-10-26 13:20 +08 快照）
+
+**准确历史主线：** `main e82c037e9d109a7e53aa2a50703fd6cfa5eb2053`，VERSION `1.0.0-alpha10-convergence11`，Schema `v1_0014`，development。该 SHA 的 Ubuntu/Windows Source、Chromium、Governance、Integrity、Wheelhouse、Host compile 和 main push audit 共 **8/8 GitHub Checks SUCCESS**；[查看这一 SHA 的检查](https://github.com/ALV522/-SRW-/commit/e82c037e9d109a7e53aa2a50703fd6cfa5eb2053/checks)。这不是新 Native ZIP/WPF GUI、Provider、生产 Knowledge 或 EXE+Web 双端验收。
+
+**未合并工作：** #129 备份原子发表修复（新 HEAD `0015471d` 的 Ubuntu/Windows Source 各 413 测试通过，但独立复审/pre-edit preflight 仍 BLOCKED）、#128 两项备份中断 RED 测试（应在生产修复合流后变绿）、#130 crash-safe restore、#131 备份下载完整性、#43 双端会话认证。这些不是已完成的产品特性。最新状态以 [#132 M1](https://github.com/ALV522/-SRW-/issues/132) 与 [#103 协作](https://github.com/ALV522/-SRW-/issues/103) 的新回复及实时 GitHub API 为准，不要复用本段旧 SHA。
+
+**开发者按顺序阅读：** [AGENTS](AGENTS.md) → [开发治理](docs/DEVELOPMENT_GOVERNANCE.md) → [单写者合并队列](docs/INTEGRATION_QUEUE.md) → [风险台账](docs/ENGINEERING_RISK_REGISTER.md) → [清单迁移边界](docs/SOURCE_MANIFEST_MIGRATION.md)。在最新 main 的干净专用分支执行 `python scripts/agent_preflight.py --issue 132 --acknowledge-reading` 并确认 `PRE-EDIT POLICY PASS` **后**才编辑。变更后按顺序执行 `python scripts/refresh_source_manifest.py --write`、`python scripts/check_source_integrity.py` 和 `python scripts/check_release_truth.py`；可用只读 `python scripts/report_source_manifest_delta.py --base-ref main` 输出已提交哈希差异。PR 必须通过准确 HEAD 全部适用 CI 与独立审查，严禁 main 直推。
+
 ## 外部 Native 工件保管与可复现性（2026-10-26）
 
 Native 输入已有固定哈希、Source/Host/Wheelhouse CI 与实机 Smoke，但不等于丢失外部 ZIP 后可独立恢复。历史 alpha10 依赖 5/13 的状态不等于当前 overlay 的 13/13。风险/保管校验/独立重建规划见 [Native Runtime/Knowledge 外部工件保管与重建](docs/NATIVE_ARTIFACT_CUSTODY_AND_REPRODUCIBILITY.md)（#124）；私有 Runtime、Knowledge、密钥和候选人数据不得上传 Public Git。
 
-## 当前事实基线
+## 历史事实基线（2026-10-21，非实时）
 
 以下为 **2026-10-21 的历史快照**（SHA `c0bc192e346ab16aeb6fa63e60a40c617274a188`），不是当前 main 或准确 CI；必须每次重新核验 GitHub SHA 与工件身份：
 

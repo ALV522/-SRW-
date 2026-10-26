@@ -6,7 +6,7 @@
 
 - 编写时 main=`8c59a233c62d382de2f4823074fc70e1bee4edef`；VERSION `1.0.0-alpha10-convergence11`，Schema `v1_0014`，377 个 SHA 文件。最近准确 SHA 跨平台 Source Gate 各 369 tests / 2 skipped PASS；开发通道，不是 RC。
 - 真实 Windows **c325** 候选 ZIP（SHA256 `7a60e67e9dce873cb370b9eba0e30747080e9937d33a4fc848655f73ec457607`）已通过嵌入式后端、WPF/WebView2 两次启动/正常退出；产品负责人还报告在**合成工作区**成功完成建岗、招聘标准、候选人创建、PDF 简历上传四项。这是人工报告的基础业务结果，尚非其余招聘、OCR/ASR/Provider、恢复或双载体验收；不能外推到新 Git SHA。
-- PR #101（旧 head `dc394e9e9488ef54b3c19be4fa70bec23ac46bbf`，基于旧 `45abc4c`）将 HTTP 迁移、前端、Supervisor、Schema 与版本混合，存在覆盖主线 R2 路由及回归的风险；**禁止整包合并或用旧文件覆盖 main**。PR #98 是另一开放的业务变更，应先解决文件重叠。
+- PR #101（旧 head `dc394e9e9488ef54b3c19be4fa70bec23ac46bbf`，基于旧 `45abc4c`）将 HTTP 迁移、前端、Supervisor、Schema 与版本混合，存在覆盖主线 R2 路由及回归的风险；**禁止整包合并或用旧文件覆盖 main**。PR #98 的开放状态是本历史快照；2026-10-26 的实时 PR 清单应重新读取，不按旧编号假定仍开放。
 - 开工前一律重新查询 live main/PR/Issues/工件，以上是带时间与 SHA 的历史证据，禁止当作未来实时事实。
 
 ## 2. 目标排序
@@ -51,3 +51,10 @@
 - **版本 / 发布**：Schema 迁移与 SemVer 独立 PR，所有新工件重新验收，重大产品取舍和正式 RC/GA 归用户决定。
 
 本宪章是负责人已批准方向下的工程授权：**协作者应自主执行第一项 R4 小 PR，无需反复询问普通工程选择**；跨作者的 API/Schema/权限合同先留可审查的 PR 注释。
+## 7. 2026-10-26 持续授权：协作人员空窗与独立审查
+
+- A 是集成人和高风险 Core/Native 生产作者，不得代 B/C 留自己的“独立 Review”；新 HEAD、真 preflight、CI 三项均不可省略。
+- B 负责 #128 确定性 RED 合流、R4 的**有用户行为价值**的前端小切片，并对 A Core 进行只读审查；不为单纯减少 `app.js` 行数拆文件。
+- C 负责 #43 原生可执行的纯安全策略与测试切片；跨 Host/API middleware 需 A 对权限/启动兼容作合同评审，默认 opt-in gate OFF。
+- B/C 暂停期间 A 可做独立治理、非重叠测试与风险发现；**不强合因审查缺席而 BLOCKED 的 PR**。交接后对照 [队列](INTEGRATION_QUEUE.md) 重新核准 SHA。
+- 单一全局 `SOURCE_MANIFEST.sha256` 暂不拆；用 `report_source_manifest_delta.py` 只读对比，迁移条件见 [设计文档](SOURCE_MANIFEST_MIGRATION.md)。
