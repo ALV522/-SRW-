@@ -116,7 +116,14 @@ class RestoreCancelRestartAcceptance(unittest.TestCase):
         proc = self.make_process()
         for _ in range(200):
             if proc.poll() is not None:
-                self.fail(f"Core exited before readiness, returncode={proc.returncode}")
+                self.stderr.flush()
+                # Tests use only disposable synthetic workspaces. Capture the
+                # bounded startup error so a backend regression is diagnosed
+                # without masking it as an unexplained browser timeout.
+                startup_error = (self.root / "backend.stderr.log").read_text(
+                    encoding="utf-8", errors="replace"
+                )[-6000:]
+                self.fail(f"Core exited before readiness, returncode={proc.returncode}; stderr={startup_error}")
             try:
                 with urllib.request.urlopen(self.base + "/health/ready", timeout=0.4) as ready:
                     if ready.status == 200:

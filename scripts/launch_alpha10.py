@@ -153,74 +153,10 @@ def _pre_restore_backup() -> Path | None:
 
 
 def apply_pending_restore() -> str | None:
-    marker = DATA / "pending_restore.json"
-    if not marker.exists():
-        return None
-    obj = json.loads(marker.read_text(encoding="utf-8"))
-    name = _safe_backup_name(str(obj.get("backup") or ""))
-    expected_hash = str(obj.get("sha256") or "")
-    expected_schema = str(obj.get("schema_revision") or "")
-    src = DATA / "backups" / name
-    if not src.is_file():
-        raise RuntimeError(f"backup not found: {name}")
-    if not expected_hash or _sha256(src) != expected_hash:
-        raise RuntimeError("backup hash mismatch; restore aborted")
-
-    with tempfile.TemporaryDirectory(prefix="srw-restore-", dir=DATA) as td_name:
-        td = Path(td_name)
-        if not expected_schema:
-            raise RuntimeError("backup schema revision missing; restore aborted")
-        # Reject ZIP path traversal, duplicate members and altered bytes before
-        # any extraction or modification of the live workspace.
-        extract_validated_backup(
-            src, td, expected_archive_sha256=expected_hash,
-            expected_schema=expected_schema, max_schema=EXPECTED_SCHEMA,
-        )
-        restored = td / "data" / "srw_v1.db"
-        actual_schema = _read_schema(restored)
-        if actual_schema != expected_schema:
-            raise RuntimeError("backup schema mismatch; restore aborted")
-
-        _pre_restore_backup()
-        new_db = DATA / ".srw_v1.db.restore-new"
-        old_db = DATA / ".srw_v1.db.restore-old"
-        new_blobs = DATA / ".blobs.restore-new"
-        old_blobs = DATA / ".blobs.restore-old"
-        for p in (new_db, old_db):
-            p.unlink(missing_ok=True)
-        for p in (new_blobs, old_blobs):
-            if p.exists(): shutil.rmtree(p)
-        shutil.copy2(restored, new_db)
-        restored_blobs = td / "data" / "blobs"
-        if restored_blobs.exists(): shutil.copytree(restored_blobs, new_blobs)
-
-        db_swapped = blobs_swapped = False
-        try:
-            for suffix in ("-wal", "-shm"):
-                Path(str(DB) + suffix).unlink(missing_ok=True)
-            if DB.exists(): os.replace(DB, old_db)
-            os.replace(new_db, DB); db_swapped = True
-            current_blobs = DATA / "blobs"
-            if current_blobs.exists(): os.replace(current_blobs, old_blobs)
-            if new_blobs.exists(): os.replace(new_blobs, current_blobs)
-            else: current_blobs.mkdir(parents=True, exist_ok=True)
-            blobs_swapped = True
-            # Validate the published DB before dropping rollback material.
-            _read_schema(DB)
-        except Exception:
-            current_blobs = DATA / "blobs"
-            if blobs_swapped and current_blobs.exists(): shutil.rmtree(current_blobs)
-            if old_blobs.exists(): os.replace(old_blobs, current_blobs)
-            if db_swapped and DB.exists(): DB.unlink(missing_ok=True)
-            if old_db.exists(): os.replace(old_db, DB)
-            raise
-        else:
-            old_db.unlink(missing_ok=True)
-            if old_blobs.exists(): shutil.rmtree(old_blobs)
-
-    marker.unlink(missing_ok=True)
-    return name
-
+    # Journal verification and recovery run before any Core database access.
+    # No unknown rollback material is removed without a matching transaction.
+    from srw.runtime.restore_transaction import apply_restore
+    return apply_restore(DATA, DB, EXPECTED_SCHEMA, _pre_restore_backup, _read_schema)
 
 def self_check() -> int:
     result = {"ok": True, "checks": {}}
