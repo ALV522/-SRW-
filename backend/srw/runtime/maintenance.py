@@ -14,7 +14,19 @@ def cleanup_stale_backup_artifacts(data_dir: str | Path) -> dict[str, int]:
     removed_dirs = 0
     removed_files = 0
 
-    for pattern in (".backup-snapshot-*", ".restore-staging-*"):
+    # ``srw-restore-*`` and ``srw-prerestore-*`` are TemporaryDirectory work dirs
+    # created by the launcher inside ``data/``. A normal exit removes them, but a
+    # hard kill (power loss, Task Manager, os._exit) leaves a full database snapshot
+    # and every Source blob behind, outside any backup retention rule. The restore
+    # journal re-extracts from the scheduled ZIP on restart, so reclaiming these
+    # names is safe; the loop only removes the named entry itself, never a target a
+    # symlink points at.
+    for pattern in (
+        ".backup-snapshot-*",
+        ".restore-staging-*",
+        "srw-restore-*",
+        "srw-prerestore-*",
+    ):
         for path in root.glob(pattern):
             if path.is_symlink() or path.is_file():
                 try:
