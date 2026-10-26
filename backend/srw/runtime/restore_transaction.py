@@ -15,7 +15,7 @@ import sqlite3
 import tempfile
 from pathlib import Path
 
-from srw.runtime.backup_truth import extract_validated_backup
+from srw.runtime.backup_truth import extract_validated_backup, validate_backup_archive
 
 JOURNAL_NAME = ".srw-restore-journal.json"
 NEW_DB = ".srw_v1.db.restore-new"
@@ -327,9 +327,18 @@ def apply_restore(data: Path, db: Path, max_schema: str, pre_restore_backup,
                 if candidate.exists():
                     raise RuntimeError("pre-restore snapshot name already occupied; retry later")
             undo = pre_restore_backup()
+            # The published undo must already be an actually restorable ZIP,
+            # not merely an arbitrary file with a plausible SHA-256 digest.
+            if undo is not None:
+                _safe_path(undo)
+                undo_digest = validate_backup_archive(
+                    undo, max_schema=max_schema,
+                )["archive_sha256"]
+            else:
+                undo_digest = None
             state.update({
                 "undo": undo.name if undo is not None else None,
-                "undo_sha256": _digest(undo) if undo is not None else None,
+                "undo_sha256": undo_digest,
                 "target_db_sha256": expected_db,
                 "target_blobs": expected_blobs,
             })

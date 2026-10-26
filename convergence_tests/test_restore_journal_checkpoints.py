@@ -152,6 +152,32 @@ raise SystemExit(98)
         self.assertFalse(self.journal.exists())
         self.assertFalse(self.marker.exists())
 
+    def test_identical_db_and_blobs_are_a_valid_noop_restore(self):
+        # Source and live are identical: no destructive DB/Blob moves needed.
+        write_backup_archive(self.archive, self.db, self.data / "blobs")
+        self.marker.write_text(json.dumps({
+            "backup": "target.zip",
+            "sha256": hashlib.sha256(self.archive.read_bytes()).hexdigest(),
+            "schema_revision": "v1_0014",
+        }), encoding="utf-8")
+        self.assertEqual(self._restart(), "target.zip")
+        self.assertEqual(self._read_db(), "BEFORE")
+        self.assertEqual(self.old_blob.read_bytes(), b"original synthetic blob")
+        self.assertFalse(self.journal.exists())
+        self.assertFalse(self.marker.exists())
+
+    def test_malformed_undo_zip_cannot_authorize_database_swap(self):
+        undo = self.data / "backups" / "pre_restore-broken.zip"
+        undo.write_bytes(b"truncated synthetic ZIP")
+        from srw.runtime.backup_truth import BackupTruthError
+        with patch.object(launcher, "_pre_restore_backup", return_value=undo):
+            with self.assertRaises(BackupTruthError):
+                self._restart()
+        self.assertEqual(self._read_db(), "BEFORE")
+        self.assertEqual(self.old_blob.read_bytes(), b"original synthetic blob")
+        self.assertTrue(self.marker.exists())
+        self.assertFalse(self.journal.exists())
+
     def test_inconsistent_journal_fails_closed_before_any_unowned_cleanup(self):
         journal = self.journal
         journal.write_text('{"schema":"unknown-restore-journal"}', encoding="utf-8")
