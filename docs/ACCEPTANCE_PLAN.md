@@ -144,3 +144,21 @@ endpoint is read directly after the restart.
 Level: **real process + real HTTP + real Chromium + real SQLite/blobs**, synthetic
 data only. It does not prove WPF/WebView2 GUI, embedded Windows Runtime, production
 Knowledge, power-loss durability or dual-carrier concurrency.
+
+## Backup creation atomicity regression (P1, currently RED)
+
+`convergence_tests/test_backup_atomicity.py` injects a deterministic failure while
+`write_backup_archive` is writing an archive, then asserts what an operator would
+expect: no normally named `*.zip` appears, the previously valid backup keeps its bytes
+and stays restorable, staging files are never listed, and a truncated archive is
+refused at scheduling time without leaving a `pending_restore.json`.
+
+**This is a target contract, not achieved coverage.** Against the current Core both
+cases fail, which is the defect being pinned: an interrupted backup publishes a
+normally named archive, and `Path.glob("*.zip")` matches dot-prefixed staging files so
+they are listed as backups. The list is deliberately specified as a cheap naming
+filter rather than a per-request SHA scan; truncation is caught at scheduling instead.
+
+Level: synthetic workspace, injected interruption (not timed), no browser and no
+Windows GUI. It turns green only when the Core stages and atomically publishes
+backups.
