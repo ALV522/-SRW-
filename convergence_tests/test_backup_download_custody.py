@@ -105,27 +105,66 @@ class BackupDownloadCustodyTests(unittest.TestCase):
         self._no_staging()
 
     def test_symlink_swap_before_fd_open_is_rejected(self):
+        # A hosted Windows runner may lack SeCreateSymbolicLinkPrivilege. First
+        # establish whether a real symlink can be created; never mistake a
+        # privilege failure for a production rejection or a broken hook.
         private = self.backups / "private-target.zip"
         private.write_bytes(self.path.read_bytes())
+        probe = self.backups / "symlink-permission-probe.zip"
+        try:
+            probe.symlink_to(private)
+        except (OSError, NotImplementedError):
+            self.skipTest("real filesystem symlinks unavailable to this test account")
+        finally:
+            if probe.is_symlink():
+                probe.unlink()
+
         original_open = os.open
         triggered = False
 
         def replace_before_open(name, flags, *args, **kwargs):
             nonlocal triggered
-            if not triggered and str(name) == str(self.path):
+            if not triggered and os.fspath(name) == os.fspath(self.path):
                 triggered = True
                 self.path.unlink()
                 self.path.symlink_to(private)
             return original_open(name, flags, *args, **kwargs)
 
         try:
+            # Exercise the real snapshot primitive synchronously. TestClient's
+            # threadpool can hide whether the intended os.open hook ran, so an
+            # HTTP response code alone is not a proof of the race-injection.
             with patch("srw.runtime.backup_download.os.open", replace_before_open):
-                response = self._get()
-            self.assertTrue(triggered)
-            self.assertGreaterEqual(response.status_code, 400)
+                with self.assertRaises((OSError, ValueError)):
+                    validated_download_snapshot(self.path, self.backups)
+            self.assertTrue(triggered, "the intended source-open race was not exercised")
             self._no_staging()
-        except (OSError, NotImplementedError):
-            self.skipTest("symlinks unavailable under this OS account")
+        finally:
+            if self.path.is_symlink():
+                self.path.unlink()
+
+    def test_changed_open_fd_identity_is_rejected_on_both_platforms(self):
+        # Independently exercise the fail-closed identity check even on Windows
+        # accounts where creating real symlinks requires special privileges.
+        original_fstat = os.fstat
+        triggered = False
+
+        def changed_identity(fd):
+            nonlocal triggered
+            metadata = original_fstat(fd)
+            if not triggered:
+                triggered = True
+                fields = list(metadata)
+                fields[1] = metadata.st_ino + 1  # os.stat_result: index 1 = inode
+                return os.stat_result(fields)
+            # rmtree also calls os.fstat: preserve its original identity checks.
+            return metadata
+
+        with patch("srw.runtime.backup_download.os.fstat", changed_identity):
+            with self.assertRaisesRegex(ValueError, "backup name changed while opening"):
+                validated_download_snapshot(self.path, self.backups)
+        self.assertTrue(triggered)
+        self._no_staging()
 
     def test_concurrent_download_refuses_second_snapshot_and_recovers_slot(self):
         entered = threading.Event()
