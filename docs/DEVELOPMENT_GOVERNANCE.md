@@ -81,3 +81,16 @@ P0：数据、证据、人工决策错误/泄露、无法启动或丢失主线�
 - 需要负责人决定的事情（如果无则注明无）。
 
 如没有真实新增进展，不得用“功能更加完善”作结论。
+
+## 11. G1.1 独立审查、冲突域与复核（#132）
+
+- Core/API、备份恢复、数据模型、会话安全、Native 发布类 PR 必须由**非作者轨道**对准确 HEAD 做正式 Review，写明代码边界、至少一条负例、跨端差异与 `SOURCE_MANIFEST` 变化，并给出 `ACCEPT/NEEDS_CHANGES/BLOCK`。HEAD 一变，旧 Review 过期；缺 Review 就是 `REVIEW BLOCKED`，CI 全绿也不能替代。
+- A/B/C 共用一个 GitHub 账号时，`COMMENTED` review 只是**过程层分工**，平台无法证明是另一个人审的；不得声称 Ruleset 或 Branch Protection 已强制审查。
+- P0/P1 修复的顺序固定为：合成且确定的 **RED** → 修复 → **RED 变 GREEN** → 正反例回归 → 双平台 Source 与 Chromium（必要时 Native）→ 独立 Review。无法自动复现的故障必须写清人工/杀进程 oracle。
+- `os.fsync`、`os.link`、`os.replace`、Windows 文件共享、SQLite WAL、路径大小写与权限、崩溃窗口属于系统级风险，**设计前**写双 OS 兼容表，不等 Windows 红灯再分析。
+- 合并遵循[事件驱动、风险优先的队列](INTEGRATION_QUEUE.md)：同一冲突域一次只有一名集成人，main/PR HEAD 实时复核；巡检不是强制等待窗口，紧急 P0 不得延迟。
+- 清单继续执行"**提交的字节与提交的 SHA 清单一致**"，CI 不得自动写回清单并盖章；评审可用只读 `scripts/report_source_manifest_delta.py`，分域清单仍属[未生效的迁移研究](SOURCE_MANIFEST_MIGRATION.md)。
+- 交接六字段（main/head｜变更｜实证｜下一件｜决策｜阻断）尽量少于 300 字，细节留在 PR/Issue；使用系统真实 ISO-8601 时间，不手填占位。
+- 任何一轨缺席都不授权另一轨代签自己的高风险 Review；可做非重叠的治理、只读工具与确定性测试合同。
+
+权威风险条目见[风险地图](ENGINEERING_RISK_REGISTER.md)。新版本仍须独立原子迁移 PR，本文不改变产品 A1–A8。
