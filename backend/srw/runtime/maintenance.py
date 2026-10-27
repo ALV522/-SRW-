@@ -40,7 +40,7 @@ def cleanup_stale_backup_artifacts(data_dir: str | Path) -> dict[str, int]:
                     removed_dirs += 1
 
     if backup_dir.is_dir():
-        for pattern in (".backup-import-*", "*.partial", ".restore-import-*"):
+        for pattern in (".backup-import-*", "*.partial", ".restore-import-*", ".backup-download-*"):
             for path in backup_dir.glob(pattern):
                 if path.is_dir() and not path.is_symlink():
                     shutil.rmtree(path, ignore_errors=True)
