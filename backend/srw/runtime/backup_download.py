@@ -10,6 +10,7 @@ import os
 import shutil
 import stat
 import tempfile
+import threading
 from pathlib import Path
 
 from starlette.responses import FileResponse
@@ -57,6 +58,73 @@ def validated_download_snapshot(path: Path, backups_dir: Path) -> tuple[Path, Pa
     except BaseException:
         shutil.rmtree(work, ignore_errors=True)
         raise
+
+
+class PendingBackupSnapshot:
+    """Transfer a verified snapshot only once, without losing a cancelled worker.
+
+    The request may disappear while its threadpool function is still copying.
+    The worker and route synchronize ownership: until a response takes over,
+    the slot stays held and the *last* owner cleans the private directory.
+    In particular, cancellation never deletes a file still open for writing
+    (important on Windows) and never releases the slot while the worker runs.
+    """
+
+    def __init__(self, release_slot):
+        self._release_slot = release_slot
+        self._lock = threading.Lock()
+        self._state = "preparing"  # preparing -> ready/failed -> delivered/done
+        self._result: tuple[Path, Path] | None = None
+
+    def prepare(self, snapshot_fn, path: Path, backups_dir: Path) -> None:
+        """Run in the worker thread; thread retains cleanup on cancellation."""
+        try:
+            result = snapshot_fn(path, backups_dir)
+        except BaseException:
+            with self._lock:
+                if self._state == "abandoned":
+                    self._state = "done"
+                    self._release_slot()
+                else:
+                    self._state = "failed"
+            raise
+        with self._lock:
+            if self._state == "abandoned":
+                # The worker has finished *all* file operations. Clean first,
+                # then allow the next download to consume disk capacity.
+                try:
+                    shutil.rmtree(result[1], ignore_errors=True)
+                finally:
+                    self._state = "done"
+                    self._release_slot()
+            else:
+                self._result = result
+                self._state = "ready"
+
+    def handoff(self) -> tuple[Path, Path]:
+        """Called after the awaited worker completed; response takes ownership."""
+        with self._lock:
+            if self._state != "ready" or self._result is None:
+                raise RuntimeError("backup snapshot is not ready for transfer")
+            self._state = "delivered"
+            result, self._result = self._result, None
+            return result
+
+    def abandon(self) -> None:
+        """Called when setup fails or the HTTP task is cancelled."""
+        with self._lock:
+            if self._state == "preparing":
+                self._state = "abandoned"
+            elif self._state in ("ready", "failed"):
+                try:
+                    if self._result is not None:
+                        shutil.rmtree(self._result[1], ignore_errors=True)
+                        self._result = None
+                finally:
+                    self._state = "done"
+                    self._release_slot()
+            # delivered: the FileResponse owns the directory and slot.
+            # abandoned/done: the worker or earlier abandon owns finalization.
 
 
 class VerifiedBackupFileResponse(FileResponse):

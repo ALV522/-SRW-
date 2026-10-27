@@ -36,6 +36,7 @@ class BackupDownloadCustodyTests(unittest.TestCase):
             knowledge_dir=create_minimal_knowledge_tree(root / "knowledge" / "active"),
             frontend_dist=root / "frontend",
         )
+        self.app = app
         self.client = self.enterContext(TestClient(app))
         self.name = self.client.post('/api/v1/system/backups').json()['filename']
         self.path = self.backups / self.name
@@ -189,6 +190,82 @@ class BackupDownloadCustodyTests(unittest.TestCase):
                 self.assertEqual(first.result(timeout=15).status_code, 200)
         self.assertEqual(self._get().status_code, 200)
         self._no_staging()
+
+    def test_cancel_during_worker_completion_preserves_slot_and_reclaims_snapshot(self):
+        # Force cancellation after the disk worker has finished validation but
+        # before its result can cross the threadpool await. This was the B review
+        # leak: the handler had no temp-dir variable and released the slot.
+        entered = threading.Event()
+        proceed = threading.Event()
+        worker_returned = threading.Event()
+        actual = system_routes_module.validated_download_snapshot
+        calls = 0
+        calls_lock = threading.Lock()
+
+        def delayed(*args):
+            nonlocal calls
+            with calls_lock:
+                calls += 1
+                number = calls
+            if number != 1:
+                return actual(*args)
+            try:
+                result = actual(*args)
+                entered.set()
+                if not proceed.wait(10):
+                    raise RuntimeError('blocked worker timed out')
+                return result
+            finally:
+                worker_returned.set()
+
+        async def scenario():
+            messages = []
+
+            async def send(message):
+                messages.append(message)
+
+            async def receive():
+                return {"type": "http.request", "body": b"", "more_body": False}
+
+            path = f'/api/v1/system/backups/{self.name}'
+            scope = {
+                'type': 'http', 'asgi': {'version': '3.0'},
+                'http_version': '1.1', 'method': 'GET', 'scheme': 'http',
+                'path': path, 'raw_path': path.encode('ascii'), 'query_string': b'',
+                'root_path': '', 'headers': [(b'host', b'testserver')],
+                'server': ('testserver', 80), 'client': ('127.0.0.1', 12345),
+            }
+            request = asyncio.create_task(self.app(scope, receive, send))
+            try:
+                self.assertTrue(await asyncio.to_thread(entered.wait, 5))
+                self.assertTrue(list(self.backups.glob('.backup-download-*')))
+                request.cancel()
+                with self.assertRaises(asyncio.CancelledError):
+                    await request
+                self.assertFalse(worker_returned.is_set(), 'worker must still be outstanding')
+                busy = await asyncio.to_thread(self._get)
+                self.assertEqual(busy.status_code, 409, 'slot cannot release during abandoned copy')
+            finally:
+                proceed.set()
+                if not request.done():
+                    request.cancel()
+                    try:
+                        await request
+                    except asyncio.CancelledError:
+                        pass
+            self.assertTrue(await asyncio.to_thread(worker_returned.wait, 6))
+            for _ in range(100):
+                if not list(self.backups.glob('.backup-download-*')):
+                    break
+                await asyncio.sleep(0.03)
+            self._no_staging()
+            subsequent = await asyncio.to_thread(self._get)
+            self.assertEqual(subsequent.status_code, 200, subsequent.text[:150]
+                             if subsequent.status_code != 200 else '')
+            self._no_staging()
+
+        with patch.object(system_routes_module, 'validated_download_snapshot', delayed):
+            asyncio.run(scenario())
 
     def test_response_cleans_and_releases_slot_when_asgi_send_aborts(self):
         snapshot, private_dir = validated_download_snapshot(self.path, self.backups)

@@ -13,6 +13,7 @@ half of the recovery contract, not a substitute for on-device acceptance.
 """
 from __future__ import annotations
 
+import asyncio
 import json
 import threading
 import shutil
@@ -29,7 +30,7 @@ from srw.modules.fullworkbench import create_backup, diagnostics
 from srw.release import get_release_state
 from srw.runtime.backup_truth import BackupTruthError, validate_backup_archive
 from srw.runtime.backup_download import (
-    VerifiedBackupFileResponse, validated_download_snapshot,
+    PendingBackupSnapshot, VerifiedBackupFileResponse, validated_download_snapshot,
 )
 from srw.runtime.db.schema import V1_SCHEMA_REVISION
 from srw.runtime.diagnostic_bundle import build_privacy_safe_diagnostic_bundle
@@ -62,8 +63,9 @@ def system_routes(*, factory, data_dir: Path, knowledge_dir: Path,
             if is_published_backup_name(p.name) and p.is_file() and not p.is_symlink()
         ]})
 
-    # Each validated snapshot can occupy up to 512 MiB on disk; only one
-    # download at a time prevents unbounded workspace disk amplification.
+    # The current Core creates one app. The bound is per Starlette app, not
+    # a cross-process/per-workspace lock; no second app is used in production.
+    # Each validated snapshot can occupy up to 512 MiB on disk.
     download_slot = threading.BoundedSemaphore(1)
 
     async def backup_download(request: Request) -> Response:
@@ -73,30 +75,38 @@ def system_routes(*, factory, data_dir: Path, knowledge_dir: Path,
             raise HTTPException(404)
         if not download_slot.acquire(blocking=False):
             raise V1InvariantError("backup download already in progress; retry after it finishes")
-        snapshot = temporary = None
+        ownership = PendingBackupSnapshot(download_slot.release)
+        # Shield the worker from HTTP-task cancellation. A cancelled caller
+        # marks ownership abandoned; the worker cleans *after* it stops writing
+        # and releases the slot, even if the caller cannot await its return.
+        job = asyncio.create_task(run_in_threadpool(
+            ownership.prepare, validated_download_snapshot, path, path.parent,
+        ))
+        # A cancelled handler is no longer waiting for exceptions. Retrieve
+        # errors from the independent worker task to avoid orphan-task warnings.
+        job.add_done_callback(lambda done: None if done.cancelled() else done.exception())
         try:
-            # Handle a possible name replacement by copying from one opened FD;
-            # neither validation nor HTTP serving reopens the published ZIP.
-            snapshot, temporary = await run_in_threadpool(
-                validated_download_snapshot, path, path.parent,
-            )
+            await asyncio.shield(job)
+            snapshot, temporary = ownership.handoff()
             try:
                 return VerifiedBackupFileResponse(
                     snapshot, temporary, filename=name, release_slot=download_slot.release,
                 )
             except BaseException:
-                shutil.rmtree(temporary, ignore_errors=True)
-                snapshot = None
+                try:
+                    shutil.rmtree(temporary, ignore_errors=True)
+                finally:
+                    download_slot.release()
                 raise
         except FileNotFoundError as exc:
+            ownership.abandon()
             raise HTTPException(404) from exc
         except (OSError, ValueError, BackupTruthError) as exc:
+            ownership.abandon()
             raise V1InvariantError("backup download rejected: invalid or unstable archive") from exc
-        finally:
-            # On success, the response owns the slot until the last ASGI send.
-            # On setup failure, no response exists to release it.
-            if snapshot is None:
-                download_slot.release()
+        except BaseException:
+            ownership.abandon()
+            raise
 
 
     async def schedule_restore(request: Request) -> JSONResponse:
