@@ -172,6 +172,34 @@ class BackupDownloadCustodyTests(unittest.TestCase):
         self.assertEqual(releases, [True])
         self._no_staging()
 
+    def test_pathsend_extension_never_escapes_ephemeral_snapshot(self):
+        # pathsend queues a *path* for the server; __call__ may return before
+        # the server opens it. Our finally would then delete it too early.
+        original = self.path.read_bytes()
+        snapshot, private_dir = validated_download_snapshot(self.path, self.backups)
+        messages = []
+        releases = []
+        response = VerifiedBackupFileResponse(
+            snapshot, private_dir, filename=self.name,
+            release_slot=lambda: releases.append(True),
+        )
+
+        async def send(message):
+            messages.append(message)
+
+        async def receive():
+            return {"type": "http.request", "body": b"", "more_body": False}
+
+        scope = {"type": "http", "method": "GET", "path": "/", "headers": [],
+                 "http_version": "1.1", "asgi": {"version": "3.0"},
+                 "extensions": {"http.response.pathsend": {}, "other": {}}}
+        asyncio.run(response(scope, receive, send))
+        self.assertFalse(any(m["type"] == "http.response.pathsend" for m in messages),
+                         "pathsend cannot own a snapshot that is cleaned on return")
+        self.assertEqual(b"".join(m.get("body", b"") for m in messages), original)
+        self.assertEqual(releases, [True])
+        self._no_staging()
+
     def test_oversized_zip_is_rejected_before_copying_or_serving(self):
         with patch("srw.runtime.backup_download.MAX_COMPRESSED_BYTES", 512):
             response = self._get()

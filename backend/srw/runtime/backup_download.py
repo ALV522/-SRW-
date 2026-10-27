@@ -71,6 +71,16 @@ class VerifiedBackupFileResponse(FileResponse):
         super().__init__(path, filename=filename, headers={"Cache-Control": "no-store"})
 
     async def __call__(self, scope, receive, send) -> None:
+        # Starlette's pathsend hands the private filename to the ASGI server.
+        # That server may open it *after* this coroutine returns, when finally
+        # has already removed our snapshot. Force the ordinary awaited file
+        # stream instead; preserve every unrelated ASGI extension.
+        if "http.response.pathsend" in scope.get("extensions", {}):
+            scope = dict(scope)
+            scope["extensions"] = {
+                name: spec for name, spec in scope["extensions"].items()
+                if name != "http.response.pathsend"
+            }
         try:
             await super().__call__(scope, receive, send)
         finally:
