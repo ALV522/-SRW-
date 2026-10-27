@@ -34,3 +34,12 @@
 P0/P1：
 建议下一个最小闭环：
 需要产品负责人决定的事情：
+
+## G1.1 独立审查与队列元数据（实际证据，不是勾选证明）
+- 干净任务分支 / pre-edit preflight 真实输出、执行时间与证据链接（未做填 `NOT RUN → BLOCKED`）：
+- 准确 main/base/head SHA、最新 CI 结果与 URL：
+- SOURCE_MANIFEST 新增/删减/修改项、实际源码 diff、历史清单核查：
+- 非作者轨道 reviewer、正式 Review URL、审查的 HEAD、结论 `ACCEPT/NEEDS_CHANGES/BLOCK`：
+- Windows/POSIX 文件系统、Host/Browser 或安全权限差异负例：
+- RED → GREEN 的用例与实际环境；若没有负例原因：
+- 冲突域 / 队列位置 / 适用的人工验收和最后复核：
