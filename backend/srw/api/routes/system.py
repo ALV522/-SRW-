@@ -13,18 +13,25 @@ half of the recovery contract, not a substitute for on-device acceptance.
 """
 from __future__ import annotations
 
+import asyncio
 import json
+import threading
+import shutil
 from pathlib import Path
 
 from starlette.exceptions import HTTPException
 from starlette.requests import Request
-from starlette.responses import FileResponse, JSONResponse, Response
+from starlette.responses import JSONResponse, Response
+from starlette.concurrency import run_in_threadpool
 from starlette.routing import Route
 
 from srw.kernel.errors import V1InvariantError
 from srw.modules.fullworkbench import create_backup, diagnostics
 from srw.release import get_release_state
 from srw.runtime.backup_truth import BackupTruthError, validate_backup_archive
+from srw.runtime.backup_download import (
+    PendingBackupSnapshot, VerifiedBackupFileResponse, validated_download_snapshot,
+)
 from srw.runtime.db.schema import V1_SCHEMA_REVISION
 from srw.runtime.diagnostic_bundle import build_privacy_safe_diagnostic_bundle
 
@@ -56,12 +63,51 @@ def system_routes(*, factory, data_dir: Path, knowledge_dir: Path,
             if is_published_backup_name(p.name) and p.is_file() and not p.is_symlink()
         ]})
 
-    async def backup_download(request: Request) -> FileResponse:
+    # The current Core creates one app. The bound is per Starlette app, not
+    # a cross-process/per-workspace lock; no second app is used in production.
+    # Each validated snapshot can occupy up to 512 MiB on disk.
+    download_slot = threading.BoundedSemaphore(1)
+
+    async def backup_download(request: Request) -> Response:
         name = Path(request.path_params["filename"]).name
         path = data_dir / "backups" / name
         if not is_published_backup_name(name) or not path.is_file() or path.is_symlink():
             raise HTTPException(404)
-        return FileResponse(path, filename=name)
+        if not download_slot.acquire(blocking=False):
+            raise V1InvariantError("backup download already in progress; retry after it finishes")
+        ownership = PendingBackupSnapshot(download_slot.release)
+        # Shield the worker from HTTP-task cancellation. A cancelled caller
+        # marks ownership abandoned; the worker cleans *after* it stops writing
+        # and releases the slot, even if the caller cannot await its return.
+        job = asyncio.create_task(run_in_threadpool(
+            ownership.prepare, validated_download_snapshot, path, path.parent,
+        ))
+        # A cancelled handler is no longer waiting for exceptions. Retrieve
+        # errors from the independent worker task to avoid orphan-task warnings.
+        job.add_done_callback(lambda done: None if done.cancelled() else done.exception())
+        try:
+            await asyncio.shield(job)
+            snapshot, temporary = ownership.handoff()
+            try:
+                return VerifiedBackupFileResponse(
+                    snapshot, temporary, filename=name, release_slot=download_slot.release,
+                )
+            except BaseException:
+                try:
+                    shutil.rmtree(temporary, ignore_errors=True)
+                finally:
+                    download_slot.release()
+                raise
+        except FileNotFoundError as exc:
+            ownership.abandon()
+            raise HTTPException(404) from exc
+        except (OSError, ValueError, BackupTruthError) as exc:
+            ownership.abandon()
+            raise V1InvariantError("backup download rejected: invalid or unstable archive") from exc
+        except BaseException:
+            ownership.abandon()
+            raise
+
 
     async def schedule_restore(request: Request) -> JSONResponse:
         name = Path(request.path_params["filename"]).name
