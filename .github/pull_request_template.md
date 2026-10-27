@@ -37,7 +37,8 @@ P0/P1：
 
 ## G1.1 独立审查与队列元数据（实际证据，不是勾选证明）
 - 干净任务分支 / pre-edit preflight 真实输出、执行时间与证据链接（未做填 `NOT RUN → BLOCKED`）：
-- 准确 main/base/head SHA、最新 CI 结果与 URL：
+- 准确 main/base/head SHA、自动 bot 的 exact-HEAD CI 证据评论 URL（若无则 NOT AVAILABLE；bot 不是合并许可）：
+- 不同工作轨审查是否有独立 GitHub 审批身份：`YES / NO（共用账号） / NOT RUN`：
 - SOURCE_MANIFEST 新增/删减/修改项、实际源码 diff、历史清单核查：
 - 非作者轨道 reviewer、正式 Review URL、审查的 HEAD、结论 `ACCEPT/NEEDS_CHANGES/BLOCK`：
 - Windows/POSIX 文件系统、Host/Browser 或安全权限差异负例：

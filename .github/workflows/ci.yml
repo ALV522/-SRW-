@@ -39,6 +39,9 @@ jobs:
           python scripts/refresh_source_manifest.py > artifacts/SOURCE_MANIFEST.candidate.sha256
       - name: Verify source manifest
         run: python scripts/check_source_integrity.py
+      - name: Report read-only source domain pilot
+        shell: bash
+        run: python scripts/report_source_manifest_domains.py --markdown >> "$GITHUB_STEP_SUMMARY"
       - name: Verify release identity
         run: python scripts/check_release_truth.py
       - name: Run capability and resource regression

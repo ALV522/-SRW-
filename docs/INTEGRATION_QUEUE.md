@@ -8,19 +8,19 @@
 4. **合并前**重读 main/head SHA、CI 所属 SHA、Review、未解决 thread、清单与 diff；头部一变就重审受影响范围。**合并后**重读 main SHA、关联 PR 与 push CI。
 5. 队列巡检按事件驱动，不设"每天只能合并两次"的窗口；紧急 P0 不因时钟拖延。交接六字段（main/head｜变更｜实证｜下一件｜决策｜阻断）尽量少于 300 字，使用系统真实时间。
 
-## 2026-10-27 22:55 快照（仅作起点，不是当前状态）
+## 2026-10-28 01:10 快照（只能用于交接，非实时授权）
 
-| 候选 | 冲突域 | 快照状态 | 下一条件 |
-|---|---|---|---|
-| **本 PR**（#132 治理刷新 v2） | `docs/`、`README.md`、`.github/pull_request_template.md`、`scripts/report_source_manifest_delta.py`、manifest | 从 `cf72d6e` 干净分支重做；取代 #133 与 #146 旧头 `dde9d794` | exact-HEAD 双平台 Source/Chromium/Governance + A 独立 Review |
-| [#137](https://github.com/ALV522/-SRW-/pull/137) 合并就绪报告器 | `scripts/`、tests、docs | 只读报告器，旧头尚未在新 main 上复验 | 与本 PR 的清单差异工具确认不重复后 Review |
-| [#101](https://github.com/ALV522/-SRW-/pull/101) | Core/Frontend/Host/Schema | 历史聚合 PR，不是可合并队列 | 只允许从新 main 抽净增量小切片 |
+| 候选 / 事项 | 冲突域与现状 | 下一动作 |
+|---|---|---|
+| **本 PR** #132 效率治理 pilot | `docs/`, `.github/workflows/`, `scripts/`, tests、根 Manifest；从 `b95d3359` 干净分支执行 pre-edit G1 | 自动 CI 证据链接、分域只读等价证明，完整 Source/Chromium/Governance、另一轨 Review 后才可合入 |
+| [#148](https://github.com/ALV522/-SRW-/pull/148) | #43 session policy + HTTP/root 测试 **test-only 故意 RED**，当前基线 `6adfcf39`（已过期） | 仅作生产 atomic RED→GREEN oracle；不能单独合并或把旧 Manifest 406 覆盖 main |
+| [#137](https://github.com/ALV522/-SRW-/pull/137) | #135 advisory PR readiness 报告器，旧分支基线 | 先比对与本 PR 的 CI 证据 bot/现有 delta 工具；仅转移不重叠的独有代码，不能直接合并 |
+| [#101](https://github.com/ALV522/-SRW-/pull/101) | 85 文件规模的旧 Core/Frontend/Host 聚合 PR；非活跃可合并候选 | 差异与唯一行为证据审计后拆小 PR；**不删除**有历史价值的分支 |
+| #130、#43、#124、#42 | 恢复交易终态、会话双端合同、Native 外部工件、目标机 WPF 验收 | 根据 P0/P1 门禁与真实测试逐项收敛 |
 
-**已闭环（不要重复排队）：** #139 备份原子发布、#140 其故障注入回归、#144 journaled 恢复（含残留清理）、#145 opt-in 纯会话策略。**#145 只进源码，生产 middleware 仍 OFF/未接入。**
+**已合并（不得重复排队）：** #139、#140、#144、#145、#147、**#149（main `b95d3359`，有界完整性校验备份下载）**。#133/#146 等旧治理候选已关闭、未合并；不删分支。#145 policy 只是源码能力，HTTP gate 仍 OFF。
 
-**已关闭：** #128、#129、#138、#141、#142、#143（superseded/unmerged）。#133 与 #146 旧头在本 PR 合并后关闭为 superseded。
-
-**待办但不在本队列：** #131 备份下载校验（只有 A 的离线补丁：无 PR、无远端 HEAD、preflight NOT RUN）、#43 middleware 接入与 7 条 test-only RED、#124 Runtime/Knowledge 保管、#42 Native 全链。
+**资源冲突减量实验：** 根 Manifest 仍必改且必校验，Pilot 仅收集分域摘要，不能声称已经让并行 PR 无冲突。来源与真实链接由 bot 写在各自 PR 上，#103 只保留 main/head、业务结论与阻断，不重复大段 CI 数字。
 
 ## 当某一轨暂时缺席
 

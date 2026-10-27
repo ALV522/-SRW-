@@ -6,12 +6,12 @@
 |---|---|---|---|
 | 恢复事务与崩溃窗口（#130） | P0；掉电或强杀时旧 DB/Blob 被误删、二次 undo、残留整库副本 | 真实子进程致死矩阵 + journal `PREPARED→APPLYING→COMMITTED` + pinned 目标哈希 + 幂等重解包 | **已合入 `a1e566e`（#144）**；残留 `srw-restore-*`/`srw-prerestore-*` 已纳入启动清理。未证明：Windows 突然掉电持久性；`COMMITTED` 后 AV 长期占用仍 fail-closed，独立终态合同未定义 / A |
 | 备份原子发布（#139/#140） | P0；中断留下"列表可见但排程才失败"的截断档、同名覆盖、不支持硬链接、AV 锁误报 | `.srw-staging-*.partial` + 逐成员 SHA/大小 + fsync + `os.link` 不覆盖 + 列表命名过滤；两条确定性注入回归 | **已合入**（#139 → #140）。未证明：POSIX 目录 fsync 后失败的已发布状态、Windows AV 干扰 / A |
-| 备份下载完整性（#131） | P1 可升级；`FileResponse(path)` 的 TOCTOU、下载中被替换/原地改写 | 有界校验快照（单 FD、1 MiB 分块、512 MiB 上限）、Range/206/400/416、finally 清理 | A 有两份离线补丁（39/39、46/46 定向），**无 PR、无远端 HEAD、preflight/CI/Native NOT RUN**；需要真实干净分支转移后才能算修复 / A |
-| 会话与敏感读（#43） | P0；回环 + Origin 挡不住同机其他进程；`/runtime/info` 暴露 instance/session 标识 | 纯策略模块（默认 OFF、`X-SRW-Session`、匿名最小白名单、路径歧义拒绝、same-site 拒绝、query 键五轮解码） | **策略已合入 `cf72d6e`（#145）**；但 **middleware 未接入，真实 HTTP 仍无会话校验**；7 条 test-only `200→401/403` RED 已获 A 合同、尚未写 / C+A |
+| 备份下载完整性（#131） | P1 可升级；`FileResponse(path)` 的 TOCTOU、下载中被替换/原地改写 | 有界校验快照（单 FD、1 MiB 分块、512 MiB 上限）、Range/206/400/416、finally 清理 | **#149 已并入 main `b95d3359`**：本 SHA Ubuntu+Windows Source/Chromium/Governance 成功，B 以准确 HEAD ACCEPT；真实 WPF/AV 占用、512 MiB 实物边界仍 NOT RUN / A |
+| 会话与敏感读（#43） | P0；回环 + Origin 挡不住同机其他进程；`/runtime/info` 暴露 instance/session 标识 | 纯策略模块（默认 OFF、`X-SRW-Session`、匿名最小白名单、路径歧义拒绝、same-site 拒绝、query 键五轮解码） | **策略已合入 `cf72d6e`（#145）**；但 **middleware 未接入，真实 HTTP 仍无会话校验**；[#148](https://github.com/ALV522/-SRW-/pull/148) 已提出 20 个故意 RED 的负例（含 Windows `/` 静态入口）；**不得单独合并**；Native Host runtime/info 仍需认证、Browser attach 与 CSRF/撤销未实现 / C+A |
 | 同工作区双端并发（#43 后半） | P1；重复 writer、Job owner、CAS 412 假审计、恢复互锁 | T1–T10 与 WPF+Browser 并发/故障注入 | **NOT RUN** / A+C |
 | Native 外部工件保管（#124） | P0 发行可复现性；私有 Runtime/Knowledge 缺第二故障域 | pins 与授权、clean-room 重建、真机验证 | **BLOCKED**；仓库内无原始 Knowledge/Runtime / A |
 | Evidence 读取完整性（#122/#127） | P1；Source 内容/路径被篡改会误导人工决定 | 读时 SHA 校验、immutable PDF/下载快照 | 生产修复已合入；未被证明的部分继续用负例覆盖，不外推"Evidence 全绿" / A |
-| 治理与清单（#132，本 PR） | P1/P2；单作者自合、无 branch protection、全局清单冲突 | 非作者轨道 Review 协议、preflight 证据、只读清单差异报告 | 协议与只读工具随本 PR；**分支保护仍未启用**，属人为纪律 / A+B |
+| 治理与清单（#132，本 PR） | P1/P2；单作者自合、无 branch protection、全局清单冲突 | 非作者轨道 Review 协议、preflight 证据、只读清单差异报告 | G1.1 已由 #147 合入；#132 另做 exact-HEAD bot 评论/只读 7 域摘要 pilot，**不修改权威根清单语义**；平台仍仅一个 ALV522 账号、无 Ruleset，人工不同轨道 Review 不能冒充第二个账户 / A+B |
 
 ## 执行规则
 
