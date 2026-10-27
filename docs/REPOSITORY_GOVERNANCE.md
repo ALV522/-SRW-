@@ -1,6 +1,8 @@
 > **暂不使用主线保护（2026-10-20）**：负责人决定暂不启用 GitHub Ruleset；以 [无保护期协议](NO_BRANCH_PROTECTION_PROTOCOL.md)、根目录 AGENTS.md、预编辑脚本、PR/CI 和 main 推送事后审计作为临时补偿。**不等于真正的分支权限保护**，不得直接向 main 推送。
 
-> **G1 加强规范（2026-10-20）**：所有 Agent 从仓库根目录 [AGENTS.md](../AGENTS.md) 开始，按序阅读产品/版本/双载体/验收契约。PR 使用 .github/pull_request_template.md，运行 Governance Contract CI；如要防止绕过，仓库管理员必须将合并要求和治理检查设置为 main 的必需规则。原有分支盘点是历史快照，未经逐一审计不得删除分支。\n\n# SRW 仓库治理与分支规则（2026-10-19）
+> **G1 加强规范（2026-10-20）**：所有 Agent 从仓库根目录 [AGENTS.md](../AGENTS.md) 开始，按序阅读产品/版本/双载体/验收契约。PR 使用 .github/pull_request_template.md，运行 Governance Contract CI；如要防止绕过，仓库管理员必须将合并要求和治理检查设置为 main 的必需规则。原有分支盘点是历史快照，未经逐一审计不得删除分支。
+
+# SRW 仓库治理与分支规则（2026-10-19）
 
 ## 唯一整合主线与版本身份
 
@@ -56,3 +58,9 @@
 7. 不为 UI 美化牺牲 0.8.x 成熟 Evidence、Decision、Offer、AI/OCR/ASR、Knowledge、Backup 能力；优先用业务验收来确认保真。
 
 详细开发顺序见 [ROADMAP](ROADMAP.md)，当前事实以 [README](../README.md) 和 [WINDOWS_GUI_FIRST_ACCEPTANCE](WINDOWS_GUI_FIRST_ACCEPTANCE.md) 为准。
+
+## 仓库整理边界（2026-10-26 起）
+
+旧 `docs/BRANCH_INVENTORY.md`、`DEVELOPMENT_STATE.md`、`docs/history/`、E1–E5 与 PR #101 是历史证据：**本轮不删文件、不删远端分支、不重写提交或 tag**。日后每条分支都要先审计与 main 的唯一提交、PR 关联、可恢复性、隐私风险与工件来源，再决定去留。
+
+最新进度参阅[集成队列](INTEGRATION_QUEUE.md) 与[风险台账](ENGINEERING_RISK_REGISTER.md)；不把历史静态统计改写成当前测试结果。

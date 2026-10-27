@@ -6,11 +6,21 @@ SRW（Smart Recruitment Workbench）是一套 **local-first、evidence-centered�
 
 > **Agent / 协作者必读**：开始任何修改前先读 [AGENTS.md](AGENTS.md)，并按其顺序阅读产品宪章、开发治理、版本政策、能力矩阵、双载体计划、验收计划和无保护开发协议。`main` 当前未启用 GitHub Branch Protection；必须从最新 main 建任务分支、运行 `python scripts/agent_preflight.py --issue <Issue号> --acknowledge-reading`、走 PR，并以同一 PR Head SHA 的适用 CI 为合并依据。
 
+## 当前开发入口（2026-10-27 22:55 +08 快照）
+
+**主线：** `main cf72d6ee15f82032443556cbd5c12239511e64a0`，VERSION `1.0.0-alpha10-convergence11`，Schema `v1_0014`，development。该 SHA 的 6 个工作流均 completed/success：Ubuntu + Windows Source Gate、真实 Chromium、Governance Contract、Repository Integrity、Windows Host Rebuild Candidate、C11 Windows Offline Wheelhouse（本段由 GitHub API 实读，不是转抄）。这是**源码/构建 CI**，不是新 Native ZIP 的 WPF GUI、生产 Provider/Knowledge 或双载体验收。
+
+**已合并的关键闭环：** #139 备份原子发布 → #140 其故障注入回归 → #144 journaled 崩溃安全恢复（含残留目录回收）→ #145 opt-in 纯会话策略（37 条编码/Origin 用例）。**注意：#145 只把策略模块放进源码，生产 HTTP 仍不校验会话（middleware 未接入、默认 OFF）。** #128/#129/#138/#141/#142/#143 均已关闭为 superseded/unmerged，不要引用它们的旧绿灯。
+
+**未合并或待办：** 本 PR（#132 G1.1 治理刷新，取代 #133/#146 旧头）、#137 合并就绪只读报告器、#131 备份下载校验（仅 A 的离线补丁，无 PR/无 CI/preflight NOT RUN）、#43 middleware 接入与 7 条 test-only RED、#124 Runtime/Knowledge 保管、#42 Native 全链。**最新状态以 [#103](https://github.com/ALV522/-SRW-/issues/103) / [#132](https://github.com/ALV522/-SRW-/issues/132) 的实时回复与 GitHub API 为准，不要复用本节快照。**
+
+**按顺序阅读：** [AGENTS](AGENTS.md) → [开发治理](docs/DEVELOPMENT_GOVERNANCE.md) → [集成队列](docs/INTEGRATION_QUEUE.md) → [风险台账](docs/ENGINEERING_RISK_REGISTER.md) → [清单迁移边界](docs/SOURCE_MANIFEST_MIGRATION.md)。在最新 main 的干净专用分支执行 `python scripts/agent_preflight.py --issue <N> --acknowledge-reading` 并确认 `PRE-EDIT POLICY PASS` **之后**才编辑。改完按顺序执行 `python scripts/refresh_source_manifest.py --write`、`python scripts/check_source_integrity.py`、`python scripts/check_release_truth.py`；评审时可用只读 `python scripts/report_source_manifest_delta.py --base-ref main` 输出清单差异（它是评审辅助，不是完整性 PASS）。
+
 ## 外部 Native 工件保管与可复现性（2026-10-26）
 
 Native 输入已有固定哈希、Source/Host/Wheelhouse CI 与实机 Smoke，但不等于丢失外部 ZIP 后可独立恢复。历史 alpha10 依赖 5/13 的状态不等于当前 overlay 的 13/13。风险/保管校验/独立重建规划见 [Native Runtime/Knowledge 外部工件保管与重建](docs/NATIVE_ARTIFACT_CUSTODY_AND_REPRODUCIBILITY.md)（#124）；私有 Runtime、Knowledge、密钥和候选人数据不得上传 Public Git。
 
-## 当前事实基线
+## 历史事实基线（2026-10-21，非实时）
 
 以下为 **2026-10-21 的历史快照**（SHA `c0bc192e346ab16aeb6fa63e60a40c617274a188`），不是当前 main 或准确 CI；必须每次重新核验 GitHub SHA 与工件身份：
 
