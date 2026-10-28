@@ -99,6 +99,7 @@ P0：数据、证据、人工决策错误/泄露、无法启动或丢失主线�
 
 这一节不是新增审批层：减少重复状态转述和全局清单冲突，保留 G1 原有合并门禁。
 
+- **#150 审查修正：** 机器人只展示三项 reporting workflows，不代表六项主线门禁全部通过；按 PR 号串行、在写入前核验 HEAD，幂等更新并清除重复的旧 bot 评论。GitHub `workflow_run` 必须在默认分支真正部署后另行实测；仅有 PR 的 Source CI 全绿不证明评论机器人已经部署。
 - **CI 链接自动化：** 可信默认分支的 `SRW CI Evidence Link Reporter` 通过 `workflow_run` 读取 GitHub API，按准确 PR HEAD 更新一条 bot 评论，附 Source/Chromium/Governance 的 run URL 和完成状态；无对应 run 一律显示 PENDING，任意失败不得显示全绿。它不运行 PR 代码、不写 Source Manifest、不合并 PR，也不自动补签 Review。main push 的工件/CI 仍需分别查 SHA。手工转述不必在 #103 复制长篇 CI 数字，给 PR 证据链接即可。
 - **真实审批身份：** A/B/C 即使有分轨实证，只要使用同一 GitHub 登录就不是第二个 GitHub 审批身份。此时如实写“不同工作轨道审查，平台审批者未独立”；不把 `COMMENTED` 算作第二账号 `APPROVED`。若产品负责人决定亲自审阅，可用独立身份在可用权限范围内提交 GitHub Review；未获正式审查不代签。每周 10 分钟是可选的审查节奏，不替代风险优先队列。
 - **Manifest 分域试运行：** `python scripts/report_source_manifest_domains.py --markdown` 仅从权威根清单导出互斥且全覆盖的 7 个领域摘要，逐字节校验合并后仍等于根清单，检查真实文件哈希。它不保存第二份权威清单，也**不减少当前 PR 对根文件的编辑冲突**。正式切换须另立迁移 PR，证明 Source ZIP、旧历史清单、Native Host、Windows 路径与复原流程的兼容性；禁止 CI 自动重算后自我批准。

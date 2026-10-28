@@ -25,8 +25,9 @@ function summarizeChecks(checks, headSha) {
   }
   const green = SOURCES.every(([f]) => checks[f] && checks[f].status === 'completed'
     && checks[f].conclusion === 'success');
-  lines.push('', green ? '**Three required workflow runs PASS on this HEAD.**'
-    : '**Not all three workflows PASS on this HEAD.**',
+  lines.push('', green ? '**Three reporting workflows PASS on this HEAD (not the complete merge gate).**'
+    : '**Not all three reporting workflows PASS on this HEAD.**',
+  '', '**NOT COVERED:** Repository Integrity, Windows Host Rebuild, C11 Offline Wheelhouse; check their actual runs separately.',
   '', 'This is **not** a merge authorization. Non-author-track review, manifest diff, '
       + 'Windows WPF/Native acceptance and final main/head checks remain separate gates.',
   '', 'Automated comment updates in place; old PR commits and main-push CI are not reused.');
@@ -43,6 +44,14 @@ async function runReporter({github, context, core}) {
   }
   const headSha = upstream.head_sha;
   if (!/^[a-f0-9]{40}$/.test(headSha)) throw new Error('missing SHA');
+  // A GitHub pull_request workflow may report a synthetic merge-ref. Do not
+  // relabel it as the submitted PR HEAD; produce an explicit provenance log.
+  for (const attached of upstream.pull_requests || []) {
+    if (attached.head?.sha && attached.head.sha !== headSha) {
+      core.warning(`Workflow SHA ${headSha} differs from PR #${attached.number} source HEAD ${attached.head.sha}; refusing to mix evidence`);
+      return;
+    }
+  }
   // All referenced PR metadata is untrusted; it is never interpolated into
   // shell commands, and this trusted workflow executes no PR-provided code.
   const associated = await github.rest.repos.listPullRequestsAssociatedWithCommit({
@@ -77,10 +86,23 @@ async function runReporter({github, context, core}) {
     const all = await github.paginate(github.rest.issues.listComments, {
       owner, repo, issue_number: pr.number, per_page: 100,
     });
-    const previous = all.find(x => x.user?.login === 'github-actions[bot]'
-      && x.body?.startsWith(MARKER));
-    if (previous) {
-      await github.rest.issues.updateComment({owner, repo, comment_id: previous.id, body});
+    // Workflow concurrency is per PR, not per HEAD. Consolidate any duplicate
+    // markers created by older bot versions or interrupted deployments. Keep
+    // the newest one as the sole authoritative updatable comment.
+    const markers = all.filter(x => x.user?.login === 'github-actions[bot]'
+      && x.body?.startsWith(MARKER)).sort((a, b) => b.id - a.id);
+    // Recheck the live head immediately before any write: a stale workflow_run
+    // must never overwrite evidence from a later PR source HEAD.
+    const beforeWrite = await github.rest.pulls.get({owner, repo, pull_number: pr.number});
+    if (beforeWrite.data.state !== 'open' || beforeWrite.data.head.sha !== headSha) {
+      core.info(`PR #${pr.number} moved while building evidence; refusing stale write`);
+      continue;
+    }
+    for (const obsolete of markers.slice(1)) {
+      await github.rest.issues.deleteComment({owner, repo, comment_id: obsolete.id});
+    }
+    if (markers.length) {
+      await github.rest.issues.updateComment({owner, repo, comment_id: markers[0].id, body});
     } else {
       await github.rest.issues.createComment({owner, repo, issue_number: pr.number, body});
     }

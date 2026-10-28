@@ -8,9 +8,10 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
+import re
 import subprocess
 import sys
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 
 ROOT = Path(__file__).resolve().parents[1]
 if __package__ in (None, ""):
@@ -39,6 +40,16 @@ def render_partition(entries: dict[str, str], original: bytes) -> dict:
     """Prove disjoint/complete mapping and exact-byte equivalence, then summarize."""
     shards: dict[str, dict[str, str]] = {name: {} for name in (*DOMAIN_PREFIXES, "root-other")}
     for path, digest in entries.items():
+        # This public helper must fail closed independently of read_manifest().
+        # In normal CI read_manifest validates paths first; direct programmatic
+        # callers cannot bypass the unsafe-path predicate through handcrafted dicts.
+        if not isinstance(path, str):
+            raise ValueError("non-string manifest path")
+        normalized = PurePosixPath(path)
+        if (not path or not re.fullmatch(r"[0-9a-f]{64}", digest)
+                or "\\" in path or ":" in path or normalized.is_absolute()
+                or ".." in normalized.parts or str(normalized) != path):
+            raise ValueError(f"unsafe or noncanonical manifest entry: {path!r}")
         shards[domain_for(path)][path] = digest
     observed = [p for entries in shards.values() for p in entries]
     if len(observed) != len(set(observed)) or set(observed) != set(entries):
@@ -57,6 +68,11 @@ def render_partition(entries: dict[str, str], original: bytes) -> dict:
             "sha256": hashlib.sha256(fragment).hexdigest(),
             "paths": sorted(values),
         }
+        if name == "root-other":
+            domains[name]["top_level_prefixes"] = sorted({
+                path.partition("/")[0] if "/" in path else "(root files)"
+                for path in values
+            })
     return {
         "schema": "srw.source-manifest-domain-pilot.v1",
         "authority": "SOURCE_MANIFEST.sha256",
@@ -92,6 +108,8 @@ def main() -> int:
         print("| Derived partition | Count | SHA-256 |\n|---|---:|---|")
         for name, d in report["domains"].items():
             print(f"| {name} | {d['count']} | `{d['sha256']}` |")
+        print("\n**root-other top-level prefixes:** " +
+              ", ".join("`" + prefix + "`" for prefix in report["domains"]["root-other"]["top_level_prefixes"]))
         print("\n**Exact union, no overlap:** PASS. "
               "No authoritative manifest was changed or auto-repaired.")
     else:

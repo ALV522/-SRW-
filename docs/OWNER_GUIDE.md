@@ -10,6 +10,8 @@
 
 ### 协作证据与负责人抽查（#132）
 
+机器人只覆盖 Source、Chromium、Governance 三项报告；Repository Integrity、Windows Host、Wheelhouse 不在评论范围内，必须分别检查。合并后先验证首次真实 `workflow_run`，而不是默认认为机器人已在运行。
+
 每个新 PR 的 CI 会由 GitHub Actions 的可信主线 Reporter 尝试写入同一条 **exact-HEAD 证据评论**，点击各 workflow 的 run 链接核对，不必从 #103 的长篇自报中寻找。机器人仅汇总 Source/Chromium/Governance，不等于 Native GUI/正式发布，也**不会替你批准或合并 PR**。如果没有 bot 评论，则按 NOT AVAILABLE 处理并人工查 Actions，不声称已部署或已有结果。
 
 当前 A/B/C 工作可能使用同一个 GitHub 账号：独立工作轨复核是真实的流程控制，但不是另一个 GitHub 账户的 APPROVED。若你希望增强独立性，可以用**真正不同的授权账号**每周集中审核风险最高的 1–2 个 PR；平台批准门禁只有在账号与分支权限实际区分后才成立。无需因此将所有普通修复变成逐单请示。

@@ -40,6 +40,7 @@ jobs:
       - name: Verify source manifest
         run: python scripts/check_source_integrity.py
       - name: Report read-only source domain pilot
+        continue-on-error: true # pilot telemetry is advisory, core integrity stays mandatory
         shell: bash
         run: python scripts/report_source_manifest_domains.py --markdown >> "$GITHUB_STEP_SUMMARY"
       - name: Verify release identity

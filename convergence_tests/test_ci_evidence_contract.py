@@ -32,10 +32,10 @@ class EvidenceCommentTests(unittest.TestCase):
           catch(e) {mixed=e.message.includes('mixed CI head')}
           const failing=summarizeChecks({...all,'ci.yml':{...all['ci.yml'], conclusion:'failure'}},sha);
           process.stdout.write(JSON.stringify({
-            good:good.includes('Three required workflow runs PASS'),
+            good:good.includes('Three reporting workflows PASS') && good.includes('NOT COVERED:') && !good.includes('Three required workflow runs'),
             hasLink:good.includes('actions/runs/123'),
-            pending:partial.includes('NOT FOUND / PENDING') && partial.includes('Not all three'),
-            mixed,fail:failing.includes('FAIL/BLOCKED')&&!failing.includes('Three required workflow runs PASS'),
+            pending:partial.includes('NOT FOUND / PENDING') && partial.includes('Not all three reporting'),
+            mixed,fail:failing.includes('FAIL/BLOCKED')&&!failing.includes('Three reporting workflows PASS'),
           }));
         '''
         flags = self.check_js(code)
@@ -48,12 +48,67 @@ class EvidenceCommentTests(unittest.TestCase):
         self.assertIn('workflow_run:', workflow)
         self.assertIn('ref: main', workflow)
         self.assertIn('persist-credentials: false', workflow)
+        self.assertIn('workflow_run.pull_requests[0].number', workflow)
+        self.assertIn('deleteComment', script)
+        self.assertIn('beforeWrite.data.head.sha !== headSha', script)
+        self.assertIn('NOT COVERED:', script)
         self.assertNotIn('ref: ${{ github.event.workflow_run.head_sha }}', workflow)
         self.assertIn('pull-requests: write', workflow)
         self.assertIn('live.data.head.sha !== headSha', script)
         self.assertIn("x.user?.login === 'github-actions[bot]'", script)
         self.assertIn("r.head_sha === headSha", script)
 
+
+    def test_reporter_deduplicates_and_respects_live_head(self):
+        code = r"""
+          const {runReporter, MARKER, SOURCES} = require('./scripts/ci_evidence_comment.cjs');
+          const SHA='a'.repeat(40), NEXT='b'.repeat(40);
+          const logs=[], edited=[], deleted=[], created=[];
+          const issueComments=[
+            {id:11,user:{login:'github-actions[bot]'},body:MARKER+'\nold 11'},
+            {id:44,user:{login:'human'},body:MARKER+'\nnot the bot'},
+            {id:33,user:{login:'github-actions[bot]'},body:MARKER+'\nold 33'},
+          ];
+          let live=SHA;
+          const github={
+            rest:{
+              repos:{listPullRequestsAssociatedWithCommit:async()=>({data:[{number:150,state:'open',base:{ref:'main'},head:{sha:SHA}}]})},
+              pulls:{get:async()=>({data:{state:'open',head:{sha:live}}})},
+              actions:{listWorkflowRuns:async({workflow_id})=>({data:{workflow_runs:[{head_sha:SHA,event:'pull_request',status:'completed',conclusion:'success',id:SOURCES.findIndex(([f])=>f===workflow_id)+101,html_url:'https://github.com/ALV522/-SRW-/actions/runs/123',created_at:'2026-10-28T00:00:00Z'}]}})},
+              issues:{
+                listComments:()=>{},
+                updateComment:async({comment_id,body})=>{edited.push(comment_id);const c=issueComments.find(x=>x.id===comment_id);c.body=body},
+                deleteComment:async({comment_id})=>{deleted.push(comment_id);const ix=issueComments.findIndex(x=>x.id===comment_id);issueComments.splice(ix,1)},
+                createComment:async({body})=>{created.push(body);issueComments.push({id:99,user:{login:'github-actions[bot]'},body})},
+              },
+            },
+            paginate:async()=>issueComments.map(x=>({...x})),
+          };
+          const core={info:x=>logs.push(x),warning:x=>logs.push(x)};
+          const context={repo:{owner:'ALV522',repo:'-SRW-'},payload:{workflow_run:{event:'pull_request',repository:{full_name:'ALV522/-SRW-'},head_sha:SHA,pull_requests:[{number:150,head:{sha:SHA}}]}}};
+          (async()=>{
+            await runReporter({github,context,core});
+            const afterOne=issueComments.filter(x=>x.user.login==='github-actions[bot]');
+            await runReporter({github,context,core});
+            live=NEXT;
+            await runReporter({github,context,core});
+            context.payload.workflow_run.pull_requests[0].head.sha=NEXT;
+            live=SHA;
+            await runReporter({github,context,core});
+            process.stdout.write(JSON.stringify({
+              edits:edited,deletes:deleted,creates:created.length,
+              remainingBot:afterOne.length,bodyHead:afterOne[0].body.includes(SHA),
+              includesCoverage:afterOne[0].body.includes('NOT COVERED:'),
+              staleWarning:logs.some(x=>x.includes('differs from PR #150')),
+            }));
+          })().catch(e=>{process.stderr.write(String(e.stack));process.exit(1)});
+        """
+        flags=self.check_js(code)
+        self.assertEqual(flags, {
+            'edits':[33,33], 'deletes':[11], 'creates':0,
+            'remainingBot':1, 'bodyHead':True, 'includesCoverage':True,
+            'staleWarning':True,
+        })
 
 if __name__ == '__main__':
     unittest.main()
