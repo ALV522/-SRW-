@@ -15,3 +15,12 @@
 4. 用两个实际冲突 PR 测量减少的 rebase 成本，证明收益；做独立 ADR/小 PR 与双 OS 全门禁才考虑把子清单提升为权威。
 
 在此之前不引入 `backend.manifest`/`frontend.manifest` 等并行真相，更不让 GitHub Action 修改 SHA 后宣称一切合法。
+
+
+## 只读分域 pilot（#132）
+
+运行 `python scripts/report_source_manifest_domains.py --markdown`：严格验证当前 Source Manifest 与全部 tracked 源字节，然后按**backend、frontend、desktop、tests（含 browser_acceptance）、docs、automation（含 .github/scripts/verification/build-lock）、root-other** 七个域导出只读 SHA-256 摘要。任意新根目录归入 root-other，不遗漏隐藏文件、中文名或构建输入。采用 canonical `sha256 + two spaces + POSIX path + LF`，全域精确合并还原权威根清单；对缺项/非规范排序/CRLF/改写内容 fail-closed。零写回、零 CI 自修复。
+
+**这不是分域清单正式上线，也尚未解决根清单冲突。** 只是在 CI 中生成可检查的映射与稳定摘要，为后续按冲突域拆分提供硬证据。迁移到权威分片前还需要测量并发 PR 的实际 rebase/冲突时长，设计根摘要、提交级版本绑定、跨平台行尾，以及 `SOURCE_RECOVERY_MANIFEST.sha256` 历史不变和 Source/Native 消费者兼容的独立评审。
+
+**#150 分域试点审查补充：** 该导出是非权威报告，Source Gate 中使用 `continue-on-error` 保持试点故障不会意外阻断全部开发；原 `check_source_integrity.py`、Release Truth 和业务 Source tests 仍是严格门禁。`root-other` 会列出未被识别的新顶层前缀，而不是悄悄掩盖目录扩展。

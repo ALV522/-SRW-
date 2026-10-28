@@ -1,0 +1,34 @@
+# Runs ONLY trusted default-branch reporter code. Never checkout a PR with write scope.
+name: SRW CI Evidence Link Reporter
+on:
+  workflow_run:
+    workflows:
+      - SRW Source Gate
+      - SRW Chromium Business Acceptance
+      - SRW Governance Contract
+    types: [completed]
+permissions:
+  contents: read
+  actions: read
+  pull-requests: write
+concurrency:
+  # The event PR list can be empty; API-discovered PRs must share this lock too.
+  # Serialize this advisory reporter repository-wide; never cancel an active write.
+  group: srw-ci-evidence-reporter
+  cancel-in-progress: false
+jobs:
+  report:
+    if: github.event.workflow_run.event == 'pull_request'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout ONLY trusted main (never PR code)
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # verified v4
+        with:
+          ref: main
+          persist-credentials: false
+      - name: Update the exact-HEAD evidence link comment
+        uses: actions/github-script@f28e40c7f34bde8b3046d885e986cb6290c5673b # verified v7
+        with:
+          script: |
+            const { runReporter } = require('./scripts/ci_evidence_comment.cjs');
+            await runReporter({github, context, core});
