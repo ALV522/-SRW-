@@ -304,6 +304,13 @@ def apply_restore(data: Path, db: Path, max_schema: str, pre_restore_backup,
             _safe_path(marker)
             if marker.exists():
                 raise RuntimeError("new restore cannot start during owned cleanup")
+            # A completed restore once had a verified live DB. Its disappearance
+            # during deferred housekeeping is never a first-run empty workspace.
+            # Do not remove the transaction fence and let SQLite create_all()
+            # silently replace real recruiting data with an empty database.
+            _safe_path(db)
+            if not db.is_file():
+                raise RuntimeError("restored live database is missing during pending cleanup; preserve journal and undo")
             _finish_cleanup(data, journal)
             return None
         if not marker.exists() or _read_marker(marker) != {

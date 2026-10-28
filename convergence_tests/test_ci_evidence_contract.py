@@ -108,6 +108,34 @@ class EvidenceCommentTests(unittest.TestCase):
         """
         self.assertEqual(self.check_js(code), {'writes':['A','B'], 'newest':True})
 
+    def test_cleanup_failure_preserves_fresh_evidence_and_stays_visible(self):
+        code = r"""
+          const {runReporter,MARKER}=require('./scripts/ci_evidence_comment.cjs');
+          const sha='a'.repeat(40);
+          (async()=>{
+            const results=[];
+            for(const status of [404,500]) {
+              let body=MARKER+' old', failure=null;
+              const github={rest:{
+                repos:{listPullRequestsAssociatedWithCommit:async()=>({data:[{number:151,state:'open',base:{ref:'main'},head:{sha}}]})},
+                pulls:{get:async()=>({data:{state:'open',head:{sha}}})},
+                actions:{listWorkflowRuns:async()=>({data:{workflow_runs:[]}})},
+                issues:{listComments(){},
+                  updateComment:async args=>{if(args.comment_id!==2)throw Error('wrong marker');body=args.body;},
+                  deleteComment:async()=>{throw Object.assign(Error('cleanup failed'),{status});}},
+              },paginate:async()=>[1,2].map(id=>({id,user:{login:'github-actions[bot]'},body}))};
+              try {await runReporter({github,core:{info(){},warning(){}},context:{
+                repo:{owner:'ALV522',repo:'-SRW-'},payload:{workflow_run:{event:'pull_request',
+                repository:{full_name:'ALV522/-SRW-'},head_sha:sha,pull_requests:[]}},
+              }});}catch(e){failure=e.status;}
+              results.push({fresh:body.includes(sha),failure});
+            }
+            process.stdout.write(JSON.stringify({results}));
+          })().catch(e=>{console.error(e);process.exit(1)});
+        """
+        self.assertEqual(self.check_js(code), {'results':[
+            {'fresh':True,'failure':404}, {'fresh':True,'failure':500}]})
+
     def test_reporter_deduplicates_and_respects_live_head(self):
         code = r"""
           const {runReporter, MARKER, SOURCES} = require('./scripts/ci_evidence_comment.cjs');

@@ -27,7 +27,7 @@ function summarizeChecks(checks, headSha) {
     && checks[f].conclusion === 'success');
   lines.push('', green ? '**Three reporting workflows PASS on this HEAD (not the complete merge gate).**'
     : '**Not all three reporting workflows PASS on this HEAD.**',
-  '', '**NOT COVERED:** Repository Integrity, Windows Host Rebuild, C11 Offline Wheelhouse; check their actual runs separately.',
+  '', '**NOT COVERED:** SRW Repository Integrity, SRW Windows Host Rebuild Candidate, SRW C11 Windows Offline Wheelhouse; check their actual runs separately.',
   '', 'This is **not** a merge authorization. Non-author-track review, manifest diff, '
       + 'Windows WPF/Native acceptance and final main/head checks remain separate gates.',
   '', 'Automated comment updates in place; old PR commits and main-push CI are not reused.');
@@ -99,13 +99,14 @@ async function runReporter({github, context, core}) {
       core.info(`PR #${pr.number} moved while building evidence; refusing stale write`);
       continue;
     }
-    for (const obsolete of markers.slice(1)) {
-      await github.rest.issues.deleteComment({owner, repo, comment_id: obsolete.id});
-    }
     if (markers.length) {
       await github.rest.issues.updateComment({owner, repo, comment_id: markers[0].id, body});
     } else {
       await github.rest.issues.createComment({owner, repo, issue_number: pr.number, body});
+    }
+    // Publish fresh evidence first; cleanup errors still fail the workflow visibly.
+    for (const obsolete of markers.slice(1)) {
+      await github.rest.issues.deleteComment({owner, repo, comment_id: obsolete.id});
     }
     core.info(`CI evidence updated for PR #${pr.number} at ${headSha}`);
   }

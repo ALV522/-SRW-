@@ -248,6 +248,32 @@ raise SystemExit(98)
         self.assertEqual(snapshots[0].read_bytes(), undo)
         self.assertEqual(len(list((self.data / "backups").glob("pre_restore-*.zip"))), 1)
 
+    def test_finalized_cleanup_missing_live_db_refuses_empty_workspace_boot(self):
+        # A prior COMMITTED restore proves the live DB must exist. If external
+        # deletion/quarantine removes it, do not boot a freshly created empty DB.
+        real_unlink = Path.unlink
+        old_db = self.data / ".srw_v1.db.restore-old"
+        def blocked(path, *args, **kwargs):
+            if path == old_db:
+                raise PermissionError("synthetic antivirus lock")
+            return real_unlink(path, *args, **kwargs)
+
+        with patch.object(Path, "unlink", blocked):
+            self.assertEqual(self._restart(), "target.zip")
+        self.assertEqual(json.loads(self.journal.read_text())["phase"],
+                         "FINALIZED_CLEANUP_PENDING")
+        snapshots = list((self.data / "backups").glob("pre_restore-*.zip"))
+        self.assertEqual(len(snapshots), 1)
+        undo_before = snapshots[0].read_bytes()
+        self.db.unlink()
+        self.assertFalse(self.db.exists())
+        with self.assertRaisesRegex(RuntimeError, "live database is missing"):
+            self._restart()
+        self.assertFalse(self.db.exists(), "missing DB must not be recreated")
+        self.assertTrue(old_db.exists(), "owned rollback residue must remain")
+        self.assertTrue(self.journal.exists(), "recovery fence must remain")
+        self.assertEqual(snapshots[0].read_bytes(), undo_before)
+
     def test_finalized_cleanup_unknown_symlink_or_changed_undo_fails_closed(self):
         original = Path.unlink
         old_db = self.data / ".srw_v1.db.restore-old"

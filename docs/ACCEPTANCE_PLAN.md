@@ -187,3 +187,25 @@ rollback path, a conflicting marker, or a failure before durable terminalization
 must still fail closed. Once cleanup succeeds, the journal is removed. Focused
 source tests use only synthetic SQLite, files and injected `PermissionError`;
 this is not a measured physical power-loss or current WPF Native GUI PASS.
+
+### Rollback and missing-live-DB safety for the cleanup terminal
+
+The durable `FINALIZED_CLEANUP_PENDING` journal is **not forward-compatible with
+older SRW binaries**: the previous release rejects the unknown phase and will
+refuse startup (fail-closed; this does not itself prove data corruption). Before
+rolling back to an older build, let the newer build finish journal-owned cleanup
+and verify that the journal has disappeared. If rollback is unavoidable while
+cleanup remains pending, first stop Core and retain a verified offline copy of
+the entire workspace. A transaction-aware recovery must remove the terminal
+journal **together with all and only its verified journal-owned residual paths**;
+never remove the journal alone, never delete live `srw_v1.db`/`blobs`, and never
+remove or replace its pinned `pre_restore-*.zip` undo. Ambiguous ownership or
+permission failures require manual recovery rather than blind deletion. This
+cleanup-terminal state is the extra rollback-compatibility case introduced by
+this change; other malformed or interrupted restore states remain fail-closed.
+
+A further RED→GREEN fault injection removes the verified live DB after terminal
+publication and before deferred cleanup. The startup must refuse to continue
+without rewriting the journal, deleting undo/owned residue, or allowing SQLite
+to create an apparently empty replacement workspace. A clean first-ever
+workspace without any journal still follows the original initialization path.
