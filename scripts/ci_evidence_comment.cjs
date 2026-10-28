@@ -86,7 +86,8 @@ async function runReporter({github, context, core}) {
     const all = await github.paginate(github.rest.issues.listComments, {
       owner, repo, issue_number: pr.number, per_page: 100,
     });
-    // Workflow concurrency is per PR, not per HEAD. Consolidate any duplicate
+    // Workflow concurrency is repository-wide, including empty event PR lists.
+    // Consolidate any duplicate
     // markers created by older bot versions or interrupted deployments. Keep
     // the newest one as the sole authoritative updatable comment.
     const markers = all.filter(x => x.user?.login === 'github-actions[bot]'

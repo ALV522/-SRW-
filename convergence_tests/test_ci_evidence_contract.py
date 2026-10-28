@@ -48,7 +48,7 @@ class EvidenceCommentTests(unittest.TestCase):
         self.assertIn('workflow_run:', workflow)
         self.assertIn('ref: main', workflow)
         self.assertIn('persist-credentials: false', workflow)
-        self.assertIn('workflow_run.pull_requests[0].number', workflow)
+        self.assertIn('cancel-in-progress: false', workflow)
         self.assertIn('deleteComment', script)
         self.assertIn('beforeWrite.data.head.sha !== headSha', script)
         self.assertIn('NOT COVERED:', script)
@@ -58,6 +58,55 @@ class EvidenceCommentTests(unittest.TestCase):
         self.assertIn("x.user?.login === 'github-actions[bot]'", script)
         self.assertIn("r.head_sha === headSha", script)
 
+
+    def test_overlapping_heads_without_event_pr_identity_keep_newest_report(self):
+        # Exercise the real reporter under a deterministic two-run scheduler.
+        # The external GitHub concurrency boundary is modeled, not deployed.
+        code = r"""
+          const fs = require('fs');
+          const {runReporter, MARKER} = require('./scripts/ci_evidence_comment.cjs');
+          const workflow = fs.readFileSync('.github/workflows/ci-evidence-comment.yml','utf8');
+          const template = workflow.match(/^  group: (.+)$/m)[1];
+          function group(sha) {
+            // Characterize the former fallback as well as a literal global lock.
+            if (!template.includes('${{')) return template;
+            const legacy='${{ github.event.workflow_run.pull_requests[0].number || github.event.workflow_run.head_sha }}';
+            if (!template.includes(legacy)) throw Error('unmodeled concurrency expression');
+            return template.replace(legacy,sha);
+          }
+          const A='a'.repeat(40), B='b'.repeat(40);
+          let live=A, body=MARKER+' initial', release, entered;
+          const paused=new Promise(r=>entered=r), resume=new Promise(r=>release=r);
+          const writes=[];
+          function run(sha) {
+            const github={rest:{
+              repos:{listPullRequestsAssociatedWithCommit:async()=>({data:[{number:150,state:'open',base:{ref:'main'},head:{sha}}]})},
+              pulls:{get:async()=>({data:{state:'open',head:{sha:live}}})},
+              actions:{listWorkflowRuns:async()=>({data:{workflow_runs:[]}})},
+              issues:{listComments:()=>{},updateComment:async(args)=>{
+                if(sha===A){entered();await resume;}
+                body=args.body;writes.push(sha===A?'A':'B');
+              }},
+            },paginate:async()=>[{id:1,user:{login:'github-actions[bot]'},body}]};
+            return runReporter({github,core:{info(){},warning(){}},context:{
+              repo:{owner:'ALV522',repo:'-SRW-'},payload:{workflow_run:{
+                event:'pull_request',repository:{full_name:'ALV522/-SRW-'},
+                head_sha:sha,pull_requests:[],
+              }},
+            }});
+          }
+          (async()=>{
+            const first=run(A);await paused;live=B;
+            if(group(A)===group(B)) {
+              // Same group cannot start B while A's write is in flight.
+              release();await first;await run(B);
+            } else {
+              await run(B);release();await first;
+            }
+            process.stdout.write(JSON.stringify({writes,newest:body.includes(B)}));
+          })().catch(e=>{console.error(e);process.exit(1)});
+        """
+        self.assertEqual(self.check_js(code), {'writes':['A','B'], 'newest':True})
 
     def test_reporter_deduplicates_and_respects_live_head(self):
         code = r"""

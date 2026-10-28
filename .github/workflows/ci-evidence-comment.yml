@@ -12,7 +12,9 @@ permissions:
   actions: read
   pull-requests: write
 concurrency:
-  group: srw-ci-evidence-pr-${{ github.event.workflow_run.pull_requests[0].number || github.event.workflow_run.head_sha }}
+  # The event PR list can be empty; API-discovered PRs must share this lock too.
+  # Serialize this advisory reporter repository-wide; never cancel an active write.
+  group: srw-ci-evidence-reporter
   cancel-in-progress: false
 jobs:
   report:
