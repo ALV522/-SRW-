@@ -13,6 +13,7 @@ import re
 import shutil
 import sqlite3
 import tempfile
+import warnings
 from pathlib import Path
 
 from srw.runtime.backup_truth import extract_validated_backup, validate_backup_archive
@@ -123,7 +124,8 @@ def _validate_journal(data: Path, state: dict) -> dict:
     _safe_backup_name(state["backup"])
     if not SHA.fullmatch(state["sha256"]) or not SHA.fullmatch(state["target_db_sha256"]):
         raise RuntimeError("invalid restore journal checksums")
-    if state.get("phase") not in ("PREPARED", "APPLYING", "COMMITTED"):
+    if state.get("phase") not in ("PREPARED", "APPLYING", "COMMITTED",
+                                  "FINALIZED_CLEANUP_PENDING"):
         raise RuntimeError("unknown restore journal phase")
     if type(state.get("had_db")) is not bool or type(state.get("had_blobs")) is not bool:
         raise RuntimeError("restore journal lacks original workspace identity")
@@ -159,25 +161,46 @@ def _check_committed(data: Path, db: Path, state: dict) -> None:
         raise RuntimeError("committed restore Blobs differ from pinned transaction")
 
 
+def _finish_cleanup(data: Path, journal: Path) -> None:
+    """Retry only durable-journal-owned debris, never the live DB or Blob tree.
+
+    Deletion failure after the terminal journal has been persisted is an
+    availability warning, not permission to replay the restore transaction.
+    The retained journal fences scheduling another restore until cleanup ends.
+    """
+    try:
+        for name in (NEW_DB, OLD_DB, OLD_WAL, OLD_SHM):
+            path = data / name
+            _safe_path(path)
+            path.unlink(missing_ok=True)
+        for name in (NEW_BLOBS, OLD_BLOBS):
+            path = data / name
+            _safe_path(path)
+            if path.exists():
+                shutil.rmtree(path)
+        journal.unlink()
+    except OSError:
+        # A Windows AV/indexer can hold a *journal-owned* old file. Neither
+        # suppress unsafe symlink RuntimeErrors nor delete the pinned undo ZIP.
+        # The next restart will retry without comparing changed live DB bytes.
+        warnings.warn("SRW restore completed; owned cleanup remains pending", RuntimeWarning,
+                      stacklevel=2)
+
+
 def _finalize(data: Path, db: Path, marker: Path, journal: Path, state: dict) -> None:
+    # This check MUST finish before release of the mandatory restore fence.
     _check_committed(data, db, state)
+    _safe_path(marker)
     if marker.exists():
         current = _read_marker(marker)
         if current != {key: state[key] for key in ("backup", "sha256", "schema_revision")}:
             raise RuntimeError("new pending restore conflicts with committed transaction")
         marker.unlink()
-    # Delete only the paths explicitly reserved by the durable journal, never
-    # globally unclaimed old rollback materials.
-    for name in (NEW_DB, OLD_DB, OLD_WAL, OLD_SHM):
-        path = data / name
-        _safe_path(path)
-        path.unlink(missing_ok=True)
-    for name in (NEW_BLOBS, OLD_BLOBS):
-        path = data / name
-        _safe_path(path)
-        if path.exists():
-            shutil.rmtree(path)
-    journal.unlink()
+    # Atomic terminal transition precedes any Core/HTTP mutations. If fsync or
+    # journal replacement fails, startup still fails closed as in COMMITTED.
+    state["phase"] = "FINALIZED_CLEANUP_PENDING"
+    _durable_json(journal, state)
+    _finish_cleanup(data, journal)
 
 
 def _publish(data: Path, db: Path, marker: Path, journal: Path, state: dict,
@@ -275,6 +298,14 @@ def apply_restore(data: Path, db: Path, max_schema: str, pre_restore_backup,
         if state["phase"] == "COMMITTED":
             _finalize(data, db, marker, journal, state)
             return state["backup"]
+        if state["phase"] == "FINALIZED_CLEANUP_PENDING":
+            # User edits to live SQLite/Blobs after the last successful startup
+            # must never be treated as corruption of the old restore target.
+            _safe_path(marker)
+            if marker.exists():
+                raise RuntimeError("new restore cannot start during owned cleanup")
+            _finish_cleanup(data, journal)
+            return None
         if not marker.exists() or _read_marker(marker) != {
             key: state[key] for key in ("backup", "sha256", "schema_revision")
         }:

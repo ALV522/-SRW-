@@ -173,3 +173,17 @@ Level: **synthetic fault injection against the real `create_backup` /
 `write_backup_archive` / HTTP routes**. It does not prove power-loss durability of
 the directory entry, Windows AV/indexer interference after `os.link`, restoring a
 backup produced by an interrupted process, or WPF/Native acceptance.
+
+## #130 COMMITTED cleanup-only terminal state (source acceptance; not Windows power-loss proof)
+
+A restore is not ready to serve HTTP until its target DB/Blobs are verified, the
+original undo ZIP is pinned, the pending marker is removed, and the durable
+journal has entered `FINALIZED_CLEANUP_PENDING`. Once terminal, antivirus/file
+lock failures while deleting *journal-owned* old DB/Blob debris may defer only
+housekeeping: subsequent legitimate Core writes must survive repeated starts
+without comparison to the original target DB hash. A new restore schedule is
+rejected while that journal exists. A missing or tampered undo, a symlinked
+rollback path, a conflicting marker, or a failure before durable terminalization
+must still fail closed. Once cleanup succeeds, the journal is removed. Focused
+source tests use only synthetic SQLite, files and injected `PermissionError`;
+this is not a measured physical power-loss or current WPF Native GUI PASS.

@@ -33,6 +33,7 @@ from srw.runtime.backup_download import (
     PendingBackupSnapshot, VerifiedBackupFileResponse, validated_download_snapshot,
 )
 from srw.runtime.db.schema import V1_SCHEMA_REVISION
+from srw.runtime.restore_transaction import JOURNAL_NAME
 from srw.runtime.diagnostic_bundle import build_privacy_safe_diagnostic_bundle
 
 
@@ -124,6 +125,11 @@ def system_routes(*, factory, data_dir: Path, knowledge_dir: Path,
                 raise V1InvariantError(f"backup schema is not compatible: {schema_revision}")
         except BackupTruthError as exc:
             raise V1InvariantError(str(exc)) from exc
+        # The old rollback names remain reserved while journal-owned debris
+        # is pending. A new plan would be replayed against the wrong owner.
+        journal = data_dir / JOURNAL_NAME
+        if journal.is_symlink() or journal.exists():
+            raise V1InvariantError("previous restore finalization/cleanup is pending")
         marker = data_dir / "pending_restore.json"
         digest = truth["archive_sha256"]
         marker.write_text(

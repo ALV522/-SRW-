@@ -102,6 +102,24 @@ class RestoreScheduleIntegrityTest(unittest.TestCase):
         self.assertFalse(self.marker.exists())
         self.assertEqual(self.client.get("/api/v1/projects").json(), self.projects_before)
 
+    def test_cleanup_only_journal_blocks_new_restore_scheduling_without_mutation(self):
+        # A live Core may have successfully reopened with journal-owned AV debris.
+        # It must not schedule another restore using the same reserved old paths.
+        journal = self.data / ".srw-restore-journal.json"
+        journal.write_text('{"schema":"srw.restore-journal.v1",'
+                           '"phase":"FINALIZED_CLEANUP_PENDING"}', encoding="utf-8")
+        for with_marker in (False, True):
+            with self.subTest(existing_plan=with_marker):
+                if with_marker:
+                    self.marker.write_bytes(b"previous synthetic plan")
+                original = self.marker.read_bytes() if self.marker.exists() else None
+                response = self.schedule()
+                self.assertEqual(response.status_code, 409, response.text)
+                self.assertEqual(response.json()["error"]["code"], "invariant_conflict")
+                self.assertEqual(self.marker.read_bytes() if self.marker.exists() else None, original)
+                self.assertEqual(self.client.get("/api/v1/projects").json(), self.projects_before)
+                self.marker.unlink(missing_ok=True)
+
     def test_legacy_database_only_backup_remains_schedulable(self):
         legacy = self.archive.parent / "legacy.zip"
         with zipfile.ZipFile(self.archive) as source, zipfile.ZipFile(legacy, "w") as target:
