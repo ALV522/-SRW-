@@ -321,6 +321,120 @@ class OriginBoundaryTests(unittest.TestCase):
             headers={SESSION_HEADER: TOKEN}).allowed)
 
 
+class HostRootBootstrapTests(unittest.TestCase):
+    """The Native Host navigates to `/`, which ``app.py`` serves as the same SPA.
+
+    ``_is_static`` used to allow only ``/v1``, so enabling the gate would have
+    answered the Host's first navigation with 401 and left a blank window. The
+    allowance must stay exact: one path, safe methods only, origin boundary first.
+    """
+
+    def setUp(self) -> None:
+        self.policy = enabled_policy()
+
+    def test_root_read_is_anonymous_after_the_origin_boundary(self) -> None:
+        for method in ("GET", "HEAD", "get"):
+            with self.subTest(method=method):
+                decision = self.policy.evaluate(method=method, raw_path="/")
+                self.assertTrue(decision.allowed, decision.reason)
+                self.assertEqual(decision.reason, "anonymous_bootstrap_path")
+
+    def test_root_write_is_never_anonymous(self) -> None:
+        for method in ("POST", "PUT", "PATCH", "DELETE", "OPTIONS"):
+            with self.subTest(method=method):
+                decision = self.policy.evaluate(method=method, raw_path="/")
+                self.assertFalse(decision.allowed)
+                self.assertEqual((decision.status_code, decision.reason),
+                                 (401, "session_token_required"))
+
+    def test_root_allowance_does_not_widen_to_lookalikes(self) -> None:
+        # Ambiguous forms are refused outright (400) or still need a token (401);
+        # none of them may inherit the root allowance.
+        for path in ("//", "/.", "/./", "/../", "/%2e%2e", "/index.html",
+                     "/ /", " /"):
+            with self.subTest(path=path):
+                decision = self.policy.evaluate(method="GET", raw_path=path)
+                self.assertFalse(decision.allowed, f"{path!r} must not be anonymous")
+                self.assertIn(decision.status_code, {400, 401})
+
+    def test_cross_origin_root_read_is_still_refused(self) -> None:
+        for headers in ({"Sec-Fetch-Site": "cross-site"},
+                        {"Sec-Fetch-Site": "same-site"},
+                        {"Origin": "http://evil.example"}):
+            with self.subTest(headers=headers):
+                decision = self.policy.evaluate(method="GET", raw_path="/", headers=headers)
+                self.assertEqual((decision.status_code, decision.reason),
+                                 (403, "origin_not_allowed"))
+
+    def test_disabled_policy_keeps_todays_behaviour_for_root(self) -> None:
+        policy = SessionPolicy(enforce=False)
+        self.assertTrue(policy.evaluate(method="POST", raw_path="/").allowed)
+
+
+class TokenCharsetTests(unittest.TestCase):
+    """A header value is untrusted text, not a byte string we control.
+
+    ``hmac.compare_digest`` raises ``TypeError`` for non-ASCII ``str`` operands,
+    so a single ``X-SRW-Session: é`` would have produced an unhandled exception
+    instead of a 401 (the same defect #158 had in the registry).
+    """
+
+    def setUp(self) -> None:
+        self.policy = enabled_policy()
+
+    def test_non_ascii_token_is_a_fixed_invalid_decision(self) -> None:
+        for presented in ("é", "会话", "tökén", f"{TOKEN}-é", "０" * 8):
+            with self.subTest(presented=presented[:4]):
+                decision = self.policy.evaluate(
+                    method="POST", raw_path="/api/v1/candidates",
+                    headers={SESSION_HEADER: presented})
+                self.assertEqual((decision.status_code, decision.reason),
+                                 (401, "session_token_invalid"))
+                # The presented value must not appear in the decision either.
+                self.assertNotIn(presented, repr(decision))
+
+    def test_overlong_token_is_refused(self) -> None:
+        decision = self.policy.evaluate(
+            method="POST", raw_path="/api/v1/candidates",
+            headers={SESSION_HEADER: "a" * 100_000})
+        self.assertEqual((decision.status_code, decision.reason),
+                         (401, "session_token_invalid"))
+
+    def test_control_characters_are_refused(self) -> None:
+        for presented in (f"{TOKEN}\n", f"{TOKEN}\t", f"{TOKEN}\x00"):
+            with self.subTest(presented=presented[-1:]):
+                decision = self.policy.evaluate(
+                    method="POST", raw_path="/api/v1/candidates",
+                    headers={SESSION_HEADER: presented})
+                self.assertFalse(decision.allowed)
+
+    def test_a_malformed_presentation_is_indistinguishable_from_a_wrong_one(self) -> None:
+        # Same status and same reason: the 401 must not become an oracle that
+        # tells an attacker their guess was well-formed but wrong.
+        malformed = self.policy.evaluate(
+            method="POST", raw_path="/api/v1/candidates",
+            headers={SESSION_HEADER: "会话"})
+        wrong = self.policy.evaluate(
+            method="POST", raw_path="/api/v1/candidates",
+            headers={SESSION_HEADER: "not-the-token"})
+        self.assertEqual((malformed.status_code, malformed.reason),
+                         (wrong.status_code, wrong.reason))
+
+    def test_ascii_token_still_matches(self) -> None:
+        decision = self.policy.evaluate(
+            method="POST", raw_path="/api/v1/candidates",
+            headers={SESSION_HEADER: TOKEN})
+        self.assertTrue(decision.allowed, decision.reason)
+
+    def test_a_non_ascii_configured_token_can_never_match(self) -> None:
+        policy = enabled_policy(token="tökén")
+        decision = policy.evaluate(
+            method="POST", raw_path="/api/v1/candidates",
+            headers={SESSION_HEADER: "tökén"})
+        self.assertEqual((decision.status_code, decision.reason),
+                         (401, "session_token_invalid"))
+
+
 class AmbiguousPathTests(unittest.TestCase):
     """Every bypass attempt must be refused, not decoded into an allowlist hit."""
 
