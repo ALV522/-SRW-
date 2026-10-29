@@ -1,6 +1,7 @@
 """Synthetic-only external Native artifact custody tests."""
 from __future__ import annotations
 
+import errno
 import hashlib
 import json
 import os
@@ -65,6 +66,22 @@ class NativeArtifactCustodyTests(unittest.TestCase):
              patch.object(Path, "open", substituted_path_open):
             with self.assertRaisesRegex(CustodyError, "archive file identity changed before reading"):
                 self.check()
+
+    def test_open_race_or_antivirus_lock_is_a_safe_custody_denial(self):
+        # The CLI already catches OSError, but direct library callers must not
+        # see a path-bearing OS error or a traceback on a raced open. No private
+        # local archive name belongs in a rejection reason.
+        for error in (errno.EACCES, errno.ELOOP):
+            with self.subTest(errno=error):
+                with patch("scripts.audit_native_artifact_custody.os.open",
+                           side_effect=OSError(error, "synthetic host failure", str(self.primary))):
+                    with self.assertRaises(CustodyError) as denial:
+                        self.check()
+                self.assertEqual(str(denial.exception),
+                                 "archive could not be opened for verification")
+                self.assertNotIn(str(self.root), str(denial.exception))
+                self.assertTrue(self.primary.is_file())
+                self.assertTrue(self.secondary.is_file())
 
     def test_reject_modified_or_missing_copy(self):
         self.secondary.write_bytes(self.data + b"modified")
