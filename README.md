@@ -6,17 +6,35 @@ SRW（Smart Recruitment Workbench）是一套 **local-first、evidence-centered�
 
 > **Agent / 协作者必读**：开始任何修改前先读 [AGENTS.md](AGENTS.md)，并按其顺序阅读产品宪章、开发治理、版本政策、能力矩阵、双载体计划、验收计划和无保护开发协议。`main` 当前未启用 GitHub Branch Protection；必须从最新 main 建任务分支、运行 `python scripts/agent_preflight.py --issue <Issue号> --acknowledge-reading`、走 PR，并以同一 PR Head SHA 的适用 CI 为合并依据。
 
-## 当前开发入口（2026-10-28 已核查快照）
+## 当前进展与路线图位置（2026-10-29 核查快照）
 
-**主线：** `main b95d3359c4c88703febac4a59d0aa0cae6cbfe0b`（#149 已 squash 合并），VERSION `1.0.0-alpha10-convergence11`，Schema `v1_0014`，development。该 SHA 的六项 GitHub push 工作流已全部 completed/success：[Source Gate](https://github.com/ALV522/-SRW-/actions/runs/40543886175)、[Chromium](https://github.com/ALV522/-SRW-/actions/runs/40543886133)、[Governance](https://github.com/ALV522/-SRW-/actions/runs/40543886152)、[Repository Integrity](https://github.com/ALV522/-SRW-/actions/runs/40543886147)、[Windows Host](https://github.com/ALV522/-SRW-/actions/runs/40543886162)、[Wheelhouse](https://github.com/ALV522/-SRW-/actions/runs/40543886128)。这些是**构建/源码/浏览器 CI**，不是当前 SHA 的 WPF GUI 实机、Provider 或全流程双载体验收。
+**我们处于“已有招聘业务 Core 的产品化收口”阶段：API/前端渐进拆分已落地多批，恢复与工件可靠性持续补强；当前关键路径是最新 Windows Native 工件实机验收，以及双载体会话安全接线。尚未进入 RC/GA。** v0.8.12-R2 仍是功能保真对照，不能用新界面或更多治理文件替代成熟业务能力。
 
-**已合并的安全闭环：** #139/#140 备份原子发布及故障注入，#144 journaled 恢复，#145 默认 OFF 的 SessionPolicy，**#149 有界、内容验证后的备份下载**（含取消复制与原子清理，B exact-HEAD 独立轨 ACCEPT）。历史与合并证据见 PR 与 [#103](https://github.com/ALV522/-SRW-/issues/103)。**生产 HTTP 仍未接入会话 gate；不能声称 #43 已完成。**
+源码基线：[`979863218c7fbcfc2c3fd5ff041237f0110c4350`](https://github.com/ALV522/-SRW-/commit/979863218c7fbcfc2c3fd5ff041237f0110c4350)（#165 已合并）；VERSION `1.0.0-alpha10-convergence11`，Schema `v1_0014`，release channel `development`。以下是该 SHA 的日期快照，不替代每轮读取最新 main。
 
-**当前工作：** #130 COMMITTED 后恢复清理的故障注入；#43 的 [#148 test-only RED oracle](https://github.com/ALV522/-SRW-/pull/148) 保持不单独合并；#124 外部 Runtime/Knowledge 第二故障域、#42 本机 GUI 实测仍有未完成项。历史 [#101](https://github.com/ALV522/-SRW-/pull/101) / [#137](https://github.com/ALV522/-SRW-/pull/137) 为未解决的旧基线 PR，**未评估其唯一代码贡献前不删除远端分支或盲目合并**。
+| 总路线 / 专项阶段 | 已进入主线 | 尚未达到的完成条件 |
+|---|---|---|
+| **Track 0：业务完整性（#41）** | 结构化重评估及上下文守卫、归档/合并候选人的写入门禁、Source 哈希验证后读取、备份原子发布/验证后下载、恢复 journal 与 `FINALIZED_CLEANUP_PENDING` 终态（#110/#115/#127/#139/#149/#153） | 完整招聘链、Provider/OCR/ASR、备份恢复在当前准确 Native 工件上的真实操作验收；合成故障注入不等于真实 AV/断电验证 |
+| **Track A：模块化 Core（#63），R0–R4** | 架构/契约安全网与多轮路由拆分；`api-client.js` 统一传输入口，`reevaluation.js`、`jobsetup.js` 分离 feature（#109/#110/#114） | R2 路由拆分继续收口；R3 应用用例层未整体完成；R4 仅部分 feature 拆出，不能称前后端重构全部完成 |
+| **Track B：Windows Native（#42/#123/#124）** | Source/Host/Wheelhouse 构建、固定哈希装配、外部双副本校验工具及 Windows 文件身份修复（#157/#162）；历史特定工件有用户报告的 GUI/业务验收 | 当前 SHA 完整 Native ZIP 的 WPF/业务/恢复验收；两份独立故障域保管、干净 Windows 重建与五套 Knowledge 许可核实 |
+| **Track C：共享 Core 双载体（#43），R5 / M3** | 单写者基础、纯 `SessionPolicy`、有界 `SessionRegistry`，根 SPA 路径与畸形 token 拒绝策略（#145/#158/#165） | **生产 HTTP gate 尚未接线，默认 OFF**；Host 身份通道、Browser cookie/CSRF attach、shutdown/business token 分离，以及 T1–T10 同机交叉验收 |
+| **Track D：发行（#44），与 R6 包装相接** | 工件身份、构建与验收工具持续推进 | 正式版本迁移、两载体发布验收与负责人 RC/GA 裁决；可扩展接口长期目标不作为当前新增平台任务 |
 
-**工程效率改进试点（#132）：** [治理协议](docs/DEVELOPMENT_GOVERNANCE.md) 增加真实审批身份声明；新增 exact-HEAD CI 证据评论 bot（不替代 Review）；新增只读 `python scripts/report_source_manifest_domains.py --markdown` 检验 7 个领域的完全覆盖和根清单一致性。**SOURCE_MANIFEST.sha256 仍是唯一权威**，不会因“分域统计”而绕过旧 Source/Native 工件完整性检查。
+总路线见 [ROADMAP](docs/ROADMAP.md)，R0–R7 见 [专项架构路线图](docs/API_FIRST_MODULAR_CORE_ROADMAP.md)，M1–M5/T1–T10 见 [双载体计划](docs/DUAL_CARRIER_PLAN.md)。这些阶段并行推进，不用一个未经定义的“完成百分比”替代退出条件。路线图的 Track A/B/C 是工作方向，协作中的 A/B/C 是责任轨，二者不能混同。
 
-**开发步骤不变：** 按 [AGENTS](AGENTS.md) 必读 → [G1](docs/DEVELOPMENT_GOVERNANCE.md) → [集成队列](docs/INTEGRATION_QUEUE.md)，干净分支 `agent_preflight.py --issue N --acknowledge-reading` 通过后修改；最后以 `refresh_source_manifest.py --write`、`check_source_integrity.py`、`check_release_truth.py` 校验。以上 SHA 是日期快照，不替代每轮 GitHub 当前状态读取。
+### 当前证据与交付物
+
+- **该 SHA 的 CI**：[Source Gate](https://github.com/ALV522/-SRW-/actions/runs/40829730586) Ubuntu / Windows 均 SUCCESS；[Chromium](https://github.com/ALV522/-SRW-/actions/runs/40829730524)、[Governance](https://github.com/ALV522/-SRW-/actions/runs/40829730712)、[Repository Integrity](https://github.com/ALV522/-SRW-/actions/runs/40829730484)、[Host](https://github.com/ALV522/-SRW-/actions/runs/40829730574)、[Wheelhouse](https://github.com/ALV522/-SRW-/actions/runs/40829730494) 已 SUCCESS。该 SHA 的六类主线工作流均已成功；这些是源码、构建与浏览器证据，不等于 WPF 实机或双端验收。
+- **最新 Source+Host kit**：[97986321 构建工件](https://github.com/ALV522/-SRW-/actions/runs/40829730574/artifacts/12877853965)，标记 `NO_RUNTIME`。它不包含 Runtime 和私有 Knowledge，**不是可直接运行的完整 Native Release**。已有逐字节校验证据及目标机装配步骤记录在 [#42](https://github.com/ALV522/-SRW-/issues/42#issuecomment-6489758901)；当前 SHA 的 WPF 实机、完整双端和私有数据重建仍未验收。
+- **可靠性修复与诊断分开**：#153 已实现恢复后可重试清理；#162 已修复 Windows 文件身份误拒绝。#156/#164 只是增加浏览器保存/真实 Core 停机超时诊断，原始时序根因仍未知，见 [#154](https://github.com/ALV522/-SRW-/issues/154)、[#159](https://github.com/ALV522/-SRW-/issues/159)；重跑通过不代表根因解决。
+
+### 接下来按什么顺序推进
+
+1. **A：最新 Native 验收与数据可恢复性**——核对当前 main CI 终态，使用同一 SHA 的 Source+Host kit 和受限旧 Prepared ZIP 装配全新候选，完成 #42/#123 的 Windows 真实业务/证据/恢复验收；#124 独立副本和许可另行取证，不上传私有数据。
+2. **C：双载体安全接线合同**——在现有 policy/registry 上明确 Host、Browser、raw ASGI 头、Origin/CSRF 和生命周期凭据边界，再以合成负例驱动原子接线。[#148](https://github.com/ALV522/-SRW-/pull/148) 保持 RED 测试合同，不单独合并，不提前开启 gate。
+3. **B：有界工程效率修复**——[#166](https://github.com/ALV522/-SRW-/issues/166) 增量 manifest 工具及 Windows CRLF/Git index 一致性；仍执行全量完整性校验。七领域报告只是只读试点，根 `SOURCE_MANIFEST.sha256` 仍是唯一权威。
+
+协作与集成以 [#103](https://github.com/ALV522/-SRW-/issues/103) 的最新分页回复和 [G1](docs/DEVELOPMENT_GOVERNANCE.md) 为准：准确 HEAD CI、非作者轨正式审查、P4 明确处置、合并后主线复验；同一 GitHub 账号下的轨道审查不等于平台独立审批。历史 [#101](https://github.com/ALV522/-SRW-/pull/101) 不整包合并；不为整理删除未评估的独有分支内容。
 
 ## 外部 Native 工件保管与可复现性（2026-10-26）
 
@@ -98,7 +116,7 @@ Windows WPF/WebView2       Local Browser       future CLI / Agent
 
 当前 C11 并不是“一个完全没有结构的巨石”。相反，`backend/srw/modules/` 已经有 candidate、protocol、decision、identity、work、knowledge、planning、feedback 等领域模块；问题主要发生在入口层重新聚合。
 
-以当前基线静态审计：
+以下数字是 **2026-10-21 重构起点的历史静态审计**，用于说明当时的拆分动因，不是当前文件规模：
 
 - `backend/srw/`：127 个文件，约 596 KB；
 - `backend/srw/modules/`：17 个业务模块目录；
