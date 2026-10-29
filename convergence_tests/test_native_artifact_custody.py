@@ -8,6 +8,7 @@ import tempfile
 import unittest
 import zipfile
 from pathlib import Path
+from unittest.mock import patch
 
 from scripts.audit_native_artifact_custody import CustodyError, audit_custody, main
 
@@ -36,6 +37,34 @@ class NativeArtifactCustodyTests(unittest.TestCase):
         self.assertFalse(report["independent_failure_domains_verified"])
         self.assertFalse(report["clean_room_rebuild_verified"])
         self.assertNotIn(str(self.root), json.dumps(report))
+
+    def test_path_open_race_cannot_hash_another_file_under_a_valid_name(self):
+        # The selected primary is incorrect but has the same length as the pin.
+        # Simulate a path replacement between the metadata precheck and open:
+        # a file handle for the intact secondary arrives instead. Old code
+        # hashed that handle and then re-statted the unchanged, corrupt primary,
+        # reporting both copies as valid. The verified descriptor must be the
+        # same file object that the path check selected.
+        self.primary.write_bytes(bytes([self.data[0] ^ 0x01]) + self.data[1:])
+        real_fd_open = os.open
+        real_path_open = Path.open
+
+        def substituted_fd(path, flags, *args, **kwargs):
+            selected = self.secondary if Path(path) == self.primary else path
+            return real_fd_open(selected, flags, *args, **kwargs)
+
+        def substituted_path_open(path, mode="r", *args, **kwargs):
+            selected = self.secondary if path == self.primary else path
+            return real_path_open(selected, mode, *args, **kwargs)
+
+        # Both implementations receive the identical wrong-but-pinned bytes
+        # through the opened handle while the original path remains corrupt.
+        # Old Path.open implementation wrongly reports PASS; new code fails
+        # the descriptor-vs-path identity comparison before digesting anything.
+        with patch("scripts.audit_native_artifact_custody.os.open", side_effect=substituted_fd), \
+             patch.object(Path, "open", substituted_path_open):
+            with self.assertRaisesRegex(CustodyError, "archive file identity changed before reading"):
+                self.check()
 
     def test_reject_modified_or_missing_copy(self):
         self.secondary.write_bytes(self.data + b"modified")
