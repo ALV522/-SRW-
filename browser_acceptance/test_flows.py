@@ -32,6 +32,59 @@ def free_loopback_port() -> int:
         return sock.getsockname()[1]
 
 
+#: Only synthetic fixture identity/flags are copied into a failure report. These
+#: values are authored in this module; no real candidate, document or operator
+#: data can reach it, and no transport detail is read at all.
+CRITERIA_DIAGNOSTIC_FIELDS = ("criterion_key", "name", "critical", "verification_required")
+
+
+def criteria_draft_diagnosis(payload, *, expected_count, expected_keys, elapsed, polls,
+                             ui_state) -> dict:
+    """Describe why a criteria draft did not become durable, without leaking data.
+
+    Deliberately narrow: revision ids, counts, synthetic criterion identity/flags,
+    timings and coarse DOM state. Request bodies, cookies, tokens, absolute URLs
+    and filesystem paths are never read here, so they cannot appear in the report.
+    """
+    body = payload or {}
+    draft = body.get("draft") or {}
+    current = body.get("current") or {}
+    items = draft.get("criteria") or []
+    rows = [{field: item.get(field) for field in CRITERIA_DIAGNOSTIC_FIELDS}
+            for item in items]
+    present = [row["criterion_key"] for row in rows if row.get("criterion_key")]
+    return {
+        "draft_revision_id": body.get("draft_revision_id"),
+        "current_revision_id": body.get("current_revision_id"),
+        "expected_criteria": expected_count,
+        "draft_criteria": len(items),
+        "published_criteria": len(current.get("criteria") or []),
+        "expected_keys": list(expected_keys),
+        "missing_keys": [key for key in expected_keys if key not in present],
+        "draft_items": rows,
+        "elapsed_s": round(elapsed, 2),
+        "polls": polls,
+        "ui_state": ui_state,
+    }
+
+
+def format_criteria_timeout(label: str, diagnosis: dict) -> str:
+    """One fact per line, each as ``key=value``, so a log can be grepped."""
+    return (
+        f"{label}: criteria draft never became durable\n"
+        f"  elapsed_s={diagnosis['elapsed_s']} polls={diagnosis['polls']}"
+        f" expected_criteria={diagnosis['expected_criteria']}"
+        f" draft_criteria={diagnosis['draft_criteria']}"
+        f" published_criteria={diagnosis['published_criteria']}"
+        f"\n  draft_revision_id={diagnosis['draft_revision_id']}"
+        f" current_revision_id={diagnosis['current_revision_id']}"
+        f"\n  expected_keys={diagnosis['expected_keys']}"
+        f" missing_keys={diagnosis['missing_keys']}"
+        f"\n  draft_items={json.dumps(diagnosis['draft_items'], ensure_ascii=False)}"
+        f"\n  ui_state={json.dumps(diagnosis['ui_state'], ensure_ascii=False)}"
+    )
+
+
 class RecruitmentBrowserAcceptance(unittest.TestCase):
     @classmethod
     def setUpClass(cls) -> None:
@@ -147,6 +200,60 @@ class RecruitmentBrowserAcceptance(unittest.TestCase):
                     f"{json.dumps(last, ensure_ascii=False)[:800]}"
                 )
             time.sleep(interval)
+
+    def ui_progress_state(self) -> dict:
+        """Coarse DOM state at timeout: is the UI ahead of the API, or behind it?
+
+        Guarded because the page can already be navigating when a wait expires;
+        diagnostics must never replace the timeout with a different error.
+        """
+        try:
+            return self.page.evaluate("""() => {
+                const rows = Array.from(document.querySelectorAll('.criterion-row'));
+                const save = Array.from(document.querySelectorAll('button'))
+                    .find((b) => (b.textContent || '').trim() === '保存草案');
+                return {
+                    criterion_rows: rows.length,
+                    save_button_present: Boolean(save),
+                    save_button_disabled: Boolean(save && save.disabled),
+                    ready_state: document.readyState,
+                };
+            }""")
+        except Exception as exc:  # noqa: BLE001 - a broken probe must not mask the miss
+            return {"unavailable": type(exc).__name__}
+
+    def wait_for_criteria_draft(self, project_id: str, *, expected_count: int,
+                                expected_keys=(), timeout: float = 8.0,
+                                label: str = "criteria draft"):
+        """Wait for the draft to be durable, then explain a miss precisely.
+
+        The previous single-sample read could not tell "the second criterion is
+        still being written" from "the write never happened". Polling keeps the
+        assertion and the timeout identical; only the failure text gets richer.
+        """
+        path = f"/api/v1/projects/{project_id}/protocol-workspace"
+        started = time.time()
+        deadline = started + timeout
+        polls = 0
+        last = None
+        while True:
+            last = self.get_json(path)
+            polls += 1
+            items = (last.get("draft") or {}).get("criteria") or []
+            keys = [item.get("criterion_key") for item in items]
+            if len(items) == expected_count and all(key in keys for key in expected_keys):
+                return last
+            if time.time() >= deadline:
+                diagnosis = criteria_draft_diagnosis(
+                    last,
+                    expected_count=expected_count,
+                    expected_keys=list(expected_keys),
+                    elapsed=time.time() - started,
+                    polls=polls,
+                    ui_state=self.ui_progress_state(),
+                )
+                self.fail(format_criteria_timeout(label, diagnosis))
+            time.sleep(0.1)
 
     def new_project(self, label: str) -> str:
         title = label + "-" + uuid.uuid4().hex[:8]
@@ -675,10 +782,9 @@ class RecruitmentBrowserAcceptance(unittest.TestCase):
         # The publish button can already be visible while the save is still in
         # flight (that is what the delayed fetch above proves), so wait for the
         # durable draft instead of sampling it exactly once.
-        second_protocol = self.wait_for_json(
-            f"/api/v1/projects/{pid}/protocol-workspace",
-            lambda w: len(w["draft"]["criteria"]) == 2,
-            label="draft with two criteria",
+        self.wait_for_criteria_draft(
+            pid, expected_count=2,
+            label="draft with two criteria after added critical standard",
         )
         self.page.once("dialog", lambda dialog: dialog.accept())
         with self.page.expect_response(
@@ -729,6 +835,74 @@ class RecruitmentBrowserAcceptance(unittest.TestCase):
         expect(self.page.get_by_role("button", name="按当前证据重申")).to_be_disabled()
         self.assertFalse(self.console_errors, self.console_errors)
 
+
+    def test_07a_criteria_draft_timeout_reports_counts_and_persisted_state(self) -> None:
+        """Deterministic fixture: the UI ahead of the API must be diagnosable.
+
+        The DOM gets a second criterion row, but its save is deliberately never
+        dispatched, so the durable draft stays at one item. This is the exact
+        shape of the reported #154 timeout, without relying on timing luck.
+
+        It asserts two things and one absence:
+        - the old wait reports only "did not reach the expected state";
+        - the new wait names counts, the draft revision, the persisted criterion
+          and the DOM rows that are ahead of it;
+        - neither message carries transport/host details.
+        """
+        pid = self.new_project("诊断夹具")
+        self.page.locator(".tabs").get_by_role("button", name="建岗与标准").click()
+        self.page.get_by_role("button", name="＋ 添加标准").click()
+        expect(self.page.locator(".criterion-row")).to_have_count(1)
+        first = self.page.locator(".criterion-row").first
+        first.locator(".c-name").fill("诊断夹具已持久化标准")
+        first.locator(".c-definition").fill("合成定义，用于诊断输出")
+        first.locator(".c-critical").check()
+        first.locator(".c-verify").check()
+        first.locator(".c-probe").fill("合成探针问题")
+        self.save_criteria(pid)
+        saved = self.get_json(f"/api/v1/projects/{pid}/protocol-workspace")
+        self.assertEqual(len(saved["draft"]["criteria"]), 1)
+
+        # Withhold the save on purpose: two DOM rows, one durable criterion.
+        self.page.get_by_role("button", name="＋ 添加标准").click()
+        expect(self.page.locator(".criterion-row")).to_have_count(2)
+        second = self.page.locator(".criterion-row").last
+        second.locator(".c-name").fill("诊断夹具未保存标准")
+        second.locator(".c-definition").fill("合成定义，刻意不保存")
+
+        path = f"/api/v1/projects/{pid}/protocol-workspace"
+        with self.assertRaises(AssertionError) as vague:
+            self.wait_for_json(
+                path, lambda w: len(w["draft"]["criteria"]) == 2,
+                timeout=0.3, label="draft with two criteria",
+            )
+        with self.assertRaises(AssertionError) as precise:
+            self.wait_for_criteria_draft(
+                pid, expected_count=2, timeout=0.3,
+                label="draft with two criteria",
+            )
+        vague_text = str(vague.exception)
+        precise_text = str(precise.exception)
+
+        # The old text cannot say which side of the UI/durable boundary is wrong.
+        self.assertNotIn("draft_revision_id=", vague_text)
+        for expected_fragment in (
+            "elapsed_s=",
+            "polls=",
+            "expected_criteria=2",
+            "draft_criteria=1",
+            "draft_revision_id=",
+            "draft_items=",
+            "ui_state=",
+            '"criterion_rows": 2',
+            "诊断夹具已持久化标准",
+        ):
+            self.assertIn(expected_fragment, precise_text)
+
+        # No transport, host, credential or local path may leak into a report.
+        for forbidden in ("http://", "https://", "Authorization", "Bearer ",
+                          "Cookie", "token", str(ROOT)):
+            self.assertNotIn(forbidden, precise_text)
 
     def test_17_pending_restore_is_visible_everywhere_and_cancellable(self) -> None:
         """A scheduled restore must never be silent, and must be cancellable.
