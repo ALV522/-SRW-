@@ -39,18 +39,42 @@ def _regular_unlinked(path: Path) -> os.stat_result:
     return st
 
 
+def _file_identity(st: os.stat_result) -> tuple[int, int, int, int, int]:
+    # Do not use atime: verification itself may legitimately update it.
+    return st.st_dev, st.st_ino, st.st_size, st.st_mtime_ns, st.st_ctime_ns
+
+
 def _digest(path: Path, *, expected_size: int, expected_digest: str) -> os.stat_result:
     before = _regular_unlinked(path)
     if before.st_size != expected_size:
         raise CustodyError("archive size mismatch")
-    h = hashlib.sha256()
-    with path.open("rb") as reader:
-        while chunk := reader.read(1024 * 1024):
+
+    # Hash an open *file object*, not an unpinned pathname. A path may be
+    # replaced between lstat/stat and open; checking only the path again after
+    # the digest allows a swapped-in good file to authenticate the wrong ZIP.
+    flags = os.O_RDONLY | getattr(os, "O_BINARY", 0) | getattr(os, "O_NOFOLLOW", 0)
+    fd = os.open(path, flags)
+    try:
+        opened = os.fstat(fd)
+        if not stat.S_ISREG(opened.st_mode) or _file_identity(opened) != _file_identity(before):
+            raise CustodyError("archive file identity changed before reading")
+        h = hashlib.sha256()
+        remaining = expected_size
+        while remaining:
+            chunk = os.read(fd, min(1024 * 1024, remaining))
+            if not chunk:
+                raise CustodyError("archive truncated during verification")
             h.update(chunk)
+            remaining -= len(chunk)
+        if os.read(fd, 1):
+            raise CustodyError("archive grew during verification")
+        if _file_identity(os.fstat(fd)) != _file_identity(opened):
+            raise CustodyError("archive changed while reading")
+    finally:
+        os.close(fd)
+
     after = _regular_unlinked(path)
-    if (before.st_dev, before.st_ino, before.st_size, before.st_mtime_ns) != (
-        after.st_dev, after.st_ino, after.st_size, after.st_mtime_ns
-    ):
+    if _file_identity(before) != _file_identity(after):
         raise CustodyError("archive changed during verification")
     if h.hexdigest() != expected_digest:
         raise CustodyError("archive content digest mismatch")

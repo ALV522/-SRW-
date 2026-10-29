@@ -30,7 +30,7 @@
 
     py -3.12 .\scripts\audit_native_artifact_custody.py --primary D:\SRW\private\prepared.zip --secondary E:\SRW-offline\prepared.zip --evidence D:\SRW\private\evidence\custody-unique.json
 
-核验器采用源码中固定的 SHA 和文件大小；拒绝缺失、内容不符、软链接、硬链接/同一文件、读时被修改、已有报告路径，既不解压执行也不打印私有路径。输出 TWO_PINNED_COPIES_VERIFIED_RECOVERY_NOT_PROVEN，仅说明两份文件对象可读且字节正确。即使观测到不同设备 ID，也不能自动判定独立故障域、许可或可恢复性。
+核验器采用源码中固定的 SHA 和文件大小；拒绝缺失、内容不符、软链接、硬链接/同一文件、读时被修改、已有报告路径，既不解压执行也不打印私有路径。校验时使用绑定实际打开文件描述符的 `fstat` 身份核对，防止检查路径与读取字节之间被换成另一个文件对象；此防护不改变副本所在故障域的验证边界，也不提供恶意系统内核或文件系统的强认证。输出 TWO_PINNED_COPIES_VERIFIED_RECOVERY_NOT_PROVEN，仅说明两份文件对象可读且字节正确。即使观测到不同设备 ID，也不能自动判定独立故障域、许可或可恢复性。
 
 真正的容灾演练需关闭原始 ZIP 路径，隔离干净 Windows 环境，使用异地副本重新执行完整装配、全部文件核验、嵌入 Python 导入、Backend smoke、真实 WPF 及合成招聘业务验收；登记新候选源码/Host/ZIP SHA、失败项与操作人员。建议季度抽查和重要发行前重演。未经完整演练不能提升到 RECOVERY_PASS。
 
