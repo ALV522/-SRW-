@@ -215,6 +215,94 @@ raise SystemExit(98)
         self.assertTrue((self.data / ".srw_v1.db.restore-old").exists())
         self.assertTrue(self.journal.exists())
 
+    def test_committed_cleanup_lock_allows_writes_then_restart_without_rechecking_target(self):
+        # RED on the previous design: AV can hold an owned old DB after COMMITTED.
+        # The first launch must complete the mandatory marker/journal transition,
+        # while optional cleanup may be retried after real recruitment writes.
+        original = Path.unlink
+        old_db = self.data / ".srw_v1.db.restore-old"
+        def blocked(path, *args, **kwargs):
+            if path == old_db:
+                raise PermissionError("synthetic AV owned rollback lock")
+            return original(path, *args, **kwargs)
+
+        with patch.object(Path, "unlink", blocked):
+            self.assertEqual(self._restart(), "target.zip")
+            self.assertFalse(self.marker.exists())
+            self.assertTrue(old_db.exists())
+            terminal = json.loads(self.journal.read_text(encoding="utf-8"))
+            self.assertEqual(terminal["phase"], "FINALIZED_CLEANUP_PENDING")
+            snapshots = list((self.data / "backups").glob("pre_restore-*.zip"))
+            self.assertEqual(len(snapshots), 1)
+            undo = snapshots[0].read_bytes()
+            with closing(sqlite3.connect(self.db)) as conn:
+                conn.execute("UPDATE workload SET value='NEW_USER_WRITE'")
+                conn.commit()
+            self.assertEqual(self._read_db(), "NEW_USER_WRITE")
+            self.assertIsNone(self._restart())
+            self.assertEqual(self._read_db(), "NEW_USER_WRITE")
+            self.assertTrue(self.journal.exists())
+        self.assertIsNone(self._restart())
+        self.assertEqual(self._read_db(), "NEW_USER_WRITE")
+        self.assertFalse(self.journal.exists())
+        self.assertEqual(snapshots[0].read_bytes(), undo)
+        self.assertEqual(len(list((self.data / "backups").glob("pre_restore-*.zip"))), 1)
+
+    def test_finalized_cleanup_missing_live_db_refuses_empty_workspace_boot(self):
+        # A prior COMMITTED restore proves the live DB must exist. If external
+        # deletion/quarantine removes it, do not boot a freshly created empty DB.
+        real_unlink = Path.unlink
+        old_db = self.data / ".srw_v1.db.restore-old"
+        def blocked(path, *args, **kwargs):
+            if path == old_db:
+                raise PermissionError("synthetic antivirus lock")
+            return real_unlink(path, *args, **kwargs)
+
+        with patch.object(Path, "unlink", blocked):
+            self.assertEqual(self._restart(), "target.zip")
+        self.assertEqual(json.loads(self.journal.read_text())["phase"],
+                         "FINALIZED_CLEANUP_PENDING")
+        snapshots = list((self.data / "backups").glob("pre_restore-*.zip"))
+        self.assertEqual(len(snapshots), 1)
+        undo_before = snapshots[0].read_bytes()
+        self.db.unlink()
+        self.assertFalse(self.db.exists())
+        with self.assertRaisesRegex(RuntimeError, "live database is missing"):
+            self._restart()
+        self.assertFalse(self.db.exists(), "missing DB must not be recreated")
+        self.assertTrue(old_db.exists(), "owned rollback residue must remain")
+        self.assertTrue(self.journal.exists(), "recovery fence must remain")
+        self.assertEqual(snapshots[0].read_bytes(), undo_before)
+
+    def test_finalized_cleanup_unknown_symlink_or_changed_undo_fails_closed(self):
+        original = Path.unlink
+        old_db = self.data / ".srw_v1.db.restore-old"
+        def blocked(path, *args, **kwargs):
+            if path == old_db:
+                raise PermissionError("synthetic AV lock")
+            return original(path, *args, **kwargs)
+        with patch.object(Path, "unlink", blocked):
+            self.assertEqual(self._restart(), "target.zip")
+        self.assertEqual(json.loads(self.journal.read_text())["phase"],
+                         "FINALIZED_CLEANUP_PENDING")
+        original_undo = next((self.data / "backups").glob("pre_restore-*.zip"))
+        before = original_undo.read_bytes()
+        original_undo.write_bytes(b"changed synthetic undo")
+        with self.assertRaisesRegex(RuntimeError, "pre-restore snapshot changed"):
+            self._restart()
+        original_undo.write_bytes(before)
+        old_db.unlink()
+        escape = self.root / "outside-old-db"
+        escape.write_bytes(b"unowned synthetic")
+        try:
+            old_db.symlink_to(escape)
+        except (OSError, NotImplementedError):
+            self.skipTest("OS does not permit creation of synthetic symlinks")
+        with self.assertRaisesRegex(RuntimeError, "unsafe symlink"):
+            self._restart()
+        self.assertEqual(escape.read_bytes(), b"unowned synthetic")
+        self.assertTrue(self.journal.exists())
+
     def test_committed_marker_cleanup_failure_retries_without_second_undo(self):
         real_unlink = Path.unlink
         failure = []
