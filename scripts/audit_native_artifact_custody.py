@@ -39,9 +39,23 @@ def _regular_unlinked(path: Path) -> os.stat_result:
     return st
 
 
-def _file_identity(st: os.stat_result) -> tuple[int, int, int, int, int]:
+def _file_identity(st: os.stat_result, *, on_windows: bool | None = None) -> tuple[int, int, int, int, int]:
     # Do not use atime: verification itself may legitimately update it.
-    return st.st_dev, st.st_ino, st.st_size, st.st_mtime_ns, st.st_ctime_ns
+    # Windows CPython os.stat(path) reports creation time in st_ctime_ns,
+    # while os.fstat(fd) can report *metadata change* time there, even for
+    # exactly the same file object (CPython issue #157671). Comparing those
+    # raw ctime fields wrongly blocks legitimate pinned ZIP copies. In 3.12+
+    # st_birthtime_ns has consistent creation-time meaning across both APIs.
+    # POSIX keeps the stricter ctime metadata-change guard.
+    if on_windows is None:
+        on_windows = sys.platform == "win32"
+    if on_windows:
+        timestamp = getattr(st, "st_birthtime_ns", None)
+        if timestamp is None:
+            raise CustodyError("archive birthtime metadata unavailable")
+    else:
+        timestamp = st.st_ctime_ns
+    return st.st_dev, st.st_ino, st.st_size, st.st_mtime_ns, timestamp
 
 
 def _digest(path: Path, *, expected_size: int, expected_digest: str) -> os.stat_result:

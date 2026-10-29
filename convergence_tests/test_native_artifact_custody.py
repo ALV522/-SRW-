@@ -6,12 +6,13 @@ import hashlib
 import json
 import os
 import tempfile
+from types import SimpleNamespace
 import unittest
 import zipfile
 from pathlib import Path
 from unittest.mock import patch
 
-from scripts.audit_native_artifact_custody import CustodyError, audit_custody, main
+from scripts.audit_native_artifact_custody import CustodyError, _file_identity, audit_custody, main
 
 
 class NativeArtifactCustodyTests(unittest.TestCase):
@@ -66,6 +67,28 @@ class NativeArtifactCustodyTests(unittest.TestCase):
              patch.object(Path, "open", substituted_path_open):
             with self.assertRaisesRegex(CustodyError, "archive file identity changed before reading"):
                 self.check()
+
+    def test_windows_stat_and_fstat_ctime_mismatch_uses_compatible_birthtime(self):
+        # CPython Windows can report creation time from path.stat and metadata
+        # change time from os.fstat(fd), even for the *same* file. Simulate the
+        # documented cross-API discrepancy without needing a Windows runner.
+        common = dict(st_dev=3, st_ino=12345, st_size=256,
+                      st_mtime_ns=4444, st_birthtime_ns=1111)
+        path_stat = SimpleNamespace(**common, st_ctime_ns=1111)
+        fd_stat = SimpleNamespace(**common, st_ctime_ns=9999)
+        self.assertEqual(_file_identity(path_stat, on_windows=True),
+                         _file_identity(fd_stat, on_windows=True))
+        self.assertNotEqual(_file_identity(path_stat, on_windows=False),
+                            _file_identity(fd_stat, on_windows=False))
+        # The compatibility fix is *not* permission to accept a substituted
+        # handle: dev/ino, size, mtime and pinned SHA still bind the real object.
+        wrong_fd = SimpleNamespace(**{**common, "st_ino": 12346}, st_ctime_ns=9999)
+        self.assertNotEqual(_file_identity(path_stat, on_windows=True),
+                            _file_identity(wrong_fd, on_windows=True))
+        missing_birthtime = SimpleNamespace(st_dev=3, st_ino=12345, st_size=256,
+                                            st_mtime_ns=4444, st_ctime_ns=1111)
+        with self.assertRaisesRegex(CustodyError, "birthtime metadata unavailable"):
+            _file_identity(missing_birthtime, on_windows=True)
 
     def test_open_race_or_antivirus_lock_is_a_safe_custody_denial(self):
         # The CLI already catches OSError, but direct library callers must not
