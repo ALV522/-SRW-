@@ -1,6 +1,6 @@
 # SRW 产品与架构总路线图
 
-状态：ACTIVE · 2026-10-21
+状态：ACTIVE · 2026-10-29 进度复核（目标与退出条件不变）
 
 本路线图以 [PRODUCT_CHARTER](PRODUCT_CHARTER.md)、[ADR-0001](decisions/ADR-0001-single-authoritative-core.md) 和 [ADR-0002](decisions/ADR-0002-api-first-modular-monolith.md) 为约束。当前开发主线是 `main`；历史 v0.8.12-R2 是功能保真对照，不是当前源码身份。
 
@@ -18,16 +18,11 @@
 
 ## 2. 当前基线与证据边界
 
-基线 `c0bc192e346ab16aeb6fa63e60a40c617274a188`：
+当前进度快照对应 main `979863218c7fbcfc2c3fd5ff041237f0110c4350`，VERSION `1.0.0-alpha10-convergence11`、Schema `v1_0014`、development。准确 CI、工件链接与未验收边界集中见 [README 当前进展](../README.md#当前进展与路线图位置2026-10-29-核查快照)，避免在多份文档重复维护测试计数。
 
-- VERSION `1.0.0-alpha10-convergence11`；Schema `v1_0014`；development；
-- Ubuntu/Windows Source Gate：各 241 tests，2 skipped，PASS；
-- Chromium：10 个真实浏览器业务场景 PASS；
-- Source integrity：329 SHA-256 entries PASS；
-- 当前 SHA 的 Windows Host rebuild / wheelhouse 构建成功；
-- 当前 SHA 的完整 Native GUI、完整招聘纵向流程、Provider/生产 Knowledge、EXE+Browser 同 Core 并发仍不能据此标为 PASS。
+**当前位置：Track 0 持续业务/恢复收口；Track A 的契约与路由拆分已有多批交付、前端共享 client 和两个 feature 已拆出，Application 层尚未整体完成；Track B 最新 Native 实机验收待完成；Track C 已有纯策略与 registry，但 HTTP/Host/Browser 安全接线未完成；Track D 尚未进入 RC/GA。**
 
-旧工件/旧 SHA 的 Windows GUI 证据保留为历史事实，不向当前 SHA 外推。
+历史特定工件的 WPF/业务验收保留，不迁移为当前 SHA 的 PASS。Source+Host NO_RUNTIME kit 是装配输入，不是可直接运行的完整 Native 产品。源码与合成测试完成不等于 T1–T10 双端实测完成。
 
 ## 3. 不再采用“P0 做完后才重构”的顺序
 
@@ -157,18 +152,15 @@ operator outcome
 - SaaS、云登录、多租户；
 - 因架构拆分删除成熟 Evidence/Decision/Knowledge/AI/OCR/ASR/Backup 能力。
 
-## 10. 近期建议执行顺序
+## 10. 当前执行顺序（2026-10-29）
 
-在现有 P0/P1 不被放弃的前提下，近期最小闭环建议：
+1. **#42/#123/#124：准确工件的 Windows 验收与可恢复性。** 最新 Source+Host kit 已构建，下一步是保留受限原 Prepared ZIP、装配新完整候选并做真实 WPF/招聘/恢复验证；外部独立副本、干净重建和 Knowledge 许可未完成。
+2. **#43：从纯组件进入跨载体安全接线。** #145/#158/#165 已交付 policy/registry 与输入边界；先确认 Host 身份、Browser attach/CSRF、重复原始 header、生命周期 token 分离合同，再把 #148 的 HTTP RED 合同与实现原子推进。现有 gate 默认 OFF；不另造第二 Core。
+3. **#41/#63：在真实业务缺口上继续应用层与 feature 收口。** API inventory、多轮 route 拆分、共享 API client、重评估和建岗 feature 已有交付，不再把“第一刀路由/第一个 feature”列成未来任务。R3/R4 未整体完成；保持现有技术栈与功能保真。
+4. **#154/#159：保留时序故障的诊断与关闭条件。** #156/#164 已改善失败信息；不因重跑成功关闭未知根因。
+5. **#166：清单工具的小范围改进。** 增量写入与 Windows/index 字节一致性，继续全量验 SHA；正式七域权威迁移暂不实施，不占用 P0/P1 产品化关键路径。
 
-1. #63 A1：生成/维护 API inventory + contract regression，先保护现有 129 个路径模板的兼容面；
-2. #63 A2：选择一个边界清楚且已有 Chromium/Source 覆盖的域，从 `fullworkbench.py` 迁出第一个 route module；
-3. #41：继续用真实业务缺陷推动 Domain/Application 边界，而不是新增独立页面逻辑；
-4. #43：在 contract/revision 基础上推进 Supervisor/session/CAS；
-5. #42：持续构建和实机验收最新准确 Native candidate；
-6. 前端在统一 `apiClient` 安全网建立后，开始第一个 feature 拆分。
-
-任何一步若发现业务行为与现有产品不变量冲突，优先保留业务真相，记录 defect/ADR，不为了完成结构指标强行迁移。
+以上按风险和可用证据并行推进；不以目录、PR 数或治理文档数量作为产品完成度。版本迁移 #44 和 RC/GA 仍须独立门禁及负责人裁决。
 
 ## 11. 最终 1.0.0 判定
 
