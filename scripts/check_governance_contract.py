@@ -36,6 +36,15 @@ PR_ATTESTATIONS = (
     "- [x] 已给出修改影响与相应业务/双端验收范围",
     "- [x] 不以源代码或浏览器通过冒充 Windows/发行通过",
 )
+#: A P4 raised in review must be disposed of explicitly, not forgotten when the
+#: PR closes. The three markers are mutually exclusive: a body that lists two is
+#: not a disposition, it is an unresolved question.
+P4_DISPOSITIONS = ("已修", "已登记", "明确接受风险")
+P4_LINE = re.compile(r"^\s*[-*]?\s*P4\s*处置\s*[:：]\s*(?P<value>.*)$", re.MULTILINE)
+P4_TEMPLATE_HINT = (
+    "PR must declare exactly one `P4 处置` line: "
+    "已修（PR/提交）/ 已登记（#155 或具体 Issue）/ 明确接受风险（理由）"
+)
 SEMVER = re.compile(
     r"(?:0|[1-9][0-9]*)\.(?:0|[1-9][0-9]*)\.(?:0|[1-9][0-9]*)"
     r"(?:-(?:0|[1-9][0-9]*|[0-9A-Za-z-]+)"
@@ -93,8 +102,31 @@ def validate(root: Path = ROOT) -> list[str]:
     return problems
 
 
+def validate_p4_disposition(body: str) -> list[str]:
+    """Require exactly one ``P4 处置`` line with a concrete reference or reason.
+
+    The check is structural: it can prove a disposition was *stated* and is
+    machine-findable, not that the fix is real or that the risk was accepted by
+    someone else. Semantics stay with human review.
+    """
+    values = [match.group("value").strip() for match in P4_LINE.finditer(body)]
+    if not values:
+        return [P4_TEMPLATE_HINT]
+    if len(values) > 1:
+        return ["PR must declare exactly one P4 处置 line, not several"]
+    value = values[0]
+    markers = [marker for marker in P4_DISPOSITIONS if marker in value]
+    if len(markers) != 1:
+        return [f"P4 处置 must contain exactly one of: {' / '.join(P4_DISPOSITIONS)}"]
+    detail = value.replace(markers[0], "", 1).strip(" \t（）()：:，,;；")
+    if len(detail) < 3:
+        return ["P4 处置 needs a concrete PR/commit, issue number or risk reason after the marker"]
+    return []
+
+
 def validate_pr_body(body: str) -> list[str]:
-    return [f"PR must check exact attestation: {value}" for value in PR_ATTESTATIONS if value not in body]
+    return [f"PR must check exact attestation: {value}" for value in PR_ATTESTATIONS if value not in body] \
+        + validate_p4_disposition(body)
 
 
 def main() -> int:
