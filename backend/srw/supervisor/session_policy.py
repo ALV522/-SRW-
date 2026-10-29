@@ -34,11 +34,17 @@ Contract (phase 2, agreed with Track A)
   an anonymous bootstrap read is rejected. Enabling the gate without a token is
   a misconfiguration and must not silently allow writes.
 * ``GET``/``HEAD`` may be anonymous only on a minimal bootstrap allowlist
-  (health, readiness, capabilities, the local ``/v1`` static bundle). Everything
-  else - including ``/api/v1/info``, ``/api/v1/runtime/info`` and
-  ``/api/v1/runtime/live``, which expose instance/release/session identifiers -
-  requires the session token.
-* Any other method requires the session token, including ``OPTIONS``.
+  (health, readiness, capabilities, the local ``/v1`` static bundle, and the SPA
+  root ``/`` that the Native Host opens). Everything else - including
+  ``/api/v1/info``, ``/api/v1/runtime/info`` and ``/api/v1/runtime/live``, which
+  expose instance/release/session identifiers - requires the session token.
+* Any other method requires the session token, including ``OPTIONS``. ``POST /``
+  is therefore never anonymous even though ``GET /`` is.
+* The presented header is untrusted text. It is compared only when it is
+  printable ASCII and no longer than ``MAX_TOKEN_LENGTH``; anything else gets the
+  same fixed ``session_token_invalid`` 401 as a wrong guess, so
+  ``hmac.compare_digest`` never raises ``TypeError`` on a Unicode value and the
+  denial cannot be used as an oracle for "well-formed but wrong".
 * A cross-origin request is refused even when it carries a valid token: the
   origin boundary is not something a header can buy its way past. ``Sec-Fetch-Site:
   same-site`` is refused too, for reads as well as writes; a request with no Fetch
@@ -76,9 +82,15 @@ ANONYMOUS_READ_PATHS = frozenset(
 
 #: The bundled SPA must keep loading so the page can show "reopen from the Host"
 #: instead of a blank screen. Only static assets live here; no API path matches.
+#: ``/`` is the same SPA index as ``/v1`` (``app.py`` registers both) and is what
+#: the Native Host navigates to, so it is allowed *exactly*, never as a prefix.
+STATIC_READ_EXACT = frozenset({"/", "/v1"})
 STATIC_READ_PREFIXES = ("/v1",)
 
 SAFE_METHODS = frozenset({"GET", "HEAD"})
+
+#: A header longer than this cannot be a token we issued; refuse before hashing.
+MAX_TOKEN_LENGTH = 512
 
 #: Query parameter names that are refused outright, even with the correct value.
 #: Keys are compared after percent-decoding (up to two rounds) and case folding,
@@ -155,9 +167,20 @@ def normalise_path(raw_path: object) -> str | None:
 
 
 def _is_static(path: str) -> bool:
-    if path == "/v1":
+    # Exact matches only for the two SPA entry points; the prefix rule is for
+    # their assets. ``/`` must never behave as a prefix of anything.
+    if path in STATIC_READ_EXACT:
         return True
     return any(path.startswith(prefix + "/") for prefix in STATIC_READ_PREFIXES)
+
+
+def _token_is_well_formed(value: object) -> bool:
+    """True only for bounded printable ASCII, which is all we could have issued."""
+    return (
+        isinstance(value, str)
+        and 0 < len(value) <= MAX_TOKEN_LENGTH
+        and all(0x21 <= ord(char) <= 0x7E for char in value)
+    )
 
 
 def _normalise_query_key(raw_key: str) -> str | None:
@@ -326,6 +349,13 @@ class SessionPolicy:
         return origin.strip().rstrip("/").lower() in self.allowed_origins
 
     def _token_matches(self, presented: str) -> bool:
-        if not self.token or presented in self.revoked:
+        # Total function over untrusted text: ``hmac.compare_digest`` raises
+        # ``TypeError`` when either ``str`` operand holds non-ASCII characters, so
+        # both sides are checked first. A value we could not have issued is denied
+        # with the same reason as a wrong ASCII guess, which keeps the 401 from
+        # becoming an oracle and bounds the work on a huge header.
+        if not _token_is_well_formed(presented) or not _token_is_well_formed(self.token):
+            return False
+        if presented in self.revoked:
             return False
         return hmac.compare_digest(presented, self.token)
