@@ -13,6 +13,7 @@ from pathlib import Path
 from srw.supervisor.session_registry import (
     DENY_CLOCK,
     DENY_EXPIRED,
+    DENY_EXPIRY,
     DENY_FOREIGN_INSTANCE,
     DENY_MALFORMED,
     DENY_SCOPE,
@@ -166,6 +167,92 @@ class DenialTests(unittest.TestCase):
         self.assertEqual(caught.exception.reason, DENY_CLOCK)
 
 
+class CanonicalInputTests(unittest.TestCase):
+    """Untrusted text must be refused by *our* contract, never by CPython.
+
+    ``hmac.compare_digest`` raises ``TypeError`` when either ``str`` operand has
+    non-ASCII characters. A credential arriving from the network is untrusted, so
+    reaching that call with non-ASCII text would surface an unhandled exception
+    instead of a denial. These cases therefore assert the declared
+    ``SessionDenied`` / ``False`` outcomes, and that the denial stays token-free.
+    """
+
+    def setUp(self) -> None:
+        self.clock = FakeClock()
+        self.registry = SessionRegistry(clock=self.clock, ttl_seconds=60.0)
+
+    def test_non_ascii_tag_is_a_malformed_denial_not_a_type_error(self) -> None:
+        tag = self.registry.instance_tag
+        cases = {
+            "latin-1-supplement": f"srw1.é.{'0' * 64}",
+            "cjk": f"srw1.会话.{'0' * 64}",
+            "fullwidth-digit": f"srw1.{'０' * 4}.{'0' * 64}",
+            "non-ascii-near-tag": f"srw1.{tag}é.{'0' * 64}",
+        }
+        for label, token in cases.items():
+            with self.subTest(case=label):
+                with self.assertRaises(SessionDenied) as caught:
+                    self.registry.authorize(token, "read")
+                self.assertEqual(caught.exception.reason, DENY_MALFORMED)
+                self.assertNotIn("é", str(caught.exception))
+                self.assertNotIn("会话", repr(caught.exception))
+
+    def test_non_ascii_tag_makes_revoke_return_false_instead_of_raising(self) -> None:
+        for token in (f"srw1.é.{'0' * 64}", "srw1.会话." + "0" * 64):
+            with self.subTest(token=token[:12]):
+                self.assertFalse(self.registry.revoke(token))
+
+    def test_non_ascii_secret_is_refused_without_digesting_it(self) -> None:
+        # A non-ASCII secret cannot be one of ours; it must not reach the digest.
+        token = f"srw1.{self.registry.instance_tag}.{'é' * 64}"
+        with self.assertRaises(SessionDenied) as caught:
+            self.registry.authorize(token, "read")
+        self.assertEqual(caught.exception.reason, DENY_MALFORMED)
+
+    def test_non_finite_ttl_is_a_configuration_error(self) -> None:
+        for bad in (float("inf"), float("-inf")):
+            with self.subTest(ttl=bad):
+                with self.assertRaises(ValueError):
+                    SessionRegistry(ttl_seconds=bad)
+
+    def test_non_finite_clock_denies_instead_of_minting_an_immortal_session(self) -> None:
+        for value in (float("inf"), float("-inf")):
+            with self.subTest(clock=value):
+                registry = SessionRegistry(clock=lambda: value, ttl_seconds=60.0)
+                with self.assertRaises(SessionDenied) as caught:
+                    registry.issue(["read"])
+                self.assertEqual(caught.exception.reason, DENY_CLOCK)
+                self.assertEqual(len(registry), 0, "a refused issue must not insert")
+
+    def test_instance_tag_must_produce_a_parseable_credential(self) -> None:
+        # A dot or non-ASCII tag makes every minted token unparseable by our own
+        # parser, so it is refused at construction rather than at first use.
+        for bad in ("has.dot", "é", "会话", "", "   ", "a b", "tag/with/slash", "x" * 65):
+            with self.subTest(tag=bad):
+                with self.assertRaises(ValueError):
+                    SessionRegistry(clock=self.clock, ttl_seconds=60.0, instance_tag=bad)
+
+    def test_finite_clock_plus_finite_ttl_overflowing_to_infinity_fails_closed(self) -> None:
+        registry = SessionRegistry(clock=lambda: 1e308, ttl_seconds=1e308)
+        with self.assertRaises(SessionDenied) as caught:
+            registry.issue(["read"])
+        self.assertEqual(caught.exception.reason, DENY_EXPIRY)
+        self.assertEqual(len(registry), 0, "an unrepresentable expiry must insert nothing")
+
+    def test_overflowing_expiry_is_refused_even_when_the_clock_later_moves(self) -> None:
+        # The refusal must not depend on the clock changing after the attempt.
+        ticks = iter([1e308, 1e308, 1e308])
+
+        def clock() -> float:
+            return next(ticks)
+
+        registry = SessionRegistry(clock=clock, ttl_seconds=1e308)
+        for _ in range(2):
+            with self.assertRaises(SessionDenied):
+                registry.issue(["read"])
+        self.assertEqual(len(registry), 0)
+
+
 class NoLeakAndNoSideEffectTests(unittest.TestCase):
     def test_no_denial_text_contains_the_presented_token(self) -> None:
         registry = SessionRegistry(clock=FakeClock(), ttl_seconds=60.0)
@@ -188,7 +275,7 @@ class NoLeakAndNoSideEffectTests(unittest.TestCase):
                 imported.add(node.module.split(".")[0])
         imported.discard("__future__")
         # Nothing that could write a log, a row, a file or a socket.
-        self.assertEqual(imported, {"hmac", "secrets", "time", "dataclasses", "typing"})
+        self.assertEqual(imported, {"hmac", "math", "secrets", "time", "dataclasses", "typing"})
         # Docstrings mention these words on purpose; only real calls matter.
         called = {node.func.id for node in ast.walk(tree)
                   if isinstance(node, ast.Call) and isinstance(node.func, ast.Name)}

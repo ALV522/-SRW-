@@ -29,10 +29,25 @@ Verification is constant time (``hmac.compare_digest`` on both the tag and the
 digest) and denies by default: malformed, foreign-instance, unknown, expired and
 out-of-scope presentations all raise :class:`SessionDenied`, and no denial
 message, exception text or ``repr`` ever contains the presented token.
+
+Canonical shape before comparison
+---------------------------------
+``hmac.compare_digest`` raises ``TypeError`` when a ``str`` operand holds
+non-ASCII characters, so untrusted text must never reach it directly. Both the
+tag and the secret are therefore validated against the exact alphabet this
+module mints *before* any comparison: an unsupported character, a dot inside the
+tag, a wrong-length or non-hex secret is ``DENY_MALFORMED`` rather than an
+unhandled exception. The same validator constrains an injected ``instance_tag``
+at construction time, because a tag we cannot parse would mint credentials we
+cannot verify. TTL, clock readings and the resulting expiry are all required to
+be finite: an infinite TTL, an infinite or NaN clock reading, and a finite
+clock plus finite TTL that overflow to infinity are all refused, and a refused
+``issue`` inserts nothing.
 """
 from __future__ import annotations
 
 import hmac
+import math
 import secrets
 import time
 from dataclasses import dataclass, field
@@ -45,6 +60,14 @@ DIGEST_KEY_BYTES = 32
 DEFAULT_TTL_SECONDS = 8 * 60 * 60.0
 #: Refuse to hash unbounded input; a request cannot make us allocate by length.
 MAX_TOKEN_LENGTH = 256
+#: Upper bound for an injected tag; the minted tag is ``2 * INSTANCE_TAG_BYTES``.
+MAX_INSTANCE_TAG_LENGTH = 64
+#: The only characters this module ever puts in, or accepts for, a tag.
+TAG_ALPHABET = frozenset(
+    "0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ-_"
+)
+#: ``secrets.token_hex`` emits lowercase hex only.
+SECRET_ALPHABET = frozenset("0123456789abcdef")
 
 DENY_MALFORMED = "malformed_session"
 DENY_FOREIGN_INSTANCE = "stale_instance"
@@ -52,6 +75,7 @@ DENY_UNKNOWN = "unknown_session"
 DENY_EXPIRED = "expired_session"
 DENY_SCOPE = "scope_not_granted"
 DENY_CLOCK = "clock_unavailable"
+DENY_EXPIRY = "expiry_unrepresentable"
 
 
 class SessionDenied(Exception):
@@ -63,6 +87,24 @@ class SessionDenied(Exception):
 
     def __str__(self) -> str:  # keep ``str(exc)`` and logs token-free by construction
         return f"session denied: {self.reason}"
+
+
+def _is_canonical_tag(tag: object) -> bool:
+    """True only for text this module would ever mint as an instance tag."""
+    return (
+        isinstance(tag, str)
+        and 0 < len(tag) <= MAX_INSTANCE_TAG_LENGTH
+        and all(character in TAG_ALPHABET for character in tag)
+    )
+
+
+def _is_canonical_secret(secret: object) -> bool:
+    """True only for the fixed-width lowercase hex this module mints."""
+    return (
+        isinstance(secret, str)
+        and len(secret) == SECRET_BYTES * 2
+        and all(character in SECRET_ALPHABET for character in secret)
+    )
 
 
 @dataclass(frozen=True)
@@ -90,14 +132,21 @@ class SessionRegistry:
     def __init__(self, *, clock: Callable[[], float] | None = None,
                  ttl_seconds: float = DEFAULT_TTL_SECONDS,
                  instance_tag: str | None = None) -> None:
-        if not isinstance(ttl_seconds, (int, float)) or ttl_seconds != ttl_seconds:
+        if not isinstance(ttl_seconds, (int, float)) or isinstance(ttl_seconds, bool):
             raise ValueError("session ttl must be a real number of seconds")
+        if not math.isfinite(float(ttl_seconds)):
+            raise ValueError("session ttl must be finite")
         if ttl_seconds <= 0:
             raise ValueError("session ttl must be positive")
         if instance_tag is None:
             instance_tag = secrets.token_hex(INSTANCE_TAG_BYTES)
         elif not isinstance(instance_tag, str) or not instance_tag:
             raise ValueError("instance tag must be a non-empty string")
+        elif not _is_canonical_tag(instance_tag):
+            raise ValueError(
+                "instance tag must be 1-64 characters of [A-Za-z0-9_-]; a dot or a "
+                "non-ASCII character would mint an unparseable credential"
+            )
         self._clock = clock if clock is not None else time.monotonic
         self._ttl = float(ttl_seconds)
         self._instance_tag = instance_tag
@@ -115,6 +164,11 @@ class SessionRegistry:
         """Mint one credential. Returns ``(token, session)``; the token is not stored."""
         granted = self._normalise_scopes(scopes)
         now = self._now()
+        # Finite + finite can still overflow to infinity; refuse before minting so
+        # a failed issue cannot leave an immortal record behind.
+        expires_at = now + self._ttl
+        if not math.isfinite(expires_at):
+            raise SessionDenied(DENY_EXPIRY)
         secret = secrets.token_hex(SECRET_BYTES)
         token = f"{TOKEN_PREFIX}.{self._instance_tag}.{secret}"
         digest = self._digest(secret)
@@ -123,7 +177,7 @@ class SessionRegistry:
             instance_tag=self._instance_tag,
             scopes=granted,
             issued_at=now,
-            expires_at=now + self._ttl,
+            expires_at=expires_at,
             token_digest=digest,
         )
         self._sessions[digest] = session
@@ -131,16 +185,12 @@ class SessionRegistry:
 
     def authorize(self, token: str, scope: str) -> Session:
         """Return the session when ``token`` grants ``scope``; raise otherwise."""
-        if not isinstance(token, str) or not token or len(token) > MAX_TOKEN_LENGTH:
+        parsed = self._parse(token)
+        if parsed is None:
             raise SessionDenied(DENY_MALFORMED)
+        tag, secret = parsed
         if not isinstance(scope, str) or not scope:
             raise SessionDenied(DENY_SCOPE)
-        prefix, _, rest = token.partition(".")
-        if prefix != TOKEN_PREFIX:
-            raise SessionDenied(DENY_MALFORMED)
-        tag, _, secret = rest.partition(".")
-        if not tag or not secret or "." in secret:
-            raise SessionDenied(DENY_MALFORMED)
         # Restart fence first: a foreign instance never reaches the lookup table.
         if not hmac.compare_digest(tag, self._instance_tag):
             raise SessionDenied(DENY_FOREIGN_INSTANCE)
@@ -165,14 +215,10 @@ class SessionRegistry:
         and would turn "revoked" into an oracle on credentials. A revoked token
         behaves exactly like an unknown one.
         """
-        if not isinstance(token, str) or not token or len(token) > MAX_TOKEN_LENGTH:
+        parsed = self._parse(token)
+        if parsed is None:
             return False
-        prefix, _, rest = token.partition(".")
-        if prefix != TOKEN_PREFIX:
-            return False
-        tag, _, secret = rest.partition(".")
-        if not tag or not secret or "." in secret:
-            return False
+        tag, secret = parsed
         if not hmac.compare_digest(tag, self._instance_tag):
             return False
         return self._sessions.pop(self._digest(secret), None) is not None
@@ -193,12 +239,35 @@ class SessionRegistry:
         return len(expired)
 
     # -- internals -------------------------------------------------------
+    @staticmethod
+    def _parse(token: object) -> tuple[str, str] | None:
+        """Split ``srw1.<tag>.<secret>`` into canonical parts, or return None.
+
+        Returning ``None`` instead of raising keeps ``authorize`` (deny) and
+        ``revoke`` (``False``) on one parser contract. Nothing here compares,
+        hashes or logs the presented text, so a hostile value cannot reach
+        ``hmac.compare_digest`` and cannot appear in an error message.
+        """
+        if not isinstance(token, str) or not token or len(token) > MAX_TOKEN_LENGTH:
+            return None
+        prefix, _, rest = token.partition(".")
+        if prefix != TOKEN_PREFIX:
+            return None
+        tag, _, secret = rest.partition(".")
+        if "." in secret:
+            return None
+        if not _is_canonical_tag(tag):
+            return None
+        if not _is_canonical_secret(secret):
+            return None
+        return tag, secret
+
     def _now(self) -> float:
         try:
             now = float(self._clock())
         except Exception as exc:  # default deny: an unusable clock never authorises
             raise SessionDenied(DENY_CLOCK) from exc
-        if now != now:  # NaN
+        if not math.isfinite(now):  # NaN and both infinities
             raise SessionDenied(DENY_CLOCK)
         return now
 
