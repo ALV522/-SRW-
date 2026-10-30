@@ -8,5 +8,9 @@
   </PropertyGroup>
   <ItemGroup>
     <Compile Include="../SRW.Desktop/Diagnostics/BackendOutputPrivacy.cs" Link="BackendOutputPrivacy.cs" />
+    <!-- #171: the loopback control-plane client is compiled into this test host so
+         the proxy regression is exercised against the real production source. -->
+    <Compile Include="../SRW.Desktop/Runtime/RuntimeApiClient.cs" Link="RuntimeApiClient.cs" />
+    <Compile Include="../SRW.Desktop/Runtime/RuntimeIdentity.cs" Link="RuntimeIdentity.cs" />
   </ItemGroup>
 </Project>
