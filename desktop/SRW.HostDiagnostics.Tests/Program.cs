@@ -55,5 +55,6 @@ Expect(stopped.EventName == "backend_lifecycle"
     && Serial(stopped).Contains("application_stopped"), "Retain shutdown transition");
 
 await SRW.HostDiagnostics.Tests.RuntimeApiClientProxyTests.RunAsync();
+await SRW.HostDiagnostics.Tests.RuntimeApiClientRedirectTests.RunAsync();
 
 Console.WriteLine("PASS: child-process HTTP status/route diagnostics without candidate, project, path, query, secret or stderr leaks");
