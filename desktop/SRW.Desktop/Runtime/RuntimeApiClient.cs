@@ -12,15 +12,19 @@ public sealed class RuntimeApiClient : IDisposable
 
     public RuntimeApiClient(int port, string sessionToken)
     {
-        // The control plane is strictly loopback (127.0.0.1). HttpClientHandler
-        // otherwise inherits HTTP_PROXY/HTTPS_PROXY/ALL_PROXY from the process
-        // environment, so on a machine with a corporate proxy and no NO_PROXY
-        // entry every /api/v1/runtime/* call is sent to that proxy: ready/info
-        // fail, the Host gives up after its retries and the window never opens
-        // (#171). Disabling the proxy here is scoped to this single loopback
-        // client; provider/AI traffic and every other outbound call keep using
-        // the ambient proxy configuration.
-        var handler = new HttpClientHandler { UseProxy = false };
+        // The control plane is strictly loopback (127.0.0.1). Two ambient defaults
+        // are wrong for it:
+        //   1. HttpClientHandler inherits HTTP_PROXY/HTTPS_PROXY/ALL_PROXY, so on a
+        //      machine with a corporate proxy and no NO_PROXY entry every
+        //      /api/v1/runtime/* call is sent to that proxy: ready/info fail, the
+        //      Host gives up after its retries and the window never opens (#171).
+        //   2. It follows redirects by default. .NET only drops Authorization on a
+        //      cross-origin hop; a custom header such as X-SRW-Session would be
+        //      copied to the redirect target, i.e. the lifecycle token would leave
+        //      the loopback control plane on a single 302.
+        // Both are scoped to this one loopback client: provider/AI traffic and every
+        // other outbound call keep the ambient proxy and redirect behaviour.
+        var handler = new HttpClientHandler { UseProxy = false, AllowAutoRedirect = false };
         _client = new HttpClient(handler)
         {
             BaseAddress = new Uri($"http://127.0.0.1:{port}"),
@@ -39,6 +43,15 @@ public sealed class RuntimeApiClient : IDisposable
             try
             {
                 using var response = await _client.GetAsync("/api/v1/runtime/ready", cancellationToken);
+                // A redirect is never legitimate for a loopback control plane, and
+                // retrying it until the deadline would hide the anomaly behind a
+                // timeout. Fail closed on the first one instead.
+                if ((int)response.StatusCode is >= 300 and < 400)
+                {
+                    throw new InvalidOperationException(
+                        "Backend /api/v1/runtime/ready answered with a redirect; "
+                        + "the loopback control plane never follows one.");
+                }
                 if (response.StatusCode == HttpStatusCode.OK)
                 {
                     using var doc = JsonDocument.Parse(await response.Content.ReadAsStringAsync(cancellationToken));
