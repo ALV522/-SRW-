@@ -12,7 +12,16 @@ public sealed class RuntimeApiClient : IDisposable
 
     public RuntimeApiClient(int port, string sessionToken)
     {
-        _client = new HttpClient
+        // The control plane is strictly loopback (127.0.0.1). HttpClientHandler
+        // otherwise inherits HTTP_PROXY/HTTPS_PROXY/ALL_PROXY from the process
+        // environment, so on a machine with a corporate proxy and no NO_PROXY
+        // entry every /api/v1/runtime/* call is sent to that proxy: ready/info
+        // fail, the Host gives up after its retries and the window never opens
+        // (#171). Disabling the proxy here is scoped to this single loopback
+        // client; provider/AI traffic and every other outbound call keep using
+        // the ambient proxy configuration.
+        var handler = new HttpClientHandler { UseProxy = false };
+        _client = new HttpClient(handler)
         {
             BaseAddress = new Uri($"http://127.0.0.1:{port}"),
             Timeout = TimeSpan.FromSeconds(3),
