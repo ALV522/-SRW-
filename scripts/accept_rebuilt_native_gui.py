@@ -10,6 +10,7 @@ from __future__ import annotations
 import argparse
 import json
 import os
+import re
 import subprocess
 import sys
 
@@ -26,7 +27,7 @@ from pathlib import Path
 if __package__ in ("", None):
     sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-from scripts.native_payload import PayloadError
+from scripts.native_payload import PayloadError, sha256_file
 from scripts.audit_windows_host_gui_log import record_failure
 from scripts.verify_rebuilt_native import inspect_rebuilt
 
@@ -34,6 +35,11 @@ REQUIRED = ("host_started", "backend_ready", "webview_initialized",
             "frontend_loaded", "shutdown_requested", "backend_stopped",
             "workspace_released", "host_closed")
 MAX_LOG_SIZE = 10_000_000
+
+#: v1 (no ZIP supplied) keeps its original schema and never invents a digest.
+V1_SCHEMA = "srw.rebuilt-native-gui-acceptance.v1"
+V2_SCHEMA = "srw.rebuilt-native-gui-acceptance.v2"
+DIGEST = re.compile(r"[0-9a-f]{64}")
 
 
 def safe_host_events(path: Path, *, offset: int = 0, strict: bool = True) -> list[str]:
@@ -164,12 +170,77 @@ def run_gui(root: Path, *, timeout_seconds: int = 180, cycles: int = 1) -> list[
     return results
 
 
+def resolve_candidate_archive(archive: Path | None,
+                              expected: str | None) -> tuple[Path | None, str | None]:
+    """Pair-check the candidate ZIP before the GUI is touched.
+
+    A half-supplied pair is a caller error, not a v1 fallback: silently degrading to
+    UNBOUND would hide that the operator believed the run was identity-bound.
+    """
+    if archive is None and expected is None:
+        return None, None
+    if archive is None or expected is None:
+        raise PayloadError("--zip and --expected-zip-sha256 must be supplied together")
+    if not isinstance(expected, str) or DIGEST.fullmatch(expected) is None:
+        raise PayloadError("expected Native ZIP hash must be 64 lowercase hex characters")
+    if archive.is_symlink() or not archive.is_file():
+        raise PayloadError("candidate ZIP must be a regular file, not a symlink or directory")
+    resolved = archive.resolve(strict=True)
+    actual = sha256_file(resolved)
+    if actual != expected:
+        raise PayloadError("independent full Native ZIP SHA-256 mismatch")
+    return resolved, actual
+
+
+def accept_candidate(*, root: Path, timeout: int, cycles: int,
+                     archive: Path | None = None,
+                     expected_sha256: str | None = None) -> dict:
+    """Static identity check, real WPF cycles, then the same static check again."""
+    candidate, candidate_sha = resolve_candidate_archive(archive, expected_sha256)
+    bound = candidate is not None
+    static_before = inspect_rebuilt(root, archive=candidate,
+                                    expected_archive_sha256=candidate_sha)
+    observed = run_gui(root, timeout_seconds=timeout, cycles=cycles)
+    if not bound:
+        return {"schema": V1_SCHEMA,
+                "status": "WPF_GUI_FIRST_USE_SMOKE_PASS_FULL_BUSINESS_PENDING",
+                "source_git_sha": static_before["source_git_sha"],
+                "static_source_rebuild_passed": True,
+                "actual_native_gui_accepted_for_basic_smoke": True,
+                "full_business_accepted": False,
+                "ocr_asr_ai_accepted": False,
+                "cycles": observed}
+    # Re-inspect *after* the two real windows: a report may only bind the ZIP that
+    # was actually exercised, so the second check must agree with the first.
+    static_after = inspect_rebuilt(root, archive=candidate,
+                                   expected_archive_sha256=candidate_sha)
+    if static_before.get("zip_sha256") != static_after.get("zip_sha256"):
+        raise PayloadError("candidate ZIP identity changed between the two GUI checks")
+    if static_before.get("source_git_sha") != static_after.get("source_git_sha"):
+        raise PayloadError("source identity changed between the two GUI checks")
+    return {"schema": V2_SCHEMA,
+            "status": "WPF_GUI_FIRST_USE_SMOKE_PASS_FULL_BUSINESS_PENDING",
+            "source_git_sha": static_before["source_git_sha"],
+            "candidate_sha256": candidate_sha,
+            "full_candidate_identity_bound": True,
+            "candidate_verified_before_and_after_gui": True,
+            "static_source_rebuild_passed": True,
+            "actual_native_gui_accepted_for_basic_smoke": True,
+            "full_business_accepted": False,
+            "ocr_asr_ai_accepted": False,
+            "cycles": observed}
+
+
 def main() -> int:
     p = argparse.ArgumentParser(description=__doc__)
     p.add_argument("--root", type=Path, required=True)
     p.add_argument("--evidence", type=Path, required=True)
     p.add_argument("--timeout", type=int, default=180)
     p.add_argument("--cycles", type=int, default=1)
+    p.add_argument("--zip", type=Path,
+                   help="Full candidate ZIP whose identity must be bound (produces a v2 report)")
+    p.add_argument("--expected-zip-sha256",
+                   help="External 64-lowercase-hex SHA-256 of --zip; required together with --zip")
     args = p.parse_args()
     try:
         if os.name != "nt":
@@ -181,16 +252,8 @@ def main() -> int:
         evidence = args.evidence.resolve()
         if root_was_symlink or evidence.is_relative_to(root) or evidence.exists() or evidence.is_symlink():
             raise PayloadError("invalid source candidate or existing/inside evidence destination")
-        static = inspect_rebuilt(root)
-        cycles = run_gui(root, timeout_seconds=args.timeout, cycles=args.cycles)
-        result = {"schema": "srw.rebuilt-native-gui-acceptance.v1",
-                  "status": "WPF_GUI_FIRST_USE_SMOKE_PASS_FULL_BUSINESS_PENDING",
-                  "source_git_sha": static["source_git_sha"],
-                  "static_source_rebuild_passed": True,
-                  "actual_native_gui_accepted_for_basic_smoke": True,
-                  "full_business_accepted": False,
-                  "ocr_asr_ai_accepted": False,
-                  "cycles": cycles}
+        result = accept_candidate(root=root, timeout=args.timeout, cycles=args.cycles,
+                                  archive=args.zip, expected_sha256=args.expected_zip_sha256)
         evidence.parent.mkdir(parents=True, exist_ok=True)
         with evidence.open("x", encoding="utf-8") as out:
             json.dump(result, out, ensure_ascii=False, indent=2, sort_keys=True)
