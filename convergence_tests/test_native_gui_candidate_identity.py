@@ -99,7 +99,17 @@ class CandidateIdentityTests(unittest.TestCase):
             self.skipTest("symlink creation not permitted on this runner")
         with self.assertRaises(PayloadError) as caught:
             self.accept(archive=link, expected=self.digest)
-        self.assertIn("symbolic link", str(caught.exception))
+        self.assertIn("symlink", str(caught.exception))
+
+    def test_symlink_branch_is_covered_even_without_symlink_privileges(self):
+        # Windows dev boxes often cannot create symlinks, which silently skipped the
+        # real case above. Exercise the same guard deterministically on every OS.
+        fake = mock.Mock()
+        fake.is_symlink.return_value = True
+        fake.is_file.return_value = True
+        with self.assertRaises(PayloadError) as caught:
+            gui.resolve_candidate_archive(fake, self.digest)
+        self.assertIn("symlink", str(caught.exception))
 
     # -- digest must match the bytes actually supplied -------------------
     def test_digest_mismatch_is_rejected(self):
