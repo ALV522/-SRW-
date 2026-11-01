@@ -274,23 +274,53 @@ raise SystemExit(98)
         self.assertTrue(self.journal.exists(), "recovery fence must remain")
         self.assertEqual(snapshots[0].read_bytes(), undo_before)
 
-    def test_finalized_cleanup_unknown_symlink_or_changed_undo_fails_closed(self):
-        original = Path.unlink
+    def _enter_finalized_cleanup_pending(self):
+        """Reach FINALIZED_CLEANUP_PENDING from setUp state, returning (residue, undo).
+
+        One cleanup unlink is blocked so the restore commits but cannot finish.
+        Both refusal tests below start from this same synthetic state, yet neither
+        depends on the other: a platform that cannot build a symlink must not be
+        able to hide the changed-undo assertion.
+        """
+        real_unlink = Path.unlink
         old_db = self.data / ".srw_v1.db.restore-old"
+
         def blocked(path, *args, **kwargs):
             if path == old_db:
                 raise PermissionError("synthetic AV lock")
-            return original(path, *args, **kwargs)
+            return real_unlink(path, *args, **kwargs)
+
         with patch.object(Path, "unlink", blocked):
             self.assertEqual(self._restart(), "target.zip")
-        self.assertEqual(json.loads(self.journal.read_text())["phase"],
+        self.assertEqual(json.loads(self.journal.read_text(encoding="utf-8"))["phase"],
                          "FINALIZED_CLEANUP_PENDING")
-        original_undo = next((self.data / "backups").glob("pre_restore-*.zip"))
-        before = original_undo.read_bytes()
-        original_undo.write_bytes(b"changed synthetic undo")
+        snapshots = list((self.data / "backups").glob("pre_restore-*.zip"))
+        self.assertEqual(len(snapshots), 1, "cleanup-pending state must own exactly one undo")
+        return old_db, snapshots[0]
+
+    def test_finalized_cleanup_changed_undo_fails_closed(self):
+        # No symlink is created here: this half must hold on every platform.
+        old_db, undo = self._enter_finalized_cleanup_pending()
+        db_before = self.db.read_bytes()
+        undo.write_bytes(b"changed synthetic undo")
         with self.assertRaisesRegex(RuntimeError, "pre-restore snapshot changed"):
             self._restart()
-        original_undo.write_bytes(before)
+        self.assertEqual(self._read_db(), "AFTER", "the committed restore must stand")
+        self.assertEqual(self.db.read_bytes(), db_before,
+                         "refusing a changed undo must not rebuild the database")
+        self.assertTrue(old_db.exists(), "owned rollback residue must survive the refusal")
+        self.assertTrue(self.journal.exists(), "recovery fence must survive the refusal")
+        self.assertEqual(json.loads(self.journal.read_text(encoding="utf-8"))["phase"],
+                         "FINALIZED_CLEANUP_PENDING")
+        self.assertEqual(undo.read_bytes(), b"changed synthetic undo",
+                         "the tampered undo must be preserved, not silently replaced")
+        self.assertEqual(list((self.data / "backups").glob("pre_restore-*.zip")), [undo],
+                         "a refused restart must not mint a second undo")
+
+    def test_finalized_cleanup_unknown_symlink_fails_closed(self):
+        old_db, undo = self._enter_finalized_cleanup_pending()
+        db_before = self.db.read_bytes()
+        undo_before = undo.read_bytes()
         old_db.unlink()
         escape = self.root / "outside-old-db"
         escape.write_bytes(b"unowned synthetic")
@@ -300,8 +330,15 @@ raise SystemExit(98)
             self.skipTest("OS does not permit creation of synthetic symlinks")
         with self.assertRaisesRegex(RuntimeError, "unsafe symlink"):
             self._restart()
-        self.assertEqual(escape.read_bytes(), b"unowned synthetic")
-        self.assertTrue(self.journal.exists())
+        self.assertEqual(escape.read_bytes(), b"unowned synthetic",
+                         "an unknown symlink must never be followed out of the workspace")
+        self.assertTrue(self.journal.exists(), "recovery fence must survive the refusal")
+        self.assertEqual(json.loads(self.journal.read_text(encoding="utf-8"))["phase"],
+                         "FINALIZED_CLEANUP_PENDING")
+        self.assertEqual(self.db.read_bytes(), db_before,
+                         "refusing an unknown symlink must not rebuild the database")
+        self.assertEqual(undo.read_bytes(), undo_before)
+        self.assertEqual(list((self.data / "backups").glob("pre_restore-*.zip")), [undo])
 
     def test_committed_marker_cleanup_failure_retries_without_second_undo(self):
         real_unlink = Path.unlink
