@@ -82,6 +82,13 @@ if ($importCode -ne 0) {
 
 Write-Host ""
 Write-Host "OK: isolated interpreter ready - $python" -ForegroundColor Green
-Write-Host "  business regression : `"$python`" -m unittest convergence_tests.test_native_embedded_business"
-Write-Host "  full suite          : `"$python`" scripts/run_convergence_verification.py"
+Write-Host "  isolated imports : `"$python`" -I -B -c `"import httpx, sqlalchemy, starlette`""
+Write-Host "  business unit    : `"$python`" -m unittest convergence_tests.test_native_embedded_business"
+Write-Host ""
+Write-Host "UNSUPPORTED: do not run the full suite with this venv." -ForegroundColor Yellow
+Write-Host "A Windows venv interpreter is a launcher that starts the base interpreter as a child," -ForegroundColor Yellow
+Write-Host "so the Host lease handshake (holder.pid -eq os.getppid()) fails in" -ForegroundColor Yellow
+Write-Host "test_host_parent_subprocess and test_prepared_native_smoke. Those tests are not skipped." -ForegroundColor Yellow
+Write-Host "Install requirements-ci.txt into the base registered Python 3.12 interpreter instead:" -ForegroundColor Yellow
+Write-Host "  full suite (base): py -3.12 scripts/run_convergence_verification.py"
 exit 0

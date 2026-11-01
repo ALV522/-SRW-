@@ -55,8 +55,8 @@ Replace 41 with the relevant existing/new issue. If blocked, do not edit. Do not
 5. **REPORT** before/after operator behavior, tests run, evidence links, remaining blockers and version/artifact identity; update STATUS only from evidence.
 6. **HANDOFF** next smallest actionable tasks and owner decisions. No background-work claims, no invented run results.
 
-Local Windows gates need a venv, because the embedded-Python business child runs with `-I -B`: run `powershell -ExecutionPolicy Bypass -File scripts/dev_venv.ps1` once, then use `.venv\Scripts\python.exe` for `convergence_tests` and `scripts/run_convergence_verification.py`.
-A "cannot import httpx/sqlalchemy/starlette" verdict is an *environment* verdict, not a business regression: fix the interpreter and never bypass `-I`/`-B` or fall back to user site-packages.
+The embedded-Python business child runs with `-I -B`, so user site-packages are invisible: build `.venv` once with `scripts/dev_venv.ps1` and use `.venv\Scripts\python.exe` for `convergence_tests.test_native_embedded_business` **only**; a "cannot import httpx/sqlalchemy/starlette" verdict is an environment verdict, never a business regression.
+A Windows **full** `run_convergence_verification.py` needs the base registered Python 3.12 with pinned `requirements-ci.txt` installed into that base interpreter's site-packages (never user site): do not use a venv, whose launcher starts the base interpreter as a child and so breaks the two Host parent-PID lease tests; with no such interpreter, report the full suite BLOCKED instead of running it under a venv.
 
 Every PR must include the required reading attestation and acceptance table in .github/pull_request_template.md. The governance CI checks the attestation and key contracts; it cannot prove cognitive reading. Repository admin should make governance and source/CI statuses mandatory via branch protection/rulesets. See docs/DEVELOPMENT_GOVERNANCE.md.
 
