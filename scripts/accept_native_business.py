@@ -40,6 +40,37 @@ SUITES = {
 MIN_TESTS = {name: 1 for name in SUITES}
 DRIVER_TAG = "SRW_SYNTHETIC_TEST_RESULT:"
 
+# The business child runs with `-I -B`, so it cannot see PYTHONPATH or user
+# site-packages. Probing the same interpreter first keeps a missing dependency from
+# being reported as a business/payload regression (#172).
+RUNTIME_DEPS = ("httpx", "sqlalchemy", "starlette")
+PROBE_TAG = "SRW_ISOLATED_DEP_PROBE:"
+PROBE_DRIVER = r'''
+import json
+import sys
+missing = []
+for name in sys.argv[1:]:
+    try:
+        __import__(name)
+    except Exception:
+        missing.append(name)
+print("SRW_ISOLATED_DEP_PROBE:" + json.dumps({"missing": missing}, separators=(",", ":")))
+'''
+
+# Fixed verdicts. They name only our own declared dependencies: never a child
+# traceback, a site-packages path, a user path or a credential.
+PROBE_MISSING_DEPS = (
+    "embedded Python cannot import the declared runtime dependencies "
+    "(httpx, sqlalchemy, starlette); -I disables user-site and PYTHONPATH, so "
+    "install them into that interpreter, or use an audited embedded runtime or "
+    "scripts/dev_venv.ps1 to build a local venv"
+)
+PROBE_TIMEOUT = "embedded Python dependency probe timed out before any business suite ran"
+PROBE_UNUSABLE = (
+    "embedded Python dependency probe produced no usable result; the interpreter "
+    "could not run the isolated driver"
+)
+
 DRIVER = r'''
 import io
 import json
@@ -91,6 +122,44 @@ def validated_result(output: str, code: int, *, suite: str) -> dict:
     return {"suite": suite, "status": "PASS", "tests": data["tests"]}
 
 
+def probe_runtime_dependencies(python: Path, *, cwd, env, timeout: int) -> None:
+    """Prove the isolated interpreter can import the declared runtime dependencies.
+
+    Same interpreter, same `-I -B`, same cwd/env/timeout as the business suites, so a
+    pass here means the suites will not fail on an import. Child output is never
+    propagated: the caller gets one of three fixed verdicts.
+    """
+    try:
+        child = subprocess.run(
+            [str(python), "-I", "-B", "-c", PROBE_DRIVER, *RUNTIME_DEPS],
+            cwd=cwd, env=env, capture_output=True, text=True,
+            encoding="utf-8", errors="replace", timeout=timeout, check=False,
+        )
+    except subprocess.TimeoutExpired as exc:
+        raise PayloadError(PROBE_TIMEOUT) from exc
+    except OSError as exc:
+        raise PayloadError(PROBE_UNUSABLE) from exc
+    lines = [line[len(PROBE_TAG):] for line in (child.stdout or "").splitlines()
+             if line.startswith(PROBE_TAG)]
+    if len(lines) != 1:
+        raise PayloadError(PROBE_UNUSABLE)
+    try:
+        data = json.loads(lines[0])
+    except (ValueError, TypeError) as exc:
+        raise PayloadError(PROBE_UNUSABLE) from exc
+    if not isinstance(data, dict) or set(data) != {"missing"}:
+        raise PayloadError(PROBE_UNUSABLE)
+    missing = data["missing"]
+    if not isinstance(missing, list) or any(not isinstance(name, str) for name in missing):
+        raise PayloadError(PROBE_UNUSABLE)
+    if missing:
+        raise PayloadError(PROBE_MISSING_DEPS)
+    if child.returncode != 0:
+        # The driver reported no missing module yet the process still failed: that is
+        # a broken probe, not a dependency verdict.
+        raise PayloadError(PROBE_UNUSABLE)
+
+
 def run_embedded_regressions(root: Path, python: Path, *, timeout: int = 600) -> list[dict]:
     """Use only candidate runtime and candidate source in disposable workspaces.
 
@@ -113,6 +182,8 @@ def run_embedded_regressions(root: Path, python: Path, *, timeout: int = 600) ->
             "PYTHONDONTWRITEBYTECODE": "1",
             "SRW_BACKGROUND_WORKER": "0",
         })
+        # Refuse to attribute a missing dependency to the business suites.
+        probe_runtime_dependencies(python, cwd=td, env=env, timeout=timeout)
         results = []
         for name, module in SUITES.items():
             child = subprocess.run(

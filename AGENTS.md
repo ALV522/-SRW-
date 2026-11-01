@@ -55,6 +55,9 @@ Replace 41 with the relevant existing/new issue. If blocked, do not edit. Do not
 5. **REPORT** before/after operator behavior, tests run, evidence links, remaining blockers and version/artifact identity; update STATUS only from evidence.
 6. **HANDOFF** next smallest actionable tasks and owner decisions. No background-work claims, no invented run results.
 
+Local Windows gates need a venv, because the embedded-Python business child runs with `-I -B`: run `powershell -ExecutionPolicy Bypass -File scripts/dev_venv.ps1` once, then use `.venv\Scripts\python.exe` for `convergence_tests` and `scripts/run_convergence_verification.py`.
+A "cannot import httpx/sqlalchemy/starlette" verdict is an *environment* verdict, not a business regression: fix the interpreter and never bypass `-I`/`-B` or fall back to user site-packages.
+
 Every PR must include the required reading attestation and acceptance table in .github/pull_request_template.md. The governance CI checks the attestation and key contracts; it cannot prove cognitive reading. Repository admin should make governance and source/CI statuses mandatory via branch protection/rulesets. See docs/DEVELOPMENT_GOVERNANCE.md.
 
 ## Guarded product goals
