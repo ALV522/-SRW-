@@ -59,23 +59,23 @@ def canonical_remote(url: str | None) -> str | None:
     return CANONICAL_REMOTES.get(url.strip())
 
 
+#: `git ls-remote` prints ``<sha>\\t<ref>``. The separator must be a TAB, there must
+#: be exactly one line, and at most one trailing newline: a space separator or an
+#: extra blank line means the output was not produced by the command we think ran.
+REMOTE_MAIN_RE = re.compile(r"([0-9a-f]{40})\trefs/heads/main\r?\n?")
+
+
 def parse_remote_main(output: str | None) -> str | None:
     """Return the single main SHA from ``git ls-remote`` output, else None.
 
-    Exactly one ``<sha>\\trefs/heads/main`` line is accepted. Empty output, two lines
-    (duplicated or diverging answers), another ref, a truncated/upper-case SHA or
-    extra columns are all refused.
+    ``fullmatch`` against :data:`REMOTE_MAIN_RE` is deliberate: an earlier version
+    filtered blank lines and used ``str.split()``, which also accepted
+    ``<sha> refs/heads/main`` and ``<sha>\\trefs/heads/main\\n\\n``.
     """
-    lines = [line for line in (output or "").splitlines() if line.strip()]
-    if len(lines) != 1:
+    if not isinstance(output, str):
         return None
-    fields = lines[0].split()
-    if len(fields) != 2:
-        return None
-    sha, ref = fields
-    if ref != "refs/heads/main" or not re.fullmatch(r"[0-9a-f]{40}", sha):
-        return None
-    return sha
+    match = REMOTE_MAIN_RE.fullmatch(output)
+    return match.group(1) if match else None
 
 
 def check_remote(*, raw_urls: list[str], effective_urls: list[str],
