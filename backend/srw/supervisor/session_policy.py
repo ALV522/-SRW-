@@ -264,10 +264,31 @@ class SessionPolicy:
 
     @classmethod
     def from_environ(cls, environ: Mapping[str, str] | None = None) -> "SessionPolicy":
-        """Build from an explicit mapping (never from ambient state at import)."""
+        """Build from an explicit mapping (never from ambient state at import).
+
+        The enable flag is a three-way contract, not a truthiness test (#43):
+
+        * unset / empty / blank -> OFF, the compatible default;
+        * ``0`` (surrounding whitespace allowed) -> explicit OFF;
+        * ``1`` (surrounding whitespace allowed) -> explicit ON;
+        * any other non-empty value (``true``, ``yes``, ``on``, ``01``, ``2`` ...)
+          or a non-string -> configuration error.
+
+        Whitespace is tolerated on purpose. ``" 1 "`` is an operator asking for ON,
+        and guessing OFF there would leave the deployment unauthenticated while the
+        operator believes otherwise. An unrecognised value is refused instead of
+        being guessed in either direction, and the message never echoes the value so
+        a secret typed into the wrong variable cannot reach a log.
+        """
 
         source = environ if environ is not None else {}
-        enforce = str(source.get(ENFORCE_ENV, "")).strip() == "1"
+        raw = source.get(ENFORCE_ENV, "")
+        if not isinstance(raw, str):
+            raise ValueError("invalid RECRUITMENT_SESSION_ENFORCE: expected 0 or 1")
+        flag = raw.strip()
+        if flag not in {"", "0", "1"}:
+            raise ValueError("invalid RECRUITMENT_SESSION_ENFORCE: expected 0 or 1")
+        enforce = flag == "1"
         token = str(source.get(TOKEN_ENV, "")).strip()
         return cls(enforce=enforce, token=token)
 
