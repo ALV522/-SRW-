@@ -5,8 +5,9 @@ to runtime/info or shutdown, and none of #148's deliberately-RED cases. These te
 only lock what is true on the current main so that the future atomic wiring PR has
 to change them on purpose instead of drifting silently:
 
-* D4 - with the flag absent (or any value but the literal "1"), the policy is inert
-  and the real app keeps answering business writes without a session header;
+* D4 - the enable flag is tri-state: unset/empty/blank/``0`` is OFF, ``1`` is ON
+  (surrounding whitespace tolerated), anything else is a configuration error; with
+  the flag unset the real app keeps answering business writes without a session header;
 * A9/A10 - the existing credential boundary: non-ASCII, control characters and
   over-long values are one fixed 401 rather than an exception or a distinguisher;
 * the raw ASGI header shape - duplicate header names survive to ``scope["headers"]``,
@@ -40,12 +41,24 @@ def decision(policy: SessionPolicy, *, method: str = "POST", path: str = "/api/v
     return policy.evaluate(method=method, raw_path=path, headers=headers or {})
 
 
-class DefaultOffCompatibilityTests(unittest.TestCase):
-    """D4: only the literal ``1`` may switch the gate on."""
+class OptInConfigurationContractTests(unittest.TestCase):
+    """D4: the enable flag is tri-state, and an unrecognised value is an error.
 
-    def test_policy_is_inert_for_every_value_but_the_literal_one(self):
-        for environ in ({}, {ENFORCE_ENV: ""}, {ENFORCE_ENV: "0"}, {ENFORCE_ENV: "true"},
-                        {ENFORCE_ENV: "yes"}, {ENFORCE_ENV: "02"}, {ENFORCE_ENV: " "}):
+    This supersedes the earlier "only the literal 1" wording, which was wrong on the
+    old code (``" 1 "`` enabled the gate) and, worse, pointed the fix in the wrong
+    direction: making the flag stricter would turn an operator's whitespace into a
+    silently unauthenticated deployment. The contract is:
+
+    * unset / empty / blank -> OFF (compatible default);
+    * ``0`` (whitespace allowed) -> explicit OFF;
+    * ``1`` (whitespace allowed) -> explicit ON;
+    * anything else non-empty, or a non-string -> configuration error naming the
+      variable and never echoing the value.
+    """
+
+    def test_unset_empty_and_zero_are_off(self):
+        for environ in ({}, {ENFORCE_ENV: ""}, {ENFORCE_ENV: " "}, {ENFORCE_ENV: "\t\n"},
+                        {ENFORCE_ENV: "0"}, {ENFORCE_ENV: " 0 "}):
             with self.subTest(environ=environ):
                 policy = SessionPolicy.from_environ(environ)
                 self.assertFalse(policy.enforce)
@@ -53,15 +66,34 @@ class DefaultOffCompatibilityTests(unittest.TestCase):
                 self.assertTrue(result.allowed, result.reason)
                 self.assertEqual(result.reason, "enforcement_disabled")
 
-    def test_literal_one_enables_and_then_requires_a_credential(self):
-        policy = SessionPolicy.from_environ({ENFORCE_ENV: "1", TOKEN_ENV: TOKEN})
-        self.assertTrue(policy.enforce)
-        denied = decision(policy)
-        self.assertFalse(denied.allowed)
-        self.assertEqual((denied.status_code, denied.reason),
-                         (401, "session_token_required"))
-        allowed = decision(policy, headers={SESSION_HEADER: TOKEN})
-        self.assertTrue(allowed.allowed, allowed.reason)
+    def test_one_is_on_and_tolerates_surrounding_whitespace(self):
+        # An operator who writes " 1 " is asking for ON. Treating that as OFF is the
+        # fail-open case this contract exists to prevent.
+        for value in ("1", " 1 ", "\t1\n"):
+            with self.subTest(value=value):
+                policy = SessionPolicy.from_environ({ENFORCE_ENV: value, TOKEN_ENV: TOKEN})
+                self.assertTrue(policy.enforce)
+                denied = decision(policy)
+                self.assertFalse(denied.allowed)
+                self.assertEqual((denied.status_code, denied.reason),
+                                 (401, "session_token_required"))
+                allowed = decision(policy, headers={SESSION_HEADER: TOKEN})
+                self.assertTrue(allowed.allowed, allowed.reason)
+
+    def test_unrecognised_values_are_a_configuration_error_not_a_silent_off(self):
+        for value in ("true", "TRUE", "yes", "on", "enabled", "01", "2", "false", "off"):
+            with self.subTest(value=value):
+                with self.assertRaises(ValueError) as caught:
+                    SessionPolicy.from_environ({ENFORCE_ENV: value})
+                message = str(caught.exception)
+                self.assertIn(ENFORCE_ENV, message)
+                self.assertNotIn(value, message, "the error must not echo the value")
+
+    def test_non_string_values_are_rejected(self):
+        for value in (0, 1, True, False, None, b"1", ["1"]):
+            with self.subTest(value=value):
+                with self.assertRaises(ValueError):
+                    SessionPolicy.from_environ({ENFORCE_ENV: value})
 
     def test_real_app_still_accepts_a_business_write_without_a_session_header(self):
         # The Windows carrier talks to loopback with no Origin and no token; the

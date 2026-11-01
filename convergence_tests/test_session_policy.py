@@ -46,15 +46,24 @@ class DefaultOffTests(unittest.TestCase):
         self.assertFalse(policy.enforce)
         self.assertFalse(policy.configured)
 
-    def test_only_the_literal_one_enables_enforcement(self) -> None:
-        # "true"/"yes"/"on" are deliberately not aliases: an operator should not be
-        # able to switch on authorization by accident.
-        for value in ("0", "false", "true", "yes", "on", ""):
+    def test_zero_and_blank_disable_enforcement(self) -> None:
+        for value in ("0", " 0 ", "", " ", "\t\n"):
             with self.subTest(value=value):
                 policy = SessionPolicy.from_environ({ENFORCE_ENV: value, TOKEN_ENV: TOKEN})
                 self.assertFalse(policy.enforce)
 
+    def test_unrecognised_values_are_refused_not_silently_off(self) -> None:
+        # "true"/"yes"/"on" are not aliases, but they are also not silently OFF:
+        # an operator who writes them is asking for ON, so guessing either way is
+        # wrong. The only safe response is a configuration error (#43).
+        for value in ("false", "true", "yes", "on", "enabled", "2", "01"):
+            with self.subTest(value=value):
+                with self.assertRaises(ValueError) as caught:
+                    SessionPolicy.from_environ({ENFORCE_ENV: value, TOKEN_ENV: TOKEN})
+                self.assertNotIn(value, str(caught.exception))
+
     def test_env_value_is_stripped(self) -> None:
+        # Contract, not an accident: " 1 " means ON and the credential is trimmed.
         policy = SessionPolicy.from_environ({ENFORCE_ENV: " 1 ", TOKEN_ENV: f" {TOKEN} "})
         self.assertTrue(policy.enforce)
         self.assertEqual(policy.token, TOKEN)
