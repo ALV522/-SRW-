@@ -90,13 +90,18 @@ def main() -> int:
                 raise SystemExit(f"BLOCKED: {exc}") from None
 
         # Keep restore/SQLite/worker startup *inside* the exclusive lifetime.
-        try:
-            import launch_alpha10 as portable_launcher
-            portable_launcher.DATA = data_dir
-            portable_launcher.DB = db
-            portable_launcher.apply_pending_restore()
-        except FileNotFoundError:
-            pass
+        # A pending restore must fail closed. The previous broad
+        # ``except FileNotFoundError: pass`` also swallowed a FileNotFoundError
+        # raised *inside* an owned restore transaction (for example the archive
+        # disappearing between validation and open), so Core started on stale
+        # data while pending_restore.json stayed behind: the operator saw a
+        # scheduled restore that silently did nothing (#130).
+        # ``apply_restore`` already returns None when this data dir owns no
+        # restore, so no exception needs tolerating here.
+        import launch_alpha10 as portable_launcher
+        portable_launcher.DATA = data_dir
+        portable_launcher.DB = db
+        portable_launcher.apply_pending_restore()
 
         os.environ["RECRUITMENT_EDITION"] = args.edition
         os.environ["RECRUITMENT_RUNTIME_MODE"] = "desktop" if args.edition == "windows" else "browser"
