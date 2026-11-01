@@ -32,11 +32,24 @@ def _schema_number(revision: str) -> int:
         raise PortableMigrationError(f"invalid source schema: {revision}") from exc
 
 
+def _has_sqlite_header(path: Path) -> bool:
+    """Check the 16-byte SQLite magic without materialising the whole database.
+
+    ``path.read_bytes()[:16]`` slices *after* reading, so a large source database
+    was loaded into memory in full just to look at its first 16 bytes.
+    """
+    try:
+        with path.open("rb") as handle:
+            return handle.read(16) == b"SQLite format 3\x00"
+    except OSError:
+        return False
+
+
 def validate_v1_database(path: str | Path) -> str:
     db = Path(path).resolve()
     if not db.is_file():
         raise PortableMigrationError(f"source database not found: {db}")
-    if db.read_bytes()[:16] != b"SQLite format 3\x00":
+    if not _has_sqlite_header(db):
         raise PortableMigrationError("source database is not valid SQLite")
     try:
         conn = sqlite3.connect(f"file:{db.as_posix()}?mode=ro", uri=True, timeout=2.0)

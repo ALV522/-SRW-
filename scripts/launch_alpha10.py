@@ -119,8 +119,21 @@ def _safe_backup_name(name: str) -> str:
     return p
 
 
+def _has_sqlite_header(path: Path) -> bool:
+    """Check the 16-byte SQLite magic without materialising the whole database.
+
+    ``path.read_bytes()[:16]`` slices *after* reading, so a large restore target or
+    knowledge database was loaded in full just to look at its first 16 bytes.
+    """
+    try:
+        with path.open("rb") as handle:
+            return handle.read(16) == b"SQLite format 3\x00"
+    except OSError:
+        return False
+
+
 def _read_schema(db: Path) -> str:
-    if not db.is_file() or db.read_bytes()[:16] != b"SQLite format 3\x00":
+    if not db.is_file() or not _has_sqlite_header(db):
         raise RuntimeError("invalid backup database")
     conn = sqlite3.connect(str(db), timeout=2.0)
     try:
@@ -179,7 +192,7 @@ def self_check() -> int:
             if not p.is_file(): raise RuntimeError(f"missing file: {p.relative_to(ROOT)}")
         for name in ("taxonomy", "job_info", "competency", "market_reference", "reference"):
             p = KNOWLEDGE / name / "knowledge.db"
-            if not p.is_file() or p.read_bytes()[:16] != b"SQLite format 3\x00":
+            if not p.is_file() or not _has_sqlite_header(p):
                 raise RuntimeError(f"knowledge database invalid: {name}")
         from srw.api.app import create_v1_app
         # Validate the application without writing a real user data directory
