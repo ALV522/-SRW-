@@ -8,6 +8,7 @@ that has not been given a valid payload.
 from __future__ import annotations
 
 import sqlite3
+from contextlib import closing
 import tempfile
 import unittest
 from pathlib import Path
@@ -123,7 +124,7 @@ class ProjectAuthoringTests(unittest.TestCase):
         revision = self.revision_id()
         refused = self.client.post(f"/api/v1/protocol-revisions/{revision}/publish")
         self.assertEqual(refused.status_code, 409, refused.text)
-        with sqlite3.connect(self.db_path) as db:
+        with closing(sqlite3.connect(self.db_path)) as db:
             self.assertEqual(db.execute(
                 "SELECT state, published_at FROM protocol_revision WHERE id=?", (revision,)
             ).fetchone(), ("draft", None))
@@ -177,7 +178,7 @@ class ProjectAuthoringTests(unittest.TestCase):
         self.assertEqual(empty.status_code, 200, empty.text)
         self.assertEqual(self.client.post(
             f"/api/v1/protocol-revisions/{second}/publish").status_code, 409)
-        with sqlite3.connect(self.db_path) as db:
+        with closing(sqlite3.connect(self.db_path)) as db:
             self.assertEqual(db.execute(
                 "SELECT current_protocol_revision_id FROM project WHERE id=?", (self.pid,)
             ).fetchone()[0], first)
@@ -191,7 +192,7 @@ class ProjectAuthoringTests(unittest.TestCase):
     def test_legacy_empty_published_is_readable_and_forkable(self):
         legacy = self.revision_id()
         # Simulate a pre-fix persisted legacy revision; do not rewrite its bytes.
-        with sqlite3.connect(self.db_path) as db:
+        with closing(sqlite3.connect(self.db_path)) as db:
             before = db.execute(
                 "SELECT payload_json FROM protocol_revision WHERE id=?", (legacy,)
             ).fetchone()[0]
@@ -199,6 +200,7 @@ class ProjectAuthoringTests(unittest.TestCase):
             db.execute(
                 "UPDATE project SET status='open', current_protocol_revision_id=? WHERE id=?",
                 (legacy, self.pid))
+            db.commit()
         workspace = self.client.get(f"/api/v1/projects/{self.pid}/protocol-workspace")
         self.assertEqual(workspace.status_code, 200, workspace.text)
         self.assertEqual(workspace.json()["current"]["criteria"], [])
@@ -208,7 +210,7 @@ class ProjectAuthoringTests(unittest.TestCase):
         self.save_publishable_draft(replacement)
         self.assertEqual(self.client.post(
             f"/api/v1/protocol-revisions/{replacement}/publish").status_code, 200)
-        with sqlite3.connect(self.db_path) as db:
+        with closing(sqlite3.connect(self.db_path)) as db:
             self.assertEqual(db.execute(
                 "SELECT payload_json FROM protocol_revision WHERE id=?", (legacy,)
             ).fetchone()[0], before)
@@ -218,11 +220,12 @@ class ProjectAuthoringTests(unittest.TestCase):
 
     def test_corrupt_persisted_draft_fails_closed_before_state_change(self):
         revision = self.revision_id()
-        with sqlite3.connect(self.db_path) as db:
+        with closing(sqlite3.connect(self.db_path)) as db:
             db.execute("UPDATE protocol_revision SET payload_json='{' WHERE id=?", (revision,))
+            db.commit()
         refused = self.client.post(f"/api/v1/protocol-revisions/{revision}/publish")
         self.assertEqual(refused.status_code, 409, refused.text)
-        with sqlite3.connect(self.db_path) as db:
+        with closing(sqlite3.connect(self.db_path)) as db:
             self.assertEqual(db.execute(
                 "SELECT state FROM protocol_revision WHERE id=?", (revision,)
             ).fetchone()[0], "draft")
