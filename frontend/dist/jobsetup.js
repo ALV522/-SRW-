@@ -90,7 +90,22 @@ export function createJobSetupFeature({api, $, esc, modal, closeModal, toast, fm
   const applyJobSetupSuggestions = ()=>{const root=$('#criteria-rows');if(!root){toast('请先回到“建岗与标准”页面',true);return}for(const x of state.jobSetupSuggestions||[]){root.insertAdjacentHTML('beforeend',criterionRow({name:x.name||'',decision_critical:!!x.decision_critical,verification_required:x.verification_required!==false,verification_probes:x.verification_probes||[]},document.querySelectorAll('.criterion-row').length))}closeModal();toast('建议已加入草案编辑区；请人工检查后保存并发布')};
   const jobSetupMove = delta=>{syncJobSetupDraftFromDom();state.jobSetupStep=Math.max(1,Math.min(4,state.jobSetupStep+delta));renderJobSetupWizard()};
   const openJobSetup = async()=>{try{const d=await api(`/api/v1/projects/${state.projectId}/protocol-workspace`);const a=d.draft||d.current||{},x=a.recruitment_context||{};state.jobSetupDraft={role_title:x.role_title||a.brief?.title||'',headcount:x.headcount??1,location:x.location||'',level:x.level||'',employment_type:x.employment_type||'full_time',compensation:x.compensation||'',target_start_date:x.target_start_date||'',recruiter_owner:x.recruiter_owner||'',hiring_manager:x.hiring_manager||'',jd_text:x.jd_text||a.brief?.summary||''};state.jobSetupStep=1;renderJobSetupWizard()}catch(e){toast(e.message,true)}};
-  const publishCriteria = async rid=>{if(!confirm('发布后将成为候选人评价的当前标准，确认发布？'))return;try{await api(`/api/v1/protocol-revisions/${rid}/publish`,{method:'POST'});toast('招聘标准已发布');await refreshProjects();await projectWorkspace()}catch(e){toast(e.message,true)}};
+  const publishCriteria = async rid=>{
+    try{
+      // Publish the saved Core draft, not unsaved DOM edits or stale client state.
+      const workspace=await api(`/api/v1/projects/${state.projectId}/protocol-workspace`);
+      if(workspace.draft_revision_id!==rid||!workspace.draft){toast('当前草案已变化，请刷新后重试',true);return}
+      const criteria=workspace.draft.criteria||[];
+      const keys=new Set(criteria.filter(c=>c&&String(c.name||'').trim()).map(c=>String(c.criterion_key||'')));
+      const assigned=(workspace.draft.assessment_stages||[]).some(stage=>String(stage.stage_key||'').trim()&&(stage.criteria||[]).some(key=>keys.has(String(key))));
+      if(!criteria.length||criteria.some(c=>!String(c.name||'').trim())||!assigned){
+        toast('请先保存至少一条有名称且已分配核实阶段的评价标准，再发布',true);return
+      }
+      if(!confirm('将发布服务端最后保存的标准；页面中未保存的编辑不会包含。确认发布？'))return;
+      await api(`/api/v1/protocol-revisions/${rid}/publish`,{method:'POST'});
+      toast('招聘标准已发布');await refreshProjects();await projectWorkspace()
+    }catch(e){toast(e.message,true)}
+  };
   const saveCriteria = async rid=>{
     try{
       if(!rid){toast('请先创建草案',true);return}

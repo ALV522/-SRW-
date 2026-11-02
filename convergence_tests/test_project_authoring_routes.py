@@ -7,6 +7,7 @@ that has not been given a valid payload.
 """
 from __future__ import annotations
 
+import sqlite3
 import tempfile
 import unittest
 from pathlib import Path
@@ -33,8 +34,9 @@ class ProjectAuthoringTests(unittest.TestCase):
         self.addCleanup(temporary.cleanup)
         root = Path(temporary.name)
         (root / "data").mkdir(parents=True)
+        self.db_path = root / "data" / "authoring.db"
         self.app = create_v1_app(
-            f"sqlite+pysqlite:///{(root / 'data' / 'authoring.db').as_posix()}",
+            f"sqlite+pysqlite:///{self.db_path.as_posix()}",
             data_dir=root / "data",
             knowledge_dir=create_minimal_knowledge_tree(root / "knowledge" / "active"),
             frontend_dist=ROOT / "frontend" / "dist",
@@ -53,6 +55,18 @@ class ProjectAuthoringTests(unittest.TestCase):
         revision = body.get("draft_revision_id")
         self.assertTrue(revision, f"workspace has no draft revision: {sorted(body)}")
         return revision
+
+    def save_publishable_draft(self, revision, criteria=None, stages=None):
+        criteria = criteria if criteria is not None else [
+            {"criterion_key": "verified", "name": "Evidence verified"}
+        ]
+        stages = stages if stages is not None else [
+            {"stage_key": "resume", "name": "Resume", "criteria": ["verified"]}
+        ]
+        saved = self.client.patch(f"/api/v1/protocol-revisions/{revision}", json={
+            "payload": {"criteria": criteria, "assessment_stages": stages}
+        })
+        self.assertEqual(saved.status_code, 200, saved.text)
 
     def test_routes_are_owned_by_the_extracted_module(self):
         owners = {}
@@ -94,6 +108,7 @@ class ProjectAuthoringTests(unittest.TestCase):
 
     def test_publish_is_one_way_and_locks_the_revision(self):
         revision = self.revision_id()
+        self.save_publishable_draft(revision)
         published = self.client.post(f"/api/v1/protocol-revisions/{revision}/publish")
         self.assertEqual(published.status_code, 200, published.text)
         self.assertEqual(published.json()["state"], "published")
@@ -103,6 +118,103 @@ class ProjectAuthoringTests(unittest.TestCase):
 
         edit = self.client.patch(f"/api/v1/protocol-revisions/{revision}", json={"payload": {}})
         self.assertEqual(edit.status_code, 409, "a published revision must not be edited in place")
+
+    def test_empty_draft_cannot_publish_or_mutate_project(self):
+        revision = self.revision_id()
+        refused = self.client.post(f"/api/v1/protocol-revisions/{revision}/publish")
+        self.assertEqual(refused.status_code, 409, refused.text)
+        with sqlite3.connect(self.db_path) as db:
+            self.assertEqual(db.execute(
+                "SELECT state, published_at FROM protocol_revision WHERE id=?", (revision,)
+            ).fetchone(), ("draft", None))
+            self.assertEqual(db.execute(
+                "SELECT status, current_protocol_revision_id FROM project WHERE id=?", (self.pid,)
+            ).fetchone(), ("draft", None))
+
+    def test_blank_name_and_unassigned_criterion_cannot_publish(self):
+        revision = self.revision_id()
+        self.save_publishable_draft(revision, criteria=[
+            {"criterion_key": "verified", "name": "   "}
+        ])
+        self.assertEqual(self.client.post(
+            f"/api/v1/protocol-revisions/{revision}/publish").status_code, 409)
+        self.save_publishable_draft(revision, stages=[
+            {"stage_key": "resume", "name": "Resume", "criteria": []}
+        ])
+        self.assertEqual(self.client.post(
+            f"/api/v1/protocol-revisions/{revision}/publish").status_code, 409)
+        self.save_publishable_draft(revision, stages=[
+            {"stage_key": "", "name": "Unnamed", "criteria": ["verified"]}
+        ])
+        self.assertEqual(self.client.post(
+            f"/api/v1/protocol-revisions/{revision}/publish").status_code, 409)
+        self.save_publishable_draft(revision)
+        self.assertEqual(self.client.post(
+            f"/api/v1/protocol-revisions/{revision}/publish").status_code, 200)
+
+    def test_unknown_stage_reference_rejected_without_publication(self):
+        revision = self.revision_id()
+        bad = self.client.patch(f"/api/v1/protocol-revisions/{revision}", json={
+            "payload": {"criteria": [{"criterion_key": "verified", "name": "Valid"}],
+                        "assessment_stages": [{"stage_key": "resume", "criteria": ["missing"]}]}
+        })
+        self.assertEqual(bad.status_code, 409, bad.text)
+        self.assertEqual(self.client.post(
+            f"/api/v1/protocol-revisions/{revision}/publish").status_code, 409)
+
+    def test_failed_republication_keeps_prior_published_pointer(self):
+        first = self.revision_id()
+        self.save_publishable_draft(first)
+        self.assertEqual(self.client.post(
+            f"/api/v1/protocol-revisions/{first}/publish").status_code, 200)
+        fork = self.client.post(f"/api/v1/projects/{self.pid}/protocol-drafts")
+        self.assertEqual(fork.status_code, 200, fork.text)
+        second = fork.json()["revision_id"]
+        self.assertNotEqual(first, second)
+        empty = self.client.patch(f"/api/v1/protocol-revisions/{second}", json={
+            "payload": {"criteria": [], "assessment_stages": []}
+        })
+        self.assertEqual(empty.status_code, 200, empty.text)
+        self.assertEqual(self.client.post(
+            f"/api/v1/protocol-revisions/{second}/publish").status_code, 409)
+        with sqlite3.connect(self.db_path) as db:
+            self.assertEqual(db.execute(
+                "SELECT current_protocol_revision_id FROM project WHERE id=?", (self.pid,)
+            ).fetchone()[0], first)
+            self.assertEqual(db.execute(
+                "SELECT state FROM protocol_revision WHERE id=?", (first,)
+            ).fetchone()[0], "published")
+            self.assertEqual(db.execute(
+                "SELECT state FROM protocol_revision WHERE id=?", (second,)
+            ).fetchone()[0], "draft")
+
+    def test_legacy_empty_published_is_readable_and_forkable(self):
+        legacy = self.revision_id()
+        # Simulate a pre-fix persisted legacy revision; do not rewrite its bytes.
+        with sqlite3.connect(self.db_path) as db:
+            before = db.execute(
+                "SELECT payload_json FROM protocol_revision WHERE id=?", (legacy,)
+            ).fetchone()[0]
+            db.execute("UPDATE protocol_revision SET state='published' WHERE id=?", (legacy,))
+            db.execute(
+                "UPDATE project SET status='open', current_protocol_revision_id=? WHERE id=?",
+                (legacy, self.pid))
+        workspace = self.client.get(f"/api/v1/projects/{self.pid}/protocol-workspace")
+        self.assertEqual(workspace.status_code, 200, workspace.text)
+        self.assertEqual(workspace.json()["current"]["criteria"], [])
+        fork = self.client.post(f"/api/v1/projects/{self.pid}/protocol-drafts")
+        self.assertEqual(fork.status_code, 200, fork.text)
+        replacement = fork.json()["revision_id"]
+        self.save_publishable_draft(replacement)
+        self.assertEqual(self.client.post(
+            f"/api/v1/protocol-revisions/{replacement}/publish").status_code, 200)
+        with sqlite3.connect(self.db_path) as db:
+            self.assertEqual(db.execute(
+                "SELECT payload_json FROM protocol_revision WHERE id=?", (legacy,)
+            ).fetchone()[0], before)
+            self.assertEqual(db.execute(
+                "SELECT state FROM protocol_revision WHERE id=?", (legacy,)
+            ).fetchone()[0], "superseded")
 
     def test_unknown_ids_are_not_found(self):
         self.assertEqual(
