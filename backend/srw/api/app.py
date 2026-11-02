@@ -31,6 +31,18 @@ from srw.runtime.db.session import create_v1_engine, create_v1_session_factory, 
 from srw.runtime.default_capabilities import register_default_lazy_capabilities
 from srw.runtime.settings import RuntimeSettingsRepository, SecretStore, SessionSecretStore, FileSecretStore, get_settings_surface
 from srw.runtime.local_boundary import LocalBoundaryMiddleware
+from srw.runtime.business_session_gateway import (
+    BusinessSessionGateway,
+    BusinessSessionMiddleware,
+    COOKIE_NAME,
+    MAX_PAIRING_BODY,
+    PairingDenied,
+    clear_cookie_headers,
+    csrf_cookie_header,
+    pairing_body_code,
+    session_cookie_header,
+)
+from srw.supervisor.session_policy import SessionPolicy
 from srw.runtime.maintenance import cleanup_stale_backup_artifacts
 from srw.providers.contracts import ProviderFailureError, ProviderNotReadyError, ProviderOutputInvalidError
 from srw.providers.runtime import ProviderRuntime
@@ -69,6 +81,11 @@ def create_v1_app(
     data_dir: str | Path | None = None,
     knowledge_dir: str | Path | None = None,
 ) -> Starlette:
+    # Opt-in flag first, before any workspace directory, SQLite file or schema
+    # exists: `true`/`01`/`2` must stop startup rather than be guessed as OFF.
+    # `SessionPolicy.from_environ` already refuses unknown values with a message
+    # that names the variable and never echoes the value.
+    session_policy = SessionPolicy.from_environ(os.environ)
     engine = create_v1_engine(database_url)
     create_v1_schema(engine)
     factory = create_v1_session_factory(engine)
@@ -178,6 +195,48 @@ def create_v1_app(
 
     app.add_middleware(LocalBoundaryMiddleware)
 
+    business_gateway = None
+    if session_policy.enforce:
+        # The gateway sits outside the boundary middleware: it decides before any
+        # route runs, so a refused request cannot create a row, an audit event or
+        # a file. With the flag off nothing below is installed at all.
+        business_gateway = BusinessSessionGateway()
+        app.add_middleware(BusinessSessionMiddleware, gateway=business_gateway)
+
+        async def business_attach(request: Request) -> Response:
+            try:
+                body = b""
+                async for chunk in request.stream():
+                    body += chunk
+                    if len(body) > MAX_PAIRING_BODY:
+                        raise PairingDenied("pairing_body_too_large")
+                token, csrf = business_gateway.pair(pairing_body_code(body))
+            except PairingDenied as exc:
+                status = 413 if exc.reason == "pairing_body_too_large" else 401
+                return JSONResponse(
+                    {"detail": "pairing refused", "error": {"code": exc.reason}},
+                    status_code=status)
+            # The session token lives only in the HttpOnly cookie: it is never
+            # echoed in JSON, never in the URL and never in a log line.
+            response = JSONResponse({"csrf_token": csrf, "scopes": ["read", "write"]})
+            response.headers.append("set-cookie", session_cookie_header(token))
+            response.headers.append("set-cookie", csrf_cookie_header(csrf))
+            return response
+
+        async def business_logout(request: Request) -> Response:
+            token = request.cookies.get(COOKIE_NAME, "")
+            if token:
+                business_gateway.revoke(token)
+            response = JSONResponse({"status": "logged_out"})
+            for header in clear_cookie_headers():
+                response.headers.append("set-cookie", header)
+            return response
+
+        app.routes.insert(0, Route("/api/v1/runtime/business-attach",
+                                   business_attach, methods=["POST"]))
+        app.routes.insert(0, Route("/api/v1/runtime/business-logout",
+                                   business_logout, methods=["POST"]))
+
     from srw.api.fullworkbench import install_full_workbench_routes
     database_path = Path(str(engine.url.database)).resolve() if engine.url.database and str(engine.url.database) != ":memory:" else (resolved_data_dir / "srw_v1.db")
     install_full_workbench_routes(
@@ -224,6 +283,8 @@ def create_v1_app(
             app.routes.append(Route("/v1/{asset_path:path}", v1_frontend, methods=["GET"]))
 
     app.state.shutdown_callback = None
+    app.state.business_gateway = business_gateway
+    app.state.business_session_policy = session_policy
     app.state.startup_cleanup = startup_cleanup
     app.state.runtime_identity = {
         "instance_id": instance_id, "session_id": runtime_session_id, "release_id": release_id,

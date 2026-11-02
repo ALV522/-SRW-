@@ -102,5 +102,69 @@ class LocalWebLauncherTests(unittest.TestCase):
         self.assertTrue(production_knowledge_errors(self.workspace))
 
 
+class LocalWebPairingConsoleTests(unittest.TestCase):
+    """#43 M3A: the pairing code appears once, on the console, and nowhere else.
+
+    It is the one credential a human hands to the browser, so a URL, a query
+    string or a repeated log line would leak it outside the trusted channel.
+    """
+
+    def setUp(self) -> None:
+        self.tmp = tempfile.TemporaryDirectory(prefix="srw-local-web-pairing-",
+                                               ignore_cleanup_errors=True)
+        self.root = Path(self.tmp.name)
+        self.workspace = self.root / "workspace"
+        self._saved = {name: os.environ.get(name) for name in
+                       ("RECRUITMENT_SESSION_ENFORCE", "SRW_SYNTHETIC_BROWSER_ACCEPTANCE")}
+        self.addCleanup(self._restore)
+
+    def _restore(self) -> None:
+        for name, value in self._saved.items():
+            if value is None:
+                os.environ.pop(name, None)
+            else:
+                os.environ[name] = value
+
+    def _run(self, *, enforce: bool) -> str:
+        import contextlib
+        import io
+        from unittest.mock import patch
+
+        from scripts import start_local_web
+
+        if enforce:
+            os.environ["RECRUITMENT_SESSION_ENFORCE"] = "1"
+        else:
+            os.environ.pop("RECRUITMENT_SESSION_ENFORCE", None)
+        os.environ["SRW_SYNTHETIC_BROWSER_ACCEPTANCE"] = "1"
+        argv = ["--workspace", str(self.workspace), "--synthetic",
+                "--no-browser", "--port", "8799"]
+        buffer = io.StringIO()
+        # uvicorn.Server.run blocks forever; the entry point is what matters here.
+        with patch("uvicorn.Server.run", return_value=None), contextlib.redirect_stdout(buffer):
+            code = start_local_web.main(argv)
+        self.assertEqual(code, 0, buffer.getvalue())
+        return buffer.getvalue()
+
+    def test_pairing_code_is_printed_once_and_never_in_the_url(self):
+        from srw.runtime.business_session_gateway import PAIRING_TTL_SECONDS
+
+        output = self._run(enforce=True)
+        self.assertIn("PAIRING CODE", output)
+        line = next(l for l in output.splitlines() if "PAIRING CODE" in l)
+        self.assertIn(str(int(PAIRING_TTL_SECONDS)), line)
+        code = line.rsplit(":", 1)[1].strip()
+        self.assertGreaterEqual(len(code), 24)
+        self.assertEqual(output.count(code), 1, "the code must not be repeated elsewhere")
+        url_line = next(l for l in output.splitlines() if "http://127.0.0.1" in l)
+        self.assertNotIn("?", url_line)
+        self.assertNotIn(code, url_line)
+
+    def test_default_off_prints_no_pairing_code(self):
+        output = self._run(enforce=False)
+        self.assertNotIn("PAIRING CODE", output)
+        self.assertIn("http://127.0.0.1:8799/v1", output)
+
+
 if __name__ == "__main__":
     unittest.main()

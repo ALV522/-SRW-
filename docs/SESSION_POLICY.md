@@ -1,10 +1,13 @@
 # Business session authorization (opt-in) - module contract
 
-Status: **NOT IMPLEMENTED in the running Core.** `backend/srw/supervisor/session_policy.py`
-is a pure decision module; no middleware, route, launcher or Host path calls it yet.
-Track A owns the integration. Until then, the only protections on business writes are
-the local boundary: loopback-only bind, unique `Host`, same-origin `Origin` /
-`Sec-Fetch-Site`, duplicate-source-header rejection.
+Status: **implemented as an opt-in M3A slice for the Local Web carrier, OFF by default.**
+With `RECRUITMENT_SESSION_ENFORCE` unset/blank/`0` the application behaves exactly as
+before and installs no gateway. With `=1`, `backend/srw/runtime/business_session_gateway.py`
+runs as the outermost middleware and every business route needs a paired session. The
+Windows Host / external-Browser carrier (M3B) is **not** wired yet: a WPF process that
+forces `=1` without pairing fails closed rather than silently falling back to OFF.
+Any other non-empty value (`true`, `yes`, `01`, `2`) refuses startup **before** the
+workspace directory or SQLite file is created.
 
 ## What problem it solves - and what it does not
 
@@ -78,5 +81,24 @@ substring scan fails the encoded-key and value-only cases; removing the
 "undecodable key is refused" rule fails the three deep-encoding cases and the three
 malformed-key cases.
 
-The 7 API-level `200 -> 401/403` RED cases need the middleware and belong to a separate
-test-only PR after Track A approves the integration.
+`convergence_tests/test_session_gate_http.py` - the migrated API-level cases (#148
+N1-N7) plus the M3A credential model: anonymous 401 on `info` / `runtime/info` /
+`projects` / `workbench` / backup listing with unchanged row counts, unknown and
+foreign-instance cookies, cross-site `Origin`, missing/wrong/duplicate `X-SRW-CSRF`,
+credentials in the query string (plain and percent-encoded), duplicate raw `Cookie`
+headers through ASGI, pairing code single-use and never echoed, logout revocation,
+TTL expiry through a fake clock, a previous Core instance's cookie, and the Host
+lifecycle route still answering only its own secret (202) while a business cookie
+gets 403.
+
+## M3A credential model (Local Web)
+
+| Credential | Where it lives | Lifetime | What it can do |
+|---|---|---|---|
+| pairing code | interactive console only (`scripts/start_local_web.py`) | 60 s, single use, 5 attempts | exchange for one session |
+| business session cookie | `srw_business_session`, `HttpOnly`, `SameSite=Strict`, `Path=/` | registry TTL | read/write business routes |
+| CSRF token | `srw_csrf`, readable by same-origin JS, echoed in `X-SRW-CSRF` | same as the session | unlocks **mutating** methods only; never authorises alone |
+
+The session token is never returned in JSON, never placed in a URL and never logged.
+`POST /api/v1/runtime/shutdown` stays on its own lifecycle secret: a business cookie
+cannot stop the Core.

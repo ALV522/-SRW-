@@ -198,6 +198,15 @@ def run(args: argparse.Namespace) -> int:
                 f"sqlite+pysqlite:///{db.as_posix()}",
                 data_dir=data, knowledge_dir=knowledge, frontend_dist=frontend,
             )
+            gateway = getattr(app.state, "business_gateway", None)
+            if gateway is not None:
+                # Opt-in business session (#43 M3A). The code goes to this
+                # trusted interactive console only: never into a URL, a query
+                # string, HTTP/access logs or an acceptance report.
+                from srw.runtime.business_session_gateway import PAIRING_TTL_SECONDS
+
+                print(f"PAIRING CODE (single use, {int(PAIRING_TTL_SECONDS)}s): "
+                      f"{gateway.issue_pairing_code()}", flush=True)
             config = uvicorn.Config(
                 app, host="127.0.0.1", port=args.port,
                 log_level="warning" if args.synthetic else "info", access_log=False,
