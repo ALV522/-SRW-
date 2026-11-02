@@ -1235,6 +1235,33 @@ class RecruitmentBrowserAcceptance(unittest.TestCase):
         self.assertEqual(self.get_json(f"/api/v1/candidates/{cid}/decision-history"), decisions)
         self.assertFalse(self.console_errors, self.console_errors)
 
+    def test_15_empty_or_unassigned_criteria_cannot_publish(self) -> None:
+        """Real browser refuses invalid saved drafts; Core independently returns 409."""
+        pid = self.new_project("空标准发布阻断")
+        self.page.locator(".tabs").get_by_role("button", name="建岗与标准").click()
+        expect(self.page.get_by_role("button", name="发布当前标准")).to_be_visible()
+        attempted = []
+        self.page.on("request", lambda req: attempted.append(req.url)
+                     if req.method == "POST" and req.url.endswith("/publish") else None)
+        self.page.get_by_role("button", name="发布当前标准").click()
+        expect(self.page.locator("#toast-root .toast.error")).to_contain_text("至少一条")
+        self.assertEqual(attempted, [])
+        self.page.get_by_role("button", name="＋ 添加标准").click()
+        self.page.locator(".criterion-row .c-name").fill("未分配核实阶段的合成标准")
+        self.save_criteria(pid)
+        self.page.get_by_role("button", name="发布当前标准").click()
+        expect(self.page.locator("#toast-root .toast.error")).to_contain_text("已分配核实阶段")
+        self.assertEqual(attempted, [])
+        workspace = self.get_json(f"/api/v1/projects/{pid}/protocol-workspace")
+        self.assertIsNone(workspace["current_revision_id"])
+        self.assertTrue(workspace["draft_revision_id"])
+        rejected = self.context.request.post(
+            self.base + f"/api/v1/protocol-revisions/{workspace['draft_revision_id']}/publish")
+        self.assertEqual(rejected.status, 409, rejected.text())
+        self.assertIsNone(
+            self.get_json(f"/api/v1/projects/{pid}/protocol-workspace")["current_revision_id"])
+        self.assertFalse(self.console_errors, self.console_errors)
+
     def test_14_structured_reevaluation_created_and_applied_through_ui(self) -> None:
         pid = self.new_project("结构化复评")
         self.page.locator(".tabs").get_by_role("button", name="建岗与标准").click()
