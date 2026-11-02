@@ -14,11 +14,21 @@
  * 2. A non-2xx response throws `body.detail || body.error.code || String(body)`,
  *    so the UI keeps showing the server's detail text exactly as before.
  */
+function srwAuthInit(opts = {}) {
+  const method = (opts.method || 'GET').toUpperCase();
+  const match = document.cookie.match(/(?:^|;\s*)srw_csrf=([^;]+)/);
+  const headers = { ...(opts.headers || {}) };
+  if (match && method !== 'GET' && method !== 'HEAD' && method !== 'OPTIONS') {
+    headers['X-SRW-CSRF'] = decodeURIComponent(match[1]);
+  }
+  return { credentials: 'same-origin', ...opts, headers };
+}
+
 async function srwApi(path, opts = {}) {
-  const response = await fetch(path, {
+  const response = await fetch(path, srwAuthInit({
     headers: { 'Content-Type': 'application/json', ...(opts.headers || {}) },
     ...opts,
-  });
+  }));
   let body;
   const contentType = response.headers.get('content-type') || '';
   body = contentType.includes('json') ? await response.json() : await response.text();
@@ -30,3 +40,4 @@ async function srwApi(path, opts = {}) {
 }
 
 window.srwApi = srwApi;
+window.srwAuthInit = srwAuthInit;

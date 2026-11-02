@@ -1,13 +1,13 @@
-"""#43 conservative contract: the gate is OFF today, and the oracles can prove it.
+"""#43 contract: the opt-in gate stays OFF by default, and the oracles prove it.
 
-Scope agreed with Track A: no middleware, no cookie/attach/token wiring, no change
-to runtime/info or shutdown, and none of #148's deliberately-RED cases. These tests
-only lock what is true on the current main so that the future atomic wiring PR has
-to change them on purpose instead of drifting silently:
+The M3A wiring now exists, but only behind ``RECRUITMENT_SESSION_ENFORCE=1``; with
+the flag absent the real app must behave exactly as before. These tests lock the
+OFF path so the opt-in slice cannot drift into a silent default-on:
 
 * D4 - the enable flag is tri-state: unset/empty/blank/``0`` is OFF, ``1`` is ON
-  (surrounding whitespace tolerated), anything else is a configuration error; with
-  the flag unset the real app keeps answering business writes without a session header;
+  (surrounding whitespace tolerated), anything else is a configuration error raised
+  before a workspace or SQLite file exists; with the flag unset the real app keeps
+  answering business writes without a session header and installs no gateway;
 * A9/A10 - the existing credential boundary: non-ASCII, control characters and
   over-long values are one fixed 401 rather than an exception or a distinguisher;
 * the raw ASGI header shape - duplicate header names survive to ``scope["headers"]``,
@@ -192,6 +192,66 @@ class RawHeaderShapeTests(unittest.TestCase):
         collapsed = dict([(SESSION_HEADER, "first"), (SESSION_HEADER, "second")])
         self.assertEqual(len(collapsed), 1)
         self.assertEqual(collapsed[SESSION_HEADER], "second")
+
+
+class OptInFlagIsValidatedBeforeAnyStateExists(unittest.TestCase):
+    """An unparseable flag must stop startup, not be guessed into OFF or ON."""
+
+    def test_invalid_values_raise_before_the_database_is_created(self):
+        import os
+
+        from knowledge_fixture import create_minimal_knowledge_tree
+        from srw.api.app import create_v1_app
+
+        saved = os.environ.get(ENFORCE_ENV)
+        self.addCleanup(lambda: os.environ.pop(ENFORCE_ENV, None) if saved is None
+                        else os.environ.__setitem__(ENFORCE_ENV, saved))
+        for value in ("true", "TRUE", "yes", "on", "01", "2", "enabled"):
+            with self.subTest(value=value):
+                with tempfile.TemporaryDirectory(prefix="srw-flag-") as temporary:
+                    root = Path(temporary)
+                    data = root / "data"
+                    data.mkdir()
+                    database = data / "srw_v1.db"
+                    knowledge = create_minimal_knowledge_tree(root / "knowledge" / "active")
+                    os.environ[ENFORCE_ENV] = value
+                    with self.assertRaises(ValueError) as caught:
+                        create_v1_app(f"sqlite+pysqlite:///{database.as_posix()}",
+                                      data_dir=data, knowledge_dir=knowledge)
+                    self.assertFalse(database.exists(),
+                                     "the flag must be refused before SQLite is created")
+                    self.assertEqual(list(data.iterdir()), [],
+                                     "no workspace artefact may be written first")
+                    # The message names the variable and never echoes the value.
+                    self.assertIn(ENFORCE_ENV, str(caught.exception))
+                    self.assertNotIn(value, str(caught.exception))
+
+    def test_off_values_still_build_a_gateway_free_app(self):
+        import os
+
+        from knowledge_fixture import create_minimal_knowledge_tree
+        from srw.api.app import create_v1_app
+
+        saved = os.environ.get(ENFORCE_ENV)
+        self.addCleanup(lambda: os.environ.pop(ENFORCE_ENV, None) if saved is None
+                        else os.environ.__setitem__(ENFORCE_ENV, saved))
+        for value in ("", " ", "0"):
+            with self.subTest(value=repr(value)):
+                with tempfile.TemporaryDirectory(prefix="srw-off-") as temporary:
+                    root = Path(temporary)
+                    data = root / "data"
+                    data.mkdir()
+                    knowledge = create_minimal_knowledge_tree(root / "knowledge" / "active")
+                    os.environ[ENFORCE_ENV] = value
+                    app = create_v1_app(
+                        f"sqlite+pysqlite:///{(data / 'srw_v1.db').as_posix()}",
+                        data_dir=data, knowledge_dir=knowledge)
+                    self.assertIsNone(app.state.business_gateway)
+                    # Entering the lifespan and leaving it disposes the engine, so
+                    # Windows can delete the temporary workspace afterwards.
+                    from starlette.testclient import TestClient
+                    with TestClient(app) as client:
+                        self.assertEqual(client.get("/api/v1/info").status_code, 200)
 
 
 if __name__ == "__main__":
