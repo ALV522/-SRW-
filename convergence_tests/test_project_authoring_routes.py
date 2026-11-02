@@ -216,6 +216,20 @@ class ProjectAuthoringTests(unittest.TestCase):
                 "SELECT state FROM protocol_revision WHERE id=?", (legacy,)
             ).fetchone()[0], "superseded")
 
+    def test_corrupt_persisted_draft_fails_closed_before_state_change(self):
+        revision = self.revision_id()
+        with sqlite3.connect(self.db_path) as db:
+            db.execute("UPDATE protocol_revision SET payload_json='{' WHERE id=?", (revision,))
+        refused = self.client.post(f"/api/v1/protocol-revisions/{revision}/publish")
+        self.assertEqual(refused.status_code, 409, refused.text)
+        with sqlite3.connect(self.db_path) as db:
+            self.assertEqual(db.execute(
+                "SELECT state FROM protocol_revision WHERE id=?", (revision,)
+            ).fetchone()[0], "draft")
+            self.assertIsNone(db.execute(
+                "SELECT current_protocol_revision_id FROM project WHERE id=?", (self.pid,)
+            ).fetchone()[0])
+
     def test_unknown_ids_are_not_found(self):
         self.assertEqual(
             self.client.post("/api/v1/projects/missing/protocol-drafts").status_code, 404)
