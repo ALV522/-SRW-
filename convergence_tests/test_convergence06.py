@@ -17,7 +17,7 @@ class Convergence06Test(unittest.TestCase):
   self.tmp=tempfile.TemporaryDirectory();self.root=Path(self.tmp.name);self.knowledge=create_minimal_knowledge_tree(self.root/'knowledge'/'active');self.db=self.root/'test.db';self.engine=create_v1_engine(f'sqlite+pysqlite:///{self.db}');create_v1_schema(self.engine);self.factory=create_v1_session_factory(self.engine)
  def tearDown(self):self.engine.dispose();self.tmp.cleanup()
  def _project(self,s):
-  p=Project(title='招聘',status='open');s.add(p);s.flush();repo=ProtocolRepository(s);d=repo.create_draft(p.id,{'brief':{'title':'招聘','summary':''},'recruitment_context':{'role_title':'招聘','location':'北京'},'criteria':[],'assessment_stages':[],'decision_policy':{'human_final':True}});repo.publish(d.id);return p
+  p=Project(title='招聘',status='open');s.add(p);s.flush();repo=ProtocolRepository(s);d=repo.create_draft(p.id,{'brief':{'title':'招聘','summary':''},'recruitment_context':{'role_title':'招聘','location':'北京'},'criteria':[{'criterion_key':'sourcing','name':'Sourcing evidence'}],'assessment_stages':[{'stage_key':'resume','name':'Resume','criteria':['sourcing']}],'decision_policy':{'human_final':True}});repo.publish(d.id);return p
  def test_sourcing_channel_observation_validates_funnel_and_separates_intelligence_from_hiring_rank(self):
   with self.factory() as s:
    p=self._project(s);upsert_plan(s,p.id,target_hires=2,target_date='2026-12-01',owner='TA',source_channels=['内推','招聘网站'],notes='')

@@ -45,7 +45,7 @@ class Convergence04Test(unittest.TestCase):
             "criteria": [
                 {"criterion_key": "exp", "name": "Experience", "weight": 1, "decision_critical": True},
             ],
-            "assessment_stages": [],
+            "assessment_stages": [{"stage_key": "resume", "name": "Resume", "criteria": ["exp"]}],
             "decision_policy": {"human_final": True},
         })
         repo.publish(draft.id)
