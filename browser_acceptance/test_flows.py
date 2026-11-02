@@ -572,7 +572,17 @@ class RecruitmentBrowserAcceptance(unittest.TestCase):
         criterion = (protocol.get("draft") or {})["criteria"][0]
         key = criterion["criterion_key"]
         self.page.once("dialog", lambda dialog: dialog.accept())
-        self.page.get_by_role("button", name="发布当前标准").click()
+        with self.page.expect_response(
+            lambda response: response.url.endswith("/publish")
+            and response.request.method == "POST"
+        ) as published:
+            self.page.get_by_role("button", name="发布当前标准").click()
+        self.assertEqual(published.value.status, 200, published.value.text())
+        self.wait_for_json(
+            f"/api/v1/projects/{pid}/protocol-workspace",
+            lambda w: w.get("current_revision_id") is not None,
+            label="persisted published criterion before candidate flow",
+        )
         expect(self.page.locator(".tabs").get_by_role("button", name="候选人收件")).to_be_visible()
         self.assertEqual(
             self.get_json(f"/api/v1/projects/{pid}/protocol-workspace")["current"]["criteria"][0]["criterion_key"],
