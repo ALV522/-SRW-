@@ -744,6 +744,8 @@ def install_full_workbench_routes(app, factory, registry, secrets, *, data_dir: 
     app.state.srw_requeue_job=_requeue_job
 
     stop_worker=threading.Event()
+    def _worker_enabled()->bool:
+        return str(__import__('os').environ.get("SRW_BACKGROUND_WORKER","0")).lower() in {"1","true","yes"}
     def _worker_loop():
         while not stop_worker.is_set():
             try:
@@ -751,13 +753,34 @@ def install_full_workbench_routes(app, factory, registry, secrets, *, data_dir: 
             except Exception:
                 worked=False
             if not worked: stop_worker.wait(0.35)
-    def _start_worker():
-        if str(__import__('os').environ.get("SRW_BACKGROUND_WORKER","0")).lower() in {"1","true","yes"}:
-            t=threading.Thread(target=_worker_loop,name="srw-task-worker",daemon=True);app.state.srw_worker_thread=t;t.start()
-    def _stop_worker():
-        stop_worker.set();t=getattr(app.state,"srw_worker_thread",None)
-        if t and t.is_alive(): t.join(timeout=2.0)
-    app.add_event_handler("startup",_start_worker);app.add_event_handler("shutdown",_stop_worker)
+    def _start_worker()->bool:
+        # The application lifespan calls this: Starlette ignores
+        # ``add_event_handler("startup", ...)`` whenever an explicit lifespan is
+        # supplied, which left ``SRW_BACKGROUND_WORKER=1`` dead (#41 P0).
+        # Repeated calls are idempotent, so a second lifespan can never run two
+        # workers against the same database.
+        if not _worker_enabled(): return False
+        existing=getattr(app.state,"srw_worker_thread",None)
+        if existing is not None and existing.is_alive(): return False
+        stop_worker.clear()
+        t=threading.Thread(target=_worker_loop,name="srw-task-worker",daemon=True)
+        app.state.srw_worker_thread=t
+        t.start()
+        return True
+    def _stop_worker()->bool:
+        # The thread must be gone before ``engine.dispose()``: a daemon worker
+        # that outlives the pool would hit a closed SQLite handle. The join is
+        # bounded, and the caller keeps the engine alive when it times out, so a
+        # slow job degrades to "database not released" instead of a crash.
+        stop_worker.set()
+        t=getattr(app.state,"srw_worker_thread",None)
+        if t is not None and t.is_alive(): t.join(timeout=5.0)
+        complete=t is None or not t.is_alive()
+        app.state.srw_worker_shutdown_complete=complete
+        return complete
+    # Exposed for ``create_v1_app``'s lifespan; not a public HTTP surface.
+    app.state.srw_start_worker=_start_worker
+    app.state.srw_stop_worker=_stop_worker
 
     async def knowledge_status(_r): return JSONResponse({"databases":knowledge.status()})
     async def knowledge_search(r): return JSONResponse({"results":knowledge.search(r.query_params.get("q","")[:200],limit=min(50,max(1,int(r.query_params.get("limit","10")))))})

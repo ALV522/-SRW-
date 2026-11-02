@@ -172,13 +172,27 @@ def create_v1_app(
 
     @asynccontextmanager
     async def _app_lifespan(_app: Starlette):
+        # Starlette ignores ``on_startup``/``on_shutdown`` when an explicit
+        # lifespan is supplied, so the task worker is started here instead of
+        # through app.add_event_handler (#41 P0).
+        starter = getattr(_app.state, "srw_start_worker", None)
+        if starter is not None:
+            starter()
+        worker_stopped = True
         try:
             yield
         finally:
-            # SQLite keeps file handles in pooled connections even after each
-            # request Session closes. Disposing the application-owned Engine is
-            # required for Windows to delete/move its workspace and test DBs.
-            engine.dispose()
+            stopper = getattr(_app.state, "srw_stop_worker", None)
+            if stopper is not None:
+                worker_stopped = bool(stopper())
+            if worker_stopped:
+                # SQLite keeps file handles in pooled connections even after
+                # each request Session closes. Disposing the application-owned
+                # Engine is required for Windows to delete/move its workspace.
+                engine.dispose()
+            # When a job outlived the bounded join, disposing the pool under a
+            # live daemon thread would turn a slow shutdown into a SQLite crash.
+            # The carrier exits the process; the engine is left to it on purpose.
 
     app = Starlette(
         lifespan=_app_lifespan,
