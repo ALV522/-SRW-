@@ -17,7 +17,8 @@ permissions:
 jobs:
   browser-acceptance:
     name: chromium-real-browser-ubuntu
-    runs-on: ubuntu-latest
+    # Playwright 1.56.0 Chromium binaries do not support ubuntu26.04-x64.
+    runs-on: ubuntu-24.04
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
