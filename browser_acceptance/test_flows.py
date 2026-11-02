@@ -564,6 +564,7 @@ class RecruitmentBrowserAcceptance(unittest.TestCase):
         self.page.locator(".criterion-row .c-critical").check()
         self.page.locator(".criterion-row .c-verify").check()
         self.page.locator(".criterion-row .c-probe").fill("请说明项目与个人职责")
+        self.page.locator(".criterion-row .c-stage").first.check()
         key = self.page.locator(".criterion-row").get_attribute("data-criterion-key")
         self.save_criteria(pid)
         expect(self.page.get_by_role("button", name="发布当前标准")).to_be_visible()
@@ -700,6 +701,7 @@ class RecruitmentBrowserAcceptance(unittest.TestCase):
         first.locator(".c-critical").check()
         first.locator(".c-verify").check()
         first.locator(".c-probe").fill("请说明项目交付")
+        first.locator(".c-stage").first.check()
         self.save_criteria(pid)
         expect(self.page.get_by_role("button", name="发布当前标准")).to_be_visible()
         self.page.once("dialog", lambda dialog: dialog.accept())
@@ -763,6 +765,7 @@ class RecruitmentBrowserAcceptance(unittest.TestCase):
         second.locator(".c-critical").check()
         second.locator(".c-verify").check()
         second.locator(".c-probe").fill("新增人工核实要求")
+        second.locator(".c-stage").first.check()
         # Delay only the next real save dispatch, never fake its response.
         # The publish button already exists while this write is pending.
         self.page.evaluate("""() => {
@@ -1168,6 +1171,7 @@ class RecruitmentBrowserAcceptance(unittest.TestCase):
         self.page.locator(".tabs").get_by_role("button", name="建岗与标准").click()
         self.page.get_by_role("button", name="＋ 添加标准").click()
         self.page.locator(".criterion-row .c-name").fill("合成经验")
+        self.page.locator(".criterion-row .c-stage").first.check()
         self.save_criteria(pid)
         key = self.get_json(f"/api/v1/projects/{pid}/protocol-workspace")["draft"]["criteria"][0]["criterion_key"]
         self.page.once("dialog", lambda dialog: dialog.accept())
@@ -1236,6 +1240,7 @@ class RecruitmentBrowserAcceptance(unittest.TestCase):
         self.page.locator(".tabs").get_by_role("button", name="建岗与标准").click()
         self.page.get_by_role("button", name="＋ 添加标准").click()
         self.page.locator(".criterion-row .c-name").fill("合成研究能力")
+        self.page.locator(".criterion-row .c-stage").first.check()
         self.save_criteria(pid)
         self.page.once("dialog", lambda dialog: dialog.accept())
         self.page.get_by_role("button", name="发布当前标准").click()
