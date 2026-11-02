@@ -4,6 +4,10 @@
 
 本路线图以 [PRODUCT_CHARTER](PRODUCT_CHARTER.md)、[ADR-0001](decisions/ADR-0001-single-authoritative-core.md) 和 [ADR-0002](decisions/ADR-0002-api-first-modular-monolith.md) 为约束。当前开发主线是 `main`；历史 v0.8.12-R2 是功能保真对照，不是当前源码身份。
 
+> **2026-11-02 最新审查快照（main `e6fab773127e49052aaec227b39a76f338c439ae`；开发中，不是 RC）**：Track 0/#41 的完整招聘/人工决策/恢复 Windows 实机链仍 P0；Track B/#42 只有该 SHA 的候选 ZIP 基础 WPF 有限实测（51 embedded tests，恢复组仅 1 项），#124 独立工件保管未闭环；Track C/#43 新 M3A Local Browser 会话 PR #187 HEAD `5bb3956` 通过 Source 双 OS 707/427 + Chromium/G1，处于复审/未合并，Windows WPF ON 和 EXE/Browser 同 Core M3B 实测未运行。Track A/#63 继续局部薄化，不能取代业务验收。**下一优先 #187 主线集成审查 → #41/#42 全业务 Windows 实测 → #43 M3B。** 本段为带 SHA 的历史快照，动态真相以 [#103](https://github.com/ALV522/-SRW-/issues/103) 为准；下文 2026-10-29 数字保留仅供历史追溯。
+
+> **治理传输**：已批准 Local Git 和 [GitHub API-native 预编辑模式](decisions/ADR-0003-github-api-native-preedit.md) 两条等效的分支身份检查路径；PR/exact-HEAD CI 和安全/发行门禁不变。
+
 ## 1. 总目标
 
 把 SRW 从功能丰富但入口层逐渐臃肿的 C11 原型，演进为一个可以真实交付、可恢复、可验证、可长期扩展的本地招聘产品：

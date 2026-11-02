@@ -4,9 +4,19 @@ SRW（Smart Recruitment Workbench）是一套 **local-first、evidence-centered�
 
 当前架构方向已经明确：**一个权威 SRW Core，Windows 与 Local Browser/HTML 只是两个客户端/载体；所有业务能力先进入 Core/API，再由前端调用。** 后续采用 API-first modular monolith 的渐进式重构，不另起新业务内核，不拆微服务，不建立两套数据库，也不为重构更换整套前端框架。详细设计见 [ADR-0002](docs/decisions/ADR-0002-api-first-modular-monolith.md) 与 [API-first 模块化 Core 路线图](docs/API_FIRST_MODULAR_CORE_ROADMAP.md)。
 
-> **Agent / 协作者必读**：开始任何修改前先读 [AGENTS.md](AGENTS.md)，并按其顺序阅读产品宪章、开发治理、版本政策、能力矩阵、双载体计划、验收计划和无保护开发协议。`main` 当前未启用 GitHub Branch Protection；必须从最新 main 建任务分支、运行 `python scripts/agent_preflight.py --issue <Issue号> --acknowledge-reading`、走 PR，并以同一 PR Head SHA 的适用 CI 为合并依据。
+> **Agent / 协作者必读**：修改前阅读 [AGENTS.md](AGENTS.md) 及关联 G1 文件。无主线保护期间允许 **Local Git 原 preflight** 或负责人批准的 **[GitHub API-native SHA→任务分支验证](docs/decisions/ADR-0003-github-api-native-preedit.md)**，后者无需在无 Git checkout 环境伪造 `git ls-remote`；两者均必须独立任务分支、更新 Source Manifest、PR、准确 HEAD CI 与复审，禁止 direct-push main。
 
-## 当前进展与路线图位置（2026-10-29 核查快照）
+## 最新主线事实（2026-11-02 23:55 UTC+8，只读快照）
+
+截至此快照，`main=e6fab773127e49052aaec227b39a76f338c439ae`；VERSION `1.0.0-alpha10-convergence11`，Schema `v1_0014`，release channel `development`。下方 2026-10-29 的详细计数/URL 是**历史 SHA 的证明，不是当前实时 CI**；此节也必须在下一次 main/PR 更新后重新核验。
+
+- **#41 / 完整业务链仍 P0**：招聘 Criteria→Candidate/Claim→Interview/Scorecard→HumanDecision→Offer→跟进→PDF/备份/恢复还缺当前 Native 的端到端人工验收，不能以 707 个 Source 测试代替。
+- **#42 真实 Windows**：旧 `e6fab773` 精确 SHA 的 candidate ZIP `4db3695cb439491f81093ed08733a2871a25877c0d43450d08f76397f96fd5a0`、102,119,020 B，B/C 报告 embedded 13 imports、6 组 51 合成测试（备份/恢复组仅 1 条）、2 次同机真实 WPF 基础流程与五 Knowledge quick_check；**未证明完整业务链或新 PR HEAD 的 Windows GUI**。原 ZIP/报告由 B/C 在本机保存，A 尚未独立托管原始字节。#124 独立恢复/许可与第二故障域仍 BLOCKED。
+- **#43 API/Local Browser**：[PR #187](https://github.com/ALV522/-SRW-/pull/187) 正在审查，HEAD `5bb39564041e960d6de977d03f7f8d10f7655c54`，Source Ubuntu/Windows 各 707 tests / 427 manifest entries，Chromium/Governance 同 HEAD successful；安全审查中 Unicode 配对、非 TTY 凭据泄露和非 ASCII CSRF 500 已接受修复。**截至快照未合 main，M3B Host/WPF ON、同 Core 双端并发全部 NOT RUN**。实时决策见 [#103](https://github.com/ALV522/-SRW-/issues/103)。
+- **当前执行顺序**：先合规收口 #187、再用旧固定 ZIP 验证 #41/#42 业务链，之后 M3B 固化 Chromium ON 验收、收敛前端 helper、设计 Windows Host 共享 Core 合同。A 独立维护 #63 模块化工程治理、体积字节审计与 #134 历史分支可恢复性清点。**本 PR 只是治理/文档更新，不改变 Native 工件、应用业务代码或发行身份**。
+- **开发传输突破**：负责人已批准 [ADR-0003 GitHub API-native 工作流](docs/decisions/ADR-0003-github-api-native-preedit.md)；只替代不可用的本地 Git DNS/checkout 预检，不放宽 GitHub PR、exact-HEAD CI、历史能力保真、真实数据保护和 Windows 实机证据分级。
+
+## 历史进展与路线图位置（2026-10-29 核查快照；不作最新状态）
 
 **我们处于“已有招聘业务 Core 的产品化收口”阶段：API/前端渐进拆分已落地多批，恢复与工件可靠性持续补强；当前关键路径是最新 Windows Native 工件实机验收，以及双载体会话安全接线。尚未进入 RC/GA。** v0.8.12-R2 仍是功能保真对照，不能用新界面或更多治理文件替代成熟业务能力。
 
