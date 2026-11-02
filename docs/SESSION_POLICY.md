@@ -95,10 +95,25 @@ gets 403.
 
 | Credential | Where it lives | Lifetime | What it can do |
 |---|---|---|---|
-| pairing code | interactive console only (`scripts/start_local_web.py`) | 60 s, single use, 5 attempts | exchange for one session |
+| pairing code | trusted interactive console only (`scripts/start_local_web.py`); a redirected stdout refuses to start | 60 s, single use, 5 attempts | exchange for one session |
 | business session cookie | `srw_business_session`, `HttpOnly`, `SameSite=Strict`, `Path=/` | registry TTL | read/write business routes |
 | CSRF token | `srw_csrf`, readable by same-origin JS, echoed in `X-SRW-CSRF` | same as the session | unlocks **mutating** methods only; never authorises alone |
 
 The session token is never returned in JSON, never placed in a URL and never logged.
 `POST /api/v1/runtime/shutdown` stays on its own lifecycle secret: a business cookie
 cannot stop the Core.
+
+Two delivery rules are enforced in code rather than in prose:
+
+* **The pairing code has exactly one channel.** `scripts/start_local_web.py` writes it
+  only when `sys.stdout.isatty()` is true. With `RECRUITMENT_SESSION_ENFORCE=1` and a
+  redirected stdout (pipe, file, service manager, CI) the launcher refuses *before* it
+  creates a workspace, a lock or a database: exit code `3`, one explanation on stderr,
+  and no code is minted at all. A log collector therefore never receives a live
+  credential, and a non-interactive run cannot end up as a Core nobody can attach to.
+* **A pairing body is untrusted JSON, not text.** Non-ASCII strings, lone surrogate
+  escapes (`"\ud800"`), non-string values, extra keys and bodies over 512 bytes are
+  `401`/`413` refusals. They never raise `UnicodeEncodeError`, never echo the presented
+  text and never touch pairing or session state, so a malformed attempt does not consume
+  the live code either. The same rule covers `X-SRW-CSRF`: a non-ASCII header value is
+  a `403`, because `hmac.compare_digest` raises on it instead of comparing.

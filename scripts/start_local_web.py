@@ -27,6 +27,55 @@ for entry in (str(ROOT), str(ROOT / "backend"), str(ROOT / "convergence_tests"))
 
 CURRENT_SCHEMA = json.loads((ROOT / "VERSION_POLICY.json").read_text(encoding="utf-8"))["schema_revision"]
 KNOWLEDGE_NAMES = ("taxonomy", "job_info", "competency", "market_reference", "reference")
+#: Distinct from the generic BLOCKED exit (2): the flags were valid, but the
+#: one-time pairing code has no trusted delivery channel.
+EXIT_NO_TRUSTED_CONSOLE = 3
+
+
+class UntrustedConsole(Exception):
+    """The code may not be written here; nothing has been minted."""
+
+
+def pairing_console_is_trusted(stream) -> bool:
+    """True only for a real interactive terminal.
+
+    The pairing code is the one credential a human hands to the browser. A
+    redirected stdout (file, pipe, service manager, CI) is not a channel a
+    person can read, but it *is* a channel a log collector can read, so writing
+    the code there would leak a live credential with no benefit. ``isatty()``
+    is the OS answer; a stream that cannot answer is not trusted.
+    """
+    try:
+        return bool(stream.isatty())
+    except (AttributeError, OSError, ValueError):
+        return False
+
+
+def announce_pairing_code(gateway, stream) -> str:
+    """Print the code once to a trusted console; mint nothing otherwise."""
+    if not pairing_console_is_trusted(stream):
+        raise UntrustedConsole("refusing to write a pairing code to a non-interactive stream")
+    from srw.runtime.business_session_gateway import PAIRING_TTL_SECONDS
+
+    code = gateway.issue_pairing_code()
+    print(f"PAIRING CODE (single use, {int(PAIRING_TTL_SECONDS)}s): {code}",
+          file=stream, flush=True)
+    return code
+
+
+def business_session_enforced() -> bool | None:
+    """The opt-in flag, or None when it is invalid.
+
+    An invalid value is not diagnosed here: ``create_v1_app`` already rejects it
+    before creating a database, and duplicating that rule would let the two
+    drift apart.
+    """
+    from srw.supervisor.session_policy import SessionPolicy
+
+    try:
+        return SessionPolicy.from_environ(os.environ).enforce
+    except ValueError:
+        return None
 
 
 def workspace_errors(path: Path, *, reuse: bool, synthetic: bool,
@@ -150,6 +199,17 @@ def run(args: argparse.Namespace) -> int:
             print(f"BLOCKED: {problem}", file=sys.stderr)
         return 2
 
+    # Fail closed before a workspace, a lock or a database exists: with the
+    # business session enforced the operator needs the one-time code, and a
+    # non-interactive stdout is the only place we would have to put it. Starting
+    # anyway would either leak a live credential into a collected log or leave a
+    # running Core nobody can attach to.
+    if business_session_enforced() and not pairing_console_is_trusted(sys.stdout):
+        print("BLOCKED: RECRUITMENT_SESSION_ENFORCE=1 needs an interactive terminal for "
+              "the one-time pairing code, and stdout is redirected. Run this from a real "
+              "console, or leave the flag off for a non-interactive run.", file=sys.stderr)
+        return EXIT_NO_TRUSTED_CONSOLE
+
     # All validation above is read-only. Synthetic fixtures are never confused
     # with production Knowledge; mode must be explicitly selected.
     workspace.mkdir(parents=True, exist_ok=True)
@@ -203,10 +263,15 @@ def run(args: argparse.Namespace) -> int:
                 # Opt-in business session (#43 M3A). The code goes to this
                 # trusted interactive console only: never into a URL, a query
                 # string, HTTP/access logs or an acceptance report.
-                from srw.runtime.business_session_gateway import PAIRING_TTL_SECONDS
-
-                print(f"PAIRING CODE (single use, {int(PAIRING_TTL_SECONDS)}s): "
-                      f"{gateway.issue_pairing_code()}", flush=True)
+                try:
+                    announce_pairing_code(gateway, sys.stdout)
+                except UntrustedConsole:
+                    # The check above already covers this, but the delivery
+                    # point refuses on its own so no future caller can print a
+                    # live credential into a pipe by forgetting the check.
+                    print("BLOCKED: the one-time pairing code cannot be delivered to a "
+                          "non-interactive stdout; nothing was issued.", file=sys.stderr)
+                    return EXIT_NO_TRUSTED_CONSOLE
             config = uvicorn.Config(
                 app, host="127.0.0.1", port=args.port,
                 log_level="warning" if args.synthetic else "info", access_log=False,

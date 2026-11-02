@@ -287,6 +287,58 @@ class BusinessSessionGateHttpTests(unittest.TestCase):
         response = self.client.post(PAIRING_PATH, json={"code": "x" * 2000})
         self.assertEqual(response.status_code, 413)
 
+    # -------------------------------------------- R1: hostile pairing payloads
+    def test_non_ascii_pairing_bodies_are_refused_without_side_effects(self):
+        """Legal JSON may still hold non-ASCII text or a lone surrogate escape.
+
+        ``str.encode('ascii')`` on that text used to raise ``UnicodeEncodeError``
+        from an anonymous endpoint, i.e. a 500. It must be a 401 with no session,
+        no attempt consumed and no business row written.
+        """
+        live = self.gateway.issue_pairing_code()
+        before = (self._count("project"), self._audit_count(), len(self.gateway.registry))
+        bodies = {
+            "utf8-chinese": '{"code":"中文"}'.encode("utf-8"),
+            "utf8-emoji": '{"code":"😀"}'.encode("utf-8"),
+            "utf8-accent": '{"code":"café"}'.encode("utf-8"),
+            "lone-surrogate": b'{"code":"\\ud800"}',
+            "invalid-utf8": b'{"code":"\xff\xfe"}',
+            "not-a-string": b'{"code":12345}',
+            "null": b'{"code":null}',
+            "array": b"[]",
+            "overlong-code": b'{"code":"' + b"x" * 300 + b'"}',
+        }
+        for label, body in bodies.items():
+            with self.subTest(label=label):
+                response = self.client.post(PAIRING_PATH, content=body,
+                                            headers={"content-type": "application/json"})
+                self.assertEqual(response.status_code, 401, response.text)
+                self.assertIn("pairing_rejected", response.text)
+                self.assertNotIn("Traceback", response.text)
+                self.assertNotIn(live, response.text)
+                self.assertNotIn("srw1.", response.text)
+        self.assertEqual(
+            (self._count("project"), self._audit_count(), len(self.gateway.registry)),
+            before, "a refused pairing body must not write a row or mint a session")
+        # The malformed attempts did not burn the live code either.
+        accepted = self.client.post(PAIRING_PATH, json={"code": live})
+        self.assertEqual(accepted.status_code, 200, accepted.text)
+
+    def test_non_ascii_csrf_header_is_refused_without_a_500(self):
+        """``hmac.compare_digest`` raises on non-ASCII ``str``; refuse instead."""
+        cookie = f"{COOKIE_NAME}={self.client.cookies.get(COOKIE_NAME)}".encode()
+        body = json.dumps({"title": "non-ascii-csrf", "role_title": "x"}).encode()
+        for value in (b"\xfc\xfc", "\u4e2d".encode("utf-8")):
+            with self.subTest(value=value):
+                status, payload = asgi_request(
+                    self.app, method="POST", path="/api/v1/projects", body=body,
+                    headers=[(b"host", b"testserver"), (b"cookie", cookie),
+                             (b"origin", ORIGIN.encode()),
+                             (b"content-type", b"application/json"),
+                             (CSRF_HEADER.encode(), value)])
+                self.assertEqual(status, 403, payload)
+        self.assertEqual(self._count("project"), 0)
+
     # ------------------------------------------------- default OFF regression
     def test_default_off_keeps_the_credential_free_behaviour(self):
         off_app = self._build_app(enforce=False)

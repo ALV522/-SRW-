@@ -1,15 +1,34 @@
 """No-network, no-real-data regressions for the local Core + Browser launcher."""
 from __future__ import annotations
 
+import io
 import sqlite3
 from contextlib import closing
 import json
 import os
+import subprocess
+import sys
 import tempfile
 import unittest
 from pathlib import Path
 
-from scripts.start_local_web import production_knowledge_errors, workspace_errors
+from scripts.start_local_web import (
+    EXIT_NO_TRUSTED_CONSOLE,
+    UntrustedConsole,
+    announce_pairing_code,
+    pairing_console_is_trusted,
+    production_knowledge_errors,
+    workspace_errors,
+)
+
+ROOT = Path(__file__).resolve().parents[1]
+
+
+class _TtyBuffer(io.StringIO):
+    """A console stand-in that answers ``isatty()`` the way a real one does."""
+
+    def isatty(self) -> bool:  # pragma: no cover - trivial
+        return True
 
 
 class LocalWebLauncherTests(unittest.TestCase):
@@ -125,9 +144,8 @@ class LocalWebPairingConsoleTests(unittest.TestCase):
             else:
                 os.environ[name] = value
 
-    def _run(self, *, enforce: bool) -> str:
+    def _run(self, *, enforce: bool, console=None) -> str:
         import contextlib
-        import io
         from unittest.mock import patch
 
         from scripts import start_local_web
@@ -139,7 +157,7 @@ class LocalWebPairingConsoleTests(unittest.TestCase):
         os.environ["SRW_SYNTHETIC_BROWSER_ACCEPTANCE"] = "1"
         argv = ["--workspace", str(self.workspace), "--synthetic",
                 "--no-browser", "--port", "8799"]
-        buffer = io.StringIO()
+        buffer = console if console is not None else io.StringIO()
         # uvicorn.Server.run blocks forever; the entry point is what matters here.
         with patch("uvicorn.Server.run", return_value=None), contextlib.redirect_stdout(buffer):
             code = start_local_web.main(argv)
@@ -149,7 +167,7 @@ class LocalWebPairingConsoleTests(unittest.TestCase):
     def test_pairing_code_is_printed_once_and_never_in_the_url(self):
         from srw.runtime.business_session_gateway import PAIRING_TTL_SECONDS
 
-        output = self._run(enforce=True)
+        output = self._run(enforce=True, console=_TtyBuffer())
         self.assertIn("PAIRING CODE", output)
         line = next(l for l in output.splitlines() if "PAIRING CODE" in l)
         self.assertIn(str(int(PAIRING_TTL_SECONDS)), line)
@@ -161,9 +179,102 @@ class LocalWebPairingConsoleTests(unittest.TestCase):
         self.assertNotIn(code, url_line)
 
     def test_default_off_prints_no_pairing_code(self):
-        output = self._run(enforce=False)
+        output = self._run(enforce=False, console=io.StringIO())
         self.assertNotIn("PAIRING CODE", output)
         self.assertIn("http://127.0.0.1:8799/v1", output)
+
+
+class PairingConsoleTrustTests(unittest.TestCase):
+    """R1: the code only ever reaches a console a human is looking at."""
+
+    def test_a_pipe_and_an_in_memory_buffer_are_not_trusted(self):
+        self.assertFalse(pairing_console_is_trusted(io.StringIO()))
+        read_fd, write_fd = os.pipe()
+        try:
+            with os.fdopen(write_fd, "w") as pipe:
+                self.assertFalse(pairing_console_is_trusted(pipe),
+                                 "a redirected stdout is a log sink, not a console")
+        finally:
+            os.close(read_fd)
+
+    def test_a_real_terminal_device_is_trusted(self):
+        try:
+            import pty
+        except ImportError:  # Windows has no pty module; the OS answer is untestable here
+            self.skipTest("pty module unavailable on this platform")
+        master, slave = pty.openpty()
+        try:
+            with os.fdopen(slave, "w") as console:
+                self.assertTrue(pairing_console_is_trusted(console))
+        finally:
+            os.close(master)
+
+    def test_announce_mints_nothing_when_the_stream_is_not_a_console(self):
+        from srw.runtime.business_session_gateway import BusinessSessionGateway
+
+        gateway = BusinessSessionGateway()
+        buffer = io.StringIO()
+        with self.assertRaises(UntrustedConsole):
+            announce_pairing_code(gateway, buffer)
+        self.assertEqual(buffer.getvalue(), "", "nothing may be written to a log sink")
+        self.assertFalse(gateway.has_pairing_code, "a refused delivery must not mint a code")
+
+    def test_announce_writes_one_usable_code_to_a_console(self):
+        from srw.runtime.business_session_gateway import BusinessSessionGateway
+
+        gateway = BusinessSessionGateway()
+        console = _TtyBuffer()
+        code = announce_pairing_code(gateway, console)
+        self.assertIn(code, console.getvalue())
+        self.assertEqual(console.getvalue().count(code), 1)
+        token, csrf = gateway.pair(code)  # the printed code really is the live one
+        self.assertTrue(token.startswith("srw1."))
+        self.assertTrue(csrf)
+
+
+class RedirectedLauncherTests(unittest.TestCase):
+    """A real subprocess with a real pipe: the fail-closed branch end to end."""
+
+    def setUp(self) -> None:
+        self.tmp = tempfile.TemporaryDirectory(prefix="srw-local-web-redirected-")
+        self.addCleanup(self.tmp.cleanup)
+        self.workspace = Path(self.tmp.name) / "workspace"
+
+    def test_redirected_stdout_refuses_to_start_and_creates_nothing(self):
+        env = dict(os.environ)
+        env.update({"RECRUITMENT_SESSION_ENFORCE": "1",
+                    "SRW_SYNTHETIC_BROWSER_ACCEPTANCE": "1",
+                    "PYTHONIOENCODING": "utf-8"})
+        completed = subprocess.run(
+            [sys.executable, str(ROOT / "scripts" / "start_local_web.py"),
+             "--workspace", str(self.workspace), "--synthetic",
+             "--no-browser", "--port", "8799"],
+            cwd=str(ROOT), env=env, capture_output=True, text=True, timeout=45,
+        )
+        combined = completed.stdout + completed.stderr
+        self.assertEqual(completed.returncode, EXIT_NO_TRUSTED_CONSOLE, combined)
+        self.assertEqual(completed.stdout, "", "the log sink must stay completely empty")
+        self.assertNotIn("PAIRING CODE", combined)
+        self.assertNotIn("single use", combined)
+        self.assertIn("interactive terminal", completed.stderr)
+        self.assertFalse(self.workspace.exists(),
+                         "a refused start must not create a workspace, lock or database")
+
+    def test_invalid_flag_still_reports_the_configuration_error(self):
+        env = dict(os.environ)
+        env.update({"RECRUITMENT_SESSION_ENFORCE": "yes",
+                    "SRW_SYNTHETIC_BROWSER_ACCEPTANCE": "1",
+                    "PYTHONIOENCODING": "utf-8"})
+        completed = subprocess.run(
+            [sys.executable, str(ROOT / "scripts" / "start_local_web.py"),
+             "--workspace", str(self.workspace), "--synthetic",
+             "--no-browser", "--port", "8799"],
+            cwd=str(ROOT), env=env, capture_output=True, text=True, timeout=45,
+        )
+        combined = completed.stdout + completed.stderr
+        self.assertNotEqual(completed.returncode, EXIT_NO_TRUSTED_CONSOLE, combined)
+        self.assertIn("RECRUITMENT_SESSION_ENFORCE", combined)
+        self.assertNotIn("PAIRING CODE", combined)
 
 
 if __name__ == "__main__":

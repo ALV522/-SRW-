@@ -10,7 +10,9 @@ Three credentials, deliberately distinct
 ----------------------------------------
 * **pairing code** - random, single use, 60 second lifetime, printed only to the
   trusted interactive console by ``scripts/start_local_web.py``. It travels in a
-  JSON POST body and never in a URL, a log line or an acceptance report.
+  JSON POST body and never in a URL, a log line or an acceptance report. A
+  redirected stdout has no trusted channel at all, so the launcher refuses to
+  start rather than write the code into a collected log.
 * **business session cookie** - opaque ``srw1.<tag>.<secret>`` from
   :class:`srw.supervisor.session_registry.SessionRegistry`, ``HttpOnly``,
   ``SameSite=Strict``, ``Path=/``. It is the only thing that authorises reads and
@@ -59,6 +61,8 @@ PAIRING_TTL_SECONDS = 60.0
 PAIRING_MAX_ATTEMPTS = 5
 MAX_PAIRING_BODY = 512
 PAIRING_CODE_BYTES = 24
+#: The minted code is 32 characters; anything longer is not ours to hash.
+MAX_PAIRING_CODE_LENGTH = 256
 
 READ_SCOPE = "read"
 WRITE_SCOPE = "write"
@@ -97,6 +101,27 @@ class Decision:
 
 def _raw_pairs(headers: Iterable[tuple[bytes, bytes]]) -> list[tuple[str, str]]:
     return [(name.decode("latin1").lower(), value.decode("latin1")) for name, value in headers]
+
+
+def _is_canonical_pairing_code(code: object) -> bool:
+    """True only for the ASCII text this module mints.
+
+    ``isascii()`` is the exact guard ``encode('ascii')`` needs: it also rejects
+    lone surrogates such as ``"\\ud800"``, which ``json.loads`` accepts and which
+    neither ASCII nor UTF-8 can encode. Legal JSON is still untrusted input, so
+    every shape check here is a refusal rather than an exception.
+    """
+    return (isinstance(code, str) and 0 < len(code) <= MAX_PAIRING_CODE_LENGTH
+            and code.isascii())
+
+
+def _presented_digest(code: str) -> bytes:
+    """SHA-256 of a code already proven ASCII; never raises on hostile text."""
+    try:
+        encoded = code.encode("ascii")
+    except UnicodeEncodeError as exc:  # defence in depth; the guard above is primary
+        raise PairingDenied(DENY_PAIRING) from exc
+    return hashlib.sha256(encoded).digest()
 
 
 def _cookie_values(pairs: list[tuple[str, str]], name: str) -> tuple[list[str], bool]:
@@ -152,8 +177,7 @@ class BusinessSessionGateway:
     def issue_pairing_code(self) -> str:
         """Mint a single-use code. Only the digest is retained."""
         code = secrets.token_urlsafe(PAIRING_CODE_BYTES)
-        self._pairing = (hashlib.sha256(code.encode("ascii")).digest(),
-                         self._now() + self._pairing_ttl)
+        self._pairing = (_presented_digest(code), self._now() + self._pairing_ttl)
         self._attempts = 0
         return code
 
@@ -162,8 +186,13 @@ class BusinessSessionGateway:
         return self._pairing is not None and self._now() < self._pairing[1]
 
     def pair(self, code: object) -> tuple[str, str]:
-        """Consume the code and mint one business session. Raises ``PairingDenied``."""
-        if not isinstance(code, str) or not code or len(code) > 256:
+        """Consume the code and mint one business session. Raises ``PairingDenied``.
+
+        Shape is rejected *before* any state is read or written, so a hostile
+        body cannot burn an attempt or clear the pending code; that keeps the
+        "no side effect" promise of a refused pairing attempt.
+        """
+        if not _is_canonical_pairing_code(code):
             raise PairingDenied(DENY_PAIRING)
         pending = self._pairing
         if pending is None:
@@ -176,7 +205,7 @@ class BusinessSessionGateway:
         if self._attempts > self._max_attempts:
             self._pairing = None
             raise PairingDenied(DENY_PAIRING)
-        if not hmac.compare_digest(hashlib.sha256(code.encode("ascii")).digest(), digest):
+        if not hmac.compare_digest(_presented_digest(code), digest):
             raise PairingDenied(DENY_PAIRING)
         # Single use: the code dies with the attempt that consumed it.
         self._pairing = None
@@ -246,7 +275,11 @@ class BusinessSessionGateway:
             if len(csrf) != 1:
                 return Decision(False, 403, DENY_BAD_CSRF, session)
             expected = self.csrf_for(session)
-            if not expected or not hmac.compare_digest(csrf[0], expected):
+            # ``compare_digest`` raises ``TypeError`` for a non-ASCII ``str``, so
+            # a legal but non-ASCII header value is refused *here* rather than
+            # turning a security decision into a 500.
+            if (not expected or not csrf[0].isascii()
+                    or not hmac.compare_digest(csrf[0], expected)):
                 return Decision(False, 403, DENY_BAD_CSRF, session)
         return Decision(True, 200, "", session)
 
@@ -335,7 +368,13 @@ def clear_cookie_headers() -> list[str]:
 
 
 def pairing_body_code(payload: bytes) -> str:
-    """Extract the code from a bounded JSON body, refusing anything else."""
+    """Extract the code from a bounded JSON body, refusing anything else.
+
+    The body is untrusted JSON, so a *legal* string may still be non-ASCII, may
+    hold a lone surrogate escape, or may not be a string at all. Each of those
+    is a ``PairingDenied`` - never an exception escaping to a 500 - and none of
+    them reaches the gateway, so a refused body cannot touch pairing state.
+    """
     if len(payload) > MAX_PAIRING_BODY:
         raise PairingDenied(DENY_BODY_TOO_LARGE)
     try:
@@ -344,4 +383,7 @@ def pairing_body_code(payload: bytes) -> str:
         raise PairingDenied(DENY_PAIRING) from exc
     if not isinstance(data, dict) or set(data) != {"code"}:
         raise PairingDenied(DENY_PAIRING)
-    return data["code"]
+    code = data["code"]
+    if not _is_canonical_pairing_code(code):
+        raise PairingDenied(DENY_PAIRING)
+    return code
