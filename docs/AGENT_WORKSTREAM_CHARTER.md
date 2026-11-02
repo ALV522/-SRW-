@@ -36,7 +36,7 @@
 
 ## 5. 不可绕过的 PR / 验收线
 
-- **开工**：读 `AGENTS.md` 全部必读文件，检查 live main SHA、VERSION、Schema、Issues/PR、Exact CI、Windows 工件。专用干净分支先运行 `python scripts/agent_preflight.py --issue N --acknowledge-reading`，**然后**改代码。
+- **开工**：读 `AGENTS.md` 全部必读文件，检查 live main SHA、VERSION、Schema、Issues/PR、Exact CI、Windows 工件。Local Git 模式在专用干净分支先运行 `python scripts/agent_preflight.py --issue N --acknowledge-reading`；GitHub API-native 模式可按 owner [ADR-0003](decisions/ADR-0003-github-api-native-preedit.md) 在首次写入前核验真实 main SHA 和新任务分支 ref，注明本地 preflight NOT RUN；**通过对应模式真实前置校验后**才可改代码。
 - **实现**：operator outcome → Domain/Application → API 合同 → Browser/WPF。保护 Source/Claim/Judgment/HumanDecision、人类录用、历史能力、单一 SQLite 与本地隐私。不创建 SaaS、微服务、新 Core、新前端框架。
 - **文件**：不得以旧分支整文件覆盖；编辑/行尾定稿后才更新 SOURCE_MANIFEST；保持 source recovery 清单不变。合同清单和测试发现列表应与基线比较，不能只靠测试总数判断是否回退。
 - **PR 证据**：四条 G1 必读声明必须逐字出现；业务前后行为、原子 diff、回滚、准确源/工件 SHA、Ubuntu/Windows Source、Chromium、Host、Windows GUI、Provider/恢复、双端各自 PASS/FAIL/BLOCKED/NOT RUN。

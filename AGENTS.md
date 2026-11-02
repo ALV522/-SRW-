@@ -13,7 +13,7 @@
 6. **docs/DUAL_CARRIER_PLAN.md** — common Core, independent Windows and local HTML/Browser carriers.
 7. **docs/decisions/ADR-0001-single-authoritative-core.md**, **docs/decisions/ADR-0002-api-first-modular-monolith.md** and **docs/API_FIRST_MODULAR_CORE_ROADMAP.md** — one authoritative Core, API-first modular-monolith boundaries and the gradual refactor sequence.
 8. **docs/ACCEPTANCE_PLAN.md**, **docs/ROADMAP.md** and **docs/RELEASE_PROCESS.md** — business acceptance, active product/architecture roadmap and release gates.
-9. **docs/NO_BRANCH_PROTECTION_PROTOCOL.md** — binding temporary workflow without server-side protection.
+9. **docs/NO_BRANCH_PROTECTION_PROTOCOL.md** and **docs/decisions/ADR-0003-github-api-native-preedit.md** — the two authorized pre-edit transports while main is unprotected.
 10. **docs/OWNER_GUIDE.md** — user-facing owner handoff and decision escalation protocol.
 
 Read **docs/AGENT_WORKSTREAM_CHARTER.md** before any parallel-agent or `dev/43`-related work; its explicit file ownership and safe PR split are binding unless superseded by a documented owner/PR decision. The task handoff is **docs/DEV43_BRANCH_AUTHOR_HANDOFF.md**.
@@ -24,13 +24,16 @@ Read **DEVELOPMENT_STATE.md**, **README.md** and the exact recent CI/artifact ev
 
 The product owner explicitly deferred paid/unsupported server-side branch protection. Read **docs/NO_BRANCH_PROTECTION_PROTOCOL.md** now. No coding agent may direct-push main, force-push, self-approve an unverified PR, or merge before **the exact PR HEAD SHA** has passed all applicable CI. GitHub allowing the button does not grant permission.
 
-Create a dedicated task branch from fresh main and run this **read-only** pre-edit policy gate:
+**Two owner-approved pre-edit execution modes** ([ADR-0003](docs/decisions/ADR-0003-github-api-native-preedit.md); [#132 owner decision](https://github.com/ALV522/-SRW-/issues/132#issuecomment-6581704649)):
 
-```bash
-python scripts/agent_preflight.py --issue 41 --acknowledge-reading
-```
+1. **Local Git checkout**: create a clean task branch from fresh main, then run this read-only gate before changing tracked bytes:
+   ```bash
+   python scripts/agent_preflight.py --issue 41 --acknowledge-reading
+   ```
+   Use the actual Issue number. A failed local Git preflight is never a PASS.
+2. **Authorized GitHub API-native** (no usable local checkout / Git DNS unavailable): **do not fabricate a local Git result**. Before any write, read `refs/heads/main` through the authenticated GitHub API; create a task branch **from that exact commit SHA**; read back the new branch ref and confirm identical SHA; record `Pre-edit mode: GitHub-API-native`, issue, timestamps, SHA, and `Local git preflight: NOT RUN`. Subsequent API tree/commit/content edits are allowed **only on this task branch**, with a reviewed `SOURCE_MANIFEST.sha256` delta and full PR/exact-HEAD CI/review gate. The complete machine-checkable steps and failure handling are in ADR-0003 and `docs/NO_BRANCH_PROTECTION_PROTOCOL.md`.
 
-Replace 41 with the relevant existing/new issue. If blocked, do not edit. Do not misrepresent the acknowledgement flag as proof of reading. The post-merge direct-push audit can only **detect after the fact**; it cannot protect main. Recheck PR head/main, CI and exact main SHA before and after merge.
+Neither mode proves genuine reading by itself. GitHub allowing a direct main push is not an authorization; never direct-push/force-push main. The post-merge audit only **detects after the fact**, not prevents. Recheck PR head/main, CI and exact main SHA before and after merge.
 
 ## Mandatory before-code checklist
 

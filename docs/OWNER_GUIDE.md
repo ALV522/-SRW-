@@ -4,9 +4,9 @@
 
 ## 当前特别规定：不启用 GitHub 主线保护
 
-请先读 [暂时不启用主线保护时的开发制度](NO_BRANCH_PROTECTION_PROTOCOL.md)。新 Agent 必须在**非 main 的干净任务分支**运行 `python scripts/agent_preflight.py --issue 41 --acknowledge-reading`（41 改成真实 Issue 号）。必须走 PR，等所有相关检查完成且成功后才能合并；合并后确认 main SHA 和 CI。没有主线保护时，Github UI 仍可能允许不安全操作，本制度降低风险但不能彻底防止绕过。
+请先读 [暂时不启用主线保护时的开发制度](NO_BRANCH_PROTECTION_PROTOCOL.md)。新 Agent 以本地 Git 模式开发时须在**非 main 的干净任务分支**运行 `python scripts/agent_preflight.py --issue 41 --acknowledge-reading`（41 改成真实 Issue 号）；对只有认证 GitHub API/连接器可用的环境，负责人已批准 [ADR-0003](decisions/ADR-0003-github-api-native-preedit.md) 的**准确 main SHA→任务分支 ref 双向校验**替代不适用的本地 Git 预检，PR 仍须标注本地预检 NOT RUN。必须走 PR，等所有相关检查完成且成功后才能合并；合并后确认 main SHA 和 CI。没有主线保护时，Github UI 仍可能允许不安全操作，本制度降低风险但不能彻底防止绕过。
 
-以后发给 Agent 的开头可以是：“主线暂不设置保护。严格执行 AGENTS.md 与无保护协议：绝不直接 push main，先读文件和运行预编辑检查，按 Issue 做 PR，核实相同 SHA 的所有 CI 才合并，合并后核对 main 和测试状态。”
+以后发给 Agent 的开头可以是：“主线暂不设置保护。严格执行 AGENTS.md 与无保护协议：绝不直接 push main，先读文件并按 Local Git 或 GitHub API-native 执行真实预编辑校验，按 Issue 做 PR，核实相同 SHA 的所有 CI 才合并，合并后核对 main 和测试状态。”
 
 ### 协作证据与负责人抽查（#132）
 

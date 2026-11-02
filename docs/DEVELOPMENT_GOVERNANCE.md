@@ -63,7 +63,7 @@ P0：数据、证据、人工决策错误/泄露、无法启动或丢失主线�
 
 ## 8. 暂无分支保护的 G1 强化纪律（当前生效）
 
-产品负责人决定暂不启用 GitHub main 保护，因此全体 Agent 必须先阅读 [临时无保护协议](NO_BRANCH_PROTECTION_PROTOCOL.md)，在新建的干净任务分支执行 `python scripts/agent_preflight.py --issue <对应Issue> --acknowledge-reading`，只能经 PR 合并，须先读取同 PR Head SHA 的治理/源码/浏览器及受影响构建检查结果，**全绿才合并**。合并前二次比较 Head/Main SHA，合并后再次查 main 的 CI 与产物。禁止任何 Agent 直接修改或 push main。不能把这称为平台级强制保护：当前无权限屏障，违规直接 push 只能事后发现与调查。
+产品负责人决定暂不启用 GitHub main 保护，因此全体 Agent 必须先阅读 [临时无保护协议](NO_BRANCH_PROTECTION_PROTOCOL.md)，在新建的独立任务分支执行 **Local Git 模式的** `python scripts/agent_preflight.py --issue <对应Issue> --acknowledge-reading`，**或按 [ADR-0003](decisions/ADR-0003-github-api-native-preedit.md) 在首次写入前从 GitHub API 的 exact main SHA 建分支并读回核验**（API 模式明确记录本地 preflight NOT RUN），只能经 PR 合并，须先读取同 PR Head SHA 的治理/源码/浏览器及受影响构建检查结果，**全绿才合并**。合并前二次比较 Head/Main SHA，合并后再次查 main 的 CI 与产物。禁止任何 Agent 直接修改或 push main。不能把这称为平台级强制保护：当前无权限屏障，违规直接 push 只能事后发现与调查。
 
 ## 9. 可执行约束与局限
 
@@ -121,7 +121,4 @@ P0：数据、证据、人工决策错误/泄露、无法启动或丢失主线�
 不是 CI 通过声明。字段单值；多个前置条件同时存在时写最先必须行动的一轨。只有所有门禁已满足且没有待执行动作时
 才可写 `none`；CI/外部保管/发布状态仍须在前文如实写出。
 
-**Git 传输不可用时的 REST 兜底。** 仅在新建任务分支上使用：先跑真实 pre-edit `agent_preflight`；每个新增 blob 与
-本地 `git hash-object` 逐字一致；整棵 tree 与本地 `git write-tree` 一致；父提交与 `refs/heads/*` 的 lease 严格核对；
-**不得创建或强推 main**；commit message 末尾加 `Transport: REST (git push 502)`；PR 正文注明本地与远端 SHA 的元数据
-不同、同一 tree 及核对方法。已合并的历史（如 #156）不因补 trailer 而改写。
+**Git 传输不可用时的 GitHub API 提交。** 已批准两条情形：① 有真实本地 Git checkout、且编辑前通过原 `agent_preflight`，只因随后 git push 502 改用 REST 时，仍核对本地 `git hash-object`、`git write-tree`、准确 parent/ref lease，并如实记录 `Transport: REST (git push 502)`；② 完全没有可用 Git checkout/Git DNS 的授权执行者，按 [ADR-0003](decisions/ADR-0003-github-api-native-preedit.md) 用认证 API 在首次写入前读取 main SHA、建新分支并读回同 SHA，随后只在该分支构建 Git tree/commit，依据实际 SHA-256 更新 manifest 与读回审计，PR 标明 `Pre-edit mode: GitHub-API-native`、`Local git preflight: NOT RUN`。**不能声称运行了不可能执行的本地 git hash-object/preflight**。两类方式都不得直接/强推 main，且同 HEAD CI 与 Review 一项不免；历史提交不得为了新 trailer 被改写。
