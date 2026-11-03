@@ -108,6 +108,18 @@ def ensure_claims_belong_to_candidate(session: Session, candidate_id: str, claim
     if foreign:
         raise V1InvariantError(f"claims belong to another candidate: {foreign}")
 
+    # A manually authored proposal is not verified evidence. Never let an
+    # unreviewed or stale manual Claim support a new criterion judgment.
+    manual = [row for row in rows if row.authority == "human_proposal"]
+    if manual:
+        unconfirmed = sorted(row.id for row in manual if row.confirmation_state != "confirmed")
+        if unconfirmed:
+            raise V1InvariantError(f"manual claims require explicit review: {unconfirmed}")
+        current_sources = set(get_current_source_ids(session, candidate_id))
+        stale = sorted(row.id for row in manual if row.source_id not in current_sources)
+        if stale:
+            raise V1InvariantError(f"manual claims refer to noncurrent sources: {stale}")
+
 @dataclass(frozen=True, slots=True)
 class ClaimGrounding:
     claim_id: str

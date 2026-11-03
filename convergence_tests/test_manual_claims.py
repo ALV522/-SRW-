@@ -17,7 +17,8 @@ from starlette.testclient import TestClient
 
 from knowledge_fixture import create_minimal_knowledge_tree
 from srw.api.app import create_v1_app
-from srw.modules.candidate.repository import MaterialRepository
+from srw.kernel.errors import V1InvariantError
+from srw.modules.candidate.repository import MaterialRepository, ensure_claims_belong_to_candidate
 from srw.runtime.db.session import create_v1_engine, create_v1_session_factory, v1_session_scope
 from srw.runtime.business_session_gateway import CSRF_COOKIE_NAME, PAIRING_PATH
 
@@ -151,6 +152,37 @@ class ManualClaimHttpTests(unittest.TestCase):
             connection.execute("UPDATE candidate SET current_material_revision_id=NULL WHERE id=?", (self.cid,))
         self.assertEqual(self.post().status_code, 409)
         self.assertEqual(len(self.rows("claim")), 0)
+
+    def test_unreviewed_and_stale_manual_claim_cannot_support_judgment(self):
+        proposed = self.post()
+        self.assertEqual(proposed.status_code, 200, proposed.text)
+        claim_id = proposed.json()["claim_id"]
+        engine = create_v1_engine(self.database_url)
+        try:
+            factory = create_v1_session_factory(engine)
+            with v1_session_scope(factory) as session:
+                with self.assertRaises(V1InvariantError):
+                    ensure_claims_belong_to_candidate(session, self.cid, [claim_id])
+            review = self.client.post(
+                f"/api/v1/claims/{claim_id}/review", json={"accepted": True},
+            )
+            self.assertEqual(review.status_code, 200, review.text)
+            with v1_session_scope(factory) as session:
+                ensure_claims_belong_to_candidate(session, self.cid, [claim_id])
+            new_source = self.client.post(
+                f"/api/v1/candidates/{self.cid}/sources/text",
+                json={"text_content": "Synthetic replacement", "publish_material": False},
+            )
+            self.assertEqual(new_source.status_code, 200, new_source.text)
+            with v1_session_scope(factory) as session:
+                MaterialRepository(session).publish_revision(
+                    self.cid, [new_source.json()["source_id"]], provenance={"test": "stale"},
+                )
+            with v1_session_scope(factory) as session:
+                with self.assertRaises(V1InvariantError):
+                    ensure_claims_belong_to_candidate(session, self.cid, [claim_id])
+        finally:
+            engine.dispose()
 
     def test_business_session_gate_rejects_anonymous_and_csrf_writes(self):
         temp = tempfile.TemporaryDirectory(prefix="srw-manual-session-")
