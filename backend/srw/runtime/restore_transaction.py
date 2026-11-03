@@ -293,6 +293,17 @@ def apply_restore(data: Path, db: Path, max_schema: str, pre_restore_backup,
     db = Path(db)
     journal, marker = data / JOURNAL_NAME, data / "pending_restore.json"
     _safe_path(journal)
+    # A missing DB with a surviving WAL/SHM is not an empty new workspace.
+    # Never create a fresh Core DB or install a restore archive on top of
+    # unclaimed SQLite sidecars: they may contain committed recruiting data.
+    if not db.exists():
+        for suffix in ("-wal", "-shm"):
+            sidecar = Path(str(db) + suffix)
+            _safe_path(sidecar)
+            if sidecar.exists():
+                raise RuntimeError(
+                    "orphaned SQLite sidecar without database; preserve workspace and stop"
+                )
     if journal.exists():
         state = _validate_journal(data, json.loads(journal.read_text(encoding="utf-8")))
         if state["phase"] == "COMMITTED":
