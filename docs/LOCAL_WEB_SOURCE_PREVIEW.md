@@ -32,6 +32,19 @@ py -3.12 scripts\start_local_web.py --workspace "D:\SRW\synthetic-local-web" --s
 
 合成模式只用于调试/自动验收，不可与真实招聘工作区混用。停止服务请在控制台按 Ctrl+C；真实模式下的 SQLite 不会因关闭浏览器而自动删除。
 
+## 会话 ON：真实本机终端配对（#43 M3A）
+
+默认会话 OFF 与上述启动方式保持不变。需要验证本地浏览器受保护入口时，先在**交互式 PowerShell/CMD 终端**中启用：
+
+```powershell
+$env:RECRUITMENT_SESSION_ENFORCE = '1'
+py -3.12 scripts\start_local_web.py --workspace "D:\SRW\local-web-session-on"
+```
+
+Core 启动时只向该终端显示一次 **60 秒有效、单次使用**的配对码；浏览器访问 `http://127.0.0.1:8765/v1`（如使用 `--port`，按实际端口），在“本机配对”表单中手工输入。配对码不得写入 URL、脚本参数、文件、工单或日志；会话 Cookie 为 HttpOnly，CSRF 由同源浏览器请求携带。输入错误次数超限、配对码过期或主动注销后，当前源码预览没有在线补发入口，须**正常关闭 Core，再在已确认不被其他进程使用的原工作区上以 `--reuse-workspace` 重启**，获取新码；不要删除锁文件或复用真实生产工作区。
+
+ON 模式下，重定向 stdout、管道、CI 或无交互终端的启动会在创建工作区前以退出码 `3` 拒绝，不会把一次性凭据打印到日志。后台服务部署、Windows Host 附着与共享 Core Supervisor 尚未通过 M3B 验收；不得通过关闭会话门禁来冒充 ON 模式成功。Linux Chromium 的合成 PTY→真实启动器→HTTP/SQLite 用例与 Windows Native/WPF 验收分开记录。
+
 ## 核心限制与后续
 
 1. 此预览的 Core 由 Local Web 进程拥有，无法让 Windows WPF 自动接管；关闭 Desktop 后浏览器独立续用、跨端并发 CAS、任务唯一所有权**仍待 Issue #43** 的正式 Supervisor/契约。
