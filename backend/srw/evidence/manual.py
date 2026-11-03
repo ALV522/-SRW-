@@ -81,12 +81,14 @@ def create_manual_claim_proposal(
             meta = {}
         extractor = meta.get("extractor", {}) if isinstance(meta, dict) else {}
         blocks = extractor.get("grounding_blocks", []) if isinstance(extractor, dict) else []
+        if not isinstance(blocks, list):
+            blocks = []
         start = grounded["char_start"]
         if not any(
             isinstance(block, dict) and block.get("page") == supplied["page"]
             and type(block.get("char_start")) is int and type(block.get("char_end")) is int
             and block["char_start"] <= start < block["char_end"]
-            for block in blocks if isinstance(blocks, list)
+            for block in blocks
         ):
             raise V1InvariantError("locator page cannot be verified against source extraction")
 
