@@ -29,6 +29,56 @@ ROOT = Path(__file__).resolve().parents[1]
 
 @unittest.skipUnless(sys.platform.startswith("linux"), "POSIX PTY launcher contract")
 class LocalWebTtySessionOnAcceptance(unittest.TestCase):
+    def test_sigterm_after_http_ready_releases_workspace_lease(self) -> None:
+        # A default SIGTERM action kills the process before the outer lease
+        # context exits if Uvicorn replays the signal on Server.run teardown.
+        # This is a real launcher/HTTP/SQLite process, not a mocked signal.
+        with tempfile.TemporaryDirectory(prefix="srw-sigterm-lease-") as temp:
+            workspace = Path(temp) / "isolated-web-workspace"
+            with socket.socket() as sock:
+                sock.bind(("127.0.0.1", 0))
+                port = sock.getsockname()[1]
+            env = dict(os.environ)
+            env.update({
+                "RECRUITMENT_SESSION_ENFORCE": "0",
+                "SRW_SYNTHETIC_BROWSER_ACCEPTANCE": "1",
+                "PYTHONDONTWRITEBYTECODE": "1",
+                "PYTHONUNBUFFERED": "1",
+            })
+            proc = subprocess.Popen(
+                [sys.executable, "-B", str(ROOT / "scripts" / "start_local_web.py"),
+                 "--workspace", str(workspace), "--synthetic",
+                 "--no-browser", "--port", str(port)],
+                cwd=str(ROOT), env=env, stdin=subprocess.DEVNULL,
+                stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+                start_new_session=True,
+            )
+            lease = workspace / "data" / "app.lock"
+            try:
+                for _ in range(120):
+                    self.assertIsNone(proc.poll(), "launcher exited before readiness")
+                    try:
+                        with urllib.request.urlopen(
+                            f"http://127.0.0.1:{port}/health/ready", timeout=0.5
+                        ) as response:
+                            if response.status == 200:
+                                break
+                    except (OSError, urllib.error.URLError):
+                        pass
+                    time.sleep(0.1)
+                else:
+                    self.fail("launcher never became HTTP ready")
+                self.assertTrue(lease.is_dir(), "must hold a live workspace lease")
+                proc.send_signal(signal.SIGTERM)
+                self.assertEqual(proc.wait(timeout=15), 0,
+                                 "SIGTERM must unwind through lease cleanup")
+                self.assertFalse(lease.exists(),
+                                 "SIGTERM exit left a stale authoritative app.lock")
+            finally:
+                if proc.poll() is None:
+                    proc.kill()
+                    proc.wait(timeout=5)
+
     def test_real_launcher_pairs_browser_without_leaking_code(self) -> None:
         import pty
 

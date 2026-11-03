@@ -30,7 +30,7 @@ $env:SRW_SYNTHETIC_BROWSER_ACCEPTANCE='1'
 py -3.12 scripts\start_local_web.py --workspace "D:\SRW\synthetic-local-web" --synthetic
 ```
 
-合成模式只用于调试/自动验收，不可与真实招聘工作区混用。停止服务请在控制台按 Ctrl+C；真实模式下的 SQLite 不会因关闭浏览器而自动删除。
+合成模式只用于调试/自动验收，不可与真实招聘工作区混用。停止服务请在控制台按 Ctrl+C；Linux 上正常发送单次 SIGTERM 也应让服务完成退出并释放本进程持有的工作区租约（#195）。SIGKILL、断电及 Windows 服务管理器关闭不属于该项验收；真实模式下的 SQLite 不会因关闭浏览器而自动删除。
 
 ## 会话 ON：真实本机终端配对（#43 M3A）
 

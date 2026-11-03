@@ -10,6 +10,7 @@ import argparse
 from contextlib import closing
 import json
 import os
+import signal
 import sqlite3
 import socket
 import sys
@@ -238,51 +239,72 @@ def run(args: argparse.Namespace) -> int:
     #     instead of taking a second write handle on the same SQLite database.
     # This is still NOT a Core supervisor: whichever carrier acquires app.lock
     # owns the Core, and the two entry points stay independent processes.
-    with launch_alpha10.InstanceLock(data / ".srw-instance.lock"):
-        try:
-            lease = WorkspaceLease(
-                data, edition="local-web", port=args.port,
-                version=version, release_id=release_id,
-            ).acquire()
-        except WorkspaceLeaseError as exc:
-            print(f"BLOCKED: {exc}", file=sys.stderr)
-            return 2
-        with lease:
-            if not args.synthetic:
-                launch_alpha10.DATA, launch_alpha10.DB = data, db
-                launch_alpha10.apply_pending_restore()
-            os.environ["RECRUITMENT_EDITION"] = "web"
-            os.environ["RECRUITMENT_RUNTIME_MODE"] = "browser"
-            os.environ["SRW_BACKGROUND_WORKER"] = "0" if args.synthetic else "1"
-            app = create_v1_app(
-                f"sqlite+pysqlite:///{db.as_posix()}",
-                data_dir=data, knowledge_dir=knowledge, frontend_dist=frontend,
-            )
-            gateway = getattr(app.state, "business_gateway", None)
-            if gateway is not None:
-                # Opt-in business session (#43 M3A). The code goes to this
-                # trusted interactive console only: never into a URL, a query
-                # string, HTTP/access logs or an acceptance report.
-                try:
-                    announce_pairing_code(gateway, sys.stdout)
-                except UntrustedConsole:
-                    # The check above already covers this, but the delivery
-                    # point refuses on its own so no future caller can print a
-                    # live credential into a pipe by forgetting the check.
-                    print("BLOCKED: the one-time pairing code cannot be delivered to a "
-                          "non-interactive stdout; nothing was issued.", file=sys.stderr)
-                    return EXIT_NO_TRUSTED_CONSOLE
-            config = uvicorn.Config(
-                app, host="127.0.0.1", port=args.port,
-                log_level="warning" if args.synthetic else "info", access_log=False,
-            )
-            server = uvicorn.Server(config)
-            app.state.shutdown_callback = lambda: setattr(server, "should_exit", True)
-            print(f"SRW C11 Local Web SOURCE PREVIEW: http://127.0.0.1:{args.port}/v1", flush=True)
-            print("This is one real Core and one local Browser. NOT a dual-carrier GA/RC.", flush=True)
-            if not args.no_browser:
-                threading.Thread(target=_open_when_ready, args=(args.port,), daemon=True).start()
-            server.run()
+    # Uvicorn restores the previous SIGTERM handler and replays SIGTERM
+    # before Server.run returns. The OS default would kill this process
+    # before the outer workspace/instance leases can release their locks.
+    # Keep the launcher handler installed until BOTH lease contexts exit.
+    server_ref = None
+    previous_sigterm = None
+    if threading.current_thread() is threading.main_thread():
+        previous_sigterm = signal.getsignal(signal.SIGTERM)
+
+        def _handle_owned_sigterm(signum, _frame):
+            if server_ref is None:
+                # During setup, unwind any acquired context managers.
+                raise SystemExit(128 + signum)
+            server_ref.should_exit = True
+
+        signal.signal(signal.SIGTERM, _handle_owned_sigterm)
+    try:
+        with launch_alpha10.InstanceLock(data / ".srw-instance.lock"):
+            try:
+                lease = WorkspaceLease(
+                    data, edition="local-web", port=args.port,
+                    version=version, release_id=release_id,
+                ).acquire()
+            except WorkspaceLeaseError as exc:
+                print(f"BLOCKED: {exc}", file=sys.stderr)
+                return 2
+            with lease:
+                if not args.synthetic:
+                    launch_alpha10.DATA, launch_alpha10.DB = data, db
+                    launch_alpha10.apply_pending_restore()
+                os.environ["RECRUITMENT_EDITION"] = "web"
+                os.environ["RECRUITMENT_RUNTIME_MODE"] = "browser"
+                os.environ["SRW_BACKGROUND_WORKER"] = "0" if args.synthetic else "1"
+                app = create_v1_app(
+                    f"sqlite+pysqlite:///{db.as_posix()}",
+                    data_dir=data, knowledge_dir=knowledge, frontend_dist=frontend,
+                )
+                gateway = getattr(app.state, "business_gateway", None)
+                if gateway is not None:
+                    # Opt-in business session (#43 M3A). The code goes to this
+                    # trusted interactive console only: never into a URL, a query
+                    # string, HTTP/access logs or an acceptance report.
+                    try:
+                        announce_pairing_code(gateway, sys.stdout)
+                    except UntrustedConsole:
+                        # The check above already covers this, but the delivery
+                        # point refuses on its own so no future caller can print a
+                        # live credential into a pipe by forgetting the check.
+                        print("BLOCKED: the one-time pairing code cannot be delivered to a "
+                              "non-interactive stdout; nothing was issued.", file=sys.stderr)
+                        return EXIT_NO_TRUSTED_CONSOLE
+                config = uvicorn.Config(
+                    app, host="127.0.0.1", port=args.port,
+                    log_level="warning" if args.synthetic else "info", access_log=False,
+                )
+                server = uvicorn.Server(config)
+                server_ref = server
+                app.state.shutdown_callback = lambda: setattr(server, "should_exit", True)
+                print(f"SRW C11 Local Web SOURCE PREVIEW: http://127.0.0.1:{args.port}/v1", flush=True)
+                print("This is one real Core and one local Browser. NOT a dual-carrier GA/RC.", flush=True)
+                if not args.no_browser:
+                    threading.Thread(target=_open_when_ready, args=(args.port,), daemon=True).start()
+                server.run()
+    finally:
+        if previous_sigterm is not None:
+            signal.signal(signal.SIGTERM, previous_sigterm)
     return 0
 
 
