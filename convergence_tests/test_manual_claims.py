@@ -186,6 +186,48 @@ class ManualClaimHttpTests(unittest.TestCase):
         finally:
             engine.dispose()
 
+    def test_page_hint_covers_complete_quote_not_just_start(self):
+        # Synthetic two-page extraction with two adjacent blocks on page 1.
+        # The phrase "candidate shipped" crosses the page boundary.
+        split = SAMPLE.index("shipped") + 3
+        blocks = [
+            {"page": 1, "char_start": 0, "char_end": 15},
+            {"page": 1, "char_start": 15, "char_end": split},
+            {"page": 2, "char_start": split, "char_end": len(SAMPLE)},
+        ]
+        metadata = json.dumps({"extractor": {"grounding_blocks": blocks}})
+        with closing(sqlite3.connect(self.database)) as connection:
+            connection.execute(
+                "UPDATE source SET metadata_json=? WHERE id=?", (metadata, self.sid),
+            )
+            connection.commit()
+
+        # Valid page hints still work, including a quote spanning two blocks
+        # of the same page.
+        first = self.post(
+            normalized_text="Synthetic candidate",
+            locator={"quote": "Synthetic candidate", "page": 1},
+        )
+        self.assertEqual(first.status_code, 200, first.text)
+        second = self.post(
+            normalized_text="Payment service",
+            locator={"quote": "payment service", "page": 2},
+        )
+        self.assertEqual(second.status_code, 200, second.text)
+
+        crossing = self.post(
+            normalized_text="Cross-page phrase",
+            locator={"quote": "candidate shipped", "page": 1},
+        )
+        self.assertEqual(crossing.status_code, 409, crossing.text)
+        wrong_page = self.post(
+            normalized_text="Wrong page",
+            locator={"quote": "Synthetic", "page": 2},
+        )
+        self.assertEqual(wrong_page.status_code, 409, wrong_page.text)
+        self.assertEqual(len(self.rows("claim")), 2)
+        self.assertEqual(len(self.audit()), 2)
+
     def test_business_session_gate_rejects_anonymous_and_csrf_writes(self):
         temp = tempfile.TemporaryDirectory(prefix="srw-manual-session-")
         self.addCleanup(temp.cleanup)
