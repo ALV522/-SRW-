@@ -10,6 +10,7 @@ import os
 import sqlite3
 import tempfile
 import unittest
+from contextlib import closing
 from pathlib import Path
 from unittest.mock import patch
 
@@ -67,11 +68,11 @@ class ManualClaimHttpTests(unittest.TestCase):
         return self.client.post(self.url, json=self.payload(**overrides))
 
     def rows(self, table):
-        with sqlite3.connect(self.database) as connection:
+        with closing(sqlite3.connect(self.database)) as connection:
             return connection.execute(f"SELECT * FROM {table}").fetchall()
 
     def audit(self):
-        with sqlite3.connect(self.database) as connection:
+        with closing(sqlite3.connect(self.database)) as connection:
             return connection.execute(
                 "SELECT actor, payload_json FROM audit_event WHERE event_type='CLAIM_PROPOSED_MANUALLY'"
             ).fetchall()
@@ -148,8 +149,9 @@ class ManualClaimHttpTests(unittest.TestCase):
         finally:
             engine.dispose()
         self.assertEqual(self.post().status_code, 409)
-        with sqlite3.connect(self.database) as connection:
+        with closing(sqlite3.connect(self.database)) as connection:
             connection.execute("UPDATE candidate SET current_material_revision_id=NULL WHERE id=?", (self.cid,))
+            connection.commit()
         self.assertEqual(self.post().status_code, 409)
         self.assertEqual(len(self.rows("claim")), 0)
 
@@ -206,7 +208,7 @@ class ManualClaimHttpTests(unittest.TestCase):
             denied_csrf = client.post(self.url, json=self.payload(), headers={"origin": "http://testserver"})
             self.assertEqual(denied_csrf.status_code, 403, denied_csrf.text)
             self.assertTrue(client.cookies.get(CSRF_COOKIE_NAME))
-        with sqlite3.connect(data / "session.db") as connection:
+        with closing(sqlite3.connect(data / "session.db")) as connection:
             self.assertEqual(connection.execute("SELECT COUNT(*) FROM claim").fetchone()[0], 0)
 
 
