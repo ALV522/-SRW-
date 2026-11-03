@@ -1,6 +1,6 @@
 """Evidence and source routes (ADR-0002 R2, tenth slice).
 
-Eight routes over the evidence chain: text Source intake, synchronous evidence
+Nine routes over the evidence chain: text Source intake, synchronous evidence
 extraction, Source content/file/page/scoring projections, Claim grounding and
 Claim review.
 
@@ -31,14 +31,16 @@ from starlette.routing import Route
 
 from srw.api.serialization import jsonable as _json
 from srw.api.request_fields import (
+    body_object as _object,
     body_boolean as _bool,
     body_dict as _body,
     body_string as _string,
 )
 from srw.evidence.grounding import enrich_source_locator
+from srw.evidence.manual import create_manual_claim_proposal
 from srw.evidence.pipeline import extract_source_claims, persist_source_claims
 from srw.intake.service import CandidateIntakeService
-from srw.kernel.errors import V1InvariantError, V1NotFoundError
+from srw.kernel.errors import V1InvariantError, V1NotFoundError, V1RequestValidationError
 from srw.modules.ai_runs.service import fail_ai_run, finish_ai_run, start_ai_run
 from srw.modules.candidate.commands import confirm_claim
 from srw.modules.candidate.models import Candidate, Claim, Source
@@ -350,6 +352,34 @@ def evidence_routes(*, factory, registry, secrets, data_dir: Path) -> list[Route
                 raise V1InvariantError("claim grounding no longer matches its source")
             return JSONResponse({"claim_id": claim.id, "source_id": source.id, "locator": enriched})
 
+    async def propose_manual_claim(request: Request) -> Response:
+        """An operator proposal, never an automatic confirmation or decision."""
+        body = await _body(request)
+        source_id = _string(body, "source_id", required=True)
+        normalized_text = _string(body, "normalized_text", required=True)
+        locator = _object(body, "locator")
+        if set(locator) - {"quote", "char_start", "page"}:
+            raise V1RequestValidationError("locator supports only quote, char_start and page")
+        if not isinstance(locator.get("quote"), str) or not locator["quote"].strip():
+            raise V1RequestValidationError("locator.quote is required")
+        if "char_start" in locator and (type(locator["char_start"]) is not int or locator["char_start"] < 0):
+            raise V1RequestValidationError("locator.char_start must be a nonnegative integer")
+        if "page" in locator and (type(locator["page"]) is not int or locator["page"] < 1):
+            raise V1RequestValidationError("locator.page must be a positive integer")
+        if _string(body, "actor", default="human") != "human":
+            raise V1RequestValidationError("actor is fixed to human; request identity is not trusted")
+        with v1_session_scope(factory) as session:
+            result = create_manual_claim_proposal(
+                session, request.path_params["candidate_id"],
+                source_id, normalized_text, locator,
+            )
+            row = result.claim
+            return JSONResponse({
+                "claim_id": row.id, "candidate_id": row.candidate_id,
+                "source_id": row.source_id, "confirmation_state": row.confirmation_state,
+                "authority": row.authority, "duplicate": result.duplicate,
+            })
+
     async def review_claim(request: Request) -> Response:
         body = await _body(request)
         with v1_session_scope(factory) as session:
@@ -372,6 +402,7 @@ def evidence_routes(*, factory, registry, secrets, data_dir: Path) -> list[Route
         Route("/api/v1/sources/{source_id:str}/file", source_file, methods=["GET"]),
         Route("/api/v1/sources/{source_id:str}/page/{page_number:int}", source_page_render, methods=["GET"]),
         Route("/api/v1/sources/{source_id:str}/scoring-view", source_scoring_view, methods=["GET"]),
+        Route("/api/v1/candidates/{candidate_id:str}/claims/manual", propose_manual_claim, methods=["POST"]),
         Route("/api/v1/claims/{claim_id:str}/grounding", claim_grounding, methods=["GET"]),
         Route("/api/v1/claims/{claim_id:str}/review", review_claim, methods=["POST"]),
     ]
