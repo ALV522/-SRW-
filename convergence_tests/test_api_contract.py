@@ -12,10 +12,12 @@ even if it is not declared in `app.py`.
 from __future__ import annotations
 
 import gc
+import os
 import json
 import tempfile
 import unittest
 from pathlib import Path
+from unittest.mock import patch
 
 from starlette.testclient import TestClient
 
@@ -99,11 +101,37 @@ class ApiContractTests(unittest.TestCase):
                          "so route moves stay attributable to a domain")
 
     def test_frontend_literals_all_resolve_to_registered_routes(self):
-        calls = api_inventory.collect_frontend_calls(self.routes)
+        # The default-OFF route inventory is intentionally frozen separately:
+        # the Local Browser pairing endpoint is registered only in ON mode.
+        # Audit both real app configurations rather than suppressing the
+        # new frontend literal or falsely declaring the endpoint always live.
+        with tempfile.TemporaryDirectory(prefix="srw-api-contract-on-",
+                                         ignore_cleanup_errors=True) as temporary:
+            root = Path(temporary)
+            with patch.dict(os.environ, {"RECRUITMENT_SESSION_ENFORCE": "1"}):
+                on_app = create_v1_app(
+                    f"sqlite+pysqlite:///{(root / 'contract.db').as_posix()}",
+                    data_dir=root / "data",
+                    knowledge_dir=create_minimal_knowledge_tree(root / "knowledge" / "active"),
+                    frontend_dist=ROOT / "frontend" / "dist",
+                )
+            on_routes = api_inventory.collect_routes(on_app)
+            on_app = None
+            gc.collect()
+
+        off_keys = {(row["method"], row["path"]) for row in self.routes}
+        on_keys = {(row["method"], row["path"]) for row in on_routes}
+        self.assertEqual(on_keys - off_keys, {
+            ("POST", "/api/v1/runtime/business-attach"),
+            ("POST", "/api/v1/runtime/business-logout"),
+        }, "the ON-only pairing/logout routes must not be exposed in default OFF")
+        self.assertEqual(off_keys - on_keys, set(),
+                         "enabling sessions must not remove existing Core routes")
+        calls = api_inventory.collect_frontend_calls(self.routes + on_routes)
         unresolved = [call for call in calls if call["matched_path"] is None]
         self.assertEqual(
             unresolved, [],
-            "the browser calls a path no route serves; update the frontend or the route. "
+            "the browser calls a path neither OFF nor ON Core serves; "
             f"unresolved={[c['literal'] for c in unresolved][:10]}",
         )
 
