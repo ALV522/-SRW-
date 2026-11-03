@@ -564,6 +564,20 @@
       "human_actor": "implicit",
       "invariants": "only ocr/asr exist (404 otherwise, plain-text detail); policy is whitelisted (422)",
       "side_effects": "persists the policy and, when disabled, unloads the capability from the registry so it stops serving from memory"
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/candidates/{candidate_id:str}/claims/manual",
+      "domain": "evidence",
+      "owner": "srw.api.routes.evidence",
+      "use_case": "CreateGroundedManualClaimProposal",
+      "request": "source_id, normalized_text, locator{quote,char_start?,page?}; actor fixed to human role",
+      "response": "claim_id, candidate_id, source_id, confirmation_state=unreviewed, authority=human_proposal, duplicate",
+      "concurrency": "same-hash duplicate lookup within one SQLite transaction; sequential idempotence proven; concurrent race not claimed as CAS",
+      "audit": "CLAIM_PROPOSED_MANUALLY once on create; payload IDs, material revision and content hashes only, no candidate text",
+      "human_actor": "human role, not authenticated personal identity; existing local session/Origin/CSRF gate applies",
+      "invariants": "candidate active/unmerged, Source belongs to candidate and current published MaterialRevision; exact grounded quote and verifiable page; manual claim must be confirmed before judgment and remain current",
+      "side_effects": "new unreviewed Claim and one audit event; no Decision, Offer, AI Provider call or material revision"
     }
   ]
 }

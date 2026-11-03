@@ -22,6 +22,7 @@ from srw.api.app import create_v1_app
 ROOT = Path(__file__).resolve().parents[1]
 EVIDENCE_PATHS = {
     ("POST", "/api/v1/candidates/{candidate_id:str}/sources/text"),
+    ("POST", "/api/v1/candidates/{candidate_id:str}/claims/manual"),
     ("POST", "/api/v1/candidates/{candidate_id:str}/evidence/extract"),
     ("GET", "/api/v1/sources/{source_id:str}/content"),
     ("GET", "/api/v1/sources/{source_id:str}/file"),

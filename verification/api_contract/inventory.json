@@ -2,12 +2,12 @@
   "schema": "srw.api-inventory.v1",
   "generated_by": "scripts/api_inventory.py",
   "source": "live Starlette route table built from srw.api.app.create_v1_app",
-  "route_count": 146,
-  "mutation_count": 73,
+  "route_count": 147,
+  "mutation_count": 74,
   "domains": {
     "candidates": 27,
     "decisions": 15,
-    "evidence": 9,
+    "evidence": 10,
     "interviews": 5,
     "knowledge": 12,
     "offers": 3,
@@ -125,6 +125,19 @@
       "domain": "projects",
       "mutation": false,
       "signals": null
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/candidates/{candidate_id:str}/claims/manual",
+      "owner": "srw.api.routes.evidence",
+      "domain": "evidence",
+      "mutation": true,
+      "signals": {
+        "concurrency": false,
+        "audit": false,
+        "human_actor": true,
+        "basis": "endpoint-source-scan"
+      }
     },
     {
       "method": "GET",

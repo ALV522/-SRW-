@@ -1,6 +1,6 @@
 """Evidence and source routes (ADR-0002 R2, tenth slice).
 
-Eight routes over the evidence chain: text Source intake, synchronous evidence
+Nine routes over the evidence chain: text Source intake, synchronous evidence
 extraction, Source content/file/page/scoring projections, Claim grounding and
 Claim review.
 

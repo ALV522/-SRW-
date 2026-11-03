@@ -6,8 +6,8 @@
 
 ## 规模
 
-- 路由条目：**146**
-- 写操作（POST/PATCH/PUT/DELETE）：**73**
+- 路由条目：**147**
+- 写操作（POST/PATCH/PUT/DELETE）：**74**
 - 前端硬编码 `/api/v1` 字面量：**104**
 
 ## 按业务域
@@ -16,7 +16,7 @@
 |---|---|
 | candidates | 27 |
 | decisions | 15 |
-| evidence | 9 |
+| evidence | 10 |
 | interviews | 5 |
 | knowledge | 12 |
 | offers | 3 |
@@ -46,6 +46,7 @@
 | POST | `/api/v1/candidates/{candidate_id:str}/archive` | candidates | `srw.api.routes.candidates` | · | · | yes |
 | GET | `/api/v1/candidates/{candidate_id:str}/assessment` | decisions | `srw.api.routes.candidate_decision` | — | — | — |
 | GET | `/api/v1/candidates/{candidate_id:str}/brief` | projects | `srw.api.routes.reporting` | — | — | — |
+| POST | `/api/v1/candidates/{candidate_id:str}/claims/manual` | evidence | `srw.api.routes.evidence` | · | · | yes |
 | GET | `/api/v1/candidates/{candidate_id:str}/contact` | candidates | `srw.api.routes.candidates` | — | — | — |
 | PATCH | `/api/v1/candidates/{candidate_id:str}/contact` | candidates | `srw.api.routes.candidates` | · | · | yes |
 | POST | `/api/v1/candidates/{candidate_id:str}/decision` | decisions | `srw.api.routes.candidate_decision` | yes | · | yes |
