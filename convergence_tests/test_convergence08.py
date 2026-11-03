@@ -190,6 +190,12 @@ class Convergence08Test(unittest.TestCase):
             created = client.post('/api/v1/projects', json={'title':'可迁移项目','role_title':'工程师','brief_summary':'完整项目包'})
             self.assertEqual(created.status_code, 200, created.text)
             pid = created.json()['project_id']; draft_id = created.json()['draft_revision_id']
+            saved = client.patch(f'/api/v1/protocol-revisions/{draft_id}', json={'payload': {
+                'criteria': [{'criterion_key': 'experience', 'name': 'Experience'}],
+                'assessment_stages': [{'stage_key': 'resume', 'name': 'Resume',
+                                       'criteria': ['experience']}],
+            }})
+            self.assertEqual(saved.status_code, 200, saved.text)
             published = client.post(f'/api/v1/protocol-revisions/{draft_id}/publish')
             self.assertEqual(published.status_code, 200, published.text)
             candidate = client.post(f'/api/v1/projects/{pid}/candidates', json={'display_name':'迁移候选人'})

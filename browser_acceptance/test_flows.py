@@ -564,6 +564,7 @@ class RecruitmentBrowserAcceptance(unittest.TestCase):
         self.page.locator(".criterion-row .c-critical").check()
         self.page.locator(".criterion-row .c-verify").check()
         self.page.locator(".criterion-row .c-probe").fill("请说明项目与个人职责")
+        self.page.locator(".criterion-row .c-stage").first.check()
         key = self.page.locator(".criterion-row").get_attribute("data-criterion-key")
         self.save_criteria(pid)
         expect(self.page.get_by_role("button", name="发布当前标准")).to_be_visible()
@@ -571,7 +572,17 @@ class RecruitmentBrowserAcceptance(unittest.TestCase):
         criterion = (protocol.get("draft") or {})["criteria"][0]
         key = criterion["criterion_key"]
         self.page.once("dialog", lambda dialog: dialog.accept())
-        self.page.get_by_role("button", name="发布当前标准").click()
+        with self.page.expect_response(
+            lambda response: response.url.endswith("/publish")
+            and response.request.method == "POST"
+        ) as published:
+            self.page.get_by_role("button", name="发布当前标准").click()
+        self.assertEqual(published.value.status, 200, published.value.text())
+        self.wait_for_json(
+            f"/api/v1/projects/{pid}/protocol-workspace",
+            lambda w: w.get("current_revision_id") is not None,
+            label="persisted published criterion before candidate flow",
+        )
         expect(self.page.locator(".tabs").get_by_role("button", name="候选人收件")).to_be_visible()
         self.assertEqual(
             self.get_json(f"/api/v1/projects/{pid}/protocol-workspace")["current"]["criteria"][0]["criterion_key"],
@@ -700,6 +711,7 @@ class RecruitmentBrowserAcceptance(unittest.TestCase):
         first.locator(".c-critical").check()
         first.locator(".c-verify").check()
         first.locator(".c-probe").fill("请说明项目交付")
+        first.locator(".c-stage").first.check()
         self.save_criteria(pid)
         expect(self.page.get_by_role("button", name="发布当前标准")).to_be_visible()
         self.page.once("dialog", lambda dialog: dialog.accept())
@@ -763,6 +775,7 @@ class RecruitmentBrowserAcceptance(unittest.TestCase):
         second.locator(".c-critical").check()
         second.locator(".c-verify").check()
         second.locator(".c-probe").fill("新增人工核实要求")
+        second.locator(".c-stage").first.check()
         # Delay only the next real save dispatch, never fake its response.
         # The publish button already exists while this write is pending.
         self.page.evaluate("""() => {
@@ -1168,6 +1181,7 @@ class RecruitmentBrowserAcceptance(unittest.TestCase):
         self.page.locator(".tabs").get_by_role("button", name="建岗与标准").click()
         self.page.get_by_role("button", name="＋ 添加标准").click()
         self.page.locator(".criterion-row .c-name").fill("合成经验")
+        self.page.locator(".criterion-row .c-stage").first.check()
         self.save_criteria(pid)
         key = self.get_json(f"/api/v1/projects/{pid}/protocol-workspace")["draft"]["criteria"][0]["criterion_key"]
         self.page.once("dialog", lambda dialog: dialog.accept())
@@ -1231,11 +1245,39 @@ class RecruitmentBrowserAcceptance(unittest.TestCase):
         self.assertEqual(self.get_json(f"/api/v1/candidates/{cid}/decision-history"), decisions)
         self.assertFalse(self.console_errors, self.console_errors)
 
+    def test_15_empty_or_unassigned_criteria_cannot_publish(self) -> None:
+        """Real browser refuses invalid saved drafts; Core independently returns 409."""
+        pid = self.new_project("空标准发布阻断")
+        self.page.locator(".tabs").get_by_role("button", name="建岗与标准").click()
+        expect(self.page.get_by_role("button", name="发布当前标准")).to_be_visible()
+        attempted = []
+        self.page.on("request", lambda req: attempted.append(req.url)
+                     if req.method == "POST" and req.url.endswith("/publish") else None)
+        self.page.get_by_role("button", name="发布当前标准").click()
+        expect(self.page.locator("#toast-root .toast.error")).to_contain_text("至少一条")
+        self.assertEqual(attempted, [])
+        self.page.get_by_role("button", name="＋ 添加标准").click()
+        self.page.locator(".criterion-row .c-name").fill("未分配核实阶段的合成标准")
+        self.save_criteria(pid)
+        self.page.get_by_role("button", name="发布当前标准").click()
+        expect(self.page.locator("#toast-root .toast.error")).to_contain_text("已分配核实阶段")
+        self.assertEqual(attempted, [])
+        workspace = self.get_json(f"/api/v1/projects/{pid}/protocol-workspace")
+        self.assertIsNone(workspace["current_revision_id"])
+        self.assertTrue(workspace["draft_revision_id"])
+        rejected = self.context.request.post(
+            self.base + f"/api/v1/protocol-revisions/{workspace['draft_revision_id']}/publish")
+        self.assertEqual(rejected.status, 409, rejected.text())
+        self.assertIsNone(
+            self.get_json(f"/api/v1/projects/{pid}/protocol-workspace")["current_revision_id"])
+        self.assertFalse(self.console_errors, self.console_errors)
+
     def test_14_structured_reevaluation_created_and_applied_through_ui(self) -> None:
         pid = self.new_project("结构化复评")
         self.page.locator(".tabs").get_by_role("button", name="建岗与标准").click()
         self.page.get_by_role("button", name="＋ 添加标准").click()
         self.page.locator(".criterion-row .c-name").fill("合成研究能力")
+        self.page.locator(".criterion-row .c-stage").first.check()
         self.save_criteria(pid)
         self.page.once("dialog", lambda dialog: dialog.accept())
         self.page.get_by_role("button", name="发布当前标准").click()

@@ -43,7 +43,7 @@ class Convergence03Test(unittest.TestCase):
                 {"criterion_key": "exp", "name": "Experience", "weight": 3, "decision_critical": True},
                 {"criterion_key": "comm", "name": "Communication", "weight": 1},
             ],
-            "assessment_stages": [],
+            "assessment_stages": [{"stage_key": "resume", "name": "Resume", "criteria": ["exp", "comm"]}],
             "decision_policy": {"human_final": True},
         })
         repo.publish(draft.id)

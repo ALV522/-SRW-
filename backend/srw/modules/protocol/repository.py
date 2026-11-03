@@ -77,6 +77,24 @@ def validate_protocol_payload(payload: dict) -> None:
             raise V1InvariantError(f"assessment stage references unknown criteria: {unknown}")
 
 
+def validate_publishable_protocol_payload(payload: dict) -> None:
+    """Drafts may be incomplete; only a persisted, assessable revision can publish."""
+    validate_protocol_payload(payload)
+    criteria = payload.get("criteria") or []
+    if not criteria:
+        raise V1InvariantError("published protocol requires at least one criterion")
+    if any(not str(item.get("name") or "").strip() for item in criteria):
+        raise V1InvariantError("published protocol criterion name is required")
+    keys = {str(item["criterion_key"]) for item in criteria}
+    for stage in payload.get("assessment_stages") or []:
+        refs = stage.get("criteria") or []
+        if not isinstance(refs, list):
+            raise V1InvariantError("assessment stage criteria must be a list")
+        if str(stage.get("stage_key") or "").strip() and any(str(ref) in keys for ref in refs):
+            return
+    raise V1InvariantError("published protocol requires a criterion assigned to a named assessment stage")
+
+
 class ProtocolRepository:
     def __init__(self, session: Session) -> None:
         self.session = session
@@ -159,6 +177,9 @@ class ProtocolRepository:
         project = self.session.get(Project, row.project_id)
         if project is None:
             raise V1NotFoundError(f"project not found: {row.project_id}")
+        # Re-read the persisted draft at publish time, before changing any
+        # published pointer, supersession state, project status or audit.
+        validate_publishable_protocol_payload(get_protocol_payload(self.session, row.id))
 
         prior = self.session.scalars(
             select(ProtocolRevision).where(

@@ -24,7 +24,7 @@ class Convergence05Test(unittest.TestCase):
     def tearDown(self):self.engine.dispose();self.tmp.cleanup()
     def _project(self,s):
         p=Project(title='Recruiting Analyst',status='open');s.add(p);s.flush();repo=ProtocolRepository(s)
-        d=repo.create_draft(p.id,{'brief':{'title':'Recruiting Analyst','summary':''},'criteria':[{'criterion_key':'exp','name':'Experience','weight':1,'decision_critical':True,'verification_required':True}],'assessment_stages':[],'decision_policy':{'human_final':True}});repo.publish(d.id);return p
+        d=repo.create_draft(p.id,{'brief':{'title':'Recruiting Analyst','summary':''},'criteria':[{'criterion_key':'exp','name':'Experience','weight':1,'decision_critical':True,'verification_required':True}],'assessment_stages':[{'stage_key':'resume','name':'Resume','criteria':['exp']}],'decision_policy':{'human_final':True}});repo.publish(d.id);return p
     def _candidate(self,s,p,name='Candidate'):
         c=Candidate(project_id=p.id,display_name=name);s.add(c);s.flush();text='Two years recruiting experience';src=Source(candidate_id=c.id,source_kind='resume',content_hash=content_hash(text),media_type='text/plain',text_content=text,metadata_json='{}');s.add(src);s.flush();MaterialRepository(s).publish_revision(c.id,[src.id],{'test':True});return c
     def test_feedback_classification_and_human_apply_creates_new_material_revision(self):

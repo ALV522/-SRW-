@@ -48,6 +48,15 @@ class CandidateDecisionTests(unittest.TestCase):
         self.assertEqual(project.status_code, 200, project.text)
         payload = project.json()
         self.pid = payload["project_id"]
+        saved = self.client.patch(
+            f"/api/v1/protocol-revisions/{payload['draft_revision_id']}",
+            json={"payload": {
+                "criteria": [{"criterion_key": "experience", "name": "Backend experience",
+                              "decision_critical": False, "verification_required": False}],
+                "assessment_stages": [{"stage_key": "resume", "name": "Resume",
+                                       "criteria": ["experience"]}],
+            }})
+        self.assertEqual(saved.status_code, 200, saved.text)
         published = self.client.post(
             f"/api/v1/protocol-revisions/{payload['draft_revision_id']}/publish")
         self.assertEqual(published.status_code, 200, published.text)

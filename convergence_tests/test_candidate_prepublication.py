@@ -69,6 +69,13 @@ class PrepublicationCandidateWorkspaceTest(unittest.TestCase):
             self.assertTrue(w["sources"][0]["in_current_material"])
             self.assertIn("结构化产品分析经验", w["sources"][0]["text_preview"])
 
+            saved = client.patch(f"/api/v1/protocol-revisions/{draft}", json={
+                "payload": {
+                    "criteria": [{"criterion_key": "experience", "name": "Experience"}],
+                    "assessment_stages": [{"stage_key": "resume", "name": "Resume",
+                                           "criteria": ["experience"]}],
+                }})
+            self.assertEqual(saved.status_code, 200, saved.text)
             publish = client.post(f"/api/v1/protocol-revisions/{draft}/publish")
             self.assertEqual(publish.status_code, 200, publish.text)
             updated = client.get(f"/api/v1/candidates/{cid}/workspace")

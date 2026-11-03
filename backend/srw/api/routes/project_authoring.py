@@ -4,12 +4,11 @@ Six routes that create a project and drive its protocol from draft to published:
 list projects, create a project with an initial draft, fork a draft from the
 current revision, read the protocol workspace, edit a draft and publish it.
 
-Behaviour is identical to the code that lived in ``create_v1_app``. The invariant
-that matters is not in this module: publishing validates the payload in
-``ProtocolRepository`` before flipping state, so a route can never publish a
-structurally invalid protocol. What the routes must keep doing is passing the
-body through unchanged - ``_object`` rejects a non-object payload with 422 rather
-than letting the repository see a wrong type.
+The Domain owns publish eligibility: ``ProtocolRepository.publish`` re-reads
+the persisted draft and requires a named criterion linked to an assessment stage
+before any published revision or project pointer changes. The route remains a
+thin transport adapter. ``_object`` rejects a non-object PATCH payload with 422;
+a draft that cannot be published is rejected by the Domain with 409.
 
 Scope note: the protocol workspace read model stays here because it is the same
 authoring surface the editor reads from; separating it from the writes would make
