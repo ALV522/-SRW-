@@ -101,16 +101,22 @@ class BusinessSessionOnBrowserAcceptance(unittest.TestCase):
         with sqlite3.connect(self.database) as connection:
             return connection.execute("SELECT COUNT(*) FROM project").fetchone()[0]
 
+    def count_audits(self) -> int:
+        with sqlite3.connect(self.database) as connection:
+            return connection.execute("SELECT COUNT(*) FROM audit_event").fetchone()[0]
+
     def test_pairing_unlocks_real_ui_and_csrf_protects_writes(self) -> None:
         self.page.goto(self.base + "/v1", wait_until="domcontentloaded")
         expect(self.page.get_by_role("heading", name="本机配对")).to_be_visible()
         self.assertEqual(self.context.request.get(self.base + "/api/v1/projects").status, 401)
         self.assertEqual(self.count_projects(), 0)
+        self.assertEqual(self.count_audits(), 0)
 
         self.page.get_by_label("一次性配对码").fill("incorrect-synthetic-code")
         self.page.get_by_role("button", name="连接工作台").click()
         expect(self.page.get_by_role("alert")).to_contain_text("配对失败")
         self.assertEqual(self.count_projects(), 0)
+        self.assertEqual(self.count_audits(), 0)
 
         self.page.get_by_label("一次性配对码").fill(self.code)
         self.page.get_by_role("button", name="连接工作台").click()
@@ -129,6 +135,7 @@ class BusinessSessionOnBrowserAcceptance(unittest.TestCase):
         }""")
         self.assertEqual(denied, 403)
         self.assertEqual(self.count_projects(), 0)
+        self.assertEqual(self.count_audits(), 0)
 
         self.page.get_by_role("button", name="＋ 新建招聘项目").click()
         self.page.locator("#np-title").fill("synthetic paired recruitment")
