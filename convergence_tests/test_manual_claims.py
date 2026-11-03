@@ -105,7 +105,7 @@ class ManualClaimHttpTests(unittest.TestCase):
 
     def test_bad_inputs_fail_closed_without_claim_or_audit(self):
         cases = [
-            ({}, 422), ({"source_id": ""}, 422),
+            ({"locator": {}}, 422), ({"source_id": ""}, 422),
             ({"normalized_text": ""}, 422),
             ({"locator": {"quote": "invented experience"}}, 409),
             ({"locator": {"quote": "shipped a payment service", "char_start": 0}}, 409),
