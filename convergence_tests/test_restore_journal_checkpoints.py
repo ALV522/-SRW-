@@ -274,6 +274,37 @@ raise SystemExit(98)
         self.assertTrue(self.journal.exists(), "recovery fence must remain")
         self.assertEqual(snapshots[0].read_bytes(), undo_before)
 
+    def test_finalized_cleanup_corrupt_live_db_preserves_undo_and_journal(self):
+        # A present but corrupt DB must not be mistaken for a healthy restored
+        # workspace and cause the last journal-owned rollback bytes to vanish.
+        old_db, undo = self._enter_finalized_cleanup_pending()
+        undo_before = undo.read_bytes()
+        self.db.write_bytes(b"synthetic non-SQLite corruption")
+        corrupted = self.db.read_bytes()
+        with self.assertRaisesRegex(RuntimeError, "live database is unreadable"):
+            self._restart()
+        self.assertEqual(self.db.read_bytes(), corrupted)
+        self.assertEqual(undo.read_bytes(), undo_before)
+        self.assertTrue(old_db.exists())
+        self.assertTrue(self.journal.exists())
+        self.assertFalse(self.marker.exists())
+
+    def test_finalized_cleanup_unrelated_empty_sqlite_db_preserves_undo(self):
+        # A replaced valid SQLite file can pass a filesystem existence check,
+        # but it cannot silently acquire SRW schema authority.
+        old_db, undo = self._enter_finalized_cleanup_pending()
+        undo_before = undo.read_bytes()
+        self.db.unlink()
+        with closing(sqlite3.connect(self.db)) as conn:
+            conn.execute("CREATE TABLE unrelated (value TEXT)")
+            conn.commit()
+        with self.assertRaisesRegex(RuntimeError, "lacks SRW schema identity"):
+            self._restart()
+        self.assertEqual(undo.read_bytes(), undo_before)
+        self.assertTrue(old_db.exists())
+        self.assertTrue(self.journal.exists())
+        self.assertFalse(self.marker.exists())
+
     def _enter_finalized_cleanup_pending(self):
         """Reach FINALIZED_CLEANUP_PENDING from setUp state, returning (residue, undo).
 
