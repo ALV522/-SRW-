@@ -186,6 +186,33 @@ class ManualClaimHttpTests(unittest.TestCase):
         finally:
             engine.dispose()
 
+    def test_overlapping_source_quote_requires_explicit_character_offset(self):
+        # A substring may recur at overlapping offsets: "aaa" occurs three
+        # times in "aaaaa". Without an explicit position it is NOT unique.
+        source = self.client.post(
+            f"/api/v1/candidates/{self.cid}/sources/text",
+            json={"text_content": "Synthetic aaaaa overlap", "publish_material": True},
+        )
+        self.assertEqual(source.status_code, 200, source.text)
+        source_id = source.json()["source_id"]
+        ambiguous = self.post(
+            source_id=source_id, normalized_text="Overlapping evidence",
+            locator={"quote": "aaa"},
+        )
+        self.assertEqual(ambiguous.status_code, 409, ambiguous.text)
+        self.assertEqual(len(self.rows("claim")), 0)
+        self.assertEqual(len(self.audit()), 0)
+
+        # An exact offset disambiguates the same real Source substring.
+        explicit = self.post(
+            source_id=source_id, normalized_text="Overlapping evidence",
+            locator={"quote": "aaa", "char_start": len("Synthetic ") + 1},
+        )
+        self.assertEqual(explicit.status_code, 200, explicit.text)
+        self.assertFalse(explicit.json()["duplicate"])
+        self.assertEqual(len(self.rows("claim")), 1)
+        self.assertEqual(len(self.audit()), 1)
+
     def test_page_hint_covers_complete_quote_not_just_start(self):
         # Synthetic two-page extraction with two adjacent blocks on page 1.
         # The phrase "candidate shipped" crosses the page boundary.
