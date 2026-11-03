@@ -111,10 +111,12 @@ class MissingRestoreInputGateTest(unittest.TestCase):
         original = b"synthetic WAL from a lost main SQLite file"
         sidecar.write_bytes(original)
         env = {"RECRUITMENT_DATA_DIR": str(self.data)}
-        with mock.patch.dict(os.environ, env, clear=False), \\
-                mock.patch.object(sys, "argv", ["run_local.py", "--port", "8123"]), \\
-                mock.patch("srw.api.app.create_v1_app",
-                           side_effect=AssertionError("Core must not start")):
+        with (
+            mock.patch.dict(os.environ, env, clear=False),
+            mock.patch.object(sys, "argv", ["run_local.py", "--port", "8123"]),
+            mock.patch("srw.api.app.create_v1_app",
+                       side_effect=AssertionError("Core must not start")),
+        ):
             with self.assertRaisesRegex(RuntimeError, "orphaned SQLite sidecar"):
                 run_local.main()
         self.assertFalse(self.db.exists())
