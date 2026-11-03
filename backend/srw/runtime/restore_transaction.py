@@ -14,6 +14,7 @@ import shutil
 import sqlite3
 import tempfile
 import warnings
+from contextlib import closing
 from pathlib import Path
 
 from srw.runtime.backup_truth import extract_validated_backup, validate_backup_archive
@@ -159,6 +160,40 @@ def _check_committed(data: Path, db: Path, state: dict) -> None:
     current = _blob_inventory(data / "blobs")
     if current != state["target_blobs"]:
         raise RuntimeError("committed restore Blobs differ from pinned transaction")
+
+
+def _check_live_db_health(db: Path) -> None:
+    """Do not discard the restore fence for a corrupt/replaced live SQLite DB.
+
+    The terminal cleanup phase can outlive legitimate Core writes, so the
+    original target byte digest is no longer authoritative. A read-only
+    integrity and SRW schema-identity check still rejects an unreadable or
+    newly substituted empty database before deleting the rollback residue.
+    """
+    try:
+        with closing(sqlite3.connect(db.resolve().as_uri() + "?mode=ro",
+                                     uri=True, timeout=4)) as connection:
+            if connection.execute("PRAGMA quick_check").fetchall() != [("ok",)]:
+                raise RuntimeError(
+                    "restored live database failed SQLite integrity check during pending cleanup"
+                )
+            if connection.execute(
+                "SELECT 1 FROM sqlite_master WHERE type='table' AND name='v1_schema_meta'"
+            ).fetchone() is None:
+                raise RuntimeError(
+                    "restored live database lacks SRW schema identity during pending cleanup"
+                )
+            row = connection.execute(
+                "SELECT schema_revision FROM v1_schema_meta LIMIT 1"
+            ).fetchone()
+            if not row or not isinstance(row[0], str) or not row[0].startswith("v1_"):
+                raise RuntimeError(
+                    "restored live database lacks SRW schema identity during pending cleanup"
+                )
+    except sqlite3.Error as exc:
+        raise RuntimeError(
+            "restored live database is unreadable during pending cleanup; preserve journal and undo"
+        ) from exc
 
 
 def _finish_cleanup(data: Path, journal: Path) -> None:
@@ -322,6 +357,7 @@ def apply_restore(data: Path, db: Path, max_schema: str, pre_restore_backup,
             _safe_path(db)
             if not db.is_file():
                 raise RuntimeError("restored live database is missing during pending cleanup; preserve journal and undo")
+            _check_live_db_health(db)
             # Cleanup may be retried after real Core writes, so the target Blob
             # digest cannot be rechecked. But losing the entire Blob root is
             # never an ordinary mutation when the restored archive had Blobs.
