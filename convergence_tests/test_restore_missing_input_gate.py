@@ -78,6 +78,51 @@ class MissingRestoreInputGateTest(unittest.TestCase):
                          "Core must not start after a failed pending restore")
         self.assertEqual(self.marker.read_bytes(), raw)
 
+    def test_orphaned_sqlite_sidecars_block_empty_workspace_and_restore(self):
+        # A lost main DB is not permission to discard a surviving SQLite WAL.
+        # This must fail before a new Core database or restore journal exists.
+        for suffix in ("-wal", "-shm"):
+            for scheduled in (False, True):
+                with self.subTest(suffix=suffix, scheduled=scheduled):
+                    sidecar = Path(str(self.db) + suffix)
+                    original = b"synthetic unclaimed SQLite sidecar"
+                    sidecar.write_bytes(original)
+                    marker_bytes = (self._schedule("missing-archive.zip")
+                                    if scheduled else None)
+                    try:
+                        with self.assertRaisesRegex(RuntimeError, "orphaned SQLite sidecar"):
+                            apply_restore(self.data, self.db, SCHEMA,
+                                          lambda: None, _forbidden_schema)
+                        self.assertFalse(self.db.exists())
+                        self.assertEqual(sidecar.read_bytes(), original)
+                        self.assertFalse((self.data / ".srw-restore-journal.json").exists())
+                        if scheduled:
+                            self.assertEqual(self.marker.read_bytes(), marker_bytes)
+                        else:
+                            self.assertFalse(self.marker.exists())
+                    finally:
+                        sidecar.unlink(missing_ok=True)
+                        self.marker.unlink(missing_ok=True)
+
+    def test_real_launcher_refuses_orphaned_wal_before_core_creation(self):
+        # This exercises the actual launcher call order and workspace locks,
+        # not only the restore helper in isolation.
+        sidecar = Path(str(self.db) + "-wal")
+        original = b"synthetic WAL from a lost main SQLite file"
+        sidecar.write_bytes(original)
+        env = {"RECRUITMENT_DATA_DIR": str(self.data)}
+        with (
+            mock.patch.dict(os.environ, env, clear=False),
+            mock.patch.object(sys, "argv", ["run_local.py", "--port", "8123"]),
+            mock.patch("srw.api.app.create_v1_app",
+                       side_effect=AssertionError("Core must not start")),
+        ):
+            with self.assertRaisesRegex(RuntimeError, "orphaned SQLite sidecar"):
+                run_local.main()
+        self.assertFalse(self.db.exists())
+        self.assertEqual(sidecar.read_bytes(), original)
+        self.assertFalse((self.data / ".srw-restore-journal.json").exists())
+
     def test_workspace_without_restore_still_starts(self):
         env = {"RECRUITMENT_DATA_DIR": str(self.data)}
         with mock.patch.dict(os.environ, env, clear=False), \
