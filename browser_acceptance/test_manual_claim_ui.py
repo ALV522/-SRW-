@@ -127,7 +127,7 @@ class ManualClaimBrowserAcceptance(unittest.TestCase):
         expect(self.page.locator(".claim.unreviewed")).to_have_count(1)
         self.assertEqual(self.count("claim"), 1)
         with sqlite3.connect(Path(self.temp.name) / "data" / "srw_v1.db") as connection:
-            row = connection.execute("SELECT id, locator_json FROM claim ORDER BY rowid DESC LIMIT 1").fetchone()
+            row = connection.execute("SELECT id, source_locator_json FROM claim ORDER BY rowid DESC LIMIT 1").fetchone()
             audit_count = connection.execute(
                 "SELECT COUNT(*) FROM audit_event WHERE event_type='CLAIM_PROPOSED_MANUALLY'"
             ).fetchone()[0]
@@ -142,7 +142,10 @@ class ManualClaimBrowserAcceptance(unittest.TestCase):
         self.page.get_by_role("button", name="引用选中文本").click()
         expect(self.page.locator("#srw-manual-submit")).to_be_disabled()
         self.assertEqual(self.count("claim"), 0)
-        self.assertEqual(self.count("audit_event") >= 0, True)
+        with sqlite3.connect(Path(self.temp.name) / "data" / "srw_v1.db") as connection:
+            self.assertEqual(connection.execute(
+                "SELECT COUNT(*) FROM audit_event WHERE event_type='CLAIM_PROPOSED_MANUALLY'"
+            ).fetchone()[0], 0)
 
 
 if __name__ == "__main__":

@@ -3,7 +3,7 @@
  * No Provider request, persistent client cache or second database is introduced.
  */
 const srwManualEscape = value => String(value ?? '').replace(/[&<>"']/g, c =>
-  ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;','"':'&#39;'}[c]));
+  ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 let srwManualDraft = null;
 
 function srwManualToast(message, error = false) {
