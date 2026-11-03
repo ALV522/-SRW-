@@ -104,6 +104,23 @@ class MissingRestoreInputGateTest(unittest.TestCase):
                         sidecar.unlink(missing_ok=True)
                         self.marker.unlink(missing_ok=True)
 
+    def test_real_launcher_refuses_orphaned_wal_before_core_creation(self):
+        # This exercises the actual launcher call order and workspace locks,
+        # not only the restore helper in isolation.
+        sidecar = Path(str(self.db) + "-wal")
+        original = b"synthetic WAL from a lost main SQLite file"
+        sidecar.write_bytes(original)
+        env = {"RECRUITMENT_DATA_DIR": str(self.data)}
+        with mock.patch.dict(os.environ, env, clear=False), \\
+                mock.patch.object(sys, "argv", ["run_local.py", "--port", "8123"]), \\
+                mock.patch("srw.api.app.create_v1_app",
+                           side_effect=AssertionError("Core must not start")):
+            with self.assertRaisesRegex(RuntimeError, "orphaned SQLite sidecar"):
+                run_local.main()
+        self.assertFalse(self.db.exists())
+        self.assertEqual(sidecar.read_bytes(), original)
+        self.assertFalse((self.data / ".srw-restore-journal.json").exists())
+
     def test_workspace_without_restore_still_starts(self):
         env = {"RECRUITMENT_DATA_DIR": str(self.data)}
         with mock.patch.dict(os.environ, env, clear=False), \
