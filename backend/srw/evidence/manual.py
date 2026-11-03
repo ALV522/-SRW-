@@ -83,13 +83,26 @@ def create_manual_claim_proposal(
         blocks = extractor.get("grounding_blocks", []) if isinstance(extractor, dict) else []
         if not isinstance(blocks, list):
             blocks = []
-        start = grounded["char_start"]
-        if not any(
-            isinstance(block, dict) and block.get("page") == supplied["page"]
-            and type(block.get("char_start")) is int and type(block.get("char_end")) is int
-            and block["char_start"] <= start < block["char_end"]
+        # A page hint must cover the complete quote, not just its first
+        # character. Grounding blocks may split one page into several adjacent
+        # ranges; merge those ranges without crossing an uncovered gap or page.
+        start, end = grounded["char_start"], grounded["char_end"]
+        page_ranges = sorted(
+            (block["char_start"], block["char_end"])
             for block in blocks
-        ):
+            if isinstance(block, dict)
+            and type(block.get("page")) is int and block["page"] == supplied["page"]
+            and type(block.get("char_start")) is int and type(block.get("char_end")) is int
+            and block["char_start"] < block["char_end"]
+        )
+        covered_to = start
+        for block_start, block_end in page_ranges:
+            if block_start > covered_to:
+                break
+            covered_to = max(covered_to, block_end)
+            if covered_to >= end:
+                break
+        if covered_to < end or grounded.get("page") != supplied["page"]:
             raise V1InvariantError("locator page cannot be verified against source extraction")
 
     authority = "human_proposal"
