@@ -298,6 +298,25 @@ raise SystemExit(98)
         self.assertEqual(len(snapshots), 1, "cleanup-pending state must own exactly one undo")
         return old_db, snapshots[0]
 
+    def test_finalized_cleanup_missing_live_blob_root_refuses_core_boot(self):
+        # After a committed restore, an AV quarantine or disk loss may remove
+        # the whole Blob directory while a retained old DB keeps the terminal
+        # cleanup fence active. Never discard that fence and start the Core.
+        old_db, undo = self._enter_finalized_cleanup_pending()
+        db_before, undo_before = self.db.read_bytes(), undo.read_bytes()
+        restored_blob = self.data / "blobs" / "new" / "replacement"
+        restored_blob.unlink()
+        restored_blob.parent.rmdir()
+        restored_blob.parent.parent.rmdir()
+        self.assertFalse((self.data / "blobs").exists())
+        with self.assertRaisesRegex(RuntimeError, "live Blob directory is missing"):
+            self._restart()
+        self.assertEqual(self.db.read_bytes(), db_before)
+        self.assertEqual(undo.read_bytes(), undo_before)
+        self.assertTrue(old_db.exists(), "rollback residue must survive refusal")
+        self.assertTrue(self.journal.exists(), "recovery fence must survive refusal")
+        self.assertFalse(self.marker.exists(), "committed restore must not be replayed")
+
     def test_finalized_cleanup_changed_undo_fails_closed(self):
         # No symlink is created here: this half must hold on every platform.
         old_db, undo = self._enter_finalized_cleanup_pending()
