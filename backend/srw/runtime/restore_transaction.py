@@ -322,6 +322,15 @@ def apply_restore(data: Path, db: Path, max_schema: str, pre_restore_backup,
             _safe_path(db)
             if not db.is_file():
                 raise RuntimeError("restored live database is missing during pending cleanup; preserve journal and undo")
+            # Cleanup may be retried after real Core writes, so the target Blob
+            # digest cannot be rechecked. But losing the entire Blob root is
+            # never an ordinary mutation when the restored archive had Blobs.
+            live_blobs = data / "blobs"
+            _safe_path(live_blobs)
+            if state["target_blobs"] and not live_blobs.is_dir():
+                raise RuntimeError(
+                    "restored live Blob directory is missing during pending cleanup; preserve journal and undo"
+                )
             _finish_cleanup(data, journal)
             return None
         if not marker.exists() or _read_marker(marker) != {
