@@ -203,6 +203,24 @@ class ManualClaimHttpTests(unittest.TestCase):
         self.assertEqual(len(self.rows("claim")), 0)
         self.assertEqual(len(self.audit()), 0)
 
+        # A page hint cannot disambiguate three overlapping hits on that
+        # same page. All extractor spans are synthetic and source-local.
+        with closing(sqlite3.connect(self.database)) as connection:
+            connection.execute(
+                "UPDATE source SET metadata_json=? WHERE id=?",
+                (json.dumps({"extractor": {"grounding_blocks": [
+                    {"page": 1, "char_start": 0,
+                     "char_end": len("Synthetic aaaaa overlap")},
+                ]}}), source_id),
+            )
+            connection.commit()
+        same_page = self.post(
+            source_id=source_id, normalized_text="Overlapping evidence",
+            locator={"quote": "aaa", "page": 1},
+        )
+        self.assertEqual(same_page.status_code, 409, same_page.text)
+        self.assertEqual(len(self.rows("claim")), 0)
+
         # An exact offset disambiguates the same real Source substring.
         explicit = self.post(
             source_id=source_id, normalized_text="Overlapping evidence",
