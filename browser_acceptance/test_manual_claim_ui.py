@@ -89,6 +89,7 @@ class ManualClaimBrowserAcceptance(unittest.TestCase):
                              {"text_content": TEXT, "publish_material": True})["source_id"]
         self.page.goto(self.base + "/v1", wait_until="domcontentloaded")
         self.page.wait_for_function("Boolean(window.openProject && window.openCandidate && window.srwManualClaimOpen)")
+        self.page.wait_for_function("document.querySelector('#top-title')?.textContent === '工作台总览'")
         self.page.evaluate("""async ([pid,cid]) => {
             await window.openProject(pid);
             await window.openCandidate(cid);
@@ -136,6 +137,26 @@ class ManualClaimBrowserAcceptance(unittest.TestCase):
         self.page.locator(".claim.unreviewed").get_by_role("button", name="确认事实").click()
         expect(self.page.locator(".claim.confirmed")).to_have_count(1)
         self.assertEqual(self.count("claim"), 1)
+
+    def test_material_revision_invalidated_before_submit_fails_closed(self):
+        self.page.get_by_role("button", name="人工提出 Claim").click()
+        self.select_quote("candidate shipped a service")
+        self.page.locator("#srw-manual-normalized").fill("Shipped a service")
+        # Simulate a material revision becoming unavailable after the modal
+        # was opened. No client-side cache may authorize a new Claim.
+        with sqlite3.connect(Path(self.temp.name) / "data" / "srw_v1.db") as connection:
+            connection.execute(
+                "UPDATE candidate SET current_material_revision_id=NULL WHERE id=?",
+                (self.cid,),
+            )
+            connection.commit()
+        self.page.get_by_role("button", name="提交待核实 Claim").click()
+        expect(self.page.get_by_text("提交未完成", exact=False)).to_be_visible()
+        self.assertEqual(self.count("claim"), 0)
+        with sqlite3.connect(Path(self.temp.name) / "data" / "srw_v1.db") as connection:
+            self.assertEqual(connection.execute(
+                "SELECT COUNT(*) FROM audit_event WHERE event_type='CLAIM_PROPOSED_MANUALLY'"
+            ).fetchone()[0], 0)
 
     def test_no_quote_selection_cannot_write(self):
         self.page.get_by_role("button", name="人工提出 Claim").click()
