@@ -32,7 +32,7 @@ def enrich_source_locator(source: Source, locator: dict) -> dict | None:
             if found < 0:
                 break
             occurrences.append(found)
-            cursor = found + max(1, len(quote))
+            cursor = found + 1  # include overlapping occurrences; otherwise ambiguous quotes look unique
         if not occurrences:
             return None
         if len(occurrences) == 1:
