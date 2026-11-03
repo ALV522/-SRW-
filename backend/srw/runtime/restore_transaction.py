@@ -177,6 +177,12 @@ def _check_live_db_health(db: Path) -> None:
                 raise RuntimeError(
                     "restored live database failed SQLite integrity check during pending cleanup"
                 )
+            if connection.execute(
+                "SELECT 1 FROM sqlite_master WHERE type='table' AND name='v1_schema_meta'"
+            ).fetchone() is None:
+                raise RuntimeError(
+                    "restored live database lacks SRW schema identity during pending cleanup"
+                )
             row = connection.execute(
                 "SELECT schema_revision FROM v1_schema_meta LIMIT 1"
             ).fetchone()
