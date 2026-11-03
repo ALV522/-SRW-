@@ -10,6 +10,7 @@ from __future__ import annotations
 import os
 import re
 import select
+import signal
 import socket
 import sqlite3
 import subprocess
@@ -134,7 +135,7 @@ class LocalWebTtySessionOnAcceptance(unittest.TestCase):
                         browser.close()
             finally:
                 if proc.poll() is None:
-                    proc.terminate()
+                    proc.send_signal(signal.SIGINT)
                 try:
                     proc.wait(timeout=15)
                 except subprocess.TimeoutExpired:
