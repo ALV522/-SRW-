@@ -336,7 +336,7 @@ window.openScorecards=async(cid,eid)=>{
     let ev=null;
     try{ev=await eventContext(cid,eid)}
     catch(e){blockedNotice('独立 Interview Scorecard',e.message||'无法读取该面试记录','未读取该面试的任何反馈，也未写入数据。');return}
-    const r=await api(`/api/v1/events/${eid}/scorecards`);
+    const r=await api(`/api/v1/projects/${state.projectId}/candidates/${cid}/events/${eid}/scorecards`);
     const existing=scorecardHistoryHtml(r.scorecards,ev);
     /* Ownership is enough to READ history; only a new write needs the pinned
        revision. A changed Published revision makes the record read-only, not

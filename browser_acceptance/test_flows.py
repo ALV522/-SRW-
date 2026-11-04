@@ -480,6 +480,23 @@ class RecruitmentBrowserAcceptance(unittest.TestCase):
             self.page.get_by_role("button", name="提交并锁定").click()
             expect(self.page.locator("#modal-root .modal")).to_have_count(0)
 
+        # The real Browser client must use the candidate-scoped Core GET.
+        # A green Core-only test cannot prove the production UI migrated.
+        with self.page.expect_response(
+            lambda response: response.request.method == "GET"
+            and response.url.endswith("/scorecards")
+        ) as scoped_read:
+            self.page.get_by_role("button", name="独立 Scorecard").click()
+        response = scoped_read.value
+        self.assertEqual(
+            response.url,
+            self.base + f"/api/v1/projects/{pid}/candidates/{cid}/events/{eid}/scorecards",
+        )
+        self.assertEqual(response.status, 200, response.text())
+        expect(self.page.locator("#modal-root")).to_contain_text("模拟面试官甲")
+        expect(self.page.locator("#modal-root")).to_contain_text("模拟面试官乙")
+        self.page.evaluate("window.closeModal()")
+
         saved = self.get_json(f"/api/v1/events/{eid}/scorecards")
         self.assertEqual(len(saved["scorecards"]), 2, saved)
         self.assertEqual({x["state"] for x in saved["scorecards"]}, {"submitted"})
