@@ -264,7 +264,17 @@ def interview_routes(*, factory) -> list[Route]:
             candidate = session.get(Candidate, row.candidate_id)
             metadata = json.loads(row.metadata_json or "{}")
             pinned = str(metadata.get("protocol_revision_id") or "").strip()
-            if pinned:
+            # Administrative cancellation/no-show of a still-scheduled
+            # historical event is NOT a structured assessment write. Keep the
+            # legitimate recruiter action after protocol R1 -> R2, but only
+            # permit a tightly bounded state/notes change with no metadata,
+            # outcome, schedule, Source, or criteria replacement.
+            safe_cancel = (
+                row.event_state == "scheduled"
+                and body.get("event_state") in {"cancelled", "no_show"}
+                and set(body).issubset({"event_state", "notes", "actor"})
+            )
+            if pinned and not safe_cancel:
                 # The event's own revision, not the browser's latest key list,
                 # is authoritative for subsequent structured writes.
                 require_pinned_event_revision(session, row.candidate_id, pinned)
