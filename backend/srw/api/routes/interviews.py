@@ -30,7 +30,7 @@ from srw.modules.candidate.models import Candidate, Source
 from srw.modules.fullworkbench import RecruitmentEvent
 from srw.modules.protocol.models import Project
 from srw.modules.protocol.repository import ProtocolRepository
-from srw.recruiting.workbench import scorecards_view, submit_scorecard
+from srw.recruiting.workbench import scorecards_view, submit_scorecard, require_pinned_event_revision
 from srw.runtime.db.session import v1_session_scope
 
 EVENT_STATES = {"scheduled", "completed", "cancelled", "no_show"}
@@ -53,6 +53,11 @@ def event_metadata(session, candidate_id: str, event_type: str, value: Any) -> d
     if not isinstance(value, dict):
         raise V1InvariantError("metadata must be an object")
     metadata = dict(value)
+    if "protocol_revision_id" in metadata:
+        pinned = metadata["protocol_revision_id"]
+        if not isinstance(pinned, str) or not pinned.strip():
+            raise V1InvariantError("protocol_revision_id must be a non-empty published revision")
+        require_pinned_event_revision(session, candidate_id, pinned)
     candidate = session.get(Candidate, candidate_id)
     if candidate is None:
         raise V1NotFoundError(f"candidate not found: {candidate_id}")
@@ -221,8 +226,16 @@ def interview_routes(*, factory) -> list[Route]:
                 raise V1NotFoundError(f"event not found: {eid}")
             candidate = session.get(Candidate, row.candidate_id)
             metadata = json.loads(row.metadata_json or "{}")
+            pinned = str(metadata.get("protocol_revision_id") or "").strip()
+            if pinned:
+                # The event's own revision, not the browser's latest key list,
+                # is authoritative for subsequent structured writes.
+                require_pinned_event_revision(session, row.candidate_id, pinned)
             if "metadata" in body:
-                metadata = event_metadata(session, row.candidate_id, row.event_type, body.get("metadata"))
+                updated = event_metadata(session, row.candidate_id, row.event_type, body.get("metadata"))
+                if pinned and updated.get("protocol_revision_id") != pinned:
+                    raise V1InvariantError("event protocol revision cannot be removed or replaced")
+                metadata = updated
                 row.metadata_json = json.dumps(metadata, ensure_ascii=False, separators=(",", ":"))
             if "event_state" in body:
                 state = s_field(body, "event_state", required=True)

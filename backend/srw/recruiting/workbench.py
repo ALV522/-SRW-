@@ -13,7 +13,7 @@ from srw.modules.decision.context import get_current_decision_context
 from srw.modules.decision.models import CriterionJudgment
 from srw.modules.fullworkbench import RecruitmentEvent
 from srw.modules.protocol.models import Project, ProtocolRevision
-from srw.modules.protocol.repository import ProtocolRepository
+from srw.modules.protocol.repository import ProtocolRepository, get_current_protocol_identity
 from srw.modules.recruiting.operations_models import CandidateActionPlan, InterviewScorecardSubmission
 
 PRIORITIES={"today","high","normal","low"}
@@ -145,6 +145,21 @@ def validate_scorecard_feedback(value) -> list[dict]:
     return out
 
 
+def require_pinned_event_revision(session: Session, candidate_id: str, pinned: str) -> None:
+    """Reject stale structured writes without changing legacy unpinned records.
+
+    This check is a Core invariant for events that explicitly carry a protocol
+    identity. Older events without a pin retain their historical API contract;
+    the new browser deliberately refuses to structure-score those records.
+    """
+    candidate = session.get(Candidate, candidate_id)
+    if candidate is None:
+        raise V1NotFoundError(f"candidate not found: {candidate_id}")
+    current = get_current_protocol_identity(session, candidate.project_id)
+    if pinned != current.protocol_revision_id:
+        raise V1InvariantError("event protocol revision changed; reopen under current published criteria")
+
+
 def submit_scorecard(session: Session, event_id: str, body: dict) -> InterviewScorecardSubmission:
     event=session.get(RecruitmentEvent,event_id)
     if event is None: raise V1NotFoundError(f"event not found: {event_id}")
@@ -152,6 +167,13 @@ def submit_scorecard(session: Session, event_id: str, body: dict) -> InterviewSc
     evaluator=str(body.get("evaluator") or "").strip()
     if not evaluator: raise V1InvariantError("evaluator is required")
     feedback=validate_scorecard_feedback(body.get("feedback"))
+    event_metadata = json.loads(event.metadata_json or "{}")
+    pinned = str(event_metadata.get("protocol_revision_id") or "").strip()
+    if pinned:
+        require_pinned_event_revision(session, event.candidate_id, pinned)
+        event_keys = {str(q.get("criterion_key") or "") for q in (event_metadata.get("questions") or []) if isinstance(q, dict)}
+        if not event_keys or any(item["criterion_key"] not in event_keys for item in feedback):
+            raise V1InvariantError("scorecard criterion must belong to the pinned interview questions")
     row=session.scalar(select(InterviewScorecardSubmission).where(InterviewScorecardSubmission.event_id==event_id,InterviewScorecardSubmission.evaluator==evaluator))
     if row is None:
         row=InterviewScorecardSubmission(event_id=event_id,project_id=candidate.project_id,candidate_id=candidate.id,evaluator=evaluator);session.add(row)
