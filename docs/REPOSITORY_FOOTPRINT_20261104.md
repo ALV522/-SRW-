@@ -29,3 +29,15 @@
 ## 验收与证据边界
 
 本清点是 **GitHub 树元数据的静态观察**；未下载生产 Runtime/Knowledge，未运行独立 Native 构建、压缩大小比较或 WPF 人机验收。任何未来“瘦身 XX MB”须指向精确 base/new 两个 ZIP SHA-256、原始 ZIP 路径体积分布、业务操作正反例、WPF/Browser 实机分级和许可证判断。不得把源代码变少、README 变短、CI 通过解释为用户软件安装体积下降。
+
+## 2026-11-04 后续快照：从 Git tree 到真正 Native ZIP 的可测量路径
+
+在 `main=8e7f9b6502b0bdf8e4c9f36109af6988e05d18d6` 的 GitHub `git/trees/main?recursive=1`（`truncated=false`）读取 **439 个 blob，2,993,287 字节**；根 Source Manifest 为 **438 条**。与本文原始 70756e2 的 437 blob/2,916,869 B 属于不同 SHA 的源代码树，而非 Native 安装体积。
+
+新增 `scripts/report_native_zip_footprint.py`，**仅本地只读**统计 ZIP central directory 中每个文件的 `file_size` 与 `compress_size`，对 `runtime/`、`knowledge/active/`、`windows-host/`、`source`、`governance`、`other` 分组，给出整包 SHA256 和 after-before 压缩字节差；不读取、展开、执行或上传成员内容，不显示文件路径。使用示例：
+
+```powershell
+py -3.12 scripts/report_native_zip_footprint.py --zip 'D:\\SRW\\old-UNVERIFIED_GUI.zip' --zip 'D:\\SRW\\new-UNVERIFIED_GUI.zip'
+```
+
+一个 ZIP 时使用单个 `--zip`。工具拒绝同名或大小写冲突 ZIP 项，纯合成测试不接触私有库。该汇总的 `integrity_verified=false` 意味着**还须另用** `scripts/native_payload.py audit-zip` / `verify_rebuilt_native.py` 验证 SHA、清单、Host 与真实 WPF 业务；不得凭此报告删 Python Runtime、Knowledge、测试或恢复文件。B/C 本地应保留原始 ZIP 不动，只返回按分组的总体字节、两份 ZIP SHA 与独立验收证据。任何安全裁剪必须另做独立 PR 和实际 before/after 容量结果。
