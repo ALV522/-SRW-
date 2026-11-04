@@ -236,6 +236,9 @@ class InterviewRouteTests(unittest.TestCase):
         self.assertEqual(valid.json()["scorecards"][0]["feedback"][0]["recommendation"],
                          "B confidential recommendation")
         self.assertEqual(scoped(pid, self.cid, event_a).status_code, 200)
+        # Existing clients keep the legacy read contract until the UI/session migration.
+        self.assertEqual(
+            self.client.get(f"/api/v1/events/{event_b}/scorecards").status_code, 200)
 
         for project_id, candidate_id, event_id in [
             (pid, self.cid, event_b), (pid, bid, event_a),
