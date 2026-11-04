@@ -272,5 +272,55 @@ class InterviewRouteTests(unittest.TestCase):
 
 
 
+    def test_pinned_interview_rejects_out_of_stage_keys_and_forged_definitions(self):
+        """Real HTTP+SQLite: a valid revision ID cannot launder a fake key or definition."""
+        with self.factory.begin() as session:
+            project = session.get(Project, session.get(Candidate, self.cid).project_id)
+            protocol = ProtocolRevision(
+                project_id=project.id, revision=1, state="published",
+                payload_json=json.dumps({
+                    "criteria": [
+                        {"criterion_key": "comm", "name": "Communication", "definition": "Team alignment"},
+                        {"criterion_key": "finance", "name": "Finance", "definition": "Finance expertise"},
+                    ],
+                    "assessment_stages": [{"stage_key": "interview", "criteria": ["comm"]}],
+                }), content_hash="c" * 64,
+            )
+            session.add(protocol)
+            session.flush()
+            project.current_protocol_revision_id = protocol.id
+            revision_id = protocol.id
+
+        def write(key, snapshot=None):
+            metadata = {
+                "protocol_revision_id": revision_id,
+                "questions": [{"criterion_key": key, "question": "Give one example"}],
+            }
+            if snapshot is not None:
+                metadata["criteria_snapshot"] = snapshot
+            return self.add_event(event_state="scheduled", metadata=metadata)
+
+        wrong_stage = write("finance")
+        self.assertEqual(wrong_stage.status_code, 409, wrong_stage.text)
+        unknown = write("invented")
+        self.assertEqual(unknown.status_code, 409, unknown.text)
+        forged = write("comm", [{
+            "criterion_key": "comm", "name": "Finance", "definition": "Invented meaning",
+        }])
+        self.assertEqual(forged.status_code, 409, forged.text)
+        self.assertEqual(self.audit_count("RECRUITMENT_EVENT_CREATED"), 0)
+        with self.factory() as session:
+            self.assertEqual(len(session.scalars(select(RecruitmentEvent)).all()), 0)
+
+        accepted = write("comm")
+        self.assertEqual(accepted.status_code, 200, accepted.text)
+        with self.factory() as session:
+            stored = json.loads(session.get(
+                RecruitmentEvent, accepted.json()["event_id"]).metadata_json)
+        self.assertEqual(stored["criteria_snapshot"], [{
+            "criterion_key": "comm", "name": "Communication", "definition": "Team alignment",
+        }])
+
+
 if __name__ == "__main__":
     unittest.main()
