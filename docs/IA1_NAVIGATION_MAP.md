@@ -49,7 +49,20 @@ quality -> candidates, view=quality
 | `openWorkbenchItem(…, 'PREPARE_INTERVIEW')` | `flow` | 候选人 → 面试视图 |
 | `openWorkbenchItem(…, 其它)` | `cockpit` | 概览 → 决策漏斗区块 |
 | `openReviewItem(…, 'identity'/'judgment'/'claim')` | `quality` | 候选人 → 数据质量视图 |
-| `openCandidateProjectFlow()` | `flow` | 候选人 → 面试视图 |
+| `openCandidateProjectFlow()` | `flow` | 候选人 → 面试视图，绑定刚打开的候选人 |
+
+### 候选人身份：两个状态，不再共用
+
+`state.flowCandidateId` 是「面试视图页内选中的候选人」，`state.candidateId` 只用于打开
+候选人 Drawer。两者分开之后：
+
+- `openOperationalItem('pending_interview_feedback', pid, cid, eid)` 会把 `cid` 写进
+  `flowCandidateId`，面试视图直接选中该候选人，不会退化成列表第一位；
+- `openWorkbenchItem(..., 'PREPARE_INTERVIEW')` 同理；
+- 从候选人 Drawer 点「面试流程」进入时，`openCandidateProjectFlow()` 先把当前 `candidateId`
+  转存到 `flowCandidateId`，再清空 Drawer 状态；
+- 面试视图的选择框、搜索、刷新只读写 `flowCandidateId`，**不会**再触发 Drawer；
+- 切换项目页签会清空 `flowCandidateId`（`setProjectTab`），避免跨页签残留。
 | 候选人工作台「返回」 | `candidateReturnTab` | 归一化后回到 3 页签之一 |
 
 ## 4. Measured numbers (synthetic Chromium workspace)
@@ -74,6 +87,9 @@ quality -> candidates, view=quality
 - 候选人工作台仍有 5 个 `btn.primary`，每屏唯一主动作尚未落地 → IA-2。
 - 「概览」现在串联 3 组请求（overview + cockpit + audit），首屏比之前多两次读取；
   若后续出现性能反馈，可改为按需加载（折叠区块）。
+- `test_manual_claim_ui` / `test_session_on` 的 `TemporaryDirectory` 加了
+  `ignore_cleanup_errors=True`：这只是**降低 Windows 清理阶段的噪声**，没有修复
+  「SQLite 句柄未释放」的根因，根因仍待单独立项。
 
 ## 6. Rollback
 

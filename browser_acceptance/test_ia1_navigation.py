@@ -206,5 +206,68 @@ class IANavigationBrowserTests(unittest.TestCase):
         self.assertEqual(events[0]["event_state"], "scheduled")
 
 
+    def test_06_pending_feedback_deep_link_targets_the_right_candidate(self):
+        """The deep link must win over the default "first candidate" selection.
+
+        The target is chosen from the real search order (the second entry), so
+        the assertion cannot pass by accident when the link target happens to
+        be the first row. The opened Scorecard must belong to that target, and
+        switching the in-page selector must never open the candidate drawer.
+        """
+        page = self.page
+        self.call("POST", f"/api/v1/projects/{self.pid}/candidates",
+                  {"display_name": "Second Person"})
+        order = [c["candidate_id"] for c in self.call(
+            "GET", f"/api/v1/projects/{self.pid}/candidate-search?q=&limit=20")["candidates"]]
+        self.assertGreaterEqual(len(order), 2, order)
+        first, target = order[0], order[1]
+        self.assertNotEqual(first, target)
+
+        events = self.call("GET", f"/api/v1/candidates/{target}/events")["events"]
+        if not events:
+            # schedule through the UI so the event carries its pinned revision;
+            # an API-only event without a pin is read-only by design
+            page.evaluate("cid => window.openCandidate(cid)", target)
+            page.wait_for_selector(".candidate-steps")
+            page.locator(".candidate-step").filter(has_text="面试").click()
+            page.get_by_role("button", name="＋ 面试排期").click()
+            page.wait_for_selector("#modal-root .modal")
+            page.locator("#e-title").fill("Target 面试")
+            page.locator("#modal-root").get_by_role("button", name="保存", exact=True).click()
+            page.wait_for_selector("#modal-root .modal", state="detached", timeout=20000)
+            events = self.call("GET", f"/api/v1/candidates/{target}/events")["events"]
+        self.assertTrue(events, "the deep-link target needs a scheduled interview")
+        event_id = events[0]["event_id"]
+        before_other = len(self.call("GET", f"/api/v1/candidates/{first}/events")["events"])
+
+        self.open_project()
+        page.evaluate(
+            "args => window.openOperationalItem('pending_interview_feedback', args.pid, args.cid, args.eid)",
+            {"pid": self.pid, "cid": target, "eid": event_id})
+        page.wait_for_selector("#project-tab-body .searchbar select", timeout=20000)
+        selector = page.locator("#project-tab-body .searchbar select")
+        expect(selector).to_have_value(target)
+        self.assertEqual(self.active_tab(), "候选人")
+        expect(page.locator(".candidate-workspace-page")).to_have_count(0)
+
+        modal = page.locator("#modal-root .modal")
+        expect(modal).to_be_visible()
+        modal.locator("#sc-evaluator").fill("面试官B")
+        modal.locator(".c-obs").fill("只属于深链目标候选人")
+        modal.locator(".c-rec").fill("advance")
+        page.get_by_role("button", name="提交并锁定").click()
+        page.wait_for_selector("#modal-root .modal", state="detached", timeout=20000)
+        self.assertEqual(len(self.call("GET", f"/api/v1/events/{event_id}/scorecards")["scorecards"]), 1)
+        self.assertEqual(len(self.call("GET", f"/api/v1/candidates/{first}/events")["events"]), before_other)
+
+        # switching the in-page selector stays in the interview view (no drawer)
+        page.select_option("#project-tab-body .searchbar select", first)
+        page.wait_for_selector("#project-tab-body .searchbar select")
+        expect(page.locator("#project-tab-body .searchbar select")).to_have_value(first)
+        expect(page.locator(".candidate-workspace-page")).to_have_count(0)
+        self.assertEqual(self.active_tab(), "候选人")
+        self.assertNotIn("加载失败", self.tab_body())
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)
