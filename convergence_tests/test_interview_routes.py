@@ -8,6 +8,7 @@ pins the HTTP contract and the ownership of the routes.
 """
 from __future__ import annotations
 
+import json
 import tempfile
 import unittest
 from pathlib import Path
@@ -19,7 +20,9 @@ from knowledge_fixture import create_minimal_knowledge_tree
 from srw.api.app import create_v1_app
 from srw.modules.audit.models import AuditEvent
 from srw.modules.candidate.models import Candidate, MaterialRevision, Source
-from srw.modules.protocol.models import Project
+from srw.modules.protocol.models import Project, ProtocolRevision
+from srw.modules.fullworkbench import RecruitmentEvent
+from srw.modules.recruiting.operations_models import InterviewScorecardSubmission
 from srw.runtime.db.schema import create_v1_schema
 from srw.runtime.db.session import create_v1_engine, create_v1_session_factory
 
@@ -156,6 +159,186 @@ class InterviewRouteTests(unittest.TestCase):
         self.assertEqual(second.status_code, 200, second.text)
         self.assertEqual(second.json()["state"], "draft")
         self.assertEqual(self.client.get(path).json()["scorecards"].__len__(), 2)
+
+
+    def test_pinned_interview_rejects_same_key_revision_drift_in_core(self):
+        """Real HTTP/SQLite: R1 and R2 share a key but change its meaning."""
+        def payload(definition):
+            return {"criteria": [{"criterion_key": "comm", "name": "Communication",
+                                  "definition": definition}],
+                    "assessment_stages": [{"stage_key": "interview", "name": "Interview",
+                                           "criteria": ["comm"]}]}
+
+        with self.factory.begin() as session:
+            project = session.get(Project, session.get(Candidate, self.cid).project_id)
+            first = ProtocolRevision(project_id=project.id, revision=1, state="published",
+                                     payload_json=json.dumps(payload("Cross-team communication")),
+                                     content_hash="a" * 64)
+            session.add(first)
+            session.flush()
+            project.current_protocol_revision_id = first.id
+            r1 = first.id
+
+        metadata = {"protocol_revision_id": r1,
+                    "questions": [{"criterion_key": "comm", "question": "Give an example"}]}
+        created = self.add_event(event_state="scheduled", metadata=metadata)
+        self.assertEqual(created.status_code, 200, created.text)
+        eid = created.json()["event_id"]
+        path = f"/api/v1/events/{eid}/scorecards"
+        accepted = self.client.post(path, json={
+            "evaluator": "first", "submit": True,
+            "feedback": [{"criterion_key": "comm", "rating": "strong"}]})
+        self.assertEqual(accepted.status_code, 200, accepted.text)
+
+        with self.factory.begin() as session:
+            first = session.get(ProtocolRevision, r1)
+            first.state = "superseded"
+            second = ProtocolRevision(project_id=first.project_id, revision=2, state="published",
+                                      payload_json=json.dumps(payload("Customer escalation")),
+                                      content_hash="b" * 64)
+            session.add(second)
+            session.flush()
+            session.get(Project, first.project_id).current_protocol_revision_id = second.id
+
+        before_audit = (self.audit_count("RECRUITMENT_EVENT_UPDATED"),
+                        self.audit_count("INTERVIEW_SCORECARD_SUBMITTED"))
+        with self.factory() as session:
+            before_metadata = session.get(RecruitmentEvent, eid).metadata_json
+
+        stale_update = self.client.patch(f"/api/v1/events/{eid}", json={
+            "event_state": "completed", "metadata": metadata})
+        self.assertEqual(stale_update.status_code, 409, stale_update.text)
+        stale_score = self.client.post(path, json={
+            "evaluator": "second", "submit": True,
+            "feedback": [{"criterion_key": "comm", "rating": "strong"}]})
+        self.assertEqual(stale_score.status_code, 409, stale_score.text)
+        stale_create = self.add_event(event_state="scheduled", metadata=metadata)
+        self.assertEqual(stale_create.status_code, 409, stale_create.text)
+        self.assertEqual(before_audit, (self.audit_count("RECRUITMENT_EVENT_UPDATED"),
+                                        self.audit_count("INTERVIEW_SCORECARD_SUBMITTED")))
+        with self.factory() as session:
+            self.assertEqual(session.get(RecruitmentEvent, eid).metadata_json, before_metadata)
+            self.assertEqual(len(session.scalars(select(InterviewScorecardSubmission)).all()), 1)
+            self.assertEqual(len(session.scalars(select(RecruitmentEvent)).all()), 1)
+            self.assertEqual(len(session.scalars(select(Source)).all()), 0)
+        self.assertEqual(len(self.client.get(path).json()["scorecards"]), 1)
+
+        # Scheduled R1 can be cancelled after R2, even though a new R1
+        # structured completion/Scorecard must be rejected.
+        cancel = self.client.patch(f"/api/v1/events/{eid}", json={
+            "event_state": "cancelled", "notes": "Candidate withdrew before interview"})
+        self.assertEqual(cancel.status_code, 200, cancel.text)
+        self.assertEqual(self.audit_count("RECRUITMENT_EVENT_UPDATED"), before_audit[0] + 1)
+        with self.factory() as session:
+            historical = session.get(RecruitmentEvent, eid)
+            self.assertEqual(historical.event_state, "cancelled")
+            self.assertEqual(historical.notes, "Candidate withdrew before interview")
+            self.assertEqual(historical.metadata_json, before_metadata)
+            self.assertIsNone(historical.source_id)
+        disguised_rewrite = self.client.patch(f"/api/v1/events/{eid}", json={
+            "event_state": "cancelled", "metadata": metadata})
+        self.assertEqual(disguised_rewrite.status_code, 409, disguised_rewrite.text)
+        self.assertEqual(self.audit_count("RECRUITMENT_EVENT_UPDATED"), before_audit[0] + 1)
+
+    def test_pinned_interview_rejects_pin_removal_and_foreign_scorecard_key(self):
+        with self.factory.begin() as session:
+            project = session.get(Project, session.get(Candidate, self.cid).project_id)
+            protocol = ProtocolRevision(project_id=project.id, revision=1, state="published",
+                                        payload_json=json.dumps({
+                                            "criteria": [{"criterion_key": "comm"}],
+                                            "assessment_stages": [{"stage_key": "interview",
+                                                                   "criteria": ["comm"]}]}),
+                                        content_hash="a" * 64)
+            session.add(protocol)
+            session.flush()
+            project.current_protocol_revision_id = protocol.id
+            revision_id = protocol.id
+
+        metadata = {"protocol_revision_id": revision_id,
+                    "questions": [{"criterion_key": "comm", "question": "Example?"}]}
+        created = self.add_event(event_state="scheduled", metadata=metadata)
+        self.assertEqual(created.status_code, 200, created.text)
+        eid = created.json()["event_id"]
+        removed = self.client.patch(f"/api/v1/events/{eid}", json={
+            "metadata": {"questions": metadata["questions"]}})
+        self.assertEqual(removed.status_code, 409, removed.text)
+        wrong_key = self.client.post(f"/api/v1/events/{eid}/scorecards", json={
+            "evaluator": "synthetic", "submit": True,
+            "feedback": [{"criterion_key": "other", "rating": "strong"}]})
+        self.assertEqual(wrong_key.status_code, 409, wrong_key.text)
+        with self.factory() as session:
+            self.assertEqual(json.loads(session.get(RecruitmentEvent, eid).metadata_json)
+                             ["protocol_revision_id"], revision_id)
+            self.assertEqual(len(session.scalars(select(InterviewScorecardSubmission)).all()), 0)
+
+    def test_phone_screen_without_published_criteria_still_completes(self):
+        """Non-structured phone follow-up is a preserved legacy operator action."""
+        created = self.client.post(f"/api/v1/candidates/{self.cid}/events", json={
+            "event_type": "phone_screen", "event_state": "scheduled",
+            "title": "Synthetic call", "notes": "Awaiting callback"})
+        self.assertEqual(created.status_code, 200, created.text)
+        eid = created.json()["event_id"]
+        completed = self.client.patch(f"/api/v1/events/{eid}", json={
+            "event_state": "completed", "notes": "Reached candidate"})
+        self.assertEqual(completed.status_code, 200, completed.text)
+        with self.factory() as session:
+            row = session.get(RecruitmentEvent, eid)
+            self.assertEqual(row.event_state, "completed")
+            self.assertEqual(row.notes, "Reached candidate")
+            self.assertIsNone(row.source_id)
+
+
+
+    def test_pinned_interview_rejects_out_of_stage_keys_and_forged_definitions(self):
+        """Real HTTP+SQLite: a valid revision ID cannot launder a fake key or definition."""
+        with self.factory.begin() as session:
+            project = session.get(Project, session.get(Candidate, self.cid).project_id)
+            protocol = ProtocolRevision(
+                project_id=project.id, revision=1, state="published",
+                payload_json=json.dumps({
+                    "criteria": [
+                        {"criterion_key": "comm", "name": "Communication", "definition": "Team alignment"},
+                        {"criterion_key": "finance", "name": "Finance", "definition": "Finance expertise"},
+                    ],
+                    "assessment_stages": [{"stage_key": "interview", "criteria": ["comm", "ghost"]}],
+                }), content_hash="c" * 64,
+            )
+            session.add(protocol)
+            session.flush()
+            project.current_protocol_revision_id = protocol.id
+            revision_id = protocol.id
+
+        def write(key, snapshot=None):
+            metadata = {
+                "protocol_revision_id": revision_id,
+                "questions": [{"criterion_key": key, "question": "Give one example"}],
+            }
+            if snapshot is not None:
+                metadata["criteria_snapshot"] = snapshot
+            return self.add_event(event_state="scheduled", metadata=metadata)
+
+        wrong_stage = write("finance")
+        self.assertEqual(wrong_stage.status_code, 409, wrong_stage.text)
+        unknown = write("invented")
+        self.assertEqual(unknown.status_code, 409, unknown.text)
+        orphan = write("ghost")
+        self.assertEqual(orphan.status_code, 409, orphan.text)
+        forged = write("comm", [{
+            "criterion_key": "comm", "name": "Finance", "definition": "Invented meaning",
+        }])
+        self.assertEqual(forged.status_code, 409, forged.text)
+        self.assertEqual(self.audit_count("RECRUITMENT_EVENT_CREATED"), 0)
+        with self.factory() as session:
+            self.assertEqual(len(session.scalars(select(RecruitmentEvent)).all()), 0)
+
+        accepted = write("comm")
+        self.assertEqual(accepted.status_code, 200, accepted.text)
+        with self.factory() as session:
+            stored = json.loads(session.get(
+                RecruitmentEvent, accepted.json()["event_id"]).metadata_json)
+        self.assertEqual(stored["criteria_snapshot"], [{
+            "criterion_key": "comm", "name": "Communication", "definition": "Team alignment",
+        }])
 
 
 if __name__ == "__main__":

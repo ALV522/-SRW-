@@ -30,7 +30,7 @@ from srw.modules.candidate.models import Candidate, Source
 from srw.modules.fullworkbench import RecruitmentEvent
 from srw.modules.protocol.models import Project
 from srw.modules.protocol.repository import ProtocolRepository
-from srw.recruiting.workbench import scorecards_view, submit_scorecard
+from srw.recruiting.workbench import scorecards_view, submit_scorecard, require_pinned_event_revision
 from srw.runtime.db.session import v1_session_scope
 
 EVENT_STATES = {"scheduled", "completed", "cancelled", "no_show"}
@@ -53,6 +53,11 @@ def event_metadata(session, candidate_id: str, event_type: str, value: Any) -> d
     if not isinstance(value, dict):
         raise V1InvariantError("metadata must be an object")
     metadata = dict(value)
+    if "protocol_revision_id" in metadata:
+        pinned = metadata["protocol_revision_id"]
+        if not isinstance(pinned, str) or not pinned.strip():
+            raise V1InvariantError("protocol_revision_id must be a non-empty published revision")
+        require_pinned_event_revision(session, candidate_id, pinned)
     candidate = session.get(Candidate, candidate_id)
     if candidate is None:
         raise V1NotFoundError(f"candidate not found: {candidate_id}")
@@ -101,6 +106,43 @@ def event_metadata(session, candidate_id: str, event_type: str, value: Any) -> d
             "counter_evidence": str(item.get("counter_evidence") or "").strip(),
             "recommendation": str(item.get("recommendation") or "").strip(),
         })
+    # A published revision ID alone is insufficient to authorize arbitrary
+    # criterion keys: only the published interview-stage keys can be pinned.
+    if metadata.get("protocol_revision_id") and event_type == "interview":
+        published = ProtocolRepository(session).get_payload(metadata["protocol_revision_id"])
+        stage_keys = set()
+        for stage in published.get("assessment_stages") or []:
+            if isinstance(stage, dict) and (stage.get("stage_key") == "interview" or stage.get("name") == "面试"):
+                stage_keys.update(str(k) for k in (stage.get("criteria") or []) if isinstance(k, str) and k)
+        question_keys = {q["criterion_key"] for q in normalized_q}
+        if not stage_keys or not question_keys or not question_keys.issubset(stage_keys):
+            raise V1InvariantError("pinned interview must use published interview-stage criteria")
+        if any(f["criterion_key"] not in question_keys for f in normalized_f):
+            raise V1InvariantError("pinned interview feedback must use its original questions")
+        # The browser's name/definition snapshot is presentation data, not a
+        # source of authority. Check supplied values and persist canonical data.
+        criteria_by_key = {
+            str(c.get("criterion_key")): c for c in (published.get("criteria") or [])
+            if isinstance(c, dict) and c.get("criterion_key")
+        }
+        if not question_keys.issubset(criteria_by_key):
+            raise V1InvariantError("pinned interview references a missing published criterion")
+        requested = metadata.get("criteria_snapshot")
+        if requested is not None:
+            if not isinstance(requested, list) or any(not isinstance(c, dict) for c in requested):
+                raise V1InvariantError("criteria_snapshot must be a list")
+            for item in requested:
+                key = str(item.get("criterion_key") or "")
+                canonical = criteria_by_key.get(key)
+                if (key not in question_keys or canonical is None or
+                        str(item.get("name") or "") != str(canonical.get("name") or "") or
+                        str(item.get("definition") or "") != str(canonical.get("definition") or "")):
+                    raise V1InvariantError("criteria_snapshot disagrees with the published revision")
+        metadata["criteria_snapshot"] = [
+            {"criterion_key": key, "name": str(criteria_by_key[key].get("name") or ""),
+             "definition": str(criteria_by_key[key].get("definition") or "")}
+            for key in dict.fromkeys(q["criterion_key"] for q in normalized_q)
+        ]
     metadata["questions"] = normalized_q
     metadata["feedback"] = normalized_f
     metadata["overall_recommendation"] = str(metadata.get("overall_recommendation") or "").strip()
@@ -221,8 +263,26 @@ def interview_routes(*, factory) -> list[Route]:
                 raise V1NotFoundError(f"event not found: {eid}")
             candidate = session.get(Candidate, row.candidate_id)
             metadata = json.loads(row.metadata_json or "{}")
+            pinned = str(metadata.get("protocol_revision_id") or "").strip()
+            # Administrative cancellation/no-show of a still-scheduled
+            # historical event is NOT a structured assessment write. Keep the
+            # legitimate recruiter action after protocol R1 -> R2, but only
+            # permit a tightly bounded state/notes change with no metadata,
+            # outcome, schedule, Source, or criteria replacement.
+            safe_cancel = (
+                row.event_state == "scheduled"
+                and body.get("event_state") in {"cancelled", "no_show"}
+                and set(body).issubset({"event_state", "notes", "actor"})
+            )
+            if pinned and not safe_cancel:
+                # The event's own revision, not the browser's latest key list,
+                # is authoritative for subsequent structured writes.
+                require_pinned_event_revision(session, row.candidate_id, pinned)
             if "metadata" in body:
-                metadata = event_metadata(session, row.candidate_id, row.event_type, body.get("metadata"))
+                updated = event_metadata(session, row.candidate_id, row.event_type, body.get("metadata"))
+                if pinned and updated.get("protocol_revision_id") != pinned:
+                    raise V1InvariantError("event protocol revision cannot be removed or replaced")
+                metadata = updated
                 row.metadata_json = json.dumps(metadata, ensure_ascii=False, separators=(",", ":"))
             if "event_state" in body:
                 state = s_field(body, "event_state", required=True)
