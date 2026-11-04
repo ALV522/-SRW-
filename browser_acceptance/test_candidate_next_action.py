@@ -383,7 +383,7 @@ class CandidateNextActionBrowserTests(unittest.TestCase):
         modal.locator(".c-obs").fill("R1 版本下的真实面评")
         modal.locator(".c-support").fill("上线提前两周完成")
         modal.locator(".c-counter").fill("跨部门依赖仍有风险")
-        modal.locator(".c-rec").fill("advance")
+        modal.locator(".c-rec").fill("建议先核实跨部门依赖")
         self.page.get_by_role("button", name="提交并锁定").click()
         expect(self.page.locator("#modal-root .modal")).to_have_count(0)
         before = self.counts(self.cid)
@@ -405,6 +405,9 @@ class CandidateNextActionBrowserTests(unittest.TestCase):
         expect(readonly).to_contain_text("R1 版本下的真实面评")
         expect(readonly).to_contain_text("上线提前两周完成")
         expect(readonly).to_contain_text("跨部门依赖仍有风险")
+        expect(readonly.locator(".scorecard-history thead")).to_contain_text("逐项建议")
+        expect(readonly.locator(".scorecard-history tbody tr")).to_contain_text("建议先核实跨部门依赖")
+        self.assertNotIn(KEY, readonly.inner_text())
         expect(readonly.locator(".notice")).to_contain_text("只读")
         self.assertEqual(readonly.get_by_role("button", name="提交并锁定").count(), 0)
         self.assertEqual(readonly.locator("#sc-evaluator").count(), 0)
@@ -426,7 +429,8 @@ class CandidateNextActionBrowserTests(unittest.TestCase):
         self.post(f"/api/v1/events/{event_id}/scorecards",
                   {"evaluator": "旧评价者", "recommendation": "hold", "submit": True,
                    "feedback": [{"criterion_key": KEY, "rating": "concern",
-                                 "observation": "旧版本记录"}]})
+                                 "observation": "旧版本记录",
+                                  "recommendation": "<img src=x onerror=alert(1)>"}]})
         before = self.counts(self.cid)
 
         self.open_step(self.cid)
@@ -437,6 +441,9 @@ class CandidateNextActionBrowserTests(unittest.TestCase):
         # No snapshot on a legacy event: neutral label, never the raw key.
         expect(readonly).to_contain_text("历史标准 1")
         expect(readonly).to_contain_text("旧版本记录")
+        expect(readonly.locator(".scorecard-history thead")).to_contain_text("逐项建议")
+        expect(readonly).to_contain_text("<img src=x onerror=alert(1)>")
+        self.assertEqual(readonly.locator(".scorecard-history img").count(), 0)
         self.assertNotIn(KEY, readonly.inner_text())
         expect(readonly.locator(".notice")).to_contain_text("没有保存创建时的标准版本")
         self.assertEqual(readonly.get_by_role("button", name="提交并锁定").count(), 0)
