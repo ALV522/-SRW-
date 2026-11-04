@@ -280,13 +280,22 @@ window.openContactWorkbench=async()=>{try{const q=await api(`/api/v1/projects/${
 window.openActionPlan=async cid=>{try{const x=await api(`/api/v1/candidates/${cid}/action-plan`);modal('候选人行动计划',`<div class="form-grid"><div class="field"><label>联系优先级</label><select id="ap-priority" class="select">${['today','high','normal','low'].map(v=>`<option value="${v}" ${x.priority===v?'selected':''}>${v}</option>`).join('')}</select></div><div class="field"><label>负责人</label><input id="ap-owner" class="input" value="${esc(x.owner||'')}"></div><div class="field"><label>联系状态</label><select id="ap-status" class="select">${['to_contact','attempted','callback','contacted','not_interested','waiting_material','done'].map(v=>`<option value="${v}" ${x.contact_status===v?'selected':''}>${v}</option>`).join('')}</select></div><div class="field"><label>下次联系时间</label><input id="ap-next" class="input" value="${esc(x.next_contact_at||'')}"></div><div class="field full"><label>原因 / 下一步</label><textarea id="ap-reason" class="textarea">${esc(x.reason||'')}</textarea></div></div>`,`<button class="btn" onclick="closeModal()">取消</button><button class="btn primary" onclick="saveActionPlan('${cid}')">保存</button>`)}catch(e){toast(e.message,true)}};
 window.saveActionPlan=async cid=>{try{await api(`/api/v1/candidates/${cid}/action-plan`,{method:'PATCH',body:JSON.stringify({priority:$('#ap-priority').value,owner:$('#ap-owner').value,contact_status:$('#ap-status').value,next_contact_at:$('#ap-next').value,reason:$('#ap-reason').value,actor:'human'})});closeModal();toast('行动计划已保存');if(state.candidateId===cid)await candidateDrawer(cid);else await openContactWorkbench()}catch(e){toast(e.message,true)}};
 window.openPhoneScript=async cid=>{try{const r=await api(`/api/v1/candidates/${cid}/phone-script`);modal('电话脚本 / 核实思路',`<p class="subtle">${esc(r.note)}</p><div class="quick-list">${r.questions.map(x=>`<div class="quick-item"><div><div class="quick-title">${esc(x.question)}</div><div class="quick-note">为什么问：${esc(x.purpose)}</div></div></div>`).join('')}</div>`,`<button class="btn" onclick="closeModal()">关闭</button>`)}catch(e){toast(e.message,true)}};
+function scorecardHistoryHtml(list,ev){
+  if(!list||!list.length)return '<div class="empty">尚无评价者提交 Scorecard</div>';
+  const snap={};(ev&&ev.metadata&&ev.metadata.criteria_snapshot||[]).forEach(c=>{if(c&&c.criterion_key)snap[c.criterion_key]=c.name||''});
+  const order=[],seen={};
+  list.forEach(s=>(s.feedback||[]).forEach(f=>{const k=f.criterion_key||'';if(!(k in seen)){seen[k]=order.length+1;order.push(k)}}));
+  const label=k=>snap[k]||`历史标准 ${seen[k]||order.length+1}`;
+  const ratings={strong:'强',acceptable:'可接受',concern:'有顾虑',unknown:'无法判断'};
+  return list.map(s=>`<div class="scorecard-history"><div class="scorecard-head"><strong>${esc(s.evaluator)}</strong><span class="status ${s.state==='submitted'?'good':''}">${esc(s.state)}</span>${s.recommendation?`<span class="subtle">总体建议：${esc(s.recommendation)}</span>`:''}</div>${(s.feedback||[]).length?`<div class="table-wrap"><table class="table compact"><thead><tr><th>标准</th><th>评价</th><th>行为观察</th><th>支持证据</th><th>反对证据</th></tr></thead><tbody>${s.feedback.map(f=>`<tr><td><strong>${esc(label(f.criterion_key))}</strong></td><td>${esc(ratings[f.rating]||f.rating||'—')}</td><td>${esc(f.observation||'—')}</td><td>${esc(f.supporting_evidence||'—')}</td><td>${esc(f.counter_evidence||'—')}</td></tr>`).join('')}</tbody></table></div>`:'<div class="subtle">该评分没有逐标准明细</div>'}</div>`).join('');
+}
 window.openScorecards=async(cid,eid)=>{
   try{
     let ev=null;
     try{ev=await eventContext(cid,eid)}
     catch(e){blockedNotice('独立 Interview Scorecard',e.message||'无法读取该面试记录','未读取该面试的任何反馈，也未写入数据。');return}
     const r=await api(`/api/v1/events/${eid}/scorecards`);
-    const existing=r.scorecards.length?`<div class="quick-list">${r.scorecards.map(x=>`<div class="quick-item"><div><div class="quick-title">${esc(x.evaluator)} · ${esc(x.state)}</div><div class="quick-note">${esc(x.recommendation||'')}</div></div></div>`).join('')}</div>`:'<div class="empty">尚无评价者提交 Scorecard</div>';
+    const existing=scorecardHistoryHtml(r.scorecards,ev);
     /* Ownership is enough to READ history; only a new write needs the pinned
        revision. A changed Published revision makes the record read-only, not
        invisible. */

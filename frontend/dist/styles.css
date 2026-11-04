@@ -67,3 +67,6 @@ button,input,textarea,select{font:inherit}.app-shell{display:grid;grid-template-
 .notice.danger{border-color:#f2b8b5;background:#fff5f4;color:#7a1f16}
 .criterion-head .subtle{font-size:12px;text-align:right}
 .criterion-def{font-size:12px;color:var(--muted);line-height:1.6;margin:-4px 0 10px}
+.scorecard-history{border:1px solid var(--line);border-radius:9px;padding:10px 12px;margin-bottom:8px;background:#fff}
+.scorecard-head{display:flex;gap:8px;align-items:center;margin-bottom:8px;flex-wrap:wrap}
+.table.compact th,.table.compact td{padding:7px 9px;font-size:12px}
