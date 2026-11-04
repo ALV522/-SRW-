@@ -33,7 +33,8 @@ def free_port():
 class ManualClaimBrowserAcceptance(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
-        cls.temp = tempfile.TemporaryDirectory(prefix="srw-browser-manual-")
+        cls.temp = tempfile.TemporaryDirectory(prefix="srw-browser-manual-",
+                                               ignore_cleanup_errors=True)
         cls.port = free_port()
         cls.base = f"http://127.0.0.1:{cls.port}"
         env = {**os.environ, "SRW_SYNTHETIC_BROWSER_ACCEPTANCE": "1",
@@ -89,7 +90,7 @@ class ManualClaimBrowserAcceptance(unittest.TestCase):
                              {"text_content": TEXT, "publish_material": True})["source_id"]
         self.page.goto(self.base + "/v1", wait_until="domcontentloaded")
         self.page.wait_for_function("Boolean(window.openProject && window.openCandidate && window.srwManualClaimOpen)")
-        self.page.wait_for_function("document.querySelector('#top-title')?.textContent === '工作台总览'")
+        self.page.wait_for_function("document.querySelector('#top-title')?.textContent === '今日待办'")
         self.page.evaluate("""async ([pid,cid]) => {
             await window.openProject(pid);
             await window.openCandidate(cid);
