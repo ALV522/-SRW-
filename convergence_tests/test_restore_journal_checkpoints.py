@@ -389,6 +389,28 @@ raise SystemExit(98)
         self.assertTrue(undo.exists())
         self.assertEqual(self._read_db(), "POST_RESTORE_WRITE")
 
+    def test_finalized_cleanup_postwrite_pinned_blob_loss_preserves_undo(self):
+        """A legitimate DB write cannot conceal disappearance of restored Source bytes."""
+        old_db, undo = self._enter_finalized_cleanup_pending()
+        undo_before = undo.read_bytes()
+        with closing(sqlite3.connect(self.db)) as conn:
+            conn.execute("UPDATE workload SET value='POST_RESTORE_WRITE'")
+            conn.commit()
+        self.assertNotEqual(self._read_db(), "AFTER")
+        pinned = self.data / "blobs" / "new" / "replacement"
+        pinned.unlink()
+        (self.data / "blobs" / "new" / "additional").write_bytes(
+            b"new synthetic evidence"
+        )
+
+        with self.assertRaisesRegex(RuntimeError, "restored Blob inventory differs"):
+            self._restart()
+        self.assertEqual(self._read_db(), "POST_RESTORE_WRITE")
+        self.assertEqual(undo.read_bytes(), undo_before)
+        self.assertTrue(old_db.exists(), "old rollback residue must survive refusal")
+        self.assertTrue(self.journal.exists(), "the restore fence must survive refusal")
+        self.assertFalse(self.marker.exists(), "committed restore must not replay")
+
     def test_finalized_cleanup_wal_pinned_blob_loss_preserves_undo(self):
         # Valid WAL frames and unchanged main DB are not proof of safe cleanup.
         old_db, undo, conn = self._enter_wal_cleanup_pending()

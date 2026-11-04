@@ -215,13 +215,16 @@ def _check_unchanged_restore_blobs(data: Path, db: Path, state: dict) -> None:
         if not wal.is_file():
             raise RuntimeError("unsafe SQLite WAL during pending restore cleanup")
         wal_nonempty = wal.stat().st_size > 0
-    if _digest(db) != state["target_db_sha256"]:
-        return
+    # A modified live SQLite DB (including a checkpointed post-restore write)
+    # cannot prove that any *original* restored Source Blob disappeared
+    # legitimately. A changed DB may add new Blob files, but the pinned
+    # restore snapshot's immutable bytes must survive until undo cleanup.
+    db_unchanged = _digest(db) == state["target_db_sha256"]
     current = _blob_inventory(data / "blobs")
     expected = state["target_blobs"]
-    if wal_nonempty:
-        # WAL may include legitimate new Source writes. New files are allowed,
-        # but the immutable restored Source bytes must still be present.
+    if wal_nonempty or not db_unchanged:
+        # Extra files are permitted after real writes; each pinned original
+        # Source byte remains required regardless of the main DB digest.
         changed = any(current is None or current.get(name) != digest
                       for name, digest in expected.items())
     else:
