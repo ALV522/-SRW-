@@ -329,6 +329,98 @@ raise SystemExit(98)
         self.assertEqual(len(snapshots), 1, "cleanup-pending state must own exactly one undo")
         return old_db, snapshots[0]
 
+    def _enter_wal_cleanup_pending(self):
+        """Create a real pinned WAL-mode restore and leave valid WAL frames."""
+        source = self.root / "source.db"
+        with closing(sqlite3.connect(source)) as conn:
+            self.assertEqual(conn.execute("PRAGMA journal_mode=WAL").fetchone()[0], "wal")
+            conn.execute("PRAGMA wal_checkpoint(TRUNCATE)")
+        # The fixture's original target.zip is immutable; replace it only
+        # inside this synthetic test workspace before publishing a new plan.
+        self.archive.unlink()
+        write_backup_archive(self.archive, source, self.root / "src-blobs")
+        marker = json.loads(self.marker.read_text(encoding="utf-8"))
+        marker["sha256"] = hashlib.sha256(self.archive.read_bytes()).hexdigest()
+        self.marker.write_text(json.dumps(marker), encoding="utf-8")
+        old_db, undo = self._enter_finalized_cleanup_pending()
+        pinned_main = self.db.read_bytes()
+        conn = sqlite3.connect(self.db)
+        try:
+            self.assertEqual(conn.execute("PRAGMA journal_mode").fetchone()[0], "wal")
+            conn.execute("PRAGMA wal_checkpoint(TRUNCATE)")
+            self.assertEqual(self.db.read_bytes(), pinned_main)
+            conn.execute("UPDATE workload SET value='TEMPORARY'")
+            conn.commit()
+            conn.execute("UPDATE workload SET value='AFTER'")
+            conn.commit()
+            self.assertEqual(self.db.read_bytes(), pinned_main)
+            self.assertGreater(Path(str(self.db) + "-wal").stat().st_size, 0)
+        except BaseException:
+            conn.close()
+            raise
+        return old_db, undo, conn
+
+    def test_finalized_cleanup_partial_pinned_blob_loss_preserves_undo(self):
+        # RED: a surviving Blob root does not prove each restored file survived.
+        old_db, undo = self._enter_finalized_cleanup_pending()
+        undo_before, db_before = undo.read_bytes(), self.db.read_bytes()
+        pinned = self.data / "blobs" / "new" / "replacement"
+        pinned.unlink()
+        self.assertTrue((self.data / "blobs").is_dir())
+        with self.assertRaisesRegex(RuntimeError, "restored Blob inventory differs"):
+            self._restart()
+        self.assertEqual(self.db.read_bytes(), db_before)
+        self.assertEqual(undo.read_bytes(), undo_before)
+        self.assertTrue(old_db.exists())
+        self.assertTrue(self.journal.exists())
+        self.assertFalse(self.marker.exists())
+
+    def test_finalized_cleanup_allows_new_blob_after_real_db_write(self):
+        # Legitimate post-restore Core writes must not be compared to the
+        # immutable target inventory once the database has changed.
+        old_db, undo = self._enter_finalized_cleanup_pending()
+        with closing(sqlite3.connect(self.db)) as conn:
+            conn.execute("UPDATE workload SET value='POST_RESTORE_WRITE'")
+            conn.commit()
+        (self.data / "blobs" / "new" / "additional").write_bytes(b"new synthetic evidence")
+        self.assertIsNone(self._restart())
+        self.assertFalse(self.journal.exists())
+        self.assertFalse(old_db.exists())
+        self.assertTrue(undo.exists())
+        self.assertEqual(self._read_db(), "POST_RESTORE_WRITE")
+
+    def test_finalized_cleanup_wal_pinned_blob_loss_preserves_undo(self):
+        # Valid WAL frames and unchanged main DB are not proof of safe cleanup.
+        old_db, undo, conn = self._enter_wal_cleanup_pending()
+        try:
+            undo_before = undo.read_bytes()
+            pinned = self.data / "blobs" / "new" / "replacement"
+            pinned.unlink()
+            with self.assertRaisesRegex(RuntimeError, "restored Blob inventory differs"):
+                self._restart()
+            self.assertEqual(undo.read_bytes(), undo_before)
+            self.assertTrue(old_db.exists())
+            self.assertTrue(self.journal.exists())
+            self.assertFalse(self.marker.exists())
+        finally:
+            conn.close()
+
+    def test_finalized_cleanup_wal_allows_legitimate_new_blob(self):
+        # Valid committed WAL writes can add a new Source without invalidating
+        # the original pinned Source bytes or the recovery cleanup.
+        old_db, undo, conn = self._enter_wal_cleanup_pending()
+        try:
+            conn.execute("UPDATE workload SET value='POST_RESTORE_WRITE'")
+            conn.commit()
+            (self.data / "blobs" / "new" / "additional").write_bytes(b"new synthetic evidence")
+            self.assertIsNone(self._restart())
+            self.assertFalse(self.journal.exists())
+            self.assertFalse(old_db.exists())
+            self.assertTrue(undo.exists())
+            self.assertEqual(self._read_db(), "POST_RESTORE_WRITE")
+        finally:
+            conn.close()
+
     def test_finalized_cleanup_missing_live_blob_root_refuses_core_boot(self):
         # After a committed restore, an AV quarantine or disk loss may remove
         # the whole Blob directory while a retained old DB keeps the terminal

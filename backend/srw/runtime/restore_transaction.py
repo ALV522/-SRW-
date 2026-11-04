@@ -196,6 +196,42 @@ def _check_live_db_health(db: Path) -> None:
         ) from exc
 
 
+def _check_unchanged_restore_blobs(data: Path, db: Path, state: dict) -> None:
+    """Retain undo if pinned Source bytes disappear before any Core DB writes.
+
+    A terminal cleanup can follow legitimate post-restore recruitment writes,
+    so a changed main DB cannot be compared to its pinned restore snapshot.
+    When the main DB is still pinned, a nonempty WAL is NOT proof that every
+    pinned Source Blob may disappear: it may contain no net logical change.
+    In WAL mode preserve all pinned Blob bytes, while allowing newly added
+    Blobs associated with legitimate committed WAL writes.
+    """
+    if not state["target_blobs"]:
+        return
+    wal = Path(str(db) + "-wal")
+    _safe_path(wal)
+    wal_nonempty = False
+    if wal.exists():
+        if not wal.is_file():
+            raise RuntimeError("unsafe SQLite WAL during pending restore cleanup")
+        wal_nonempty = wal.stat().st_size > 0
+    if _digest(db) != state["target_db_sha256"]:
+        return
+    current = _blob_inventory(data / "blobs")
+    expected = state["target_blobs"]
+    if wal_nonempty:
+        # WAL may include legitimate new Source writes. New files are allowed,
+        # but the immutable restored Source bytes must still be present.
+        changed = any(current is None or current.get(name) != digest
+                      for name, digest in expected.items())
+    else:
+        changed = current != expected
+    if changed:
+        raise RuntimeError(
+            "restored Blob inventory differs from pinned transaction during pending cleanup; preserve journal and undo"
+        )
+
+
 def _finish_cleanup(data: Path, journal: Path) -> None:
     """Retry only durable-journal-owned debris, never the live DB or Blob tree.
 
@@ -367,6 +403,9 @@ def apply_restore(data: Path, db: Path, max_schema: str, pre_restore_backup,
                 raise RuntimeError(
                     "restored live Blob directory is missing during pending cleanup; preserve journal and undo"
                 )
+            # Before any Core writes, a missing individual pinned Source file
+            # is also a recovery failure, even if the Blob root still exists.
+            _check_unchanged_restore_blobs(data, db, state)
             _finish_cleanup(data, journal)
             return None
         if not marker.exists() or _read_marker(marker) != {
