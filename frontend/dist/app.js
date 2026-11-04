@@ -110,6 +110,7 @@ window.openCandidateQuickAction=async(id,kind)=>{
     if(!row||row.archived)throw uiError('候选人不在当前可操作列表中，请刷新后重试');
     const summary=await api('/api/v1/candidates/'+id+'/summary');
     if(!summary||summary.project_id!==state.projectId)throw uiError('候选人已不属于当前项目，已阻止跳转');
+    if(summary.archived)throw uiError('候选人已归档，请先恢复后再操作');
     state.candidateReturnTab='candidates';
     state.candidateId=id;
     state.candidateSection=kind==='verify'?'evidence':'process';
