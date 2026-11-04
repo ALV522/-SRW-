@@ -609,5 +609,84 @@ class CandidateNextActionBrowserTests(unittest.TestCase):
         self.assertNotIn(KEY_R2, json.dumps(stored, ensure_ascii=False))
 
 
+    # ------------------------------------------------------------- S1b list UX
+    def test_list_quick_schedule_targets_second_candidate_and_preserves_return(self):
+        second = self.post(f"/api/v1/projects/{self.pid}/candidates",
+                           {"display_name": "Synthetic Second"})["candidate_id"]
+        self.page.evaluate("window.setProjectTab('candidates')")
+        self.page.locator("#cand-q").fill("Synthetic")
+        self.page.get_by_role("button", name="应用筛选").click()
+        row = self.page.locator(f'tr[data-candidate-id="{second}"]')
+        expect(row).to_be_visible()
+        before_a = self.counts(self.cid)
+        row.locator('[data-quick-action="schedule"]').click()
+        expect(self.page.locator(".candidate-workspace-head h1")).to_have_text("Synthetic Second")
+        modal = self.page.locator(".modal")
+        expect(modal).to_contain_text("已发布标准")
+        self.assertNotIn("criterion_key", modal.inner_text())
+        modal.locator(".c-q").fill("第二位候选人的面试问题")
+        modal.get_by_role("button", name="保存").click()
+        expect(self.page.locator("#modal-root .modal")).to_have_count(0)
+        with closing(self.db()) as connection:
+            rows = connection.execute(
+                "SELECT candidate_id, metadata_json FROM recruitment_event "
+                "WHERE candidate_id IN (?,?)", (self.cid, second)).fetchall()
+        self.assertEqual(len(rows), 1)
+        self.assertEqual(rows[0][0], second)
+        self.assertEqual(json.loads(rows[0][1])["questions"][0]["criterion_key"], KEY)
+        self.assertEqual(self.counts(self.cid), before_a)
+        self.page.get_by_role("button", name="← 返回项目工作区").click()
+        expect(self.page.locator("#cand-q")).to_have_value("Synthetic")
+        expect(self.page.locator(f'tr[data-candidate-id="{second}"]')).to_be_visible()
+
+    def test_list_quick_scorecard_uses_exact_candidate_event_and_persists(self):
+        second = self.post(f"/api/v1/projects/{self.pid}/candidates",
+                           {"display_name": "Synthetic Second"})["candidate_id"]
+        published = self.get(f"/api/v1/projects/{self.pid}/protocol-workspace")
+        event = self.post(f"/api/v1/candidates/{second}/events", {
+            "event_type": "interview", "event_state": "scheduled",
+            "title": "Second interview", "metadata": {
+                "protocol_revision_id": published["current_revision_id"],
+                "questions": [{"criterion_key": KEY, "question": "核实经历"}]}})
+        before_a = self.counts(self.cid)
+        self.page.evaluate("window.setProjectTab('candidates')")
+        self.page.locator(f'tr[data-candidate-id="{second}"] [data-quick-action="scorecard"]').click()
+        expect(self.page.locator(".candidate-workspace-head h1")).to_have_text("Synthetic Second")
+        modal = self.page.locator(".modal")
+        expect(modal.locator("#sc-evaluator")).to_be_visible()
+        self.assertNotIn("criterion_key", modal.inner_text())
+        modal.locator("#sc-evaluator").fill("独立面试官")
+        modal.locator(".c-obs").fill("仅属于第二位候选人的观察")
+        modal.locator("#sc-rec").fill("advance")
+        modal.get_by_role("button", name="提交并锁定").click()
+        expect(self.page.locator("#modal-root .modal")).to_have_count(0)
+        with closing(self.db()) as connection:
+            rows = connection.execute(
+                "SELECT candidate_id,event_id,feedback_json FROM interview_scorecard_submission "
+                "WHERE candidate_id IN (?,?)", (self.cid, second)).fetchall()
+        self.assertEqual(len(rows), 1)
+        self.assertEqual((rows[0][0], rows[0][1]), (second, event["event_id"]))
+        self.assertEqual(json.loads(rows[0][2])[0]["criterion_key"], KEY)
+        self.assertEqual(self.counts(self.cid), before_a)
+        self.page.get_by_role("button", name="← 返回项目工作区").click()
+        self.page.locator(f'tr[data-candidate-id="{second}"] [data-quick-action="scorecard"]').click()
+        expect(self.page.locator(".modal")).to_contain_text("仅属于第二位候选人的观察")
+
+    def test_list_quick_actions_do_not_write_when_no_interview_exists(self):
+        self.page.evaluate("window.setProjectTab('candidates')")
+        before = self.counts(self.cid)
+        row = self.page.locator(f'tr[data-candidate-id="{self.cid}"]')
+        row.locator('[data-quick-action="scorecard"]').click()
+        expect(self.page.locator("#toast-root")).to_contain_text("尚无可填写面评的面试记录")
+        expect(self.page.locator(".candidate-workspace-head h1")).to_have_text("Synthetic Person")
+        self.assertEqual(self.counts(self.cid), before)
+        self.page.get_by_role("button", name="← 返回项目工作区").click()
+        row = self.page.locator(f'tr[data-candidate-id="{self.cid}"]')
+        row.locator('[data-quick-action="verify"]').click()
+        expect(self.page.locator(".candidate-workspace-head h1")).to_have_text("Synthetic Person")
+        expect(self.page.locator(".candidate-step.active")).to_contain_text("资料")
+        self.assertEqual(self.counts(self.cid), before)
+
+
 if __name__ == "__main__":
     unittest.main()
