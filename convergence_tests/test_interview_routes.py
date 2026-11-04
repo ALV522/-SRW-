@@ -271,6 +271,66 @@ class InterviewRouteTests(unittest.TestCase):
                              ["protocol_revision_id"], revision_id)
             self.assertEqual(len(session.scalars(select(InterviewScorecardSubmission)).all()), 0)
 
+    def test_legacy_unpinned_event_cannot_acquire_future_revision_by_patch(self):
+        """HTTP/SQLite: an old event cannot acquire a later Published identity."""
+        def payload(key):
+            return {"criteria": [{"criterion_key": key, "name": key,
+                                  "definition": "Synthetic criterion"}],
+                    "assessment_stages": [{"stage_key": "interview", "criteria": [key]}]}
+
+        with self.factory.begin() as session:
+            project = session.get(Project, session.get(Candidate, self.cid).project_id)
+            first = ProtocolRevision(project_id=project.id, revision=1, state="published",
+                                     payload_json=json.dumps(payload("r1-key")),
+                                     content_hash="d" * 64)
+            session.add(first)
+            session.flush()
+            project.current_protocol_revision_id = first.id
+
+        legacy = self.add_event(event_state="scheduled", metadata={
+            "questions": [{"question": "Legacy question without version", "criterion_key": ""}]})
+        self.assertEqual(legacy.status_code, 200, legacy.text)
+        eid = legacy.json()["event_id"]
+        with self.factory() as session:
+            before = session.get(RecruitmentEvent, eid).metadata_json
+            self.assertNotIn("protocol_revision_id", json.loads(before))
+
+        with self.factory.begin() as session:
+            project = session.get(Project, session.get(Candidate, self.cid).project_id)
+            first = session.get(ProtocolRevision, project.current_protocol_revision_id)
+            first.state = "superseded"
+            second = ProtocolRevision(project_id=project.id, revision=2, state="published",
+                                      payload_json=json.dumps(payload("r2-key")),
+                                      content_hash="e" * 64)
+            session.add(second)
+            session.flush()
+            project.current_protocol_revision_id = second.id
+            r2 = second.id
+
+        before_audit = self.audit_count("RECRUITMENT_EVENT_UPDATED")
+        forged = self.client.patch(f"/api/v1/events/{eid}", json={
+            "event_state": "completed",
+            "metadata": {"protocol_revision_id": r2,
+                         "questions": [{"criterion_key": "r2-key", "question": "Backdated R2"}]}})
+        self.assertEqual(forged.status_code, 409, forged.text)
+        with self.factory() as session:
+            row = session.get(RecruitmentEvent, eid)
+            self.assertEqual(row.metadata_json, before)
+            self.assertEqual(row.event_state, "scheduled")
+            self.assertIsNone(row.source_id)
+            self.assertEqual(len(session.scalars(select(Source)).all()), 0)
+            self.assertEqual(len(session.scalars(select(MaterialRevision)).all()), 0)
+        self.assertEqual(self.audit_count("RECRUITMENT_EVENT_UPDATED"), before_audit)
+
+        # Preserve normal legacy note-taking and never silently backfill a pin.
+        notes = self.client.patch(f"/api/v1/events/{eid}", json={
+            "notes": "Follow up on original interview"})
+        self.assertEqual(notes.status_code, 200, notes.text)
+        with self.factory() as session:
+            row = session.get(RecruitmentEvent, eid)
+            self.assertEqual(row.metadata_json, before)
+            self.assertEqual(row.notes, "Follow up on original interview")
+
     def test_phone_screen_without_published_criteria_still_completes(self):
         """Non-structured phone follow-up is a preserved legacy operator action."""
         created = self.client.post(f"/api/v1/candidates/{self.cid}/events", json={
