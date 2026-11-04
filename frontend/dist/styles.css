@@ -66,3 +66,4 @@ button,input,textarea,select{font:inherit}.app-shell{display:grid;grid-template-
 .notice{border:1px solid var(--line);border-radius:10px;padding:12px 14px;background:#fafbfc;line-height:1.65}
 .notice.danger{border-color:#f2b8b5;background:#fff5f4;color:#7a1f16}
 .criterion-head .subtle{font-size:12px;text-align:right}
+.criterion-def{font-size:12px;color:var(--muted);line-height:1.6;margin:-4px 0 10px}
