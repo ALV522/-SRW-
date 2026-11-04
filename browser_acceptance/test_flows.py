@@ -269,6 +269,26 @@ class RecruitmentBrowserAcceptance(unittest.TestCase):
         self.assertEqual(len(matches), 1)
         return matches[0]["project_id"]
 
+    def publish_criterion(self, project_id: str, key: str = "research_reasoning", name: str = "研究推理") -> None:
+        forked = self.context.request.post(self.base + f"/api/v1/projects/{project_id}/protocol-drafts")
+        self.assertEqual(forked.status, 200, forked.text())
+        revision = forked.json()["revision_id"]
+        payload = {
+            "brief": {"title": "合成岗位", "summary": "浏览器验收"},
+            "criteria": [{"criterion_key": key, "name": name, "definition": "合成标准",
+                          "decision_critical": True, "verification_required": False,
+                          "verification_probes": ["样例问题"], "weight": 1}],
+            "assessment_stages": [{"stage_key": "interview", "name": "面试", "criteria": [key]}],
+            "decision_policy": {"human_final": True},
+        }
+        patched = self.context.request.patch(
+            self.base + f"/api/v1/protocol-revisions/{revision}",
+            data=json.dumps({"payload": payload}, ensure_ascii=False),
+            headers={"Content-Type": "application/json"})
+        self.assertEqual(patched.status, 200, patched.text())
+        published = self.context.request.post(self.base + f"/api/v1/protocol-revisions/{revision}/publish")
+        self.assertEqual(published.status, 200, published.text())
+
     def new_candidate(self, project_id: str, name: str) -> str:
         self.page.locator(".tabs").get_by_role("button", name="候选人收件").click()
         expect(self.page.get_by_role("button", name="＋ 新增候选人")).to_be_visible()
@@ -318,7 +338,7 @@ class RecruitmentBrowserAcceptance(unittest.TestCase):
         expect(self.page.locator(".source-card")).to_contain_text("结构化调研与数据分析")
         expect(self.page.get_by_role("button", name="记录人工决定")).to_be_disabled()
 
-        self.page.locator(".candidate-workspace-tab").filter(has_text="流程与跟进").click()
+        self.page.locator(".candidate-step").filter(has_text="面试").click()
         expect(self.page.get_by_role("button", name="编辑下一步")).to_be_visible()
         self.page.get_by_role("button", name="编辑下一步").click()
         self.page.locator("#ap-owner").fill("模拟招聘负责人")
@@ -329,7 +349,7 @@ class RecruitmentBrowserAcceptance(unittest.TestCase):
         self.assertEqual(plan.get("owner"), "模拟招聘负责人")
         self.assertEqual(plan.get("reason"), "安排人工电话核实")
 
-        self.page.locator(".candidate-workspace-tab").filter(has_text="Offer").click()
+        self.page.locator(".candidate-step").filter(has_text="Offer").click()
         expect(self.page.get_by_role("button", name="创建 Offer")).to_be_disabled()
         # Backend enforces actual human pipeline transitions. Test through the UI,
         # not by bypassing the stage gate with direct API calls.
@@ -370,7 +390,7 @@ class RecruitmentBrowserAcceptance(unittest.TestCase):
         counts = self.get_json("/api/v1/dashboard")
         self.page.get_by_role("button", name="← 返回项目工作区").click()
         self.page.locator(".tabs").get_by_role("button", name="候选人收件").click()
-        row = self.page.locator("tbody tr").filter(has_text=cid)
+        row = self.page.locator(f'tr[data-candidate-id="{cid}"]')
         row.get_by_role("button", name="归档", exact=True).click()
         expect(row).to_have_count(0)
         archived = self.get_json("/api/v1/dashboard")
@@ -387,7 +407,7 @@ class RecruitmentBrowserAcceptance(unittest.TestCase):
         self.assertEqual(restored["candidates_by_stage"]["new"], counts["candidates_by_stage"]["new"])
         self.page.locator("#cand-archive").select_option("active")
         self.page.get_by_role("button", name="应用筛选").click()
-        row.get_by_role("button", name="工作区", exact=True).click()
+        row.get_by_role("button", name="打开工作台", exact=True).click()
         expect(self.page.locator(".source-card")).to_contain_text(material)
         self.assertEqual(self.get_json(f"/api/v1/candidates/{cid}/workspace")["sources"], before["sources"])
 
@@ -408,14 +428,19 @@ class RecruitmentBrowserAcceptance(unittest.TestCase):
 
     def test_03_interview_is_a_real_persisted_workflow(self) -> None:
         pid = self.new_project("面试闭环")
+        # A structured interview requires a Published interview-stage criterion.
+        self.publish_criterion(pid)
         cid = self.new_candidate(pid, "模拟候选人丙")
-        self.page.locator(".candidate-workspace-tab").filter(has_text="流程与跟进").click()
+        self.page.locator(".candidate-step").filter(has_text="面试").click()
         self.page.get_by_role("button", name="＋ 面试排期").click()
         self.page.locator("#e-title").fill("模拟一面")
         self.page.locator("#e-time").fill("2026-11-12T14:00")
         self.page.locator("#e-interviewer").fill("模拟面试官")
         self.page.locator("#e-location").fill("线上")
         self.page.locator("#modal-root").get_by_role("button", name="保存", exact=True).click()
+        # Saving re-checks the Published revision before the POST, so wait for
+        # the modal to close (i.e. the request resolved) before reading rows.
+        expect(self.page.locator("#modal-root .modal")).to_have_count(0)
         events = self.get_json(f"/api/v1/candidates/{cid}/events")["events"]
         self.assertTrue(any(x.get("title") == "模拟一面" for x in events), events)
         expect(self.page.locator(".candidate-workspace-content")).to_contain_text("模拟一面")
@@ -424,8 +449,9 @@ class RecruitmentBrowserAcceptance(unittest.TestCase):
 
     def test_04_independent_interview_scorecards_cannot_be_overwritten(self) -> None:
         pid = self.new_project("独立面试评价")
+        self.publish_criterion(pid)
         cid = self.new_candidate(pid, "模拟候选人-双面试官")
-        self.page.locator(".candidate-workspace-tab").filter(has_text="流程与跟进").click()
+        self.page.locator(".candidate-step").filter(has_text="面试").click()
         self.page.get_by_role("button", name="＋ 面试排期").click()
         self.page.locator("#e-title").fill("合成双人结构化面试")
         self.page.locator("#e-time").fill("2026-11-20T10:00")
@@ -444,12 +470,13 @@ class RecruitmentBrowserAcceptance(unittest.TestCase):
             self.page.get_by_role("button", name="独立 Scorecard").click()
             expect(self.page.locator("#sc-evaluator")).to_be_visible()
             self.page.locator("#sc-evaluator").fill(evaluator)
-            self.page.locator("#sc-key").fill("research_reasoning")
-            self.page.locator("#sc-rating").select_option(rating)
+            block = self.page.locator("#modal-root .criterion-block").filter(has_text="研究推理")
+            block.locator(".c-rating").select_option(rating)
+            block.locator(".c-obs").fill("模拟行为观察，纯合成数据")
+            block.locator(".c-support").fill("模拟支持性证据")
+            block.locator(".c-counter").fill("模拟需要复核的内容")
+            block.locator(".c-rec").fill(recommendation)
             self.page.locator("#sc-rec").fill(recommendation)
-            self.page.locator("#sc-observation").fill("模拟行为观察，纯合成数据")
-            self.page.locator("#sc-support").fill("模拟支持性证据")
-            self.page.locator("#sc-counter").fill("模拟需要复核的内容")
             self.page.get_by_role("button", name="提交并锁定").click()
             expect(self.page.locator("#modal-root .modal")).to_have_count(0)
 
@@ -481,7 +508,7 @@ class RecruitmentBrowserAcceptance(unittest.TestCase):
     def test_05_offer_lifecycle_requires_human_transitions_and_never_auto_hires(self) -> None:
         pid = self.new_project("Offer 状态闭环")
         cid = self.new_candidate(pid, "模拟候选人-Offer")
-        self.page.locator(".candidate-workspace-tab").filter(has_text="Offer").click()
+        self.page.locator(".candidate-step").filter(has_text="Offer").click()
         expect(self.page.get_by_role("button", name="创建 Offer")).to_be_disabled()
         for stage in ("shortlisted", "interview"):
             self.page.get_by_role("button", name="推进阶段").click()
@@ -1028,12 +1055,14 @@ class RecruitmentBrowserAcceptance(unittest.TestCase):
     def test_10_completed_interview_correction_replaces_current_evidence_via_ui(self) -> None:
         """Operator revises interview evidence in the real browser without mutating Source history."""
         pid = self.new_project("面试记录更正")
+        self.publish_criterion(pid)
         cid = self.new_candidate(pid, "模拟面试记录校正候选人")
-        self.page.locator(".candidate-workspace-tab").filter(has_text="流程与跟进").click()
+        self.page.locator(".candidate-step").filter(has_text="面试").click()
         self.page.get_by_role("button", name="＋ 面试排期").click()
         self.page.locator("#e-state").select_option("completed")
         self.page.locator("#e-title").fill("模拟已完成面试")
-        self.page.locator("#e-questions").fill(" | 请说明工作经验 | 核对客观情况")
+        self.page.locator("#modal-root .c-q").fill("请说明工作经验")
+        self.page.locator("#modal-root .c-p").fill("核对客观情况")
         self.page.locator("#e-notes").fill("原先面试记录")
         self.page.locator("#modal-root").get_by_role("button", name="保存", exact=True).click()
         expect(self.page.locator("#modal-root .modal")).to_have_count(0)
@@ -1202,7 +1231,7 @@ class RecruitmentBrowserAcceptance(unittest.TestCase):
         decisions = self.get_json(f"/api/v1/candidates/{cid}/decision-history")
         writes = []
         self.page.on("request", lambda r: writes.append(r.url) if r.method == "POST" else None)
-        self.page.get_by_role("button", name="流程与跟进").click()
+        self.page.locator(".candidate-step").filter(has_text="面试").click()
         self.page.get_by_role("button", name="查看/应用差异").click()
         dialog = self.page.locator("#modal-root")
         expect(dialog.get_by_role("heading", name="复评差异确认")).to_be_visible()
@@ -1290,7 +1319,7 @@ class RecruitmentBrowserAcceptance(unittest.TestCase):
         self.page.locator("#v-evidence").select_option("strong")
         self.page.locator("#v-reason").fill("合成人工核实记录")
         self.page.get_by_role("button", name="保存人工核实").click()
-        self.page.get_by_role("button", name="流程与跟进").click()
+        self.page.locator(".candidate-step").filter(has_text="面试").click()
         before = self.get_json(f"/api/v1/candidates/{cid}/assessment")
         workspace = self.get_json(f"/api/v1/candidates/{cid}/workspace")
         claim = next(c for c in workspace["claims"] if c["authority"] == "human")
