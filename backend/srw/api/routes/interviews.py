@@ -125,6 +125,8 @@ def event_metadata(session, candidate_id: str, event_type: str, value: Any) -> d
             str(c.get("criterion_key")): c for c in (published.get("criteria") or [])
             if isinstance(c, dict) and c.get("criterion_key")
         }
+        if not question_keys.issubset(criteria_by_key):
+            raise V1InvariantError("pinned interview references a missing published criterion")
         requested = metadata.get("criteria_snapshot")
         if requested is not None:
             if not isinstance(requested, list) or any(not isinstance(c, dict) for c in requested):
