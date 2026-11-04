@@ -407,7 +407,7 @@ class RecruitmentBrowserAcceptance(unittest.TestCase):
         self.assertEqual(restored["candidates_by_stage"]["new"], counts["candidates_by_stage"]["new"])
         self.page.locator("#cand-archive").select_option("active")
         self.page.get_by_role("button", name="应用筛选").click()
-        row.get_by_role("button", name="工作区", exact=True).click()
+        row.get_by_role("button", name="打开工作台", exact=True).click()
         expect(self.page.locator(".source-card")).to_contain_text(material)
         self.assertEqual(self.get_json(f"/api/v1/candidates/{cid}/workspace")["sources"], before["sources"])
 
@@ -428,6 +428,8 @@ class RecruitmentBrowserAcceptance(unittest.TestCase):
 
     def test_03_interview_is_a_real_persisted_workflow(self) -> None:
         pid = self.new_project("面试闭环")
+        # A structured interview requires a Published interview-stage criterion.
+        self.publish_criterion(pid)
         cid = self.new_candidate(pid, "模拟候选人丙")
         self.page.locator(".candidate-step").filter(has_text="面试").click()
         self.page.get_by_role("button", name="＋ 面试排期").click()
@@ -436,6 +438,9 @@ class RecruitmentBrowserAcceptance(unittest.TestCase):
         self.page.locator("#e-interviewer").fill("模拟面试官")
         self.page.locator("#e-location").fill("线上")
         self.page.locator("#modal-root").get_by_role("button", name="保存", exact=True).click()
+        # Saving re-checks the Published revision before the POST, so wait for
+        # the modal to close (i.e. the request resolved) before reading rows.
+        expect(self.page.locator("#modal-root .modal")).to_have_count(0)
         events = self.get_json(f"/api/v1/candidates/{cid}/events")["events"]
         self.assertTrue(any(x.get("title") == "模拟一面" for x in events), events)
         expect(self.page.locator(".candidate-workspace-content")).to_contain_text("模拟一面")
@@ -1050,6 +1055,7 @@ class RecruitmentBrowserAcceptance(unittest.TestCase):
     def test_10_completed_interview_correction_replaces_current_evidence_via_ui(self) -> None:
         """Operator revises interview evidence in the real browser without mutating Source history."""
         pid = self.new_project("面试记录更正")
+        self.publish_criterion(pid)
         cid = self.new_candidate(pid, "模拟面试记录校正候选人")
         self.page.locator(".candidate-step").filter(has_text="面试").click()
         self.page.get_by_role("button", name="＋ 面试排期").click()

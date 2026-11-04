@@ -1,8 +1,10 @@
-"""S1 UX acceptance: next action, stage stepper, criterion-driven forms.
+"""S1a acceptance: protocol-pinned interview forms, scorecards and completion.
 
-Real Chromium against a disposable loopback Core. Proves that HR never has to
-type a criterion UUID: the published protocol generates the interview outline
-and the scorecard rows.
+Real Chromium against a disposable loopback Core plus real SQLite assertions.
+The contract under test (PR #207 review): only the *Published* protocol may
+generate structured interview content, every event/scorecard stays bound to the
+candidate and protocol revision it was created under, and a revision change
+fails closed instead of silently remapping criterion keys.
 """
 from __future__ import annotations
 
@@ -17,12 +19,14 @@ import time
 import unittest
 import urllib.error
 import urllib.request
+from contextlib import closing
 from pathlib import Path
 
 from playwright.sync_api import expect, sync_playwright
 
 ROOT = Path(__file__).resolve().parents[1]
 KEY = "comm"
+KEY_R2 = "delivery"
 TEXT = "Synthetic candidate led a cross-team launch; the launch shipped on time."
 
 PROTOCOL = {
@@ -35,6 +39,20 @@ PROTOCOL = {
     "assessment_stages": [
         {"stage_key": "resume", "name": "简历筛选", "criteria": [KEY]},
         {"stage_key": "interview", "name": "面试", "criteria": [KEY]},
+    ],
+    "decision_policy": {"human_final": True},
+}
+
+PROTOCOL_R2 = {
+    "brief": {"title": "Backend Engineer", "summary": "Synthetic requisition v2"},
+    "criteria": [{
+        "criterion_key": KEY_R2, "name": "交付能力", "definition": "按期交付",
+        "decision_critical": True, "verification_required": False,
+        "verification_probes": ["讲一次按期交付的项目"], "weight": 1,
+    }],
+    "assessment_stages": [
+        {"stage_key": "resume", "name": "简历筛选", "criteria": [KEY_R2]},
+        {"stage_key": "interview", "name": "面试", "criteria": [KEY_R2]},
     ],
     "decision_policy": {"human_final": True},
 }
@@ -118,6 +136,7 @@ class CandidateNextActionBrowserTests(unittest.TestCase):
         self.assertFalse(self.page_errors, self.page_errors)
         self.context.close()
 
+    # ------------------------------------------------------------------ helpers
     def _request(self, method, path, payload):
         response = self.page.request.fetch(
             self.base + path, method=method, data=json.dumps(payload),
@@ -131,15 +150,63 @@ class CandidateNextActionBrowserTests(unittest.TestCase):
     def patch(self, path, payload):
         return self._request("PATCH", path, payload)
 
+    def get(self, path):
+        response = self.page.request.get(self.base + path)
+        self.assertEqual(response.status, 200, response.text())
+        return response.json()
+
     def db(self):
         return sqlite3.connect(Path(self.temp.name) / "data" / "srw_v1.db")
 
-    def test_row_offers_the_next_action_and_the_stepper_opens_the_interview(self):
+    def counts(self, cid):
+        with closing(self.db()) as connection:
+            return {
+                "events": connection.execute(
+                    "SELECT COUNT(*) FROM recruitment_event WHERE candidate_id=?", (cid,)).fetchone()[0],
+                "scorecards": connection.execute(
+                    "SELECT COUNT(*) FROM interview_scorecard_submission WHERE candidate_id=?",
+                    (cid,)).fetchone()[0],
+                "sources": connection.execute(
+                    "SELECT COUNT(*) FROM source WHERE candidate_id=?", (cid,)).fetchone()[0],
+                "audits": connection.execute(
+                    "SELECT COUNT(*) FROM audit_event WHERE candidate_id=?", (cid,)).fetchone()[0],
+            }
+
+    def publish_next(self, pid, payload):
+        forked = self.post(f"/api/v1/projects/{pid}/protocol-drafts", {})
+        revision = forked["revision_id"]
+        self.patch(f"/api/v1/protocol-revisions/{revision}", {"payload": payload})
+        self.post(f"/api/v1/protocol-revisions/{revision}/publish", {})
+        return revision
+
+    def open_step(self, cid, step="面试"):
+        self.page.evaluate("cid => window.openCandidate(cid)", cid)
+        expect(self.page.locator(".candidate-steps")).to_be_visible()
+        self.page.locator(".candidate-step").filter(has_text=step).click()
+
+    def schedule_interview(self, cid=None, question="请说明一次跨部门协作经历"):
+        cid = cid or self.cid
+        self.open_step(cid)
+        self.page.get_by_role("button", name="＋ 面试排期").click()
+        modal = self.page.locator(".modal")
+        expect(modal.locator(".criterion-block")).to_have_count(1)
+        modal.locator(".c-q").fill(question)
+        self.page.get_by_role("button", name="保存").click()
+        expect(self.page.locator("#modal-root .modal")).to_have_count(0)
+        with closing(self.db()) as connection:
+            row = connection.execute(
+                "SELECT id, metadata_json FROM recruitment_event "
+                "WHERE candidate_id=? ORDER BY rowid DESC LIMIT 1", (cid,)).fetchone()
+        return row[0], json.loads(row[1])
+
+    # ------------------------------------------------------------------- S1a UI
+    def test_row_opens_the_workspace_and_the_stepper_shows_the_next_action(self):
         self.page.evaluate("window.setProjectTab('candidates')")
         row = self.page.locator("tbody tr").filter(has_text="Synthetic Person")
         expect(row).to_be_visible()
         row_button = row.locator("button.btn.primary")
-        expect(row_button).to_have_text("核实事实")
+        # A row never asserts "verified"/"should offer"; it only navigates.
+        expect(row_button).to_have_text("打开工作台")
         row_button.click()
         expect(self.page.locator(".candidate-steps")).to_be_visible()
         expect(self.page.locator(".candidate-step")).to_have_count(3)
@@ -148,32 +215,22 @@ class CandidateNextActionBrowserTests(unittest.TestCase):
         expect(self.page.get_by_role("button", name="＋ 面试排期")).to_be_visible()
 
     def test_interview_form_is_generated_from_the_published_criterion(self):
-        self.page.locator(".candidate-step").filter(has_text="面试").click()
-        self.page.get_by_role("button", name="＋ 面试排期").click()
-        modal = self.page.locator(".modal")
-        expect(modal.locator(".criterion-block")).to_have_count(1)
-        expect(modal.locator(".criterion-head")).to_contain_text("沟通能力")
-        self.assertNotIn("criterion_key", modal.inner_text())
-        self.assertNotIn(KEY, modal.inner_text())
-        modal.locator(".c-q").fill("请讲一次你推动跨部门协作的经历")
-        modal.locator(".c-p").fill("核实跨部门沟通能力")
-        self.page.get_by_role("button", name="保存").click()
-        expect(self.page.locator(".timeline")).to_contain_text("面试")
-        with self.db() as connection:
-            questions = json.loads(connection.execute(
-                "SELECT metadata_json FROM recruitment_event ORDER BY rowid DESC LIMIT 1").fetchone()[0])["questions"]
-        self.assertEqual(questions, [{"criterion_key": KEY,
-                                      "question": "请讲一次你推动跨部门协作的经历",
-                                      "purpose": "核实跨部门沟通能力", "answer": ""}])
+        event_id, metadata = self.schedule_interview()
+        with closing(self.db()) as connection:
+            stored = json.loads(connection.execute(
+                "SELECT metadata_json FROM recruitment_event WHERE id=?", (event_id,)).fetchone()[0])
+        self.assertEqual(stored["questions"], [{"criterion_key": KEY,
+                                                "question": "请说明一次跨部门协作经历",
+                                                "purpose": "", "answer": ""}])
+        self.assertEqual(stored["criteria_snapshot"], [{"criterion_key": KEY, "name": "沟通能力"}])
+        published = self.get(f"/api/v1/projects/{self.pid}/protocol-workspace")
+        self.assertEqual(stored["protocol_revision_id"], published["current_revision_id"])
+        self.assertEqual(metadata["criteria_snapshot"][0]["name"], "沟通能力")
 
     def test_scorecard_never_asks_for_a_key(self):
-        self.post(f"/api/v1/candidates/{self.cid}/events",
-                  {"event_type": "interview", "title": "面试", "event_state": "scheduled"})
-        self.page.evaluate("window.setProjectTab('candidates')")
-        self.page.locator("tbody tr").filter(has_text="Synthetic Person").locator("button.btn.primary").click()
-        expect(self.page.locator(".candidate-steps")).to_be_visible()
-        self.page.locator(".candidate-step").filter(has_text="面试").click()
-        self.page.get_by_role("button", name="独立 Scorecard").click()
+        event_id, _ = self.schedule_interview()
+        self.page.locator(".timeline-item").filter(has_text="面试").get_by_role(
+            "button", name="独立 Scorecard").click()
         modal = self.page.locator(".modal")
         self.assertNotIn("Criterion Key", modal.inner_text())
         self.assertNotIn(KEY, modal.inner_text())
@@ -185,20 +242,19 @@ class CandidateNextActionBrowserTests(unittest.TestCase):
         modal.locator("#sc-rec").fill("advance")
         self.page.get_by_role("button", name="提交并锁定").click()
         expect(self.page.locator("#modal-root .modal")).to_have_count(0)
-        with self.db() as connection:
-            feedback = json.loads(connection.execute(
-                "SELECT feedback_json FROM interview_scorecard_submission ORDER BY rowid DESC LIMIT 1").fetchone()[0])
+        with closing(self.db()) as connection:
+            row = connection.execute(
+                "SELECT event_id, feedback_json FROM interview_scorecard_submission "
+                "ORDER BY rowid DESC LIMIT 1").fetchone()
+        self.assertEqual(row[0], event_id)
+        feedback = json.loads(row[1])
         self.assertEqual(feedback[0]["criterion_key"], KEY)
         self.assertEqual(feedback[0]["rating"], "strong")
 
-    def test_completion_form_uses_the_same_criterion_rows(self):
-        task = self.post(f"/api/v1/candidates/{self.cid}/events",
-                         {"event_type": "interview", "title": "面试", "event_state": "scheduled"})
-        self.page.evaluate("window.setProjectTab('candidates')")
-        self.page.locator("tbody tr").filter(has_text="Synthetic Person").locator("button.btn.primary").click()
-        expect(self.page.locator(".candidate-steps")).to_be_visible()
-        self.page.locator(".candidate-step").filter(has_text="面试").click()
-        self.page.locator(".timeline-item").filter(has_text="面试").get_by_role("button", name="完成").first.click()
+    def test_completion_form_uses_the_event_criterion_rows_and_keeps_questions(self):
+        event_id, metadata = self.schedule_interview()
+        self.page.locator(".timeline-item").filter(has_text="面试").get_by_role(
+            "button", name="完成").first.click()
         modal = self.page.locator(".modal")
         expect(modal.locator(".criterion-block")).to_have_count(1)
         self.assertNotIn(KEY, modal.inner_text())
@@ -207,11 +263,132 @@ class CandidateNextActionBrowserTests(unittest.TestCase):
         modal.locator("#event-overall").fill("advance")
         self.page.get_by_role("button", name="完成").last.click()
         expect(self.page.locator("#modal-root .modal")).to_have_count(0)
-        with self.db() as connection:
-            feedback = json.loads(connection.execute(
-                "SELECT metadata_json FROM recruitment_event WHERE id=?",
-                (task["event_id"],)).fetchone()[0])["feedback"]
-        self.assertEqual(feedback[0]["criterion_key"], KEY)
+        with closing(self.db()) as connection:
+            stored = json.loads(connection.execute(
+                "SELECT metadata_json FROM recruitment_event WHERE id=?", (event_id,)).fetchone()[0])
+        self.assertEqual(stored["questions"], metadata["questions"])
+        self.assertEqual(stored["protocol_revision_id"], metadata["protocol_revision_id"])
+        self.assertEqual(stored["feedback"][0]["criterion_key"], KEY)
+
+    # ----------------------------------------------------- (a) Draft-only block
+    def test_draft_only_protocol_never_creates_a_structured_interview(self):
+        created = self.post("/api/v1/projects", {"title": "Draft Only", "role_title": "Engineer"})
+        pid = created["project_id"]
+        self.patch(f"/api/v1/protocol-revisions/{created['draft_revision_id']}", {"payload": PROTOCOL})
+        cid = self.post(f"/api/v1/projects/{pid}/candidates",
+                        {"display_name": "Draft Person"})["candidate_id"]
+        workspace = self.get(f"/api/v1/projects/{pid}/protocol-workspace")
+        self.assertIsNone(workspace["current"])
+        self.assertEqual(len(workspace["draft"]["criteria"]), 1)
+
+        self.page.evaluate("pid => window.openProject(pid)", pid)
+        self.open_step(cid)
+        self.page.get_by_role("button", name="＋ 面试排期").click()
+        modal = self.page.locator(".modal")
+        expect(modal.locator(".notice.danger")).to_be_visible()
+        expect(modal.locator(".notice.danger")).to_contain_text("还没有已发布的岗位标准")
+        self.assertEqual(modal.locator(".criterion-block").count(), 0)
+        self.assertEqual(modal.get_by_role("button", name="保存").count(), 0)
+        self.assertEqual(self.counts(cid)["events"], 0)
+
+        # The same wall applies after a reload: nothing was cached into the form.
+        self.page.reload(wait_until="domcontentloaded")
+        self.page.wait_for_function("Boolean(window.openProject)")
+        self.page.evaluate("pid => window.openProject(pid)", pid)
+        self.open_step(cid)
+        self.page.get_by_role("button", name="＋ 面试排期").click()
+        expect(self.page.locator(".modal .notice.danger")).to_be_visible()
+        self.assertEqual(self.counts(cid)["events"], 0)
+
+    # ------------------------------------ (b) candidate ownership under switching
+    def test_event_and_scorecard_stay_bound_to_the_opening_candidate(self):
+        """Ownership survives a candidate switch and is refused when ids disagree.
+
+        (1) A scorecard modal opened for B keeps writing to B even after the
+            workspace underneath is switched to A.
+        (2) A dashboard deep link whose candidate id and event id disagree is
+            refused instead of silently scoring somebody else's interview.
+        """
+        other = self.post(f"/api/v1/projects/{self.pid}/candidates",
+                          {"display_name": "Second Person"})["candidate_id"]
+        event_id, _ = self.schedule_interview(other, question="B 的面试问题")
+        self.page.locator(".timeline-item").filter(has_text="面试").get_by_role(
+            "button", name="独立 Scorecard").click()
+        modal = self.page.locator(".modal")
+        expect(modal.locator(".criterion-block")).to_have_count(1)
+
+        # (1) switch the visible workspace to the other candidate mid-modal
+        self.page.evaluate("cid => window.openCandidate(cid)", self.cid)
+        expect(self.page.locator(".candidate-steps")).to_be_visible()
+        modal.locator("#sc-evaluator").fill("面试官B")
+        modal.locator(".c-obs").fill("只应归属第二个候选人")
+        modal.locator(".c-rec").fill("advance")
+        self.page.get_by_role("button", name="提交并锁定").click()
+        expect(self.page.locator("#modal-root .modal")).to_have_count(0)
+        with closing(self.db()) as connection:
+            rows = connection.execute(
+                "SELECT candidate_id, event_id FROM interview_scorecard_submission").fetchall()
+        self.assertEqual(rows, [(other, event_id)])
+        self.assertEqual(self.counts(self.cid)["scorecards"], 0)
+
+        # (2) deep link with a mismatched candidate id must be refused
+        before = self.counts(other)["scorecards"]
+        self.page.evaluate(
+            "args => window.openOperationalItem('pending_interview_feedback', args.pid, args.cid, args.eid)",
+            {"pid": self.pid, "cid": self.cid, "eid": event_id})
+        mismatch = self.page.locator(".modal")
+        expect(mismatch.locator(".notice.danger")).to_be_visible()
+        expect(mismatch.locator(".notice.danger")).to_contain_text("不属于当前候选人")
+        self.assertEqual(mismatch.get_by_role("button", name="提交并锁定").count(), 0)
+        self.assertEqual(self.counts(other)["scorecards"], before)
+
+    # --------------------------------------------- (c) R1 open, R2 before submit
+    def test_revision_change_while_the_form_is_open_blocks_the_write(self):
+        self.open_step(self.cid)
+        self.page.get_by_role("button", name="＋ 面试排期").click()
+        modal = self.page.locator(".modal")
+        expect(modal.locator(".criterion-block")).to_have_count(1)
+        modal.locator(".c-q").fill("R1 提纲问题")
+
+        revision = self.publish_next(self.pid, PROTOCOL_R2)
+        self.assertTrue(revision)
+
+        self.page.get_by_role("button", name="保存").click()
+        expect(self.page.locator("#toast-root")).to_contain_text("岗位标准已更新")
+        self.assertEqual(self.counts(self.cid)["events"], 0)
+        self.assertEqual(self.counts(self.cid)["sources"], 1)
+
+    # ------------------------------------- (d) historical R1 event after a R2 swap
+    def test_historical_event_is_never_remapped_by_a_newer_revision(self):
+        event_id, metadata = self.schedule_interview()
+        before = self.counts(self.cid)
+        self.publish_next(self.pid, PROTOCOL_R2)
+
+        self.open_step(self.cid)
+        self.page.locator(".timeline-item").filter(has_text="面试").get_by_role(
+            "button", name="完成").first.click()
+        modal = self.page.locator(".modal")
+        expect(modal.locator(".notice.danger")).to_be_visible()
+        expect(modal.locator(".notice.danger")).to_contain_text("已阻止提交")
+        self.assertEqual(modal.get_by_role("button", name="完成").count(), 0)
+        self.page.get_by_role("button", name="关闭").click()
+
+        self.page.locator(".timeline-item").filter(has_text="面试").get_by_role(
+            "button", name="独立 Scorecard").click()
+        scorecard_modal = self.page.locator(".modal")
+        expect(scorecard_modal.locator(".notice.danger")).to_be_visible()
+        expect(scorecard_modal.locator(".notice.danger")).to_contain_text("已阻止提交")
+        self.assertEqual(scorecard_modal.get_by_role("button", name="提交并锁定").count(), 0)
+        self.page.get_by_role("button", name="关闭").click()
+
+        after = self.counts(self.cid)
+        self.assertEqual(after, before)
+        with closing(self.db()) as connection:
+            stored = json.loads(connection.execute(
+                "SELECT metadata_json FROM recruitment_event WHERE id=?", (event_id,)).fetchone()[0])
+        self.assertEqual(stored, metadata)
+        self.assertEqual(stored["questions"][0]["criterion_key"], KEY)
+        self.assertNotIn(KEY_R2, json.dumps(stored, ensure_ascii=False))
 
 
 if __name__ == "__main__":
