@@ -199,23 +199,34 @@ def _check_live_db_health(db: Path) -> None:
 def _check_unchanged_restore_blobs(data: Path, db: Path, state: dict) -> None:
     """Retain undo if pinned Source bytes disappear before any Core DB writes.
 
-    A terminal cleanup can follow legitimate post-restore recruitment writes:
-    the old Blob inventory is no longer authoritative once the live DB differs
-    or a nonempty WAL might contain committed changes. Only the still-pinned,
-    no-pending-WAL case may safely demand exact restored Blob bytes.
+    A terminal cleanup can follow legitimate post-restore recruitment writes,
+    so a changed main DB cannot be compared to its pinned restore snapshot.
+    When the main DB is still pinned, a nonempty WAL is NOT proof that every
+    pinned Source Blob may disappear: it may contain no net logical change.
+    In WAL mode preserve all pinned Blob bytes, while allowing newly added
+    Blobs associated with legitimate committed WAL writes.
     """
     if not state["target_blobs"]:
         return
     wal = Path(str(db) + "-wal")
     _safe_path(wal)
+    wal_nonempty = False
     if wal.exists():
         if not wal.is_file():
             raise RuntimeError("unsafe SQLite WAL during pending restore cleanup")
-        if wal.stat().st_size:
-            return
+        wal_nonempty = wal.stat().st_size > 0
     if _digest(db) != state["target_db_sha256"]:
         return
-    if _blob_inventory(data / "blobs") != state["target_blobs"]:
+    current = _blob_inventory(data / "blobs")
+    expected = state["target_blobs"]
+    if wal_nonempty:
+        # WAL may include legitimate new Source writes. New files are allowed,
+        # but the immutable restored Source bytes must still be present.
+        changed = any(current is None or current.get(name) != digest
+                      for name, digest in expected.items())
+    else:
+        changed = current != expected
+    if changed:
         raise RuntimeError(
             "restored Blob inventory differs from pinned transaction during pending cleanup; preserve journal and undo"
         )
