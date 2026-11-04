@@ -258,7 +258,7 @@ class RecruitmentBrowserAcceptance(unittest.TestCase):
     def new_project(self, label: str) -> str:
         title = label + "-" + uuid.uuid4().hex[:8]
         self.page.goto(self.base + "/v1", wait_until="domcontentloaded")
-        expect(self.page.locator("#content h1")).to_have_text("工作台总览")
+        expect(self.page.locator("#content h1")).to_have_text("今日待办")
         self.page.get_by_role("button", name="＋ 新建招聘项目").click()
         self.page.locator("#np-title").fill(title)
         self.page.locator("#np-role").fill("产品分析师")
@@ -290,7 +290,7 @@ class RecruitmentBrowserAcceptance(unittest.TestCase):
         self.assertEqual(published.status, 200, published.text())
 
     def new_candidate(self, project_id: str, name: str) -> str:
-        self.page.locator(".tabs").get_by_role("button", name="候选人收件").click()
+        self.page.locator(".tabs").get_by_role("button", name="候选人").click()
         expect(self.page.get_by_role("button", name="＋ 新增候选人")).to_be_visible()
         self.page.get_by_role("button", name="＋ 新增候选人").click()
         self.page.locator("#cand-name").fill(name)
@@ -389,7 +389,7 @@ class RecruitmentBrowserAcceptance(unittest.TestCase):
         before = self.get_json(f"/api/v1/candidates/{cid}/workspace")
         counts = self.get_json("/api/v1/dashboard")
         self.page.get_by_role("button", name="← 返回项目工作区").click()
-        self.page.locator(".tabs").get_by_role("button", name="候选人收件").click()
+        self.page.locator(".tabs").get_by_role("button", name="候选人").click()
         row = self.page.locator(f'tr[data-candidate-id="{cid}"]')
         row.get_by_role("button", name="归档", exact=True).click()
         expect(row).to_have_count(0)
@@ -420,7 +420,7 @@ class RecruitmentBrowserAcceptance(unittest.TestCase):
             self.page.get_by_role("button", name="归档项目", exact=True).click()
         self.assertEqual(response.value.status, 200)
         self.page.goto(self.base + "/v1", wait_until="domcontentloaded")
-        expect(self.page.locator("#content h1")).to_have_text("工作台总览")
+        expect(self.page.locator("#content h1")).to_have_text("今日待办")
         funnel = self.page.locator(".funnel-step").filter(has=self.page.locator("span", has_text="新候选人"))
         expect(funnel.locator("strong")).to_have_text(str(counts["candidates_by_stage"]["new"] - 1))
         self.assertEqual(self.get_json(f"/api/v1/candidates/{cid}/workspace")["sources"], before["sources"])
@@ -582,7 +582,7 @@ class RecruitmentBrowserAcceptance(unittest.TestCase):
 
     def test_06_human_verification_decision_stale_and_explicit_reaffirmation(self) -> None:
         pid = self.new_project("人工证据决策")
-        self.page.locator(".tabs").get_by_role("button", name="建岗与标准").click()
+        self.page.locator(".tabs").get_by_role("button", name="岗位与标准").click()
         expect(self.page.get_by_role("button", name="＋ 添加标准")).to_be_visible()
         self.page.get_by_role("button", name="＋ 添加标准").click()
         expect(self.page.locator(".criterion-row")).to_have_count(1)
@@ -610,7 +610,7 @@ class RecruitmentBrowserAcceptance(unittest.TestCase):
             lambda w: w.get("current_revision_id") is not None,
             label="persisted published criterion before candidate flow",
         )
-        expect(self.page.locator(".tabs").get_by_role("button", name="候选人收件")).to_be_visible()
+        expect(self.page.locator(".tabs").get_by_role("button", name="候选人")).to_be_visible()
         self.assertEqual(
             self.get_json(f"/api/v1/projects/{pid}/protocol-workspace")["current"]["criteria"][0]["criterion_key"],
             key,
@@ -729,7 +729,7 @@ class RecruitmentBrowserAcceptance(unittest.TestCase):
     def test_07_published_protocol_change_invalidates_previous_human_decision(self) -> None:
         """New verification-critical hiring standard invalidates old approval."""
         pid = self.new_project("标准版本失效")
-        self.page.locator(".tabs").get_by_role("button", name="建岗与标准").click()
+        self.page.locator(".tabs").get_by_role("button", name="岗位与标准").click()
         self.page.get_by_role("button", name="＋ 添加标准").click()
         expect(self.page.locator(".criterion-row")).to_have_count(1)
         first = self.page.locator(".criterion-row").first
@@ -788,7 +788,7 @@ class RecruitmentBrowserAcceptance(unittest.TestCase):
         # the published protocol. An unchanged document/material version
         # must not allow the old decision to survive a new critical criterion.
         self.page.evaluate("() => window.closeCandidateWorkspace()")
-        self.page.locator(".tabs").get_by_role("button", name="建岗与标准").click()
+        self.page.locator(".tabs").get_by_role("button", name="岗位与标准").click()
         expect(self.page.get_by_role(
             "button", name="基于当前版本创建新草案"
         )).to_be_visible()
@@ -890,7 +890,7 @@ class RecruitmentBrowserAcceptance(unittest.TestCase):
         - neither message carries transport/host details.
         """
         pid = self.new_project("诊断夹具")
-        self.page.locator(".tabs").get_by_role("button", name="建岗与标准").click()
+        self.page.locator(".tabs").get_by_role("button", name="岗位与标准").click()
         self.page.get_by_role("button", name="＋ 添加标准").click()
         expect(self.page.locator(".criterion-row")).to_have_count(1)
         first = self.page.locator(".criterion-row").first
@@ -971,8 +971,8 @@ class RecruitmentBrowserAcceptance(unittest.TestCase):
         # The warning must survive navigating to another page, not only a reload:
         # shell() re-renders on every page change, so this is the real proof that
         # it is global rather than a Settings-only line.
-        self.page.get_by_role("button", name="系统设置").click()
-        expect(self.page.locator("#top-title")).to_have_text("系统设置")
+        self.page.locator(".nav-item").filter(has_text="设置").click()
+        expect(self.page.locator("#top-title")).to_have_text("设置")
         expect(self.page.locator("#restore-banner")).to_be_visible()
 
         self.page.once("dialog", lambda dialog: dialog.accept())
@@ -1103,7 +1103,7 @@ class RecruitmentBrowserAcceptance(unittest.TestCase):
         blob = data / "blobs" / "e2e-restore" / "synthetic"
         blob.parent.mkdir(parents=True, exist_ok=True)
         blob.write_bytes(b"synthetic backup evidence")
-        self.page.locator(".sidebar").get_by_role("button", name="系统设置").click()
+        self.page.locator(".nav-item").filter(has_text="设置").click()
         with self.page.expect_response(
             lambda response: response.url == self.base + "/api/v1/system/backups"
             and response.request.method == "POST"
@@ -1207,7 +1207,7 @@ class RecruitmentBrowserAcceptance(unittest.TestCase):
 
     def test_13_reevaluation_preview_cancel_and_explicit_apply(self) -> None:
         pid = self.new_project("复评确认")
-        self.page.locator(".tabs").get_by_role("button", name="建岗与标准").click()
+        self.page.locator(".tabs").get_by_role("button", name="岗位与标准").click()
         self.page.get_by_role("button", name="＋ 添加标准").click()
         self.page.locator(".criterion-row .c-name").fill("合成经验")
         self.page.locator(".criterion-row .c-stage").first.check()
@@ -1277,7 +1277,7 @@ class RecruitmentBrowserAcceptance(unittest.TestCase):
     def test_15_empty_or_unassigned_criteria_cannot_publish(self) -> None:
         """Real browser refuses invalid saved drafts; Core independently returns 409."""
         pid = self.new_project("空标准发布阻断")
-        self.page.locator(".tabs").get_by_role("button", name="建岗与标准").click()
+        self.page.locator(".tabs").get_by_role("button", name="岗位与标准").click()
         expect(self.page.get_by_role("button", name="发布当前标准")).to_be_visible()
         attempted = []
         self.page.on("request", lambda req: attempted.append(req.url)
@@ -1303,7 +1303,7 @@ class RecruitmentBrowserAcceptance(unittest.TestCase):
 
     def test_14_structured_reevaluation_created_and_applied_through_ui(self) -> None:
         pid = self.new_project("结构化复评")
-        self.page.locator(".tabs").get_by_role("button", name="建岗与标准").click()
+        self.page.locator(".tabs").get_by_role("button", name="岗位与标准").click()
         self.page.get_by_role("button", name="＋ 添加标准").click()
         self.page.locator(".criterion-row .c-name").fill("合成研究能力")
         self.page.locator(".criterion-row .c-stage").first.check()

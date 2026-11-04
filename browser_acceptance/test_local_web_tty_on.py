@@ -159,7 +159,7 @@ class LocalWebTtySessionOnAcceptance(unittest.TestCase):
 
                         page.get_by_label("一次性配对码").fill(code)
                         page.get_by_role("button", name="连接工作台").click()
-                        expect(page.locator("#content h1")).to_have_text("工作台总览")
+                        expect(page.locator("#content h1")).to_have_text("今日待办")
                         self.assertNotIn("srw_business_session=", page.evaluate("document.cookie"))
                         self.assertIn("srw_csrf=", page.evaluate("document.cookie"))
 
