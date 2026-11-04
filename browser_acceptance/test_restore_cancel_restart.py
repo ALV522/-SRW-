@@ -184,8 +184,8 @@ class RestoreCancelRestartAcceptance(unittest.TestCase):
         expect(self.page.locator("#content h1")).to_be_visible()
 
     def create_project_via_ui(self, title: str) -> None:
-        self.page.locator("aside .nav-item", has_text="工作台总览").click()
-        expect(self.page.locator("#content h1")).to_have_text("工作台总览")
+        self.page.locator("aside .nav-item", has_text="今日待办").click()
+        expect(self.page.locator("#content h1")).to_have_text("今日待办")
         self.page.get_by_role("button", name="＋ 新建招聘项目").click()
         self.page.locator("#np-title").fill(title)
         self.page.locator("#np-role").fill("Synthetic recovery analyst")
@@ -200,8 +200,8 @@ class RestoreCancelRestartAcceptance(unittest.TestCase):
         schedule confirmation itself warns about post-schedule data loss; a future
         edit that drops that warning fails here.
         """
-        self.page.locator("aside .nav-item", has_text="系统设置").click()
-        expect(self.page.locator("#top-title")).to_have_text("系统设置")
+        self.page.locator("aside .nav-item", has_text="设置").click()
+        expect(self.page.locator("#top-title")).to_have_text("设置")
         expect(self.page.locator("#content")).to_contain_text(filename)
         seen: dict[str, str] = {}
 

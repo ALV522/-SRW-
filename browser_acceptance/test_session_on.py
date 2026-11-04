@@ -32,7 +32,8 @@ from srw.api.app import create_v1_app  # noqa: E402
 
 class BusinessSessionOnBrowserAcceptance(unittest.TestCase):
     def setUp(self) -> None:
-        self.temp = tempfile.TemporaryDirectory(prefix="srw-session-on-browser-")
+        self.temp = tempfile.TemporaryDirectory(prefix="srw-session-on-browser-",
+                                                ignore_cleanup_errors=True)
         self.addCleanup(self.temp.cleanup)
         self.root = Path(self.temp.name)
         self.data = self.root / "data"
@@ -120,7 +121,7 @@ class BusinessSessionOnBrowserAcceptance(unittest.TestCase):
 
         self.page.get_by_label("一次性配对码").fill(self.code)
         self.page.get_by_role("button", name="连接工作台").click()
-        expect(self.page.locator("#content h1")).to_have_text("工作台总览")
+        expect(self.page.locator("#content h1")).to_have_text("今日待办")
         self.assertNotIn("srw_business_session=", self.page.evaluate("document.cookie"))
         self.assertIn("srw_csrf=", self.page.evaluate("document.cookie"))
 
