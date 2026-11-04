@@ -159,6 +159,49 @@ class ManualClaimBrowserAcceptance(unittest.TestCase):
                 "SELECT COUNT(*) FROM audit_event WHERE event_type='CLAIM_PROPOSED_MANUALLY'"
             ).fetchone()[0], 0)
 
+    def test_manual_claim_survives_reload_and_never_moves_to_another_candidate(self):
+        # This is an operator workflow with no Provider request or background worker.
+        self.page.get_by_role("button", name="人工提出 Claim").click()
+        self.select_quote("candidate shipped a service")
+        self.page.locator("#srw-manual-normalized").fill("Persistent manual evidence")
+        self.page.get_by_role("button", name="提交待核实 Claim").click()
+        expect(self.page.locator(".claim.unreviewed")).to_have_count(1)
+
+        other = self.post(f"/api/v1/projects/{self.pid}/candidates",
+                          {"display_name": "Synthetic Other Person"})["candidate_id"]
+        self.page.evaluate("""async ([pid, cid]) => {
+            await window.openProject(pid);
+            await window.openCandidate(cid);
+        }""", [self.pid, other])
+        expect(self.page.locator(".claim.unreviewed")).to_have_count(0)
+
+        self.page.reload(wait_until="domcontentloaded")
+        self.page.wait_for_function("Boolean(window.openProject && window.openCandidate)")
+        self.page.evaluate("""async ([pid, cid]) => {
+            await window.openProject(pid);
+            await window.openCandidate(cid);
+        }""", [self.pid, self.cid])
+        expect(self.page.locator(".claim.unreviewed")).to_have_count(1)
+        with sqlite3.connect(Path(self.temp.name) / "data" / "srw_v1.db") as db:
+            rows = db.execute("SELECT candidate_id FROM claim").fetchall()
+            audit = db.execute(
+                "SELECT COUNT(*) FROM audit_event WHERE event_type='CLAIM_PROPOSED_MANUALLY'"
+            ).fetchone()[0]
+        self.assertEqual(rows, [(self.cid,)])
+        self.assertEqual(audit, 1)
+        self.page.locator(".claim.unreviewed").get_by_role(
+            "button", name="确认事实").click()
+        expect(self.page.locator(".claim.confirmed")).to_have_count(1)
+
+        self.page.reload(wait_until="domcontentloaded")
+        self.page.wait_for_function("Boolean(window.openProject && window.openCandidate)")
+        self.page.evaluate("""async ([pid, cid]) => {
+            await window.openProject(pid);
+            await window.openCandidate(cid);
+        }""", [self.pid, self.cid])
+        expect(self.page.locator(".claim.confirmed")).to_have_count(1)
+        self.assertEqual(self.count("claim"), 1)
+
     def test_no_quote_selection_cannot_write(self):
         self.page.get_by_role("button", name="人工提出 Claim").click()
         self.page.get_by_role("button", name="引用选中文本").click()

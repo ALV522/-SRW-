@@ -185,6 +185,33 @@ class OperatorClickBudgetAcceptance(unittest.TestCase):
             self.assertEqual(json.loads(scorecards[0][1])[0]["criterion_key"],
                              "synthetic-communication")
 
+            # The browser's candidate context must not read B's feedback as A.
+            # This is a real HTTP read against the same Core/SQLite instance.
+            with sqlite3.connect(db_path) as db:
+                event_id = db.execute(
+                    "SELECT id FROM recruitment_event WHERE candidate_id=?", (b,)
+                ).fetchone()[0]
+                before_audit = db.execute("SELECT COUNT(*) FROM audit_event").fetchone()[0]
+            scoped = (f"/api/v1/projects/{pid}/candidates/{b}"
+                      f"/events/{event_id}/scorecards")
+            own = page.request.get(self.base + scoped)
+            self.assertEqual(own.status, 200, own.text())
+            self.assertEqual(own.json()["scorecards"][0]["evaluator"],
+                             "Synthetic Interviewer")
+            foreign = page.request.get(
+                self.base + f"/api/v1/projects/{pid}/candidates/{a}"
+                f"/events/{event_id}/scorecards")
+            self.assertEqual(foreign.status, 404, foreign.text())
+            self.assertNotIn("只属于候选人B的面评", foreign.text())
+            self.assertNotIn("Synthetic Interviewer", foreign.text())
+            with sqlite3.connect(db_path) as db:
+                self.assertEqual(
+                    db.execute("SELECT COUNT(*) FROM audit_event").fetchone()[0],
+                    before_audit)
+                self.assertEqual(
+                    db.execute("SELECT COUNT(*) FROM interview_scorecard_submission").fetchone()[0],
+                    1)
+
             page.reload(wait_until="domcontentloaded")
             page.wait_for_function("Boolean(window.openProject && window.openCandidate)")
             page.evaluate("pid => window.openProject(pid)", pid)
