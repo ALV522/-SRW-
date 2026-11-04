@@ -283,7 +283,7 @@ class InterviewRouteTests(unittest.TestCase):
                         {"criterion_key": "comm", "name": "Communication", "definition": "Team alignment"},
                         {"criterion_key": "finance", "name": "Finance", "definition": "Finance expertise"},
                     ],
-                    "assessment_stages": [{"stage_key": "interview", "criteria": ["comm"]}],
+                    "assessment_stages": [{"stage_key": "interview", "criteria": ["comm", "ghost"]}],
                 }), content_hash="c" * 64,
             )
             session.add(protocol)
@@ -304,6 +304,8 @@ class InterviewRouteTests(unittest.TestCase):
         self.assertEqual(wrong_stage.status_code, 409, wrong_stage.text)
         unknown = write("invented")
         self.assertEqual(unknown.status_code, 409, unknown.text)
+        orphan = write("ghost")
+        self.assertEqual(orphan.status_code, 409, orphan.text)
         forged = write("comm", [{
             "criterion_key": "comm", "name": "Finance", "definition": "Invented meaning",
         }])
