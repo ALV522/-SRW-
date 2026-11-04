@@ -688,5 +688,38 @@ class CandidateNextActionBrowserTests(unittest.TestCase):
         self.assertEqual(self.counts(self.cid), before)
 
 
+    def test_list_multiple_interviews_never_guesses_an_event_id(self):
+        second = self.post(f"/api/v1/projects/{self.pid}/candidates",
+                           {"display_name": "Synthetic Second"})["candidate_id"]
+        published = self.get(f"/api/v1/projects/{self.pid}/protocol-workspace")
+        for label in ("Interview One", "Interview Two"):
+            self.post(f"/api/v1/candidates/{second}/events", {
+                "event_type": "interview", "event_state": "scheduled",
+                "title": label, "metadata": {
+                    "protocol_revision_id": published["current_revision_id"],
+                    "questions": [{"criterion_key": KEY, "question": label}]}})
+        before = self.counts(second)
+        self.page.evaluate("window.setProjectTab('candidates')")
+        self.page.locator(f'tr[data-candidate-id="{second}"] [data-quick-action="scorecard"]').click()
+        expect(self.page.locator(".candidate-workspace-head h1")).to_have_text("Synthetic Second")
+        expect(self.page.locator("#toast-root")).to_contain_text("有多场面试")
+        expect(self.page.locator("#modal-root .modal")).to_have_count(0)
+        self.assertEqual(self.counts(second), before)
+
+    def test_list_stale_archived_row_is_blocked_by_fresh_core_summary(self):
+        second = self.post(f"/api/v1/projects/{self.pid}/candidates",
+                           {"display_name": "Synthetic Second"})["candidate_id"]
+        self.page.evaluate("window.setProjectTab('candidates')")
+        row = self.page.locator(f'tr[data-candidate-id="{second}"]')
+        expect(row.locator('[data-quick-action="schedule"]')).to_be_visible()
+        self.post(f"/api/v1/candidates/{second}/archive", {})
+        before = self.counts(second)
+        row.locator('[data-quick-action="schedule"]').click()
+        expect(self.page.locator("#toast-root")).to_contain_text("已归档")
+        expect(self.page.locator("#modal-root .modal")).to_have_count(0)
+        self.assertEqual(self.counts(second), before)
+
+
+
 if __name__ == "__main__":
     unittest.main()
