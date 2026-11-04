@@ -429,7 +429,8 @@ class CandidateNextActionBrowserTests(unittest.TestCase):
         self.post(f"/api/v1/events/{event_id}/scorecards",
                   {"evaluator": "旧评价者", "recommendation": "hold", "submit": True,
                    "feedback": [{"criterion_key": KEY, "rating": "concern",
-                                 "observation": "旧版本记录"}]})
+                                 "observation": "旧版本记录",
+                                  "recommendation": "<img src=x onerror=alert(1)>"}]})
         before = self.counts(self.cid)
 
         self.open_step(self.cid)
@@ -440,6 +441,9 @@ class CandidateNextActionBrowserTests(unittest.TestCase):
         # No snapshot on a legacy event: neutral label, never the raw key.
         expect(readonly).to_contain_text("历史标准 1")
         expect(readonly).to_contain_text("旧版本记录")
+        expect(readonly.locator(".scorecard-history thead")).to_contain_text("逐项建议")
+        expect(readonly).to_contain_text("<img src=x onerror=alert(1)>")
+        self.assertEqual(readonly.locator(".scorecard-history img").count(), 0)
         self.assertNotIn(KEY, readonly.inner_text())
         expect(readonly.locator(".notice")).to_contain_text("没有保存创建时的标准版本")
         self.assertEqual(readonly.get_by_role("button", name="提交并锁定").count(), 0)
