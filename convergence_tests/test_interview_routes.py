@@ -223,6 +223,23 @@ class InterviewRouteTests(unittest.TestCase):
             self.assertEqual(len(session.scalars(select(Source)).all()), 0)
         self.assertEqual(len(self.client.get(path).json()["scorecards"]), 1)
 
+        # Scheduled R1 can be cancelled after R2, even though a new R1
+        # structured completion/Scorecard must be rejected.
+        cancel = self.client.patch(f"/api/v1/events/{eid}", json={
+            "event_state": "cancelled", "notes": "Candidate withdrew before interview"})
+        self.assertEqual(cancel.status_code, 200, cancel.text)
+        self.assertEqual(self.audit_count("RECRUITMENT_EVENT_UPDATED"), before_audit[0] + 1)
+        with self.factory() as session:
+            historical = session.get(RecruitmentEvent, eid)
+            self.assertEqual(historical.event_state, "cancelled")
+            self.assertEqual(historical.notes, "Candidate withdrew before interview")
+            self.assertEqual(historical.metadata_json, before_metadata)
+            self.assertIsNone(historical.source_id)
+        disguised_rewrite = self.client.patch(f"/api/v1/events/{eid}", json={
+            "event_state": "cancelled", "metadata": metadata})
+        self.assertEqual(disguised_rewrite.status_code, 409, disguised_rewrite.text)
+        self.assertEqual(self.audit_count("RECRUITMENT_EVENT_UPDATED"), before_audit[0] + 1)
+
     def test_pinned_interview_rejects_pin_removal_and_foreign_scorecard_key(self):
         with self.factory.begin() as session:
             project = session.get(Project, session.get(Candidate, self.cid).project_id)
