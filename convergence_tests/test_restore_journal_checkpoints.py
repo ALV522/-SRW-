@@ -335,6 +335,9 @@ raise SystemExit(98)
         with closing(sqlite3.connect(source)) as conn:
             self.assertEqual(conn.execute("PRAGMA journal_mode=WAL").fetchone()[0], "wal")
             conn.execute("PRAGMA wal_checkpoint(TRUNCATE)")
+        # The fixture's original target.zip is immutable; replace it only
+        # inside this synthetic test workspace before publishing a new plan.
+        self.archive.unlink()
         write_backup_archive(self.archive, source, self.root / "src-blobs")
         marker = json.loads(self.marker.read_text(encoding="utf-8"))
         marker["sha256"] = hashlib.sha256(self.archive.read_bytes()).hexdigest()
