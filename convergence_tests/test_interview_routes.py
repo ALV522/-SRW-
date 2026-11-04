@@ -254,5 +254,23 @@ class InterviewRouteTests(unittest.TestCase):
                              ["protocol_revision_id"], revision_id)
             self.assertEqual(len(session.scalars(select(InterviewScorecardSubmission)).all()), 0)
 
+    def test_phone_screen_without_published_criteria_still_completes(self):
+        """Non-structured phone follow-up is a preserved legacy operator action."""
+        created = self.client.post(f"/api/v1/candidates/{self.cid}/events", json={
+            "event_type": "phone_screen", "event_state": "scheduled",
+            "title": "Synthetic call", "notes": "Awaiting callback"})
+        self.assertEqual(created.status_code, 200, created.text)
+        eid = created.json()["event_id"]
+        completed = self.client.patch(f"/api/v1/events/{eid}", json={
+            "event_state": "completed", "notes": "Reached candidate"})
+        self.assertEqual(completed.status_code, 200, completed.text)
+        with self.factory() as session:
+            row = session.get(RecruitmentEvent, eid)
+            self.assertEqual(row.event_state, "completed")
+            self.assertEqual(row.notes, "Reached candidate")
+            self.assertIsNone(row.source_id)
+
+
+
 if __name__ == "__main__":
     unittest.main()
