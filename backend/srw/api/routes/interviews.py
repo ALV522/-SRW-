@@ -280,6 +280,10 @@ def interview_routes(*, factory) -> list[Route]:
                 require_pinned_event_revision(session, row.candidate_id, pinned)
             if "metadata" in body:
                 updated = event_metadata(session, row.candidate_id, row.event_type, body.get("metadata"))
+                if not pinned and updated.get("protocol_revision_id"):
+                    # A legacy event has no authoritative creation-time revision.
+                    # Never let a later PATCH assign it a revision it never used.
+                    raise V1InvariantError("legacy event protocol revision cannot be introduced retroactively")
                 if pinned and updated.get("protocol_revision_id") != pinned:
                     raise V1InvariantError("event protocol revision cannot be removed or replaced")
                 metadata = updated
