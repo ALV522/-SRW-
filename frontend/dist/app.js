@@ -282,14 +282,24 @@ window.saveActionPlan=async cid=>{try{await api(`/api/v1/candidates/${cid}/actio
 window.openPhoneScript=async cid=>{try{const r=await api(`/api/v1/candidates/${cid}/phone-script`);modal('电话脚本 / 核实思路',`<p class="subtle">${esc(r.note)}</p><div class="quick-list">${r.questions.map(x=>`<div class="quick-item"><div><div class="quick-title">${esc(x.question)}</div><div class="quick-note">为什么问：${esc(x.purpose)}</div></div></div>`).join('')}</div>`,`<button class="btn" onclick="closeModal()">关闭</button>`)}catch(e){toast(e.message,true)}};
 window.openScorecards=async(cid,eid)=>{
   try{
-    let ctx=null;
-    try{ctx=await eventWriteContext(cid,eid)}
-    catch(e){blockedNotice('独立 Interview Scorecard',e.message||'无法读取该面试记录','在确认这条面试属于当前候选人、且标准版本未变化之前，不会读取任何 Scorecard，也不会写入数据。');return}
+    let ev=null;
+    try{ev=await eventContext(cid,eid)}
+    catch(e){blockedNotice('独立 Interview Scorecard',e.message||'无法读取该面试记录','未读取该面试的任何反馈，也未写入数据。');return}
     const r=await api(`/api/v1/events/${eid}/scorecards`);
     const existing=r.scorecards.length?`<div class="quick-list">${r.scorecards.map(x=>`<div class="quick-item"><div><div class="quick-title">${esc(x.evaluator)} · ${esc(x.state)}</div><div class="quick-note">${esc(x.recommendation||'')}</div></div></div>`).join('')}</div>`:'<div class="empty">尚无评价者提交 Scorecard</div>';
+    /* Ownership is enough to READ history; only a new write needs the pinned
+       revision. A changed Published revision makes the record read-only, not
+       invisible. */
+    let ctx=null,readonly='';
+    try{ctx=await eventWriteContext(cid,eid,ev)}catch(e){readonly=e.message||'该记录当前不可编辑'}
+    if(readonly){
+      modal('独立 Interview Scorecard',`${existing}<div class="notice" role="status" style="margin-top:12px"><strong>只读</strong><div class="subtle" style="margin-top:6px">${esc(readonly)}</div><div class="subtle" style="margin-top:6px">历史评分仍可查看；本次不会新增或修改任何记录。</div></div>`,`<button class="btn" onclick="closeModal()">关闭</button>`);
+      return;
+    }
     modal('独立 Interview Scorecard',`${existing}<div class="divider"></div><div class="form-grid"><div class="field"><label>评价者</label><input id="sc-evaluator" class="input"></div><div class="field"><label>总体建议</label><input id="sc-rec" class="input" placeholder="advance / hold / reject"></div></div><div id="sc-criteria" style="margin-top:12px">${criterionFeedbackRows(ctx.keys,ctx.names,ctx.definitions)}</div><p class="subtle">不同评价者意见独立保存；系统不会自动平均成总分。</p>`,`<button class="btn" onclick="closeModal()">关闭</button><button class="btn primary" onclick="saveScorecard('${cid}','${eid}')">提交并锁定</button>`)
   }catch(e){toast(e.message||'无法读取该面试记录',true)}
 };
+
 
 window.saveScorecard=async(cid,eid)=>{
   try{

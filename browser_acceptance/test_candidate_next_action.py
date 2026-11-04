@@ -359,8 +359,10 @@ class CandidateNextActionBrowserTests(unittest.TestCase):
         self.page.locator(".timeline-item").filter(has_text="面试").get_by_role(
             "button", name="独立 Scorecard").click()
         scorecard_modal = self.page.locator(".modal")
-        expect(scorecard_modal.locator(".notice.danger")).to_be_visible()
-        expect(scorecard_modal.locator(".notice.danger")).to_contain_text("旧的标准版本")
+        # History stays readable; the new write is what gets refused.
+        expect(scorecard_modal.locator(".notice")).to_be_visible()
+        expect(scorecard_modal.locator(".notice")).to_contain_text("只读")
+        expect(scorecard_modal.locator(".notice")).to_contain_text("旧的标准版本")
         self.assertEqual(scorecard_modal.get_by_role("button", name="提交并锁定").count(), 0)
         self.page.get_by_role("button", name="关闭").click()
 
@@ -369,6 +371,63 @@ class CandidateNextActionBrowserTests(unittest.TestCase):
             stored = json.loads(connection.execute(
                 "SELECT metadata_json FROM recruitment_event WHERE id=?", (event_id,)).fetchone()[0])
         self.assertEqual(stored, metadata)
+
+    # ------------------------------- history stays readable after a revision swap
+    def test_historical_scorecard_stays_readable_after_revision_change(self):
+        event_id, _ = self.schedule_interview()
+        self.page.locator(".timeline-item").filter(has_text="面试").get_by_role(
+            "button", name="独立 Scorecard").click()
+        modal = self.page.locator(".modal")
+        modal.locator("#sc-evaluator").fill("历史面试官")
+        modal.locator(".c-obs").fill("R1 版本下的真实面评")
+        modal.locator(".c-rec").fill("advance")
+        self.page.get_by_role("button", name="提交并锁定").click()
+        expect(self.page.locator("#modal-root .modal")).to_have_count(0)
+        before = self.counts(self.cid)
+        with closing(self.db()) as connection:
+            stored_before = connection.execute(
+                "SELECT feedback_json FROM interview_scorecard_submission WHERE event_id=?",
+                (event_id,)).fetchone()[0]
+
+        self.publish_next(self.pid, PROTOCOL_R2)
+        self.open_step(self.cid)
+        self.page.locator(".timeline-item").filter(has_text="面试").get_by_role(
+            "button", name="独立 Scorecard").click()
+        readonly = self.page.locator(".modal")
+        expect(readonly.locator(".quick-list")).to_contain_text("历史面试官")
+        expect(readonly.locator(".notice")).to_contain_text("只读")
+        self.assertEqual(readonly.get_by_role("button", name="提交并锁定").count(), 0)
+        self.assertEqual(readonly.locator("#sc-evaluator").count(), 0)
+        self.page.get_by_role("button", name="关闭").click()
+
+        self.assertEqual(self.counts(self.cid), before)
+        with closing(self.db()) as connection:
+            stored_after = connection.execute(
+                "SELECT feedback_json FROM interview_scorecard_submission WHERE event_id=?",
+                (event_id,)).fetchone()[0]
+        self.assertEqual(stored_after, stored_before)
+
+    # ----------------------------- legacy history without a pinned revision is readable
+    def test_legacy_scorecard_without_pinned_revision_is_read_only(self):
+        created = self.post(f"/api/v1/candidates/{self.cid}/events",
+                            {"event_type": "interview", "title": "旧面试", "event_state": "completed",
+                             "metadata": {"questions": [{"criterion_key": KEY, "question": "旧问题"}]}})
+        event_id = created["event_id"]
+        self.post(f"/api/v1/events/{event_id}/scorecards",
+                  {"evaluator": "旧评价者", "recommendation": "hold", "submit": True,
+                   "feedback": [{"criterion_key": KEY, "rating": "concern",
+                                 "observation": "旧版本记录"}]})
+        before = self.counts(self.cid)
+
+        self.open_step(self.cid)
+        self.page.locator(".timeline-item").filter(has_text="旧面试").get_by_role(
+            "button", name="独立 Scorecard").click()
+        readonly = self.page.locator(".modal")
+        expect(readonly.locator(".quick-list")).to_contain_text("旧评价者")
+        expect(readonly.locator(".notice")).to_contain_text("没有保存创建时的标准版本")
+        self.assertEqual(readonly.get_by_role("button", name="提交并锁定").count(), 0)
+        self.page.get_by_role("button", name="关闭").click()
+        self.assertEqual(self.counts(self.cid), before)
 
     # ------------------------------------- legacy structured event, no pinned rev
     def test_legacy_event_without_pinned_revision_is_read_only(self):
@@ -379,8 +438,8 @@ class CandidateNextActionBrowserTests(unittest.TestCase):
         self.page.locator(".timeline-item").filter(has_text="旧面试").get_by_role(
             "button", name="独立 Scorecard").click()
         modal = self.page.locator(".modal")
-        expect(modal.locator(".notice.danger")).to_be_visible()
-        expect(modal.locator(".notice.danger")).to_contain_text("没有保存创建时的标准版本")
+        expect(modal.locator(".notice")).to_be_visible()
+        expect(modal.locator(".notice")).to_contain_text("没有保存创建时的标准版本")
         self.assertEqual(modal.get_by_role("button", name="提交并锁定").count(), 0)
         self.page.get_by_role("button", name="关闭").click()
         self.assertEqual(self.counts(self.cid)["scorecards"], 0)
@@ -521,8 +580,8 @@ class CandidateNextActionBrowserTests(unittest.TestCase):
         self.page.locator(".timeline-item").filter(has_text="面试").get_by_role(
             "button", name="独立 Scorecard").click()
         scorecard_modal = self.page.locator(".modal")
-        expect(scorecard_modal.locator(".notice.danger")).to_be_visible()
-        expect(scorecard_modal.locator(".notice.danger")).to_contain_text("已阻止提交")
+        expect(scorecard_modal.locator(".notice")).to_be_visible()
+        expect(scorecard_modal.locator(".notice")).to_contain_text("只读")
         self.assertEqual(scorecard_modal.get_by_role("button", name="提交并锁定").count(), 0)
         self.page.get_by_role("button", name="关闭").click()
 
