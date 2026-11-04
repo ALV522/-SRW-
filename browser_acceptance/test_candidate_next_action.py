@@ -184,6 +184,7 @@ class CandidateNextActionBrowserTests(unittest.TestCase):
         modal.locator(".c-rec").fill("advance")
         modal.locator("#sc-rec").fill("advance")
         self.page.get_by_role("button", name="提交并锁定").click()
+        expect(self.page.locator("#modal-root .modal")).to_have_count(0)
         with self.db() as connection:
             feedback = json.loads(connection.execute(
                 "SELECT feedback_json FROM interview_scorecard_submission ORDER BY rowid DESC LIMIT 1").fetchone()[0])
@@ -205,6 +206,7 @@ class CandidateNextActionBrowserTests(unittest.TestCase):
         modal.locator(".c-rec").fill("proceed")
         modal.locator("#event-overall").fill("advance")
         self.page.get_by_role("button", name="完成").last.click()
+        expect(self.page.locator("#modal-root .modal")).to_have_count(0)
         with self.db() as connection:
             feedback = json.loads(connection.execute(
                 "SELECT metadata_json FROM recruitment_event WHERE id=?",
