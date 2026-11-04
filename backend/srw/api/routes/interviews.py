@@ -352,7 +352,27 @@ def interview_routes(*, factory) -> list[Route]:
             return JSONResponse({"scorecard_id": row.id, "event_id": row.event_id, "evaluator": row.evaluator,
                                  "state": row.state, "recommendation": row.recommendation})
 
+    async def candidate_event_scorecards(request: Request) -> JSONResponse:
+        """Read an event only within its server-verified project/candidate context.
+
+        This is an ownership consistency check, not multi-user authorization:
+        local Host/session authentication remains a separate #43 contract.
+        """
+        pid = request.path_params["project_id"]
+        cid = request.path_params["candidate_id"]
+        eid = request.path_params["event_id"]
+        with factory() as session:
+            candidate = session.get(Candidate, cid)
+            if candidate is None or candidate.project_id != pid:
+                raise V1NotFoundError("scorecards not found in candidate context")
+            event = session.get(RecruitmentEvent, eid)
+            if event is None or event.candidate_id != cid:
+                raise V1NotFoundError("scorecards not found in candidate context")
+            return JSONResponse(scorecards_view(session, eid))
+
     return [
+        Route("/api/v1/projects/{project_id:str}/candidates/{candidate_id:str}/events/{event_id:str}/scorecards",
+              candidate_event_scorecards, methods=["GET"]),
         Route("/api/v1/candidates/{candidate_id:str}/events", events, methods=["GET"]),
         Route("/api/v1/candidates/{candidate_id:str}/events", add_event, methods=["POST"]),
         Route("/api/v1/events/{event_id:str}", update_event, methods=["PATCH"]),
