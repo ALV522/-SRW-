@@ -106,6 +106,41 @@ def event_metadata(session, candidate_id: str, event_type: str, value: Any) -> d
             "counter_evidence": str(item.get("counter_evidence") or "").strip(),
             "recommendation": str(item.get("recommendation") or "").strip(),
         })
+    # A published revision ID alone is insufficient to authorize arbitrary
+    # criterion keys: only the published interview-stage keys can be pinned.
+    if metadata.get("protocol_revision_id") and event_type == "interview":
+        published = ProtocolRepository(session).get_payload(metadata["protocol_revision_id"])
+        stage_keys = set()
+        for stage in published.get("assessment_stages") or []:
+            if isinstance(stage, dict) and (stage.get("stage_key") == "interview" or stage.get("name") == "面试"):
+                stage_keys.update(str(k) for k in (stage.get("criteria") or []) if isinstance(k, str) and k)
+        question_keys = {q["criterion_key"] for q in normalized_q}
+        if not stage_keys or not question_keys or not question_keys.issubset(stage_keys):
+            raise V1InvariantError("pinned interview must use published interview-stage criteria")
+        if any(f["criterion_key"] not in question_keys for f in normalized_f):
+            raise V1InvariantError("pinned interview feedback must use its original questions")
+        # The browser's name/definition snapshot is presentation data, not a
+        # source of authority. Check supplied values and persist canonical data.
+        criteria_by_key = {
+            str(c.get("criterion_key")): c for c in (published.get("criteria") or [])
+            if isinstance(c, dict) and c.get("criterion_key")
+        }
+        requested = metadata.get("criteria_snapshot")
+        if requested is not None:
+            if not isinstance(requested, list) or any(not isinstance(c, dict) for c in requested):
+                raise V1InvariantError("criteria_snapshot must be a list")
+            for item in requested:
+                key = str(item.get("criterion_key") or "")
+                canonical = criteria_by_key.get(key)
+                if (key not in question_keys or canonical is None or
+                        str(item.get("name") or "") != str(canonical.get("name") or "") or
+                        str(item.get("definition") or "") != str(canonical.get("definition") or "")):
+                    raise V1InvariantError("criteria_snapshot disagrees with the published revision")
+        metadata["criteria_snapshot"] = [
+            {"criterion_key": key, "name": str(criteria_by_key[key].get("name") or ""),
+             "definition": str(criteria_by_key[key].get("definition") or "")}
+            for key in dict.fromkeys(q["criterion_key"] for q in normalized_q)
+        ]
     metadata["questions"] = normalized_q
     metadata["feedback"] = normalized_f
     metadata["overall_recommendation"] = str(metadata.get("overall_recommendation") or "").strip()
