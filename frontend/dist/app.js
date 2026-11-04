@@ -108,7 +108,7 @@ window.openCandidateQuickAction=async(id,kind)=>{
     if(!['verify','schedule','scorecard'].includes(kind))throw uiError('不支持的候选人操作');
     const row=(state.candidateRows||[]).find(x=>x.candidate_id===id);
     if(!row||row.archived)throw uiError('候选人不在当前可操作列表中，请刷新后重试');
-    const summary=await api('/api/v1/candidates/'+id+'/summary');
+    const summary=await api(`/api/v1/candidates/${id}/summary`);
     if(!summary||summary.project_id!==state.projectId)throw uiError('候选人已不属于当前项目，已阻止跳转');
     if(summary.archived)throw uiError('候选人已归档，请先恢复后再操作');
     state.candidateReturnTab='candidates';
@@ -117,7 +117,7 @@ window.openCandidateQuickAction=async(id,kind)=>{
     await candidateDrawer(id);
     if(kind==='schedule'){await window.openEvent(id,'interview');return}
     if(kind==='scorecard'){
-      const result=await api('/api/v1/candidates/'+id+'/events');
+      const result=await api(`/api/v1/candidates/${id}/events`);
       const eligible=(result.events||[]).filter(e=>e.event_type==='interview'&&!['cancelled','no_show'].includes(e.event_state));
       if(eligible.length===1){await window.openScorecards(id,eligible[0].event_id);return}
       if(eligible.length>1){toast('该候选人有多场面试，请在当前面试面板选择准确的记录',true);return}
