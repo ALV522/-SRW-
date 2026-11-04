@@ -33,6 +33,7 @@ INTERVIEW_PATHS = {
     ("PATCH", "/api/v1/events/{event_id:str}"),
     ("GET", "/api/v1/events/{event_id:str}/scorecards"),
     ("POST", "/api/v1/events/{event_id:str}/scorecards"),
+    ("GET", "/api/v1/projects/{project_id:str}/candidates/{candidate_id:str}/events/{event_id:str}/scorecards"),
 }
 
 
@@ -160,6 +161,99 @@ class InterviewRouteTests(unittest.TestCase):
         self.assertEqual(second.json()["state"], "draft")
         self.assertEqual(self.client.get(path).json()["scorecards"].__len__(), 2)
 
+
+    def test_scoped_scorecard_read_rejects_cross_candidate_and_project_without_leaking(self):
+        """HTTP + SQLite: B's historical R1 assessment is not A's event."""
+        with self.factory.begin() as session:
+            project = session.get(Project, session.get(Candidate, self.cid).project_id)
+            pid = project.id
+            candidate_b = Candidate(project_id=pid, display_name="Synthetic B",
+                                    pipeline_stage="interview")
+            other_project = Project(title="Unrelated synthetic project")
+            session.add_all([candidate_b, other_project])
+            session.flush()
+            candidate_c = Candidate(project_id=other_project.id, display_name="Synthetic C",
+                                    pipeline_stage="interview")
+            session.add(candidate_c)
+            session.flush()
+            bid, cid, other_pid = candidate_b.id, candidate_c.id, other_project.id
+            r1 = ProtocolRevision(
+                project_id=pid, revision=1, state="published",
+                payload_json=json.dumps({
+                    "criteria": [{"criterion_key": "comm", "name": "R1 communication",
+                                  "definition": "R1 meaning"}],
+                    "assessment_stages": [{"stage_key": "interview", "criteria": ["comm"]}],
+                }), content_hash="a" * 64)
+            session.add(r1)
+            session.flush()
+            project.current_protocol_revision_id = r1.id
+            r1_id = r1.id
+
+        event_a = self.add_event(event_state="scheduled").json()["event_id"]
+        created_b = self.client.post(f"/api/v1/candidates/{bid}/events", json={
+            "event_type": "interview", "title": "B's interview",
+            "event_state": "scheduled",
+            "metadata": {"protocol_revision_id": r1_id,
+                         "questions": [{"criterion_key": "comm", "question": "R1 question"}]},
+        })
+        self.assertEqual(created_b.status_code, 200, created_b.text)
+        event_b = created_b.json()["event_id"]
+        posted = self.client.post(f"/api/v1/events/{event_b}/scorecards", json={
+            "evaluator": "B-only evaluator", "submit": True,
+            "feedback": [{"criterion_key": "comm", "rating": "strong",
+                          "recommendation": "B confidential recommendation"}],
+        })
+        self.assertEqual(posted.status_code, 200, posted.text)
+
+        with self.factory.begin() as session:
+            session.get(ProtocolRevision, r1_id).state = "superseded"
+            r2 = ProtocolRevision(project_id=pid, revision=2, state="published",
+                                  payload_json=json.dumps({
+                                      "criteria": [{"criterion_key": "comm", "name": "R2 changed",
+                                                    "definition": "New meaning"}],
+                                      "assessment_stages": [{"stage_key": "interview",
+                                                             "criteria": ["comm"]}],
+                                  }), content_hash="b" * 64)
+            session.add(r2)
+            session.flush()
+            session.get(Project, pid).current_protocol_revision_id = r2.id
+
+        def scoped(project_id, candidate_id, event_id):
+            return self.client.get(
+                f"/api/v1/projects/{project_id}/candidates/{candidate_id}"
+                f"/events/{event_id}/scorecards")
+
+        with self.factory() as session:
+            before = (session.get(RecruitmentEvent, event_b).metadata_json,
+                      session.get(InterviewScorecardSubmission, posted.json()["scorecard_id"]).feedback_json,
+                      session.scalar(select(AuditEvent).where(
+                          AuditEvent.event_type == "INTERVIEW_SCORECARD_SUBMITTED")).id)
+            before_count = len(session.scalars(select(AuditEvent)).all())
+
+        valid = scoped(pid, bid, event_b)
+        self.assertEqual(valid.status_code, 200, valid.text)
+        self.assertEqual(valid.json()["scorecards"][0]["evaluator"], "B-only evaluator")
+        self.assertEqual(valid.json()["scorecards"][0]["feedback"][0]["recommendation"],
+                         "B confidential recommendation")
+        self.assertEqual(scoped(pid, self.cid, event_a).status_code, 200)
+
+        for project_id, candidate_id, event_id in [
+            (pid, self.cid, event_b), (pid, bid, event_a),
+            (other_pid, bid, event_b), (pid, cid, event_b),
+            (pid, "missing-candidate", event_b), (pid, bid, "missing-event"),
+        ]:
+            response = scoped(project_id, candidate_id, event_id)
+            self.assertEqual(response.status_code, 404, response.text)
+            self.assertNotIn("B-only evaluator", response.text)
+            self.assertNotIn("B confidential recommendation", response.text)
+
+        with self.factory() as session:
+            after = (session.get(RecruitmentEvent, event_b).metadata_json,
+                     session.get(InterviewScorecardSubmission, posted.json()["scorecard_id"]).feedback_json,
+                     session.scalar(select(AuditEvent).where(
+                         AuditEvent.event_type == "INTERVIEW_SCORECARD_SUBMITTED")).id)
+            self.assertEqual(before, after)
+            self.assertEqual(len(session.scalars(select(AuditEvent)).all()), before_count)
 
     def test_pinned_interview_rejects_same_key_revision_drift_in_core(self):
         """Real HTTP/SQLite: R1 and R2 share a key but change its meaning."""
