@@ -497,6 +497,35 @@ class RecruitmentBrowserAcceptance(unittest.TestCase):
         expect(self.page.locator("#modal-root")).to_contain_text("模拟面试官乙")
         self.page.evaluate("window.closeModal()")
 
+        # A mismatched candidate/event identity must fail in the real browser
+        # before any Scorecard GET; an API-only 404 test cannot prove this.
+        foreign = self.context.request.post(
+            self.base + f"/api/v1/projects/{pid}/candidates",
+            data=json.dumps({"display_name": "模拟候选人-非所属"}, ensure_ascii=False),
+            headers={"Content-Type": "application/json"},
+        )
+        self.assertEqual(foreign.status, 200, foreign.text())
+        other_cid = foreign.json()["candidate_id"]
+        foreign_reads = []
+
+        def record_scorecard_read(request):
+            if request.method == "GET" and request.url.endswith("/scorecards"):
+                foreign_reads.append(request.url)
+
+        self.page.on("request", record_scorecard_read)
+        try:
+            self.page.evaluate(
+                "async ([candidate, event]) => await window.openScorecards(candidate, event)",
+                [other_cid, eid],
+            )
+            expect(self.page.locator("#modal-root")).to_contain_text(
+                "该面试记录不属于当前候选人"
+            )
+            self.assertEqual(foreign_reads, [])
+        finally:
+            self.page.remove_listener("request", record_scorecard_read)
+            self.page.evaluate("window.closeModal()")
+
         saved = self.get_json(f"/api/v1/events/{eid}/scorecards")
         self.assertEqual(len(saved["scorecards"]), 2, saved)
         self.assertEqual({x["state"] for x in saved["scorecards"]}, {"submitted"})
