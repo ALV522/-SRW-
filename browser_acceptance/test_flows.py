@@ -592,6 +592,39 @@ class RecruitmentBrowserAcceptance(unittest.TestCase):
                 self.assertEqual(db.execute(
                     "SELECT COUNT(*) FROM interview_scorecard_submission"
                 ).fetchone()[0], before_scores)
+            # Fault injection: the candidate's project changes after the
+            # mismatch prompt, before HR clicks its recovery action. The UI
+            # must recheck Core, refuse stale navigation and read no scorecard.
+            self.page.evaluate("window.closeModal()")
+            self.page.evaluate("pid => window.openProject(pid)", wrong_pid)
+            self.page.evaluate(
+                "async ([candidate, event]) => await window.openScorecards(candidate, event)",
+                [cid, eid],
+            )
+            expect(self.page.get_by_role(
+                "button", name="前往候选人所属项目")).to_be_visible()
+            with sqlite3.connect(db_path) as db:
+                db.execute("UPDATE candidate SET project_id=? WHERE id=?", (wrong_pid, cid))
+                db.commit()
+            try:
+                self.page.get_by_role(
+                    "button", name="前往候选人所属项目").click()
+                expect(self.page.locator("#modal-root [role=alert]")).to_contain_text(
+                    "候选人所属项目已变化"
+                )
+                self.assertEqual(wrong_project_reads, [expected_read])
+                with sqlite3.connect(db_path) as db:
+                    self.assertEqual(db.execute(
+                        "SELECT COUNT(*) FROM audit_event").fetchone()[0], before_audit)
+                    self.assertEqual(db.execute(
+                        "SELECT COUNT(*) FROM interview_scorecard_submission"
+                    ).fetchone()[0], before_scores)
+            finally:
+                # Restore synthetic fixture identity for the remaining checks.
+                with sqlite3.connect(db_path) as db:
+                    db.execute("UPDATE candidate SET project_id=? WHERE id=?", (pid, cid))
+                    db.commit()
+
         finally:
             self.page.remove_listener("request", record_wrong_project_read)
             self.page.evaluate("window.closeModal()")
