@@ -333,6 +333,14 @@ function scorecardHistoryHtml(list,ev){
 }
 window.openScorecards=async(cid,eid)=>{
   try{
+    // The selected project is UI state, not proof of candidate ownership.
+    // Verify it against Core before any candidate-scoped Scorecard GET.
+    if(!cid||!state.projectId)throw uiError('缺少候选人或项目上下文，已阻止读取面评');
+    const owner=await api(`/api/v1/candidates/${cid}/summary`);
+    if(!owner||!owner.project_id||owner.project_id!==state.projectId){
+      blockedNotice('独立 Interview Scorecard','候选人所属项目与当前项目不一致，已阻止读取','请返回正确项目重新打开该候选人；本次未读取评分或写入数据。');
+      return;
+    }
     let ev=null;
     try{ev=await eventContext(cid,eid)}
     catch(e){blockedNotice('独立 Interview Scorecard',e.message||'无法读取该面试记录','未读取该面试的任何反馈，也未写入数据。');return}
@@ -348,7 +356,7 @@ window.openScorecards=async(cid,eid)=>{
       return;
     }
     modal('独立 Interview Scorecard',`${existing}<div class="divider"></div><div class="form-grid"><div class="field"><label>评价者</label><input id="sc-evaluator" class="input"></div><div class="field"><label>总体建议</label><input id="sc-rec" class="input" placeholder="advance / hold / reject"></div></div><div id="sc-criteria" style="margin-top:12px">${criterionFeedbackRows(ctx.keys,ctx.names,ctx.definitions)}</div><p class="subtle">不同评价者意见独立保存；系统不会自动平均成总分。</p>`,`<button class="btn" onclick="closeModal()">关闭</button><button class="btn primary" onclick="saveScorecard('${cid}','${eid}')">提交并锁定</button>`)
-  }catch(e){toast(e.message||'无法读取该面试记录',true)}
+  }catch(e){blockedNotice('独立 Interview Scorecard',e.message||'无法读取该面试记录','请从正确项目的候选人工作台重新打开；本次未提交任何评分。')}
 };
 
 

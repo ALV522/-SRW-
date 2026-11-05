@@ -526,6 +526,38 @@ class RecruitmentBrowserAcceptance(unittest.TestCase):
             self.page.remove_listener("request", record_scorecard_read)
             self.page.evaluate("window.closeModal()")
 
+        # A valid P1 candidate/event must not be read from a P2 UI context.
+        # This checks the real Browser request boundary, not a mocked API.
+        wrong_project = self.context.request.post(
+            self.base + "/api/v1/projects",
+            data=json.dumps({"title": "Synthetic Wrong Project",
+                             "role_title": "Synthetic Role", "brief_summary": "Only a scope test"}),
+            headers={"Content-Type": "application/json"},
+        )
+        self.assertEqual(wrong_project.status, 200, wrong_project.text())
+        wrong_pid = wrong_project.json()["project_id"]
+        self.page.evaluate("pid => window.openProject(pid)", wrong_pid)
+        wrong_project_reads = []
+
+        def record_wrong_project_read(request):
+            if request.method == "GET" and request.url.endswith("/scorecards"):
+                wrong_project_reads.append(request.url)
+
+        self.page.on("request", record_wrong_project_read)
+        try:
+            self.page.evaluate(
+                "async ([candidate, event]) => await window.openScorecards(candidate, event)",
+                [cid, eid],
+            )
+            expect(self.page.locator("#modal-root [role=alert]")).to_contain_text(
+                "候选人所属项目与当前项目不一致"
+            )
+            expect(self.page.locator("#modal-root")).to_contain_text("请返回正确项目")
+            self.assertEqual(wrong_project_reads, [])
+        finally:
+            self.page.remove_listener("request", record_wrong_project_read)
+            self.page.evaluate("window.closeModal()")
+
         saved = self.get_json(f"/api/v1/events/{eid}/scorecards")
         self.assertEqual(len(saved["scorecards"]), 2, saved)
         self.assertEqual({x["state"] for x in saved["scorecards"]}, {"submitted"})
