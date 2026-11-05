@@ -560,7 +560,7 @@ class RecruitmentBrowserAcceptance(unittest.TestCase):
             expect(self.page.locator("#modal-root [role=alert]")).to_contain_text(
                 "候选人所属项目与当前项目不一致"
             )
-            expect(self.page.get_by_role("button", name="前往候选人所属项目")).to_be_visible()
+            expect(self.page.get_by_role("button", name="前往所属项目并查看本次面评")).to_be_visible()
             self.assertEqual(wrong_project_reads, [])
             with sqlite3.connect(db_path) as db:
                 self.assertEqual(db.execute(
@@ -569,18 +569,20 @@ class RecruitmentBrowserAcceptance(unittest.TestCase):
                     "SELECT COUNT(*) FROM interview_scorecard_submission"
                 ).fetchone()[0], before_scores)
             # A real UI click returns to the Core-confirmed project/candidate.
-            self.page.get_by_role("button", name="前往候选人所属项目").click()
-            expect(self.page.locator("#modal-root .modal")).to_have_count(0)
+            expected_read = (self.base + f"/api/v1/projects/{pid}/candidates/{cid}"
+                             f"/events/{eid}/scorecards")
+            # One deliberate recovery click must reopen this exact event's
+            # scorecard, not merely navigate to a candidate and require a
+            # second manual click. The Core-scoped GET proves the binding.
+            with self.page.expect_response(
+                lambda response: response.request.method == "GET"
+                and response.url == expected_read
+            ) as recovered_read:
+                self.page.get_by_role(
+                    "button", name="前往所属项目并查看本次面评").click()
             expect(self.page.locator(".candidate-workspace-content")).to_contain_text(
                 "合成双人结构化面试"
             )
-            with self.page.expect_response(
-                lambda response: response.request.method == "GET"
-                and response.url.endswith("/scorecards")
-            ) as recovered_read:
-                self.page.get_by_role("button", name="独立 Scorecard").click()
-            expected_read = (self.base + f"/api/v1/projects/{pid}/candidates/{cid}"
-                             f"/events/{eid}/scorecards")
             self.assertEqual(recovered_read.value.url, expected_read)
             self.assertEqual(recovered_read.value.status, 200)
             expect(self.page.locator("#modal-root")).to_contain_text("模拟面试官甲")
@@ -602,13 +604,13 @@ class RecruitmentBrowserAcceptance(unittest.TestCase):
                 [cid, eid],
             )
             expect(self.page.get_by_role(
-                "button", name="前往候选人所属项目")).to_be_visible()
+                "button", name="前往所属项目并查看本次面评")).to_be_visible()
             with sqlite3.connect(db_path) as db:
                 db.execute("UPDATE candidate SET project_id=? WHERE id=?", (wrong_pid, cid))
                 db.commit()
             try:
                 self.page.get_by_role(
-                    "button", name="前往候选人所属项目").click()
+                    "button", name="前往所属项目并查看本次面评").click()
                 expect(self.page.locator("#modal-root [role=alert]")).to_contain_text(
                     "候选人所属项目已变化"
                 )

@@ -341,7 +341,7 @@ window.openScorecards=async(cid,eid)=>{
       if(!owner||!owner.project_id)throw uiError('无法确认候选人所属项目，已阻止读取面评');
       modal('独立 Interview Scorecard',
         '<div class="notice danger" role="alert"><strong>候选人所属项目与当前项目不一致，已阻止读取</strong><div class="subtle" style="margin-top:6px">本次未读取评分或写入数据。可前往候选人所属项目，重新核对原面试记录。</div></div>',
-        '<button class="btn" onclick="closeModal()">关闭</button><button class="btn primary" id="sc-open-owner">前往候选人所属项目</button>');
+        '<button class="btn" onclick="closeModal()">关闭</button><button class="btn primary" id="sc-open-owner">前往所属项目并查看本次面评</button>');
       $('#sc-open-owner').addEventListener('click',async()=>{
         try{
           // Recheck ownership before switching workspaces; never trust a stale UI hint.
@@ -352,6 +352,8 @@ window.openScorecards=async(cid,eid)=>{
           await window.setProjectTab('candidates');
           await window.openCandidate(cid);
           await window.setCandidateSection('process');
+          // This explicit recovery action opens the original event, not just a candidate list.
+          await window.openScorecards(cid,eid);
         }catch(e){blockedNotice('无法打开候选人所属项目',e.message||'项目导航失败','请从招聘项目列表重新查找该候选人；本次没有写入面评。')}
       });
       return;
