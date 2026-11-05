@@ -480,6 +480,52 @@ class RecruitmentBrowserAcceptance(unittest.TestCase):
             self.page.get_by_role("button", name="提交并锁定").click()
             expect(self.page.locator("#modal-root .modal")).to_have_count(0)
 
+        # The real Browser client must use the candidate-scoped Core GET.
+        # A green Core-only test cannot prove the production UI migrated.
+        with self.page.expect_response(
+            lambda response: response.request.method == "GET"
+            and response.url.endswith("/scorecards")
+        ) as scoped_read:
+            self.page.get_by_role("button", name="独立 Scorecard").click()
+        response = scoped_read.value
+        self.assertEqual(
+            response.url,
+            self.base + f"/api/v1/projects/{pid}/candidates/{cid}/events/{eid}/scorecards",
+        )
+        self.assertEqual(response.status, 200, response.text())
+        expect(self.page.locator("#modal-root")).to_contain_text("模拟面试官甲")
+        expect(self.page.locator("#modal-root")).to_contain_text("模拟面试官乙")
+        self.page.evaluate("window.closeModal()")
+
+        # A mismatched candidate/event identity must fail in the real browser
+        # before any Scorecard GET; an API-only 404 test cannot prove this.
+        foreign = self.context.request.post(
+            self.base + f"/api/v1/projects/{pid}/candidates",
+            data=json.dumps({"display_name": "模拟候选人-非所属"}, ensure_ascii=False),
+            headers={"Content-Type": "application/json"},
+        )
+        self.assertEqual(foreign.status, 200, foreign.text())
+        other_cid = foreign.json()["candidate_id"]
+        foreign_reads = []
+
+        def record_scorecard_read(request):
+            if request.method == "GET" and request.url.endswith("/scorecards"):
+                foreign_reads.append(request.url)
+
+        self.page.on("request", record_scorecard_read)
+        try:
+            self.page.evaluate(
+                "async ([candidate, event]) => await window.openScorecards(candidate, event)",
+                [other_cid, eid],
+            )
+            expect(self.page.locator("#modal-root")).to_contain_text(
+                "该面试记录不属于当前候选人"
+            )
+            self.assertEqual(foreign_reads, [])
+        finally:
+            self.page.remove_listener("request", record_scorecard_read)
+            self.page.evaluate("window.closeModal()")
+
         saved = self.get_json(f"/api/v1/events/{eid}/scorecards")
         self.assertEqual(len(saved["scorecards"]), 2, saved)
         self.assertEqual({x["state"] for x in saved["scorecards"]}, {"submitted"})
