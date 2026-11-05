@@ -560,7 +560,7 @@ class RecruitmentBrowserAcceptance(unittest.TestCase):
             expect(self.page.locator("#modal-root [role=alert]")).to_contain_text(
                 "候选人所属项目与当前项目不一致"
             )
-            expect(self.page.locator("#modal-root")).to_contain_text("请返回正确项目")
+            expect(self.page.get_by_role("button", name="前往候选人所属项目")).to_be_visible()
             self.assertEqual(wrong_project_reads, [])
             with sqlite3.connect(db_path) as db:
                 self.assertEqual(db.execute(
