@@ -6,22 +6,21 @@ SRW（Smart Recruitment Workbench）是一套 **local-first、evidence-centered�
 
 > **Agent / 协作者必读**：修改前阅读 [AGENTS.md](AGENTS.md) 及关联 G1 文件。无主线保护期间允许 **Local Git 原 preflight** 或负责人批准的 **[GitHub API-native SHA→任务分支验证](docs/decisions/ADR-0003-github-api-native-preedit.md)**，后者无需在无 Git checkout 环境伪造 `git ls-remote`；两者均必须独立任务分支、更新 Source Manifest、PR、准确 HEAD CI 与复审，禁止 direct-push main。
 
-## 当前产品化状态（2026-11-04 可追溯快照）
+## 当前产品化状态（2026-11-05 固定快照）
 
-本节是阶段索引，**不能替代** GitHub 实时 main ref、同 SHA CI 与 Windows ZIP 的独立验收。唯一实时协作看板：[Issue #103](https://github.com/ALV522/-SRW-/issues/103)；招聘体验任务：[Issue #206](https://github.com/ALV522/-SRW-/issues/206)。
+> 本节不是自动实时更新。核对基线：2026-11-05 14:40（UTC+8），认证 GitHub `main=fed76776ac522028a274b5af1a6b55835dade88b`；Source Manifest **443 条**。后续合并必须重新核对 [Issue #103](https://github.com/ALV522/-SRW-/issues/103)、[PR 列表](https://github.com/ALV522/-SRW-/pulls) 和准确 SHA 的 [GitHub Actions](https://github.com/ALV522/-SRW-/actions)。该主线的 Ubuntu/Windows Source、Chromium、Governance、Repository Integrity、Host Build、Offline Wheelhouse **六类 push 工作流已成功**，但不等于可发布 Native/WPF。
 
-| 维度 | 证据与当前裁决 |
+| 维度 | 当前核准事实 |
 | --- | --- |
-| 软件身份 | `VERSION=1.0.0-alpha10-convergence11`、Schema `v1_0014`、`development`；不等于 RC/GA |
-| 已合并的招聘易用性 | [#207](https://github.com/ALV522/-SRW-/pull/207)、[#209](https://github.com/ALV522/-SRW-/pull/209)、[#211](https://github.com/ALV522/-SRW-/pull/211)、[#212](https://github.com/ALV522/-SRW-/pull/212) 已在 `main=8e7f9b6502b0bdf8e4c9f36109af6988e05d18d6` 合并：无需 HR 手填标准技术 ID；候选人列表直达面试/材料；历史逐标准建议只读展示 |
-| 新发现的 Core 完整性 | [#213](https://github.com/ALV522/-SRW-/issues/213) / [PR #214](https://github.com/ALV522/-SRW-/pull/214)：阻止旧未 pin 面试被追溯指定新标准版本；已在新主线 `88217f60d3ac0632651a33c47ed4af83071d212d` **合并**，精确 PR HEAD 的 Ubuntu/Windows Source、Chromium、Governance 均 SUCCESS；新的 Windows GUI 仍未验收 |
-| Windows Native Q1-R3 | B/C 在固定 `deabba0a` 源 SHA 候选 ZIP（SHA256 `72a1c16bbae6e67aaef14ee0cac0414dab4269ef08c1d2e470724410e3633a27`）完成真人 WPF/WebView2：Published 标准→面试→Scorecard→R2 历史只读零写入→电话筛选→人工 Claim 与核实，**对应这一工件**；后继 main GUI、Decision/Offer、该工件的备份恢复/双载体并发**未由此证明** |
-| 信息架构 | [#215 IA-1](https://github.com/ALV522/-SRW-/issues/215) 已交 B/C 做可逆导航整合，原 6 个侧栏/8 个项目标签/多处候选入口需收敛；禁止丢失旧深链、Knowledge/Provider/Decision/Offer/备份功能，不是产品宪章允许的整体 UI 重写 |
-| 发行阻断 | #43 同 Core 双载体完整场景、#124 私有资产/许可/两故障域、#130 物理恢复，仍为 BLOCKED；Windows WPF 与 Chromium/Source CI 必须分别陈述 |
+| 产品身份 | `VERSION=1.0.0-alpha10-convergence11`；Schema `v1_0014`；`development`，**尚非 RC/GA** |
+| 可用业务主线 | [#207](https://github.com/ALV522/-SRW-/pull/207)、[#209](https://github.com/ALV522/-SRW-/pull/209)、[#211](https://github.com/ALV522/-SRW-/pull/211)、[#212](https://github.com/ALV522/-SRW-/pull/212)、[#220](https://github.com/ALV522/-SRW-/pull/220) 已合入：以业务名称而非技术 ID 安排面试/提交独立面评、历史 R1/R2 保真、候选人列表直达操作；合成点击预算从**候选列表已打开**的条件计数，不能冒充从启动首页的人机全路径 |
+| IA-1 已交付 | [#221](https://github.com/ALV522/-SRW-/pull/221) 已合入：侧栏 **6→3**（今日待办／招聘项目／设置）、项目页签 **8→3**（概览／岗位与标准／候选人），旧 Knowledge/Provider/Decision/Offer/备份/审计入口保留；双候选人面试深链不再因 Drawer 状态混用而错选。**候选列表→面试保存仍需 4 次显式点击**，候选人单页五段 IA-2 与弹窗内联 IA-3 尚未交付 |
+| Core/恢复安全 | [#214](https://github.com/ALV522/-SRW-/pull/214) 阻断旧事件追溯补 pin；[#219](https://github.com/ALV522/-SRW-/pull/219) 提供项目/候选人 scoped Scorecard GET；[#222](https://github.com/ALV522/-SRW-/pull/222) 保留恢复完成后经合法 DB 写入的 pinned Source Blob 完整性。均已合入；真实电源中断恢复仍未完成 |
+| **尚未合入**的增量 | [#223](https://github.com/ALV522/-SRW-/pull/223) 手工 Claim 重开及跨候选 Scorecard 隔离的 Browser 回归、[#224](https://github.com/ALV522/-SRW-/pull/224) 生产 `app.js` scoped Scorecard GET；两份 PR 的准确 HEAD Ubuntu/Windows Source、Chromium、Governance 已 SUCCESS，但截至本快照**均缺 B/C 非作者工作轨复核，不得视为 main 已具备** |
+| Windows Native 证据 | B/C 的 Q1-R3 真人 WPF PASS 仅属于旧源 `deabba0a`、ZIP SHA256 `72a1c16bbae6e67aaef14ee0cac0414dab4269ef08c1d2e470724410e3633a27`；本基线完整 ZIP 的真人 WPF、Decision/Offer、备份物理恢复、双端同 Core 实测 **NOT RUN** |
+| 发行阻断与大小 | [#43](https://github.com/ALV522/-SRW-/issues/43) 双载体、[#124](https://github.com/ALV522/-SRW-/issues/124) 私有 Runtime/五库许可与异故障域保管、[#130](https://github.com/ALV522/-SRW-/issues/130) 物理恢复仍 OPEN。[#217](https://github.com/ALV522/-SRW-/pull/217) 仅交付 Native ZIP *只读容量分析器*，**未实际减少 ZIP 大小** |
 
-**工作优先序**：A 已修复并合并 #213 Core 事件归属漏洞，继续负责 #216 README/Native 体积审计与集成；B/C 独立推进 #215 IA-1，可复用其 Q1-R3 真机经验；下一次按新 main 的真实 Windows ZIP 重验，不重做已合并 #207/#209/#211/#212。Scorecard candidate-scoped GET 的 #210 独立处理。重大决策归产品负责人；所有普通修复按小 PR、准确 HEAD CI 自主交付。
-
-已过期的 2026-10-21、10-29、11-02 等主线/CI 快照保留在 [DEVELOPMENT_STATE.md](DEVELOPMENT_STATE.md) 历史和 [GitHub commits](https://github.com/ALV522/-SRW-/commits/main)，不可被当作实时完成状态。
+**执行次序：**先让 #223/#224 经过非作者工作轨 Review、准确 HEAD CI、main 集成复验；再按 #215 另立 IA-2 用户流水线切片，不能在多个 PR 并行覆盖 `app.js`。并行由持有独立 Windows 本机的协作者检查最新准确工件、归档与恢复/两端同 Core 业务；未取得合法 Runtime/Knowledge 与新 ZIP 时只标 BLOCKED。普通工程事项由 A 自主裁决，重大数据/发布政策归产品负责人。
 
 ## Native 体积与保管
 
