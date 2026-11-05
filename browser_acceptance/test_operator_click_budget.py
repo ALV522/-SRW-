@@ -1,7 +1,8 @@
-"""#206 operator metric: real list -> interview -> feedback, with no internal IDs.
+"""#206 operator metric: real home -> project -> candidate -> interview feedback.
 
-One disposable Core, SQLite and Chromium; only synthetic data. The click budget
-counts deliberate pointer clicks (not typing, navigation setup or reload).
+One disposable Core, SQLite and Chromium; only synthetic data. Counts deliberate
+pointer clicks separately from home navigation and from the candidate list;
+project/Published criteria/candidates are API-seeded, not counted as HR clicks.
 This is Browser acceptance, never Windows WPF acceptance.
 """
 from __future__ import annotations
@@ -109,9 +110,9 @@ class OperatorClickBudgetAcceptance(unittest.TestCase):
             self.assertEqual(response.status, 200, response.text())
             return response.json()
 
-        def click(locator, label):
+        def click(locator, label, ledger=None):
             locator.click()
-            clicks.append(label)
+            (clicks if ledger is None else ledger).append(label)
 
         try:
             project = api("POST", "/api/v1/projects",
@@ -128,9 +129,15 @@ class OperatorClickBudgetAcceptance(unittest.TestCase):
                 {"text_content": "Synthetic evidence for candidate B",
                  "publish_material": True})
             page.goto(self.base + "/v1", wait_until="domcontentloaded")
-            page.wait_for_function("Boolean(window.openProject && window.setProjectTab)")
-            page.evaluate("pid => window.openProject(pid)", pid)
-            page.evaluate("window.setProjectTab('candidates')")
+            expect(page.locator("#top-title")).to_have_text("今日待办")
+            click(page.locator(".nav-item").filter(has_text="招聘项目"),
+                  "首页→招聘项目")
+            project_row = page.locator("tr").filter(has_text="Operator Journey")
+            click(project_row.get_by_role("button", name="进入工作区"),
+                  "项目列表→工作区")
+            click(page.locator(".tabs").get_by_role("button", name="候选人"),
+                  "项目→候选人列表")
+            list_start = len(clicks)
             row = page.locator(f'tr[data-candidate-id="{b}"]')
             expect(row).to_be_visible()
 
@@ -166,7 +173,9 @@ class OperatorClickBudgetAcceptance(unittest.TestCase):
             scorecard.locator("#sc-rec").fill("advance")
             click(scorecard.get_by_role("button", name="提交并锁定"), "提交并锁定面评")
             expect(page.locator("#modal-root .modal")).to_have_count(0)
-            self.assertEqual(len(clicks), 6, clicks)
+            self.assertEqual(list_start, 3, clicks)
+            self.assertEqual(len(clicks) - list_start, 6, clicks)
+            self.assertEqual(len(clicks), 9, clicks)
 
             db_path = Path(self.temp.name) / "data" / "srw_v1.db"
             with sqlite3.connect(db_path) as db:
@@ -213,21 +222,38 @@ class OperatorClickBudgetAcceptance(unittest.TestCase):
                     1)
 
             page.reload(wait_until="domcontentloaded")
-            page.wait_for_function("Boolean(window.openProject && window.openCandidate)")
-            page.evaluate("pid => window.openProject(pid)", pid)
-            page.evaluate("cid => window.openCandidate(cid)", b)
+            expect(page.locator("#top-title")).to_have_text("今日待办")
+            reopen_clicks = []
+            click(page.locator(".nav-item").filter(has_text="招聘项目"),
+                  "重开→招聘项目", reopen_clicks)
+            click(page.locator("tr").filter(has_text="Operator Journey").get_by_role(
+                  "button", name="进入工作区"), "重开→项目工作区", reopen_clicks)
+            click(page.locator(".tabs").get_by_role("button", name="候选人"),
+                  "重开→候选人列表", reopen_clicks)
+            row = page.locator(f'tr[data-candidate-id="{b}"]')
+            expect(row).to_contain_text("Synthetic Candidate B")
+            click(row.get_by_role("button", name="打开工作台"),
+                  "重开→候选人B工作台", reopen_clicks)
             expect(page.locator(".candidate-workspace-head h1")).to_have_text("Synthetic Candidate B")
-            page.locator(".candidate-step").filter(has_text="面试").click()
-            page.locator(".timeline-item").filter(has_text="面试").get_by_role(
-                "button", name="独立 Scorecard").click()
+            click(page.locator(".candidate-step").filter(has_text="面试"),
+                  "重开→面试", reopen_clicks)
+            click(page.locator(".timeline-item").filter(has_text="面试").get_by_role(
+                  "button", name="独立 Scorecard"), "重开→独立面评", reopen_clicks)
+            self.assertEqual(len(reopen_clicks), 6, reopen_clicks)
             expect(page.locator(".modal")).to_contain_text("只属于候选人B的面评")
             self.assertFalse(errors, errors)
 
             evidence = ROOT / "artifacts" / "browser"
             evidence.mkdir(parents=True, exist_ok=True)
             (evidence / "operator-click-budget.json").write_text(
-                json.dumps({"scenario": "synthetic candidate B list -> feedback",
-                            "pointer_clicks": len(clicks), "steps": clicks,
+                json.dumps({"scenario": "synthetic candidate B home -> feedback",
+                            "precondition": "project, Published criteria and candidates API-seeded",
+                            "pointer_clicks": len(clicks) - list_start,
+                            "pointer_clicks_from_home": len(clicks),
+                            "navigation_steps": clicks[:list_start],
+                            "steps": clicks[list_start:],
+                            "reopen_ui_pointer_clicks": len(reopen_clicks),
+                            "reopen_steps": reopen_clicks,
                             "internal_id_input_required": False,
                             "cross_candidate_write": False,
                             "reopen_persisted": True}, ensure_ascii=False, indent=2) + "\n",
