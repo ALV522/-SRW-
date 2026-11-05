@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import json
 import os
+import sqlite3
 import socket
 import subprocess
 import sys
@@ -537,6 +538,13 @@ class RecruitmentBrowserAcceptance(unittest.TestCase):
         self.assertEqual(wrong_project.status, 200, wrong_project.text())
         wrong_pid = wrong_project.json()["project_id"]
         self.page.evaluate("pid => window.openProject(pid)", wrong_pid)
+        # The refused UI action must not touch persisted audit or scorecards.
+        db_path = Path(self.tmp.name) / "data" / "srw_v1.db"
+        with sqlite3.connect(db_path) as db:
+            before_audit = db.execute("SELECT COUNT(*) FROM audit_event").fetchone()[0]
+            before_scores = db.execute(
+                "SELECT COUNT(*) FROM interview_scorecard_submission"
+            ).fetchone()[0]
         wrong_project_reads = []
 
         def record_wrong_project_read(request):
@@ -554,6 +562,12 @@ class RecruitmentBrowserAcceptance(unittest.TestCase):
             )
             expect(self.page.locator("#modal-root")).to_contain_text("请返回正确项目")
             self.assertEqual(wrong_project_reads, [])
+            with sqlite3.connect(db_path) as db:
+                self.assertEqual(db.execute(
+                    "SELECT COUNT(*) FROM audit_event").fetchone()[0], before_audit)
+                self.assertEqual(db.execute(
+                    "SELECT COUNT(*) FROM interview_scorecard_submission"
+                ).fetchone()[0], before_scores)
         finally:
             self.page.remove_listener("request", record_wrong_project_read)
             self.page.evaluate("window.closeModal()")
