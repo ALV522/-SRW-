@@ -130,6 +130,9 @@ class OperatorClickBudgetAcceptance(unittest.TestCase):
                  "publish_material": True})
             page.goto(self.base + "/v1", wait_until="domcontentloaded")
             expect(page.locator("#top-title")).to_have_text("今日待办")
+            # init() sets the title before its async dashboard render finishes.
+            # Wait for content so late dashboard paint cannot detach project rows.
+            expect(page.locator(".kpi-card").first).to_be_visible()
             click(page.locator(".nav-item").filter(has_text="招聘项目"),
                   "首页→招聘项目")
             project_row = page.locator("tr").filter(has_text="Operator Journey")
@@ -223,6 +226,9 @@ class OperatorClickBudgetAcceptance(unittest.TestCase):
 
             page.reload(wait_until="domcontentloaded")
             expect(page.locator("#top-title")).to_have_text("今日待办")
+            # init() sets the title before its async dashboard render finishes.
+            # Wait for content so late dashboard paint cannot detach project rows.
+            expect(page.locator(".kpi-card").first).to_be_visible()
             reopen_clicks = []
             click(page.locator(".nav-item").filter(has_text="招聘项目"),
                   "重开→招聘项目", reopen_clicks)
