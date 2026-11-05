@@ -568,6 +568,30 @@ class RecruitmentBrowserAcceptance(unittest.TestCase):
                 self.assertEqual(db.execute(
                     "SELECT COUNT(*) FROM interview_scorecard_submission"
                 ).fetchone()[0], before_scores)
+            # A real UI click returns to the Core-confirmed project/candidate.
+            self.page.get_by_role("button", name="前往候选人所属项目").click()
+            expect(self.page.locator("#modal-root .modal")).to_have_count(0)
+            expect(self.page.locator(".candidate-workspace-content")).to_contain_text(
+                "合成双人结构化面试"
+            )
+            with self.page.expect_response(
+                lambda response: response.request.method == "GET"
+                and response.url.endswith("/scorecards")
+            ) as recovered_read:
+                self.page.get_by_role("button", name="独立 Scorecard").click()
+            expected_read = (self.base + f"/api/v1/projects/{pid}/candidates/{cid}"
+                             f"/events/{eid}/scorecards")
+            self.assertEqual(recovered_read.value.url, expected_read)
+            self.assertEqual(recovered_read.value.status, 200)
+            expect(self.page.locator("#modal-root")).to_contain_text("模拟面试官甲")
+            expect(self.page.locator("#modal-root")).to_contain_text("模拟面试官乙")
+            self.assertEqual(wrong_project_reads, [expected_read])
+            with sqlite3.connect(db_path) as db:
+                self.assertEqual(db.execute(
+                    "SELECT COUNT(*) FROM audit_event").fetchone()[0], before_audit)
+                self.assertEqual(db.execute(
+                    "SELECT COUNT(*) FROM interview_scorecard_submission"
+                ).fetchone()[0], before_scores)
         finally:
             self.page.remove_listener("request", record_wrong_project_read)
             self.page.evaluate("window.closeModal()")

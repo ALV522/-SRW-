@@ -338,7 +338,22 @@ window.openScorecards=async(cid,eid)=>{
     if(!cid||!state.projectId)throw uiError('缺少候选人或项目上下文，已阻止读取面评');
     const owner=await api(`/api/v1/candidates/${cid}/summary`);
     if(!owner||!owner.project_id||owner.project_id!==state.projectId){
-      blockedNotice('独立 Interview Scorecard','候选人所属项目与当前项目不一致，已阻止读取','请返回正确项目重新打开该候选人；本次未读取评分或写入数据。');
+      if(!owner||!owner.project_id)throw uiError('无法确认候选人所属项目，已阻止读取面评');
+      modal('独立 Interview Scorecard',
+        '<div class="notice danger" role="alert"><strong>候选人所属项目与当前项目不一致，已阻止读取</strong><div class="subtle" style="margin-top:6px">本次未读取评分或写入数据。可前往候选人所属项目，重新核对原面试记录。</div></div>',
+        '<button class="btn" onclick="closeModal()">关闭</button><button class="btn primary" id="sc-open-owner">前往候选人所属项目</button>');
+      $('#sc-open-owner').addEventListener('click',async()=>{
+        try{
+          // Recheck ownership before switching workspaces; never trust a stale UI hint.
+          const fresh=await api(`/api/v1/candidates/${cid}/summary`);
+          if(!fresh||fresh.project_id!==owner.project_id)throw uiError('候选人所属项目已变化，请刷新后重新查找');
+          closeModal();
+          await window.openProject(owner.project_id);
+          await window.setProjectTab('candidates');
+          await window.openCandidate(cid);
+          await window.setCandidateSection('process');
+        }catch(e){blockedNotice('无法打开候选人所属项目',e.message||'项目导航失败','请从招聘项目列表重新查找该候选人；本次没有写入面评。')}
+      });
       return;
     }
     let ev=null;
