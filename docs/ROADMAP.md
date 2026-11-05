@@ -4,7 +4,9 @@
 
 本路线图以 [PRODUCT_CHARTER](PRODUCT_CHARTER.md)、[ADR-0001](decisions/ADR-0001-single-authoritative-core.md) 和 [ADR-0002](decisions/ADR-0002-api-first-modular-monolith.md) 为约束。当前开发主线是 `main`；历史 v0.8.12-R2 是功能保真对照，不是当前源码身份。
 
-> **2026-11-02 最新审查快照（main `e6fab773127e49052aaec227b39a76f338c439ae`；开发中，不是 RC）**：Track 0/#41 的完整招聘/人工决策/恢复 Windows 实机链仍 P0；Track B/#42 只有该 SHA 的候选 ZIP 基础 WPF 有限实测（51 embedded tests，恢复组仅 1 项），#124 独立工件保管未闭环；Track C/#43 新 M3A Local Browser 会话 PR #187 HEAD `5bb3956` 通过 Source 双 OS 707/427 + Chromium/G1，处于复审/未合并，Windows WPF ON 和 EXE/Browser 同 Core M3B 实测未运行。Track A/#63 继续局部薄化，不能取代业务验收。**下一优先 #187 主线集成审查 → #41/#42 全业务 Windows 实测 → #43 M3B。** 本段为带 SHA 的历史快照，动态真相以 [#103](https://github.com/ALV522/-SRW-/issues/103) 为准；下文 2026-10-29 数字保留仅供历史追溯。
+> **2026-11-05 14:40+08:00 进度快照（`main=fed76776ac522028a274b5af1a6b55835dade88b`）**：Track 0/#41 已合入 #207/#209/#211/#212/#220 的招聘流程增量、#219 Core scoped Scorecard GET 和 #222 恢复后写入的 pinned Blob 保护；#223/#224 分别是 Browser 回归与生产 UI scoped GET，准确 HEAD CI 全绿但尚缺非作者复审，**尚未合入**。信息架构 IA-1 [#221](https://github.com/ALV522/-SRW-/pull/221) 已合入：6→3 侧栏、8→3 项目页签、历史深链候选人绑定已验收；**IA-2 单页五段、IA-3 内联表单仍未开始**。Track B/#42 的新 SHA WPF/恢复、Track C/#43 真实 WPF+Browser 共用 Core、[#124](https://github.com/ALV522/-SRW-/issues/124) 私有 Runtime/Knowledge 容灾及 #130 物理恢复均未验证；Track D 不批准 RC。六类 main push CI 为成功不等于 Native ZIP 可发布。当前执行顺序：#223/#224 复审集成 → IA-2 小切片与新 Windows 工件逐步验收 → #43/#124/#130 阻断关闭。以下 11-02/10-29 快照是历史记录，不能复用为现时完成状态。
+
+> **2026-11-02 历史审查快照（main `e6fab773127e49052aaec227b39a76f338c439ae`；开发中，不是 RC）**：Track 0/#41 的完整招聘/人工决策/恢复 Windows 实机链仍 P0；Track B/#42 只有该 SHA 的候选 ZIP 基础 WPF 有限实测（51 embedded tests，恢复组仅 1 项），#124 独立工件保管未闭环；Track C/#43 新 M3A Local Browser 会话 PR #187 HEAD `5bb3956` 通过 Source 双 OS 707/427 + Chromium/G1，处于复审/未合并，Windows WPF ON 和 EXE/Browser 同 Core M3B 实测未运行。Track A/#63 继续局部薄化，不能取代业务验收。**下一优先 #187 主线集成审查 → #41/#42 全业务 Windows 实测 → #43 M3B。** 本段为带 SHA 的历史快照，动态真相以 [#103](https://github.com/ALV522/-SRW-/issues/103) 为准；下文 2026-10-29 数字保留仅供历史追溯。
 
 > **治理传输**：已批准 Local Git 和 [GitHub API-native 预编辑模式](decisions/ADR-0003-github-api-native-preedit.md) 两条等效的分支身份检查路径；PR/exact-HEAD CI 和安全/发行门禁不变。
 
@@ -22,7 +24,7 @@
 
 ## 2. 当前基线与证据边界
 
-当前进度快照对应 main `979863218c7fbcfc2c3fd5ff041237f0110c4350`，VERSION `1.0.0-alpha10-convergence11`、Schema `v1_0014`、development。准确 CI、工件链接与未验收边界集中见 [README 当前进展](../README.md#当前进展与路线图位置2026-10-29-核查快照)，避免在多份文档重复维护测试计数。
+当前进度快照对应 main `979863218c7fbcfc2c3fd5ff041237f0110c4350`，VERSION `1.0.0-alpha10-convergence11`、Schema `v1_0014`、development。该段 SHA 为历史基线；准确 CI、工件链接及未验收边界请优先查看 [README 当前快照](../README.md) 和 [#103 实时协作板](https://github.com/ALV522/-SRW-/issues/103)，避免在多份文档重复维护测试计数。
 
 **当前位置：Track 0 持续业务/恢复收口；Track A 的契约与路由拆分已有多批交付、前端共享 client 和两个 feature 已拆出，Application 层尚未整体完成；Track B 最新 Native 实机验收待完成；Track C 已有纯策略与 registry，但 HTTP/Host/Browser 安全接线未完成；Track D 尚未进入 RC/GA。**
 
