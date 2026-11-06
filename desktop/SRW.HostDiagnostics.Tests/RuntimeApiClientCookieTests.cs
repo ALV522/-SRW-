@@ -21,11 +21,16 @@ internal static class RuntimeApiClientCookieTests
         if (client.BrowserCookies.Count != 2)
             throw new InvalidOperationException("Host did not retain two validated cookies");
         var identity = await client.GetInfoAsync();
+        // Lifecycle shutdown must carry only the Host control credential,
+        // never either WebView2 business Cookie after a successful attach.
+        await client.RequestShutdownAsync();
         await server.CompleteAsync();
         if (identity.InstanceId != "synthetic-instance")
             throw new InvalidOperationException("Host identity mismatch");
-        if (server.AttachCookies.Length != 0 || server.InfoCookies.Length != 1)
-            throw new InvalidOperationException("Host Cookie header count invalid");
+        if (server.AttachCookies.Length != 0 || server.InfoCookies.Length != 1
+            || server.ShutdownCookies.Length != 0
+            || server.ShutdownLifecycleHeaders.Length != 1)
+            throw new InvalidOperationException("Host Cookie/control header count invalid");
         var header = server.InfoCookies[0];
         if (Count(header, "srw_business_session=") != 1
             || Count(header, "srw_csrf=") != 1
@@ -33,7 +38,11 @@ internal static class RuntimeApiClientCookieTests
             || !header.Contains(Csrf, StringComparison.Ordinal)
             || header.Contains(Lifecycle, StringComparison.Ordinal))
             throw new InvalidOperationException("Host business Cookie duplicated or contaminated");
-        Console.WriteLine("PASS: Host business cookies are explicit, unique and isolated");
+        if (!server.ShutdownLifecycleHeaders[0].EndsWith(Lifecycle, StringComparison.Ordinal)
+            || server.ShutdownLifecycleHeaders[0].Contains(Business, StringComparison.Ordinal)
+            || server.ShutdownLifecycleHeaders[0].Contains(Csrf, StringComparison.Ordinal))
+            throw new InvalidOperationException("Host shutdown credential/cookie boundary violated");
+        Console.WriteLine("PASS: Host business cookies explicit and absent from lifecycle shutdown");
     }
 
     private static int Count(string text, string part)
@@ -55,6 +64,8 @@ internal static class RuntimeApiClientCookieTests
         private readonly Task _serving;
         internal string[] AttachCookies { get; private set; } = [];
         internal string[] InfoCookies { get; private set; } = [];
+        internal string[] ShutdownCookies { get; private set; } = [];
+        internal string[] ShutdownLifecycleHeaders { get; private set; } = [];
         internal int Port => ((IPEndPoint)_listener.LocalEndpoint).Port;
 
         internal CookieStub()
@@ -66,7 +77,7 @@ internal static class RuntimeApiClientCookieTests
 
         private async Task ServeAsync()
         {
-            for (var i = 0; i < 2; i++)
+            for (var i = 0; i < 3; i++)
             {
                 using var connection = await _listener.AcceptTcpClientAsync(_stop.Token);
                 var stream = connection.GetStream();
@@ -79,6 +90,7 @@ internal static class RuntimeApiClientCookieTests
                 var cookies = headers.Where(h => h.StartsWith("Cookie:", StringComparison.OrdinalIgnoreCase)).ToArray();
                 string body;
                 string extra = "";
+                string status = "200 OK";
                 if (request.Contains("/host-business-attach", StringComparison.Ordinal))
                 {
                     AttachCookies = cookies;
@@ -94,10 +106,18 @@ internal static class RuntimeApiClientCookieTests
                         + "\"edition\":\"windows\",\"instanceId\":\"synthetic-instance\","
                         + "\"releaseId\":\"synthetic-release\",\"sessionId\":\"synthetic-session\"}";
                 }
+                else if (request.Contains("/runtime/shutdown", StringComparison.Ordinal))
+                {
+                    ShutdownCookies = cookies;
+                    ShutdownLifecycleHeaders = headers.Where(h =>
+                        h.StartsWith("X-SRW-Session:", StringComparison.OrdinalIgnoreCase)).ToArray();
+                    status = "202 Accepted";
+                    body = "{}";
+                }
                 else throw new InvalidOperationException("Unexpected control-plane request");
                 var payload = Encoding.UTF8.GetBytes(body);
                 var response = Encoding.ASCII.GetBytes(
-                    "HTTP/1.1 200 OK\r\nContent-Type: application/json\r\n"
+                    "HTTP/1.1 " + status + "\r\nContent-Type: application/json\r\n"
                     + extra + "Content-Length: " + payload.Length
                     + "\r\nConnection: close\r\n\r\n");
                 await stream.WriteAsync(response);
