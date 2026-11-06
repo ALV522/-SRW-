@@ -15,8 +15,33 @@ public partial class MainWindow : Window
     {
         _controller = controller;
         InitializeComponent();
+        FitToWorkArea();
         Loaded += OnLoaded;
         Closing += OnClosing;
+    }
+
+    // The XAML size is DIP. On a 1920x1200 screen at 135% scaling, 1440x900 DIP
+    // becomes ~1946x1226 physical pixels: the window is wider and taller than the
+    // desktop, so CenterScreen pushes the title bar (and its minimize/maximize/
+    // close buttons) above the visible area and clips the left edge of the shell.
+    // Clamp to the work area before the window is shown.
+    private void FitToWorkArea()
+    {
+        var work = SystemParameters.WorkArea;
+        var fitted = Hosting.WindowPlacement.Fit(
+            Width, Height, MinWidth, MinHeight, work.Left, work.Top, work.Width, work.Height);
+        if (!fitted.Changed)
+        {
+            return;
+        }
+
+        MinWidth = fitted.MinWidth;
+        MinHeight = fitted.MinHeight;
+        Width = fitted.Width;
+        Height = fitted.Height;
+        WindowStartupLocation = WindowStartupLocation.Manual;
+        Left = fitted.Left;
+        Top = fitted.Top;
     }
 
     private async void OnLoaded(object sender, RoutedEventArgs e)
