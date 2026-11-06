@@ -280,8 +280,11 @@ class IANavigationBrowserTests(unittest.TestCase):
         for destination, title in (("dashboard", "今日待办"), ("settings", "设置")):
             with self.subTest(destination=destination):
                 self.open_project()
-                page.evaluate("p => window.go(p)", destination)
+                # Exercise the visible sidebar, not a direct window.go call.
+                page.locator(".nav-item").filter(has_text=title).click()
                 expect(page.locator("#top-title")).to_have_text(title)
+                expect(page.locator("#content h1")).to_have_text(title)
+                expect(page.locator("#content .project-banner")).to_have_count(0)
                 self.assertEqual(
                     page.locator("#top-back:visible").count(), 0,
                     f"{destination}: back must not point to a previous project",
