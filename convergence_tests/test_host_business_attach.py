@@ -13,6 +13,7 @@ import hashlib
 import hmac
 import sqlite3
 import tempfile
+from contextlib import closing
 import unittest
 from pathlib import Path
 from unittest.mock import patch
@@ -40,7 +41,7 @@ def host_headers(nonce="a" * 64, secret=SECRET):
 
 class HostBusinessAttachHttpTests(unittest.TestCase):
     def setUp(self):
-        temp = tempfile.TemporaryDirectory(prefix="srw-m3b-host-", ignore_cleanup_errors=True)
+        temp = tempfile.TemporaryDirectory(prefix="srw-m3b-host-")
         self.addCleanup(temp.cleanup)
         self.root = Path(temp.name)
         self.data = self.root / "data"
@@ -65,7 +66,7 @@ class HostBusinessAttachHttpTests(unittest.TestCase):
             )
 
     def _counts(self):
-        with sqlite3.connect(self.db) as db:
+        with closing(sqlite3.connect(self.db)) as db:
             return (
                 db.execute("SELECT COUNT(*) FROM project").fetchone()[0],
                 db.execute("SELECT COUNT(*) FROM audit_event").fetchone()[0],
@@ -108,8 +109,10 @@ class HostBusinessAttachHttpTests(unittest.TestCase):
         # Persisted project creation does not necessarily emit an audit row.
         # Denied paths below must preserve both counts exactly.
         self.assertEqual(self._counts()[0], before[0] + 1)
-        with TestClient(self.app) as anonymous:
-            self.assertEqual(anonymous.get("/api/v1/projects").status_code, 401)
+        anonymous_status, _ = asgi_request(
+            self.app, method="GET", path="/api/v1/projects",
+            headers=[(b"host", b"testserver")])
+        self.assertEqual(anonymous_status, 401)
         self.assertEqual(self.client.post("/api/v1/runtime/shutdown").status_code, 403)
         self.assertEqual(self.client.post("/api/v1/runtime/business-logout",
                                           headers={"origin": ORIGIN,
