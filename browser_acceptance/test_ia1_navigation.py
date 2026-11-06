@@ -269,5 +269,29 @@ class IANavigationBrowserTests(unittest.TestCase):
         self.assertNotIn("加载失败", self.tab_body())
 
 
+    def test_07_dashboard_has_no_stale_project_back_action(self):
+        """#235: leaving a project must not show a misleading project return.
+
+        This passes on the current main without a topbar back button and
+        guards the opt-in #235 topbar against stale projectId/crumb context.
+        No business mutation or implicit project selection is permitted.
+        """
+        self.open_project()
+        page = self.page
+        page.evaluate("() => window.go('dashboard')")
+        expect(page.locator("#content h1")).to_have_text("今日待办")
+        expect(page.locator("#content .kpi-card").first).to_be_visible()
+        self.assertEqual(
+            page.locator("#top-back:visible").count(), 0,
+            "dashboard must not expose a back button for a previous project",
+        )
+        self.assertEqual(
+            page.locator("#top-crumb .crumb-link").count(), 0,
+            "dashboard must not retain project/candidate breadcrumbs",
+        )
+        self.assertEqual(page.locator(".nav-item.active").count(), 1)
+        self.assertIn("今日待办", page.locator(".nav-item.active").inner_text())
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)
