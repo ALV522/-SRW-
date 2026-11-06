@@ -104,3 +104,4 @@ button,input,textarea,select{font:inherit}.app-shell{display:grid;grid-template-
 .actions.tool-row .btn.primary{color:#fff;background:var(--brand);border-color:var(--brand)}
 .nac-meta{margin-top:8px;font-size:12px;color:#7b879c;display:flex;gap:12px;flex-wrap:wrap}
 .nac-meta span{white-space:nowrap}
+.nac-meta-label{color:#98a2b3;font-weight:600;margin-right:4px}
