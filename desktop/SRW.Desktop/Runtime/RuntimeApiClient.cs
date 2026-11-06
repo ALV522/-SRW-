@@ -30,7 +30,13 @@ public sealed class RuntimeApiClient : IDisposable
         //      the loopback control plane on a single 302.
         // Both are scoped to this one loopback client: provider/AI traffic and every
         // other outbound call keep the ambient proxy and redirect behaviour.
-        var handler = new HttpClientHandler { UseProxy = false, AllowAutoRedirect = false };
+        // Host business cookies are explicitly validated and sent only to /info.
+        // Disable the handler's ambient jar: it would replay Set-Cookie as well
+        // as our explicit Cookie header and could send it to lifecycle routes.
+        var handler = new HttpClientHandler
+        {
+            UseProxy = false, AllowAutoRedirect = false, UseCookies = false,
+        };
         _client = new HttpClient(handler)
         {
             BaseAddress = new Uri($"http://127.0.0.1:{port}"),

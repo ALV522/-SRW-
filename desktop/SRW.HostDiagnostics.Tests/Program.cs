@@ -56,5 +56,6 @@ Expect(stopped.EventName == "backend_lifecycle"
 
 await SRW.HostDiagnostics.Tests.RuntimeApiClientProxyTests.RunAsync();
 await SRW.HostDiagnostics.Tests.RuntimeApiClientRedirectTests.RunAsync();
+await SRW.HostDiagnostics.Tests.RuntimeApiClientCookieTests.RunAsync();
 
 Console.WriteLine("PASS: child-process HTTP status/route diagnostics without candidate, project, path, query, secret or stderr leaks");
