@@ -234,6 +234,7 @@ class RealProcessRestoreAcceptance(unittest.TestCase):
             "RECRUITMENT_FRONTEND_DIST": str(ROOT / "frontend" / "dist"),
             "RECRUITMENT_KNOWLEDGE_DIR": str(knowledge),
             "PYTHONPATH": os.pathsep.join((str(ROOT / "backend"), str(ROOT / "scripts"))),
+            "SRW_TEST_SHUTDOWN_PHASE_PROBE": "1",
         })
         self.processes: list[subprocess.Popen] = []
         self.addCleanup(self.stop_any_processes)

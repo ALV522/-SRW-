@@ -117,7 +117,13 @@ def main() -> int:
             knowledge_dir=knowledge,
         )
         config = uvicorn.Config(app, host=args.host, port=args.port, log_level="info")
-        server = uvicorn.Server(config)
+        if os.environ.get("SRW_TEST_SHUTDOWN_PHASE_PROBE") == "1":
+            # Only synthetic acceptance enables aggregate lifecycle tracing.
+            # All product launchers retain the existing Uvicorn implementation.
+            from shutdown_phase_probe import ShutdownPhaseProbeServer
+            server = ShutdownPhaseProbeServer(config)
+        else:
+            server = uvicorn.Server(config)
         app.state.shutdown_callback = lambda: setattr(server, "should_exit", True)
         server.run()
     return 0
