@@ -74,6 +74,9 @@ jobs:
           PYTHONUNBUFFERED: '1'
         run: |
           New-Item -ItemType Directory -Force -Path artifacts/browser | Out-Null
+          # A focused run catches Windows sqlite handle leaks that full-suite GC can hide.
+          python -m unittest discover -s browser_acceptance -p 'test_flows.py' -v 2>&1 | Tee-Object -FilePath artifacts/browser/browser-flows-windows.log
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           python -m unittest discover -s browser_acceptance -p 'test_*.py' -v 2>&1 | Tee-Object -FilePath artifacts/browser/browser-e2e-windows.log
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
       - name: Upload Windows Chromium evidence and failure screenshots
