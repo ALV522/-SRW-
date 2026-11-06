@@ -18,6 +18,15 @@ import uvicorn
 T = TypeVar("T")
 
 
+def _stage(event: str) -> None:
+    """Fixed-name, best-effort markers; no objects, IDs, paths or exceptions."""
+    try:
+        sys.stderr.write(f"SRW_SHUTDOWN_PHASE stage={event}\n")
+        sys.stderr.flush()
+    except (OSError, ValueError):
+        pass
+
+
 async def observe_shutdown(
     shutdown: Awaitable[T], state: Any, *,
     stream: TextIO, interval_s: float = 2.0,
@@ -66,11 +75,31 @@ async def observe_shutdown(
 
 
 class ShutdownPhaseProbeServer(uvicorn.Server):
-    """Uvicorn's normal implementation plus synthetic-test-only observation."""
+    """Test-only stage markers around Uvicorn's unchanged shutdown delegates."""
+
+    async def _wait_tasks_to_complete(self) -> None:
+        _stage("drain_enter")
+        try:
+            return await super()._wait_tasks_to_complete()
+        finally:
+            _stage("drain_exit")
 
     async def shutdown(self, sockets=None) -> None:
-        await observe_shutdown(
-            super().shutdown(sockets=sockets),
-            self.server_state,
-            stream=sys.stderr,
-        )
+        original_lifespan_shutdown = self.lifespan.shutdown
+
+        async def traced_lifespan_shutdown() -> None:
+            _stage("lifespan_enter")
+            try:
+                return await original_lifespan_shutdown()
+            finally:
+                _stage("lifespan_exit")
+
+        self.lifespan.shutdown = traced_lifespan_shutdown
+        try:
+            await observe_shutdown(
+                super().shutdown(sockets=sockets),
+                self.server_state,
+                stream=sys.stderr,
+            )
+        finally:
+            self.lifespan.shutdown = original_lifespan_shutdown
