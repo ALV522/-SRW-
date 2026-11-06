@@ -963,6 +963,20 @@ class RecruitmentBrowserAcceptance(unittest.TestCase):
             "button", name="基于当前版本创建新草案"
         )).to_be_visible()
         self.page.get_by_role("button", name="基于当前版本创建新草案").click()
+        # The fork is asynchronous: the previous published criterion is already
+        # visible, so a count of one alone does not prove the new Draft UI loaded.
+        # Wait for both the durable revision and the form bound to that revision
+        # before editing; otherwise a late projectWorkspace() redraw can erase
+        # the second row and silently save only the original criterion.
+        forked = self.wait_for_json(
+            f"/api/v1/projects/{pid}/protocol-workspace",
+            lambda w: bool(w.get("draft_revision_id"))
+            and len((w.get("draft") or {}).get("criteria") or []) == 1,
+            label="new draft revision after published standard",
+        )
+        expect(self.page.get_by_role("button", name="保存草案")).to_have_attribute(
+            "onclick", f"saveCriteria('{forked['draft_revision_id']}')"
+        )
         expect(self.page.locator(".criterion-row")).to_have_count(1)
         self.page.get_by_role("button", name="＋ 添加标准").click()
         expect(self.page.locator(".criterion-row")).to_have_count(2)
