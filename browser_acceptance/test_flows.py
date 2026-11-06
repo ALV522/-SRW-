@@ -5,8 +5,10 @@ temporary directory. This is browser acceptance, NOT WPF/WebView2 acceptance.
 """
 from __future__ import annotations
 
+from contextlib import closing
 import json
 import os
+import sqlite3
 import socket
 import subprocess
 import sys
@@ -524,6 +526,128 @@ class RecruitmentBrowserAcceptance(unittest.TestCase):
             self.assertEqual(foreign_reads, [])
         finally:
             self.page.remove_listener("request", record_scorecard_read)
+            self.page.evaluate("window.closeModal()")
+
+        # A valid P1 candidate/event must not be read from a P2 UI context.
+        # This checks the real Browser request boundary, not a mocked API.
+        wrong_project = self.context.request.post(
+            self.base + "/api/v1/projects",
+            data=json.dumps({"title": "Synthetic Wrong Project",
+                             "role_title": "Synthetic Role", "brief_summary": "Only a scope test"}),
+            headers={"Content-Type": "application/json"},
+        )
+        self.assertEqual(wrong_project.status, 200, wrong_project.text())
+        wrong_pid = wrong_project.json()["project_id"]
+        self.page.evaluate(
+            "async pid => {await window.openProject(pid); await window.setProjectTab('candidates')}",
+            wrong_pid,
+        )
+        self.page.locator("#cand-q").fill("return-only-filter")
+        self.page.get_by_role("button", name="应用筛选").click()
+        expect(self.page.locator("#cand-q")).to_have_value("return-only-filter")
+        # The refused UI action must not touch persisted audit or scorecards.
+        db_path = Path(self.tmp.name) / "data" / "srw_v1.db"
+        with closing(sqlite3.connect(db_path)) as db:
+            before_audit = db.execute("SELECT COUNT(*) FROM audit_event").fetchone()[0]
+            before_scores = db.execute(
+                "SELECT COUNT(*) FROM interview_scorecard_submission"
+            ).fetchone()[0]
+        wrong_project_reads = []
+
+        def record_wrong_project_read(request):
+            if request.method == "GET" and request.url.endswith("/scorecards"):
+                wrong_project_reads.append(request.url)
+
+        self.page.on("request", record_wrong_project_read)
+        try:
+            self.page.evaluate(
+                "async ([candidate, event]) => await window.openScorecards(candidate, event)",
+                [cid, eid],
+            )
+            expect(self.page.locator("#modal-root [role=alert]")).to_contain_text(
+                "候选人所属项目与当前项目不一致"
+            )
+            expect(self.page.get_by_role("button", name="前往所属项目并查看本次面评")).to_be_visible()
+            self.assertEqual(wrong_project_reads, [])
+            with closing(sqlite3.connect(db_path)) as db:
+                self.assertEqual(db.execute(
+                    "SELECT COUNT(*) FROM audit_event").fetchone()[0], before_audit)
+                self.assertEqual(db.execute(
+                    "SELECT COUNT(*) FROM interview_scorecard_submission"
+                ).fetchone()[0], before_scores)
+            # A real UI click returns to the Core-confirmed project/candidate.
+            expected_read = (self.base + f"/api/v1/projects/{pid}/candidates/{cid}"
+                             f"/events/{eid}/scorecards")
+            # One deliberate recovery click must reopen this exact event's
+            # scorecard, not merely navigate to a candidate and require a
+            # second manual click. The Core-scoped GET proves the binding.
+            with self.page.expect_response(
+                lambda response: response.request.method == "GET"
+                and response.url == expected_read
+            ) as recovered_read:
+                self.page.get_by_role(
+                    "button", name="前往所属项目并查看本次面评").click()
+            expect(self.page.locator(".candidate-workspace-content")).to_contain_text(
+                "合成双人结构化面试"
+            )
+            self.assertEqual(recovered_read.value.url, expected_read)
+            self.assertEqual(recovered_read.value.status, 200)
+            expect(self.page.locator("#modal-root")).to_contain_text("模拟面试官甲")
+            expect(self.page.locator("#modal-root")).to_contain_text("模拟面试官乙")
+            self.assertEqual(wrong_project_reads, [expected_read])
+            with closing(sqlite3.connect(db_path)) as db:
+                self.assertEqual(db.execute(
+                    "SELECT COUNT(*) FROM audit_event").fetchone()[0], before_audit)
+                self.assertEqual(db.execute(
+                    "SELECT COUNT(*) FROM interview_scorecard_submission"
+                ).fetchone()[0], before_scores)
+            # Return is a real UI click to the original project and filters;
+            # it must not restore the foreign candidate drawer or touch scores.
+            self.page.get_by_role("button", name="返回原项目").click()
+            expect(self.page.locator("#cand-q")).to_have_value("return-only-filter")
+            expect(self.page.locator("#content")).to_contain_text("Synthetic Wrong Project")
+            self.assertEqual(wrong_project_reads, [expected_read])
+            with closing(sqlite3.connect(db_path)) as db:
+                self.assertEqual(db.execute(
+                    "SELECT COUNT(*) FROM audit_event").fetchone()[0], before_audit)
+                self.assertEqual(db.execute(
+                    "SELECT COUNT(*) FROM interview_scorecard_submission"
+                ).fetchone()[0], before_scores)
+            # Fault injection: the candidate's project changes after the
+            # mismatch prompt, before HR clicks its recovery action. The UI
+            # must recheck Core, refuse stale navigation and read no scorecard.
+            self.page.evaluate("window.closeModal()")
+            self.page.evaluate("pid => window.openProject(pid)", wrong_pid)
+            self.page.evaluate(
+                "async ([candidate, event]) => await window.openScorecards(candidate, event)",
+                [cid, eid],
+            )
+            expect(self.page.get_by_role(
+                "button", name="前往所属项目并查看本次面评")).to_be_visible()
+            with closing(sqlite3.connect(db_path)) as db:
+                db.execute("UPDATE candidate SET project_id=? WHERE id=?", (wrong_pid, cid))
+                db.commit()
+            try:
+                self.page.get_by_role(
+                    "button", name="前往所属项目并查看本次面评").click()
+                expect(self.page.locator("#modal-root [role=alert]")).to_contain_text(
+                    "候选人所属项目已变化"
+                )
+                self.assertEqual(wrong_project_reads, [expected_read])
+                with closing(sqlite3.connect(db_path)) as db:
+                    self.assertEqual(db.execute(
+                        "SELECT COUNT(*) FROM audit_event").fetchone()[0], before_audit)
+                    self.assertEqual(db.execute(
+                        "SELECT COUNT(*) FROM interview_scorecard_submission"
+                    ).fetchone()[0], before_scores)
+            finally:
+                # Restore synthetic fixture identity for the remaining checks.
+                with closing(sqlite3.connect(db_path)) as db:
+                    db.execute("UPDATE candidate SET project_id=? WHERE id=?", (pid, cid))
+                    db.commit()
+
+        finally:
+            self.page.remove_listener("request", record_wrong_project_read)
             self.page.evaluate("window.closeModal()")
 
         saved = self.get_json(f"/api/v1/events/{eid}/scorecards")
