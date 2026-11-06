@@ -269,28 +269,29 @@ class IANavigationBrowserTests(unittest.TestCase):
         self.assertNotIn("加载失败", self.tab_body())
 
 
-    def test_07_dashboard_has_no_stale_project_back_action(self):
+    def test_07_other_sections_have_no_stale_project_back_action(self):
         """#235: leaving a project must not show a misleading project return.
 
-        This passes on the current main without a topbar back button and
-        guards the opt-in #235 topbar against stale projectId/crumb context.
-        No business mutation or implicit project selection is permitted.
+        The main branch has no topbar back button; a new topbar must not
+        expose the stale projectId when navigating to other top-level pages.
+        This is a UI-only check, with no business mutation or auto-selection.
         """
-        self.open_project()
         page = self.page
-        page.evaluate("() => window.go('dashboard')")
-        expect(page.locator("#content h1")).to_have_text("今日待办")
-        expect(page.locator("#content .kpi-card").first).to_be_visible()
-        self.assertEqual(
-            page.locator("#top-back:visible").count(), 0,
-            "dashboard must not expose a back button for a previous project",
-        )
-        self.assertEqual(
-            page.locator("#top-crumb .crumb-link").count(), 0,
-            "dashboard must not retain project/candidate breadcrumbs",
-        )
-        self.assertEqual(page.locator(".nav-item.active").count(), 1)
-        self.assertIn("今日待办", page.locator(".nav-item.active").inner_text())
+        for destination, title in (("dashboard", "今日待办"), ("settings", "设置")):
+            with self.subTest(destination=destination):
+                self.open_project()
+                page.evaluate("p => window.go(p)", destination)
+                expect(page.locator("#top-title")).to_have_text(title)
+                self.assertEqual(
+                    page.locator("#top-back:visible").count(), 0,
+                    f"{destination}: back must not point to a previous project",
+                )
+                self.assertEqual(
+                    page.locator("#top-crumb .crumb-link").count(), 0,
+                    f"{destination}: stale project/candidate breadcrumb",
+                )
+                self.assertEqual(page.locator(".nav-item.active").count(), 1)
+                self.assertIn(title, page.locator(".nav-item.active").inner_text())
 
 
 if __name__ == "__main__":
