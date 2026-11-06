@@ -200,5 +200,39 @@ class UiHierarchyTests(unittest.TestCase):
         self.assertLess(box["y"], 500, f"next action moved down to y={box['y']} on revisit")
 
 
+    def test_topbar_workbench_and_candidate_identity_are_scoped(self) -> None:
+        pid, title = self._seed_project()
+        second = self._post(f"/api/v1/projects/{pid}/candidates",
+                            {"display_name": "第二位合成候选人"})["candidate_id"]
+        self._open_project(title)
+        self.page.locator("#top-crumb .crumb-link", has_text="工作台").click()
+        expect(self.page.locator("#top-title")).to_have_text("今日待办")
+        expect(self.page.locator("#content h1")).to_have_text("今日待办")
+        expect(self.page.locator("#top-back:visible")).to_have_count(0)
+        expect(self.page.locator("#top-crumb .crumb-link")).to_have_count(0)
+        self.page.locator("aside .nav-item", has_text="招聘项目").click()
+        expect(self.page.locator("#content h1")).to_have_text("招聘项目")
+        expect(self.page.locator(".project-banner")).to_have_count(0)
+        expect(self.page.locator("tr").filter(has_text=title)).to_have_count(1)
+
+        self.page.locator("tr").filter(has_text=title).get_by_role(
+            "button", name="进入工作区").click()
+        expect(self.page.locator("#top-crumb")).to_contain_text(title)
+        # A direct link may target a candidate outside the current filtered
+        # candidateRows. The breadcrumb must come from that scoped Core GET.
+        self.page.evaluate("cid => window.openCandidate(cid)", second)
+        expect(self.page.locator("#content h1")).to_have_text("第二位合成候选人")
+        expect(self.page.locator("#top-crumb")).to_contain_text("第二位合成候选人")
+        expect(self.page.locator(".candidate-workspace-breadcrumb button")).to_have_count(0)
+        expect(self.page.locator("#top-back:visible")).to_have_count(1)
+        self.page.locator("#top-back").click()
+        expect(self.page.locator(".project-banner")).to_be_visible()
+        self.assertNotIn("第二位合成候选人", self.page.locator("#top-crumb").inner_text())
+        self.page.locator("#top-back").click()
+        expect(self.page.locator("#content h1")).to_have_text("招聘项目")
+        expect(self.page.locator("#top-back:visible")).to_have_count(0)
+
+
+
 if __name__ == "__main__":
     unittest.main()
