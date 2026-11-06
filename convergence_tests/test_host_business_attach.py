@@ -88,9 +88,16 @@ class HostBusinessAttachHttpTests(unittest.TestCase):
         self.assertNotIn(SECRET, response.text)
         self.assertNotIn("srw1.", response.text)
         self.assertEqual(self._counts(), before, "attachment must not write business/audit")
-        self.assertEqual(self.client.post(HOST_ATTACH_PATH,
-                                          headers=host_headers()).status_code, 403,
-                         "the same Host nonce must not mint another session")
+        # Replay through raw ASGI without the browser Cookie: this proves the
+        # nonce fence, not merely the Host endpoint's Cookie-envelope rejection.
+        headers = host_headers()
+        replay_status, _ = asgi_request(
+            self.app, method="POST", path=HOST_ATTACH_PATH,
+            headers=[(b"host", b"testserver"),
+                     (b"x-srw-host-nonce", headers["X-SRW-Host-Nonce"].encode()),
+                     (b"x-srw-host-proof", headers["X-SRW-Host-Proof"].encode())])
+        self.assertEqual(replay_status, 403)
+        self.assertEqual(len(self.app.state.business_gateway.registry), 1)
         csrf = self.client.cookies.get(CSRF_COOKIE_NAME)
         self.assertTrue(csrf)
         self.assertEqual(self.client.get("/api/v1/runtime/info").status_code, 200)
