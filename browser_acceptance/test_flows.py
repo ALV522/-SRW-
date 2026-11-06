@@ -5,6 +5,7 @@ temporary directory. This is browser acceptance, NOT WPF/WebView2 acceptance.
 """
 from __future__ import annotations
 
+from contextlib import closing
 import json
 import os
 import sqlite3
@@ -546,7 +547,7 @@ class RecruitmentBrowserAcceptance(unittest.TestCase):
         expect(self.page.locator("#cand-q")).to_have_value("return-only-filter")
         # The refused UI action must not touch persisted audit or scorecards.
         db_path = Path(self.tmp.name) / "data" / "srw_v1.db"
-        with sqlite3.connect(db_path) as db:
+        with closing(sqlite3.connect(db_path)) as db:
             before_audit = db.execute("SELECT COUNT(*) FROM audit_event").fetchone()[0]
             before_scores = db.execute(
                 "SELECT COUNT(*) FROM interview_scorecard_submission"
@@ -568,7 +569,7 @@ class RecruitmentBrowserAcceptance(unittest.TestCase):
             )
             expect(self.page.get_by_role("button", name="前往所属项目并查看本次面评")).to_be_visible()
             self.assertEqual(wrong_project_reads, [])
-            with sqlite3.connect(db_path) as db:
+            with closing(sqlite3.connect(db_path)) as db:
                 self.assertEqual(db.execute(
                     "SELECT COUNT(*) FROM audit_event").fetchone()[0], before_audit)
                 self.assertEqual(db.execute(
@@ -594,7 +595,7 @@ class RecruitmentBrowserAcceptance(unittest.TestCase):
             expect(self.page.locator("#modal-root")).to_contain_text("模拟面试官甲")
             expect(self.page.locator("#modal-root")).to_contain_text("模拟面试官乙")
             self.assertEqual(wrong_project_reads, [expected_read])
-            with sqlite3.connect(db_path) as db:
+            with closing(sqlite3.connect(db_path)) as db:
                 self.assertEqual(db.execute(
                     "SELECT COUNT(*) FROM audit_event").fetchone()[0], before_audit)
                 self.assertEqual(db.execute(
@@ -606,7 +607,7 @@ class RecruitmentBrowserAcceptance(unittest.TestCase):
             expect(self.page.locator("#cand-q")).to_have_value("return-only-filter")
             expect(self.page.locator("#content")).to_contain_text("Synthetic Wrong Project")
             self.assertEqual(wrong_project_reads, [expected_read])
-            with sqlite3.connect(db_path) as db:
+            with closing(sqlite3.connect(db_path)) as db:
                 self.assertEqual(db.execute(
                     "SELECT COUNT(*) FROM audit_event").fetchone()[0], before_audit)
                 self.assertEqual(db.execute(
@@ -623,7 +624,7 @@ class RecruitmentBrowserAcceptance(unittest.TestCase):
             )
             expect(self.page.get_by_role(
                 "button", name="前往所属项目并查看本次面评")).to_be_visible()
-            with sqlite3.connect(db_path) as db:
+            with closing(sqlite3.connect(db_path)) as db:
                 db.execute("UPDATE candidate SET project_id=? WHERE id=?", (wrong_pid, cid))
                 db.commit()
             try:
@@ -633,7 +634,7 @@ class RecruitmentBrowserAcceptance(unittest.TestCase):
                     "候选人所属项目已变化"
                 )
                 self.assertEqual(wrong_project_reads, [expected_read])
-                with sqlite3.connect(db_path) as db:
+                with closing(sqlite3.connect(db_path)) as db:
                     self.assertEqual(db.execute(
                         "SELECT COUNT(*) FROM audit_event").fetchone()[0], before_audit)
                     self.assertEqual(db.execute(
@@ -641,7 +642,7 @@ class RecruitmentBrowserAcceptance(unittest.TestCase):
                     ).fetchone()[0], before_scores)
             finally:
                 # Restore synthetic fixture identity for the remaining checks.
-                with sqlite3.connect(db_path) as db:
+                with closing(sqlite3.connect(db_path)) as db:
                     db.execute("UPDATE candidate SET project_id=? WHERE id=?", (pid, cid))
                     db.commit()
 
