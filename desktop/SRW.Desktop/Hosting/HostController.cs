@@ -36,6 +36,8 @@ public sealed class HostController
 
     public AppPaths Paths { get; }
     public Uri ApplicationUri => new($"http://127.0.0.1:{_port}/");
+    public IReadOnlyList<System.Net.Cookie> BrowserCookies =>
+        _runtime?.BrowserCookies ?? Array.Empty<System.Net.Cookie>();
 
     public async Task StartAsync()
     {
@@ -82,6 +84,9 @@ public sealed class HostController
                 }
 
                 await readyTask;
+                // In opt-in ON mode the Host attaches before requesting protected
+                // identity; OFF mode returns 404 and retains the old path.
+                await _runtime.AttachBusinessSessionIfAvailableAsync();
                 var info = await _runtime.GetInfoAsync();
                 ValidateRuntimeIdentity(info);
                 _backendSessionId = info.SessionId;

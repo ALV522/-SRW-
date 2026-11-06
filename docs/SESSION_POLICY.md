@@ -1,6 +1,6 @@
 # Business session authorization (opt-in) — production M3A contract
 
-Status: **Local Web M3A implemented, OFF by default; Windows/External Browser M3B NOT RUN.**
+Status: **Local Web M3A implemented, OFF by default; WPF opt-in M3B attach source pending CI/real Windows validation; external Browser shared-Core lifecycle NOT RUN.**
 This page describes production behavior at the 2026-11-06 C11 baseline, not a
 hypothetical single-header policy. The business gateway is installed by
 `backend/srw/api/app.py` when the **validated** opt-in flag is ON; it is
@@ -59,7 +59,17 @@ attached to one Core.
   docstrings in `session_policy.py` include pre-M3A terminology; the
   implemented `from_environ` parser and `BusinessSessionGateway` are
   authoritative until that source-level documentation is corrected.
-* **M3B remains incomplete**: WPF and an external Browser are not yet two
+* **M3B remains incomplete**: opt-in WPF Host may request a separate business
+  Cookie via the lifecycle-authenticated `POST /api/v1/runtime/host-business-attach`
+  (only desktop/windows, only ON). Host injects those Cookies into WebView2
+  before navigation; the lifecycle token is never copied to the renderer.
+  `GET /api/v1/runtime/ready` is anonymously readable under ON solely to let
+  the native Host wait for readiness before attaching; it returns no candidate
+  data or session secret. The Host control client sends the business Cookie
+  only for its protected identity GET, not for shutdown. These are **source
+  contracts pending exact-HEAD CI and real Windows WPF acceptance**, not a
+  claim that WPF and an external Browser now share an independently owned Core.
+  WPF and an external Browser are not yet two
   independently attached/revocable clients of a persistent shared Core;
   Host shutdown lifetime, lease ownership and same-machine T1–T10 require
   separate real Windows tests. Source/Chromium CI alone is never WPF proof.

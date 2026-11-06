@@ -51,6 +51,7 @@ COOKIE_NAME = "srw_business_session"
 CSRF_COOKIE_NAME = "srw_csrf"
 CSRF_HEADER = "x-srw-csrf"
 PAIRING_PATH = "/api/v1/runtime/business-attach"
+HOST_ATTACH_PATH = "/api/v1/runtime/host-business-attach"
 LOGOUT_PATH = "/api/v1/runtime/business-logout"
 #: The Host lifecycle route keeps its own independent secret. A business cookie
 #: must never become a shutdown credential, so the gateway steps aside and lets
@@ -74,7 +75,8 @@ MUTATING_METHODS = frozenset({"POST", "PUT", "PATCH", "DELETE"})
 #: Anonymous, credential-free surfaces. They carry no business data: liveness,
 #: the static shell and its assets, the pairing endpoint and the lifecycle route.
 ANONYMOUS_EXACT = frozenset({"/", "/v1", "/health/live", "/health/ready",
-                             PAIRING_PATH, LIFECYCLE_PATH})
+                             "/api/v1/runtime/ready", PAIRING_PATH,
+                             HOST_ATTACH_PATH, LIFECYCLE_PATH})
 ANONYMOUS_PREFIXES = ("/v1/",)
 
 DENY_FLAG = "enforcement_disabled"
@@ -209,6 +211,14 @@ class BusinessSessionGateway:
             raise PairingDenied(DENY_PAIRING)
         # Single use: the code dies with the attempt that consumed it.
         self._pairing = None
+        return self.issue_host_session()
+
+    def issue_host_session(self) -> tuple[str, str]:
+        """Mint a business Cookie only after a trusted Host control-plane check.
+
+        The caller must authenticate the Host lifecycle credential; this method
+        is not an HTTP endpoint and never exposes that credential to a browser.
+        """
         token, session = self._registry.issue(BUSINESS_SCOPES)
         self._csrf[session.session_id] = secrets.token_urlsafe(32)
         return token, self._csrf[session.session_id]

@@ -3,7 +3,7 @@ from __future__ import annotations
 from dataclasses import asdict
 from contextlib import asynccontextmanager
 from pathlib import Path
-import hashlib, json, os, uuid
+import hashlib, hmac, json, os, uuid
 from time import perf_counter
 from typing import Any
 
@@ -35,6 +35,7 @@ from srw.runtime.business_session_gateway import (
     BusinessSessionGateway,
     BusinessSessionMiddleware,
     COOKIE_NAME,
+    HOST_ATTACH_PATH,
     MAX_PAIRING_BODY,
     PairingDenied,
     clear_cookie_headers,
@@ -245,6 +246,37 @@ def create_v1_app(
             for header in clear_cookie_headers():
                 response.headers.append("set-cookie", header)
             return response
+
+        # M3B incremental WPF attach: the native Host's private control client
+        # receives business Cookies; neither the SPA nor an external browser
+        # receives the Host lifecycle secret. Default OFF has no such route.
+        if runtime_mode == "desktop" and edition == "windows":
+            async def host_business_attach(request: Request) -> Response:
+                raw = request.scope.get("headers") or []
+                credentials = [value for name, value in raw
+                               if name.lower() == b"x-srw-session"]
+                # A browser must not be able to repurpose its Cookie, Origin or
+                # Fetch Metadata envelope as a privileged Host attach request.
+                browser_envelope = any(name.lower() in (
+                    b"cookie", b"origin", b"referer", b"sec-fetch-site")
+                    for name, _ in raw)
+                presented = (credentials[0].decode("latin1")
+                             if len(credentials) == 1 else "")
+                if (not runtime_session_token or len(credentials) != 1
+                        or browser_envelope or len(presented) > 256
+                        or not presented.isascii()
+                        or not runtime_session_token.isascii()
+                        or not hmac.compare_digest(presented, runtime_session_token)):
+                    return JSONResponse({"detail": "host attachment refused"},
+                                        status_code=403)
+                token, csrf = business_gateway.issue_host_session()
+                response = JSONResponse({"status": "attached"})
+                response.headers.append("set-cookie", session_cookie_header(token))
+                response.headers.append("set-cookie", csrf_cookie_header(csrf))
+                return response
+
+            app.routes.insert(0, Route(HOST_ATTACH_PATH, host_business_attach,
+                                       methods=["POST"]))
 
         app.routes.insert(0, Route("/api/v1/runtime/business-attach",
                                    business_attach, methods=["POST"]))
