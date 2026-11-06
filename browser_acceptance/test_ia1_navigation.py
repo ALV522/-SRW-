@@ -297,5 +297,29 @@ class IANavigationBrowserTests(unittest.TestCase):
                 self.assertIn(title, page.locator(".nav-item.active").inner_text())
 
 
+    def test_08_topbar_workbench_breadcrumb_does_not_retain_project(self):
+        """#235: exercise the actual breadcrumb link, not only the sidebar.
+
+        Pre-#235 main has no breadcrumb, so its existing navigation is still
+        checked by test_07. On the UI PR, the breadcrumb must clear context.
+        """
+        page = self.page
+        self.open_project()
+        workbench = page.locator("#top-crumb .crumb-link").filter(has_text="工作台")
+        if workbench.count() == 0:
+            self.assertEqual(page.locator("#top-back").count(), 0)
+            return
+        expect(workbench).to_be_visible()
+        workbench.click()
+        expect(page.locator("#top-title")).to_have_text("今日待办")
+        expect(page.locator("#content h1")).to_have_text("今日待办")
+        expect(page.locator("#content .project-banner")).to_have_count(0)
+        expect(page.locator("#top-back:visible")).to_have_count(0)
+        expect(page.locator("#top-crumb .crumb-link")).to_have_count(0)
+        self.assertEqual(page.locator(".nav-item.active").count(), 1)
+        self.assertIn("今日待办", page.locator(".nav-item.active").inner_text())
+
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)
