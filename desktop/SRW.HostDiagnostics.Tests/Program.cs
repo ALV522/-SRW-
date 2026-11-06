@@ -56,6 +56,7 @@ Expect(stopped.EventName == "backend_lifecycle"
 
 await SRW.HostDiagnostics.Tests.RuntimeApiClientProxyTests.RunAsync();
 await SRW.HostDiagnostics.Tests.RuntimeApiClientRedirectTests.RunAsync();
+await SRW.HostDiagnostics.Tests.RuntimeApiClientCookieTests.RunAsync();
 
 
 // #232: the initial window is authored as 1440x900 DIP. The work area reported by
