@@ -42,6 +42,18 @@ internal static class RuntimeApiClientCookieTests
             || server.ShutdownLifecycleHeaders[0].Contains(Business, StringComparison.Ordinal)
             || server.ShutdownLifecycleHeaders[0].Contains(Csrf, StringComparison.Ordinal))
             throw new InvalidOperationException("Host shutdown credential/cookie boundary violated");
+        // Default-OFF Core has no host attach endpoint. The Host must keep its
+        // legacy anonymous /runtime/info flow without injecting stale cookies.
+        using (var offServer = new CookieStub(attachMissing: true))
+        using (var offClient = new RuntimeApiClient(offServer.Port, Lifecycle))
+        {
+            await offClient.AttachBusinessSessionIfAvailableAsync();
+            var offIdentity = await offClient.GetInfoAsync();
+            await offServer.CompleteAsync();
+            if (offClient.BrowserCookies.Count != 0 || offIdentity.InstanceId != "synthetic-instance")
+                throw new InvalidOperationException("Host default-OFF fallback changed business cookies or identity");
+        }
+        Console.WriteLine("PASS: Host default-OFF 404 fallback retains anonymous identity without cookies");
         Console.WriteLine("PASS: Host business cookies explicit and absent from lifecycle shutdown");
     }
 
@@ -62,14 +74,16 @@ internal static class RuntimeApiClientCookieTests
         private readonly TcpListener _listener;
         private readonly CancellationTokenSource _stop = new();
         private readonly Task _serving;
+        private readonly bool _attachMissing;
         internal string[] AttachCookies { get; private set; } = [];
         internal string[] InfoCookies { get; private set; } = [];
         internal string[] ShutdownCookies { get; private set; } = [];
         internal string[] ShutdownLifecycleHeaders { get; private set; } = [];
         internal int Port => ((IPEndPoint)_listener.LocalEndpoint).Port;
 
-        internal CookieStub()
+        internal CookieStub(bool attachMissing = false)
         {
+            _attachMissing = attachMissing;
             _listener = new TcpListener(IPAddress.Loopback, 0);
             _listener.Start();
             _serving = ServeAsync();
@@ -77,7 +91,7 @@ internal static class RuntimeApiClientCookieTests
 
         private async Task ServeAsync()
         {
-            for (var i = 0; i < 3; i++)
+            for (var i = 0; i < (_attachMissing ? 2 : 3); i++)
             {
                 using var connection = await _listener.AcceptTcpClientAsync(_stop.Token);
                 var stream = connection.GetStream();
@@ -95,9 +109,16 @@ internal static class RuntimeApiClientCookieTests
                 {
                     AttachCookies = cookies;
                     body = "{\"status\":\"attached\"}";
-                    extra = "Set-Cookie: srw_business_session=" + Business
-                        + "; Path=/; HttpOnly; SameSite=Strict\r\n"
-                        + "Set-Cookie: srw_csrf=" + Csrf + "; Path=/; SameSite=Strict\r\n";
+                    if (_attachMissing)
+                    {
+                        status = "404 Not Found";
+                    }
+                    else
+                    {
+                        extra = "Set-Cookie: srw_business_session=" + Business
+                            + "; Path=/; HttpOnly; SameSite=Strict\r\n"
+                            + "Set-Cookie: srw_csrf=" + Csrf + "; Path=/; SameSite=Strict\r\n";
+                    }
                 }
                 else if (request.Contains("/runtime/info", StringComparison.Ordinal))
                 {
