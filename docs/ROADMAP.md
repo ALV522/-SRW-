@@ -1,10 +1,10 @@
 # SRW 产品与架构总路线图
 
-状态：ACTIVE · 2026-10-29 进度复核（目标与退出条件不变）
+状态：ACTIVE · 2026-11-06 进度复核（目标与退出条件不变）
 
 本路线图以 [PRODUCT_CHARTER](PRODUCT_CHARTER.md)、[ADR-0001](decisions/ADR-0001-single-authoritative-core.md) 和 [ADR-0002](decisions/ADR-0002-api-first-modular-monolith.md) 为约束。当前开发主线是 `main`；历史 v0.8.12-R2 是功能保真对照，不是当前源码身份。
 
-> **2026-11-05 14:40+08:00 进度快照（`main=fed76776ac522028a274b5af1a6b55835dade88b`）**：Track 0/#41 已合入 #207/#209/#211/#212/#220 的招聘流程增量、#219 Core scoped Scorecard GET 和 #222 恢复后写入的 pinned Blob 保护；#223/#224 分别是 Browser 回归与生产 UI scoped GET，准确 HEAD CI 全绿但尚缺非作者复审，**尚未合入**。信息架构 IA-1 [#221](https://github.com/ALV522/-SRW-/pull/221) 已合入：6→3 侧栏、8→3 项目页签、历史深链候选人绑定已验收；**IA-2 单页五段、IA-3 内联表单仍未开始**。Track B/#42 的新 SHA WPF/恢复、Track C/#43 真实 WPF+Browser 共用 Core、[#124](https://github.com/ALV522/-SRW-/issues/124) 私有 Runtime/Knowledge 容灾及 #130 物理恢复均未验证；Track D 不批准 RC。六类 main push CI 为成功不等于 Native ZIP 可发布。当前执行顺序：#223/#224 复审集成 → IA-2 小切片与新 Windows 工件逐步验收 → #43/#124/#130 阻断关闭。以下 11-02/10-29 快照是历史记录，不能复用为现时完成状态。
+> **2026-11-06 核准快照（main `aa82863528d0ee78d102371433e6cb679429516e`，非 RC）**：Track 0/#41 已合入 #207/#209/#211/#212/#220/#221/#224/#227；最后一项是真实 HR 错项目 Scorecard 的“前往所属项目→原候选人/事件面评→返回原项目保留筛选”用户可见恢复路径，既有 scoped Core 校验、零额外写入和只读历史保护不变。#223 浏览器回归、#226 Wheelhouse 13 依赖人工哈希锁及 #228 Windows Chromium 单文件+全套真实 CI 门禁均已按各自准确 HEAD 验证并合入当前 main；新主线 Windows WPF、全套备份恢复仍 NOT RUN。IA-1 已合入，IA-2/IA-3 未交付。Track B/#42 当前准确 SHA 的 WPF/备份恢复尚无实机证据；Track C/#43 会话/双端互操作及 #124/#130 仍为 RC BLOCK；Track D 未进入 RC/GA。本段只保证变更状态及来源，main 新 SHA 六类 push CI 未全部终结前不声称全绿。以下 11-05/11-02/10-29 条目均是历史快照。
 
 > **2026-11-02 历史审查快照（main `e6fab773127e49052aaec227b39a76f338c439ae`；开发中，不是 RC）**：Track 0/#41 的完整招聘/人工决策/恢复 Windows 实机链仍 P0；Track B/#42 只有该 SHA 的候选 ZIP 基础 WPF 有限实测（51 embedded tests，恢复组仅 1 项），#124 独立工件保管未闭环；Track C/#43 新 M3A Local Browser 会话 PR #187 HEAD `5bb3956` 通过 Source 双 OS 707/427 + Chromium/G1，处于复审/未合并，Windows WPF ON 和 EXE/Browser 同 Core M3B 实测未运行。Track A/#63 继续局部薄化，不能取代业务验收。**下一优先 #187 主线集成审查 → #41/#42 全业务 Windows 实测 → #43 M3B。** 本段为带 SHA 的历史快照，动态真相以 [#103](https://github.com/ALV522/-SRW-/issues/103) 为准；下文 2026-10-29 数字保留仅供历史追溯。
 

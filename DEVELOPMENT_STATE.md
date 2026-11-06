@@ -1,5 +1,7 @@
 # SRW Development State — Convergence 11
 
+> **2026-11-06 当前定位（固定提交 `aa82863528d0ee78d102371433e6cb679429516e`）**：#224 scoped Scorecard 生产 GET 与 #227 错项目一键恢复/返回原项目并保留筛选现均已主线合入；#223 Claim/Scorecard 回归、#226 Windows 13 依赖 Wheelhouse 人工字节锁、#228 Windows Chromium 独立 17 项+全套 52 项门禁均已合主线。根 Manifest 446 条，源码 Git tree 447 blob / 3,083,875 B（非 Native ZIP 尺寸）。#227 合并前精确 HEAD Ubuntu/Windows Source、Ubuntu Chromium、Governance 全绿 + B/C Windows 单文件复核；新 main push 全部 CI、真实 Windows WPF/WebView2、双载体同 Core、物理恢复及私有 Runtime/Knowledge 保管授权尚需各自证据。以下 2026-11-05 及更早记录**全部按带 SHA 的历史事实阅读，不能称最新状态**。权威动态入口：[README](README.md) / [#103](https://github.com/ALV522/-SRW-/issues/103) / [GitHub Actions](https://github.com/ALV522/-SRW-/actions)。
+
 > **2026-11-05 新基线（历史证据不继承）**：经 GitHub 实时读取 `main=fed76776ac522028a274b5af1a6b55835dade88b`，源码 SHA 清单 **443** 条；此 SHA 的 Ubuntu/Windows Source、Chromium、Governance、Repository Integrity、Windows Host Build、Offline Wheelhouse 六类 push 工作流均 **SUCCESS**。已合并 #221（侧栏 6→3／项目 8→3；面试流 `flowCandidateId` 与 Drawer 身份分离）及 #222（恢复后写入仍保留 pinned Source Blob 完整性），#219 Core scoped Scorecard GET 已有但 #224 生产调用仍在 PR 中；#223 浏览器隔离回归也仍为未合入的 PR。此 SHA 真正 Native WPF/Decision/Offer、#43 双端同 Core、#124 私有工件故障域和 #130 物理恢复 **NOT RUN/BLOCKED**。真实用户流程“候选列表→面试保存”仍 4 点击；IA-2/IA-3 仅为待交付。以上为准确时间点快照，较早各段数据属于历史阶段；请以 [README](README.md)、[Issue #103](https://github.com/ALV522/-SRW-/issues/103) 和最新准确 HEAD Actions 为准。
 
 > **2026-11-04 新主线索引（非历史全篇重验）**：在 `main=8e7f9b6502b0bdf8e4c9f36109af6988e05d18d6` 上 #207/#209/#211/#212 已合并，HR 无内部标准 ID 的面试/面评与历史逐标准建议进入主线。VERSION=`1.0.0-alpha10-convergence11`、Schema=`v1_0014`、`development`；#213/PR #214 的旧未 pin 事件追溯 pin P1 已在 `main=88217f60d3ac0632651a33c47ed4af83071d212d` 合并（精确 PR HEAD Ubuntu/Windows Source、Chromium、Governance SUCCESS；新主线 WPF 未验收）；#215 IA-1 已由 B/C 承担。**B/C 报告的真机 Q1-R3 只适用于 `deabba0a` 源及 SHA256 `72a1c16bbae6e67aaef14ee0cac0414dab4269ef08c1d2e470724410e3633a27` 的 ZIP**：Published Criteria、面试/Scorecard、R2 历史只读、电话筛选、人工 Claim 和核实 PASS；新 main WPF、该 ZIP 的备份恢复、Decision/Offer、#43/#124/#130 未由这一轮证明。最新事实以 [#103](https://github.com/ALV522/-SRW-/issues/103)、同 SHA Actions 与 [README](README.md) 为准；下文 2026-10 的各类“current”数字均为历史记录。
@@ -7,10 +9,10 @@
 > **2026-10-21 架构/事实更新（main `c0bc192e346a`）**：准确 main 的 Ubuntu/Windows Python 3.12 Source Gate 各 **241 tests / 2 skipped / PASS**，真实 Chromium **10** 项 PASS，当前源码 SHA 清单 **329** 项 PASS；Windows Host rebuild/offline wheelhouse 构建门禁成功，但当前 SHA 的完整 Native GUI/完整招聘业务/Provider/生产 Knowledge/EXE+Browser 双端仍未由这些 CI 证明。产品负责人已批准 ADR-0002：SRW 后续采用 **API-first modular monolith**，以现有 C11 Core 为唯一业务权威，Windows/Browser 为客户端；`fullworkbench.py` 与 `app.js` 采用小 PR、行为保真的渐进拆分，禁止 `new-core` 全面重写、微服务化、双数据库同步和同时更换前端框架。详见 [专项路线图](docs/API_FIRST_MODULAR_CORE_ROADMAP.md)。
 
 
-> **最新项目状态（2026-10-19；main `c9d70cd48d03`）**：Ubuntu/Windows 各 146 项源码测试、5 项真实 Chromium 业务场景、280 项仓库完整性校验 PASS。旧 `d8d032d` Windows Native 候选包已在真实电脑上通过 WPF/WebView2 基础启动、项目创建、标准草案更新和正常退出验证，仍非正式 RC/GA。本文其余“138/121/109 项”和“GUI 待验收”等内容属于不同开发阶段**历史追加记录**，不得取代最新身份与证据。请优先查看 [README](README.md)、[Windows GUI 实机报告](docs/WINDOWS_GUI_FIRST_ACCEPTANCE.md)、[路线图](docs/ROADMAP.md)。
+> **2026-10-19 历史状态（main `c9d70cd48d03`）**：Ubuntu/Windows 各 146 项源码测试、5 项真实 Chromium 业务场景、280 项仓库完整性校验 PASS。旧 `d8d032d` Windows Native 候选包已在真实电脑上通过 WPF/WebView2 基础启动、项目创建、标准草案更新和正常退出验证，仍非正式 RC/GA。本文其余“138/121/109 项”和“GUI 待验收”等内容属于不同开发阶段**历史追加记录**，不得取代最新身份与证据。请优先查看 [README](README.md)、[Windows GUI 实机报告](docs/WINDOWS_GUI_FIRST_ACCEPTANCE.md)、[路线图](docs/ROADMAP.md)。
 
 
-> **最新业务增量**：`c9d70cd` 还新增两条真实 Chromium E2E：独立面试 Scorecard 分歧保留与 Offer Draft→Approved→Sent→Accepted 人工状态流；主线 Chromium 总量现为 **5** 项。该增量保留旧决定必须由人类确认的约束。参见 [验收记录](docs/BUSINESS_E2E_SCORECARD_OFFER.md)。
+> **2026-10-19 历史业务增量**：`c9d70cd` 还新增两条真实 Chromium E2E：独立面试 Scorecard 分歧保留与 Offer Draft→Approved→Sent→Accepted 人工状态流；主线 Chromium 总量现为 **5** 项。该增量保留旧决定必须由人类确认的约束。参见 [验收记录](docs/BUSINESS_E2E_SCORECARD_OFFER.md)。
 
 Version: `1.0.0-alpha10-convergence11`; schema `v1_0014`; capability reference `v0.8.12-R2`.
 
@@ -20,7 +22,7 @@ C08 business capabilities are retained. C09 supplies local-only Host and browser
 
 Integration separates immutable C08 source history from the current complete source hash inventory. Windows file-handle checks now enumerate real process handles through psutil instead of returning an empty Linux-only /proc result. A real SQLite open/close test runs on each OS. Probe errors fail the run rather than manufacturing PASS.
 
-The current suite contains 138 tests. Runtime counts and results are emitted by CI for the exact commit. This document does not substitute for that evidence. Release identity is C11 throughout; historical C08 metadata is preserved under verification/history/convergence08.
+At the original C11 snapshot, the suite contained 138 tests. Runtime counts and results are emitted by CI for the exact commit. This document does not substitute for that evidence. Release identity is C11 throughout; historical C08 metadata is preserved under verification/history/convergence08.
 
 ## Delivery
 
