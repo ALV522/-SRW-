@@ -110,6 +110,20 @@ class ManualClaimBrowserAcceptance(unittest.TestCase):
         with sqlite3.connect(db) as connection:
             return connection.execute(f"SELECT COUNT(*) FROM {table}").fetchone()[0]
 
+    def candidate_claim_count(self):
+        db = Path(self.temp.name) / "data" / "srw_v1.db"
+        with sqlite3.connect(db) as connection:
+            return connection.execute(
+                "SELECT COUNT(*) FROM claim WHERE candidate_id=?", (self.cid,)
+            ).fetchone()[0]
+
+    def manual_claim_audit_count(self):
+        db = Path(self.temp.name) / "data" / "srw_v1.db"
+        with sqlite3.connect(db) as connection:
+            return connection.execute(
+                "SELECT COUNT(*) FROM audit_event WHERE event_type='CLAIM_PROPOSED_MANUALLY'"
+            ).fetchone()[0]
+
     def select_quote(self, quote):
         self.page.locator("#srw-manual-source").evaluate("""(element, quote) => {
             const start = element.value.lastIndexOf(quote);
@@ -120,6 +134,7 @@ class ManualClaimBrowserAcceptance(unittest.TestCase):
         self.page.get_by_role("button", name="引用选中文本").click()
 
     def test_unicode_offset_and_separate_human_review(self):
+        before_audit = self.manual_claim_audit_count()
         self.page.get_by_role("button", name="人工提出 Claim").click()
         expect(self.page.locator("#srw-manual-submit")).to_be_disabled()
         self.select_quote("candidate shipped a service")
@@ -127,19 +142,20 @@ class ManualClaimBrowserAcceptance(unittest.TestCase):
         self.page.locator("#srw-manual-normalized").fill("Shipped a service")
         self.page.get_by_role("button", name="提交待核实 Claim").click()
         expect(self.page.locator(".claim.unreviewed")).to_have_count(1)
-        self.assertEqual(self.count("claim"), 1)
+        self.assertEqual(self.candidate_claim_count(), 1)
         with sqlite3.connect(Path(self.temp.name) / "data" / "srw_v1.db") as connection:
             row = connection.execute("SELECT id, source_locator_json FROM claim ORDER BY rowid DESC LIMIT 1").fetchone()
             audit_count = connection.execute(
                 "SELECT COUNT(*) FROM audit_event WHERE event_type='CLAIM_PROPOSED_MANUALLY'"
             ).fetchone()[0]
         self.assertEqual(json.loads(row[1])["char_start"], TEXT.rindex("candidate shipped"))
-        self.assertEqual(audit_count, 1)
+        self.assertEqual(audit_count, before_audit + 1)
         self.page.locator(".claim.unreviewed").get_by_role("button", name="确认事实").click()
         expect(self.page.locator(".claim.confirmed")).to_have_count(1)
-        self.assertEqual(self.count("claim"), 1)
+        self.assertEqual(self.candidate_claim_count(), 1)
 
     def test_material_revision_invalidated_before_submit_fails_closed(self):
+        before_audit = self.manual_claim_audit_count()
         self.page.get_by_role("button", name="人工提出 Claim").click()
         self.select_quote("candidate shipped a service")
         self.page.locator("#srw-manual-normalized").fill("Shipped a service")
@@ -153,21 +169,67 @@ class ManualClaimBrowserAcceptance(unittest.TestCase):
             connection.commit()
         self.page.get_by_role("button", name="提交待核实 Claim").click()
         expect(self.page.get_by_text("提交未完成", exact=False)).to_be_visible()
-        self.assertEqual(self.count("claim"), 0)
-        with sqlite3.connect(Path(self.temp.name) / "data" / "srw_v1.db") as connection:
-            self.assertEqual(connection.execute(
+        self.assertEqual(self.candidate_claim_count(), 0)
+        self.assertEqual(self.manual_claim_audit_count(), before_audit)
+
+    def test_manual_claim_survives_reload_and_never_moves_to_another_candidate(self):
+        # Other tests share this disposable SQLite; count only this test's delta.
+        before_claims = self.count("claim")
+        with sqlite3.connect(Path(self.temp.name) / "data" / "srw_v1.db") as db:
+            before_audit = db.execute(
                 "SELECT COUNT(*) FROM audit_event WHERE event_type='CLAIM_PROPOSED_MANUALLY'"
-            ).fetchone()[0], 0)
+            ).fetchone()[0]
+        # This is an operator workflow with no Provider request or background worker.
+        self.page.get_by_role("button", name="人工提出 Claim").click()
+        self.select_quote("candidate shipped a service")
+        self.page.locator("#srw-manual-normalized").fill("Persistent manual evidence")
+        self.page.get_by_role("button", name="提交待核实 Claim").click()
+        expect(self.page.locator(".claim.unreviewed")).to_have_count(1)
+
+        other = self.post(f"/api/v1/projects/{self.pid}/candidates",
+                          {"display_name": "Synthetic Other Person"})["candidate_id"]
+        self.page.evaluate("""async ([pid, cid]) => {
+            await window.openProject(pid);
+            await window.openCandidate(cid);
+        }""", [self.pid, other])
+        expect(self.page.locator(".claim.unreviewed")).to_have_count(0)
+
+        self.page.reload(wait_until="domcontentloaded")
+        self.page.wait_for_function("Boolean(window.openProject && window.openCandidate)")
+        self.page.evaluate("""async ([pid, cid]) => {
+            await window.openProject(pid);
+            await window.openCandidate(cid);
+        }""", [self.pid, self.cid])
+        expect(self.page.locator(".claim.unreviewed")).to_have_count(1)
+        with sqlite3.connect(Path(self.temp.name) / "data" / "srw_v1.db") as db:
+            rows = db.execute(
+                "SELECT candidate_id FROM claim WHERE candidate_id=?", (self.cid,)
+            ).fetchall()
+            audit = db.execute(
+                "SELECT COUNT(*) FROM audit_event WHERE event_type='CLAIM_PROPOSED_MANUALLY'"
+            ).fetchone()[0]
+        self.assertEqual(rows, [(self.cid,)])
+        self.assertEqual(audit, before_audit + 1)
+        self.page.locator(".claim.unreviewed").get_by_role(
+            "button", name="确认事实").click()
+        expect(self.page.locator(".claim.confirmed")).to_have_count(1)
+
+        self.page.reload(wait_until="domcontentloaded")
+        self.page.wait_for_function("Boolean(window.openProject && window.openCandidate)")
+        self.page.evaluate("""async ([pid, cid]) => {
+            await window.openProject(pid);
+            await window.openCandidate(cid);
+        }""", [self.pid, self.cid])
+        expect(self.page.locator(".claim.confirmed")).to_have_count(1)
+        self.assertEqual(self.count("claim"), before_claims + 1)
 
     def test_no_quote_selection_cannot_write(self):
+        before_audit = self.manual_claim_audit_count()
         self.page.get_by_role("button", name="人工提出 Claim").click()
         self.page.get_by_role("button", name="引用选中文本").click()
         expect(self.page.locator("#srw-manual-submit")).to_be_disabled()
-        self.assertEqual(self.count("claim"), 0)
-        with sqlite3.connect(Path(self.temp.name) / "data" / "srw_v1.db") as connection:
-            self.assertEqual(connection.execute(
-                "SELECT COUNT(*) FROM audit_event WHERE event_type='CLAIM_PROPOSED_MANUALLY'"
-            ).fetchone()[0], 0)
+        self.assertEqual(self.candidate_claim_count(), 0)
+        self.assertEqual(self.manual_claim_audit_count(), before_audit)
 
 
 if __name__ == "__main__":

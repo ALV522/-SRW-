@@ -333,6 +333,58 @@ function scorecardHistoryHtml(list,ev){
 }
 window.openScorecards=async(cid,eid)=>{
   try{
+    // The selected project is UI state, not proof of candidate ownership.
+    // Verify it against Core before any candidate-scoped Scorecard GET.
+    if(!cid||!state.projectId)throw uiError('缺少候选人或项目上下文，已阻止读取面评');
+    const owner=await api(`/api/v1/candidates/${cid}/summary`);
+    if(!owner||!owner.project_id||owner.project_id!==state.projectId){
+      if(!owner||!owner.project_id)throw uiError('无法确认候选人所属项目，已阻止读取面评');
+      // Capture a return route, but never restore a mismatched candidate drawer.
+      const origin={projectId:state.projectId,projectTab:state.projectTab,
+        candidateView:state.candidateView,candidateQuery:state.candidateQuery,
+        candidateArchive:state.candidateArchive,candidateMaterial:state.candidateMaterial,
+        candidateStage:state.candidateStage,candidatePage:state.candidatePage};
+      modal('独立 Interview Scorecard',
+        '<div class="notice danger" role="alert"><strong>候选人所属项目与当前项目不一致，已阻止读取</strong><div class="subtle" style="margin-top:6px">本次未读取评分或写入数据。可前往候选人所属项目，重新核对原面试记录。</div></div>',
+        '<button class="btn" onclick="closeModal()">关闭</button><button class="btn primary" id="sc-open-owner">前往所属项目并查看本次面评</button>');
+      $('#sc-open-owner').addEventListener('click',async()=>{
+        try{
+          // Recheck ownership before switching workspaces; never trust a stale UI hint.
+          const fresh=await api(`/api/v1/candidates/${cid}/summary`);
+          if(!fresh||fresh.project_id!==owner.project_id)throw uiError('候选人所属项目已变化，请刷新后重新查找');
+          closeModal();
+          await window.openProject(owner.project_id);
+          await window.setProjectTab('candidates');
+          await window.openCandidate(cid);
+          await window.setCandidateSection('process');
+          // This explicit recovery action opens the original event, not just a candidate list.
+          await window.openScorecards(cid,eid);
+          // Keep the operator's original project/filter route available after
+          // recovery, without restoring an unverified candidate identity.
+          const footer=$('#modal-root .modal-foot');
+          if(footer){
+            const back=document.createElement('button');
+            back.type='button';back.className='btn';back.textContent='返回原项目';
+            back.addEventListener('click',async()=>{
+              try{
+                closeModal();
+                state.candidateQuery=origin.candidateQuery;
+                state.candidateArchive=origin.candidateArchive;
+                state.candidateMaterial=origin.candidateMaterial;
+                state.candidateStage=origin.candidateStage;
+                state.candidatePage=origin.candidatePage;
+                await window.openProject(origin.projectId);
+                await window.setProjectTab(origin.projectTab);
+                state.candidateView=origin.candidateView;
+                if(origin.projectTab==='candidates'&&origin.candidateView!=='all')await projectWorkspace();
+              }catch(e){blockedNotice('无法返回原项目',e.message||'原项目暂不可访问','请从招聘项目列表重新进入；本次没有写入面评。')}
+            });
+            footer.prepend(back);
+          }
+        }catch(e){blockedNotice('无法打开候选人所属项目',e.message||'项目导航失败','请从招聘项目列表重新查找该候选人；本次没有写入面评。')}
+      });
+      return;
+    }
     let ev=null;
     try{ev=await eventContext(cid,eid)}
     catch(e){blockedNotice('独立 Interview Scorecard',e.message||'无法读取该面试记录','未读取该面试的任何反馈，也未写入数据。');return}
@@ -348,7 +400,7 @@ window.openScorecards=async(cid,eid)=>{
       return;
     }
     modal('独立 Interview Scorecard',`${existing}<div class="divider"></div><div class="form-grid"><div class="field"><label>评价者</label><input id="sc-evaluator" class="input"></div><div class="field"><label>总体建议</label><input id="sc-rec" class="input" placeholder="advance / hold / reject"></div></div><div id="sc-criteria" style="margin-top:12px">${criterionFeedbackRows(ctx.keys,ctx.names,ctx.definitions)}</div><p class="subtle">不同评价者意见独立保存；系统不会自动平均成总分。</p>`,`<button class="btn" onclick="closeModal()">关闭</button><button class="btn primary" onclick="saveScorecard('${cid}','${eid}')">提交并锁定</button>`)
-  }catch(e){toast(e.message||'无法读取该面试记录',true)}
+  }catch(e){blockedNotice('独立 Interview Scorecard',e.message||'无法读取该面试记录','请从正确项目的候选人工作台重新打开；本次未提交任何评分。')}
 };
 
 
