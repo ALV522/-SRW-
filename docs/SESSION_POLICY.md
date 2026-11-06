@@ -61,7 +61,9 @@ attached to one Core.
   authoritative until that source-level documentation is corrected.
 * **M3B remains incomplete**: opt-in WPF Host may request a separate business
   Cookie via the lifecycle-authenticated `POST /api/v1/runtime/host-business-attach`
-  (only desktop/windows, only ON). Host injects those Cookies into WebView2
+  (only desktop/windows, only ON), authenticated with a one-use HMAC proof
+  over a fresh nonce rather than transmitting the Host lifecycle secret.
+  Host injects those Cookies into WebView2
   before navigation; the lifecycle token is never copied to the renderer.
   `GET /api/v1/runtime/ready` is anonymously readable under ON solely to let
   the native Host wait for readiness before attaching; it returns no candidate

@@ -9,6 +9,8 @@ Windows WPF GUI remains a separate, not-yet-run acceptance.
 from __future__ import annotations
 
 import os
+import hashlib
+import hmac
 import sqlite3
 import tempfile
 import unittest
@@ -27,6 +29,13 @@ from test_session_gate_http import asgi_request
 ROOT = Path(__file__).resolve().parents[1]
 SECRET = "synthetic-host-lifecycle-secret"
 ORIGIN = "http://testserver"
+
+
+def host_headers(nonce="a" * 64, secret=SECRET):
+    proof = hmac.new(secret.encode("ascii"),
+                     ("srw-host-attach-v1:" + nonce).encode("ascii"),
+                     hashlib.sha256).hexdigest()
+    return {"X-SRW-Host-Nonce": nonce, "X-SRW-Host-Proof": proof}
 
 
 class HostBusinessAttachHttpTests(unittest.TestCase):
@@ -67,7 +76,7 @@ class HostBusinessAttachHttpTests(unittest.TestCase):
         self.assertEqual(self.client.get("/api/v1/runtime/ready").status_code, 200)
         self.assertEqual(self.client.get("/api/v1/runtime/info").status_code, 401)
         before = self._counts()
-        response = self.client.post(HOST_ATTACH_PATH, headers={"X-SRW-Session": SECRET})
+        response = self.client.post(HOST_ATTACH_PATH, headers=host_headers())
         self.assertEqual(response.status_code, 200, response.text)
         self.assertEqual(response.json(), {"status": "attached"})
         cookies = response.headers.get_list("set-cookie")
@@ -79,6 +88,9 @@ class HostBusinessAttachHttpTests(unittest.TestCase):
         self.assertNotIn(SECRET, response.text)
         self.assertNotIn("srw1.", response.text)
         self.assertEqual(self._counts(), before, "attachment must not write business/audit")
+        self.assertEqual(self.client.post(HOST_ATTACH_PATH,
+                                          headers=host_headers()).status_code, 403,
+                         "the same Host nonce must not mint another session")
         csrf = self.client.cookies.get(CSRF_COOKIE_NAME)
         self.assertTrue(csrf)
         self.assertEqual(self.client.get("/api/v1/runtime/info").status_code, 200)
@@ -100,11 +112,13 @@ class HostBusinessAttachHttpTests(unittest.TestCase):
         before = self._counts()
         cases = [
             {},
-            {"X-SRW-Session": "incorrect"},
-            {"X-SRW-Session": SECRET, "Origin": ORIGIN},
-            {"X-SRW-Session": SECRET, "Referer": ORIGIN + "/"},
-            {"X-SRW-Session": SECRET, "Cookie": "unused=x"},
-            {"X-SRW-Session": SECRET, "Sec-Fetch-Site": "same-origin"},
+            {"X-SRW-Session": SECRET},
+            {"X-SRW-Host-Nonce": "a" * 64},
+            {"X-SRW-Host-Nonce": "a" * 64, "X-SRW-Host-Proof": "0" * 64},
+            {**host_headers(), "Origin": ORIGIN},
+            {**host_headers(), "Referer": ORIGIN + "/"},
+            {**host_headers(), "Cookie": "unused=x"},
+            {**host_headers(), "Sec-Fetch-Site": "same-origin"},
         ]
         for headers in cases:
             with self.subTest(headers=tuple(headers)):
@@ -114,19 +128,18 @@ class HostBusinessAttachHttpTests(unittest.TestCase):
                 self.assertEqual(len(gateway.registry), 0)
                 self.assertEqual(self._counts(), before)
 
-        for credentials in ((SECRET.encode(), SECRET.encode()),
-                            (b"incorrect", SECRET.encode())):
+        for duplicated in (b"x-srw-host-nonce", b"x-srw-host-proof"):
+            headers = [(b"host", b"testserver"),
+                       (b"x-srw-host-nonce", b"a" * 64),
+                       (b"x-srw-host-proof", host_headers()["X-SRW-Host-Proof"].encode())]
+            headers.append((duplicated, headers[1 if duplicated.endswith(b"nonce") else 2][1]))
             status, body = asgi_request(
-                self.app, method="POST", path=HOST_ATTACH_PATH,
-                headers=[(b"host", b"testserver"),
-                         (b"x-srw-session", credentials[0]),
-                         (b"x-srw-session", credentials[1])],
-            )
+                self.app, method="POST", path=HOST_ATTACH_PATH, headers=headers)
             self.assertEqual(status, 403, body)
             self.assertEqual(len(gateway.registry), 0)
         # Even a valid Host header cannot launder a credential in a query URL.
         response = self.client.post(HOST_ATTACH_PATH + "?session_token=synthetic",
-                                    headers={"X-SRW-Session": SECRET})
+                                    headers=host_headers())
         self.assertEqual(response.status_code, 401)
         self.assertEqual(len(gateway.registry), 0)
         self.assertEqual(self._counts(), before)
@@ -142,7 +155,7 @@ class HostBusinessAttachHttpTests(unittest.TestCase):
                                      edition=edition, token=token)
                 with TestClient(app) as client:
                     response = client.post(HOST_ATTACH_PATH,
-                                           headers={"X-SRW-Session": SECRET})
+                                           headers=host_headers())
                     self.assertIn(response.status_code, (403, 404))
                     self.assertNotIn("set-cookie", response.headers)
                     if not enforced:

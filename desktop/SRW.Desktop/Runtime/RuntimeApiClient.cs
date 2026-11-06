@@ -2,6 +2,8 @@ using System.Net;
 using System.Net.Http;
 using System.Net.Http.Json;
 using System.Linq;
+using System.Security.Cryptography;
+using System.Text;
 using System.Text.Json;
 
 namespace SRW.Desktop.Runtime;
@@ -82,7 +84,14 @@ public sealed class RuntimeApiClient : IDisposable
     {
         using var request = new HttpRequestMessage(
             HttpMethod.Post, "/api/v1/runtime/host-business-attach");
-        request.Headers.Add("X-SRW-Session", _sessionToken);
+        // Never send the raw lifecycle secret to an unverified listener. The
+        // HMAC is scoped to this attach use case and uses a fresh 256-bit nonce.
+        var nonce = Convert.ToHexString(RandomNumberGenerator.GetBytes(32)).ToLowerInvariant();
+        var proof = HMACSHA256.HashData(
+            Encoding.ASCII.GetBytes(_sessionToken),
+            Encoding.ASCII.GetBytes("srw-host-attach-v1:" + nonce));
+        request.Headers.Add("X-SRW-Host-Nonce", nonce);
+        request.Headers.Add("X-SRW-Host-Proof", Convert.ToHexString(proof).ToLowerInvariant());
         using var response = await _client.SendAsync(request, cancellationToken);
         if (response.StatusCode == HttpStatusCode.NotFound)
         {
