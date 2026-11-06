@@ -1,72 +1,77 @@
-# Business session authorization (opt-in) - module contract
+# Business session authorization (opt-in) — production M3A contract
 
-Status: **implemented as an opt-in M3A slice for the Local Web carrier, OFF by default.**
-With `RECRUITMENT_SESSION_ENFORCE` unset/blank/`0` the application behaves exactly as
-before and installs no gateway. With `=1`, `backend/srw/runtime/business_session_gateway.py`
-runs as the outermost middleware and every business route needs a paired session. The
-Windows Host / external-Browser carrier (M3B) is **not** wired yet: a WPF process that
-forces `=1` without pairing fails closed rather than silently falling back to OFF.
-Any other non-empty value (`true`, `yes`, `01`, `2`) refuses startup **before** the
-workspace directory or SQLite file is created.
+Status: **Local Web M3A implemented, OFF by default; Windows/External Browser M3B NOT RUN.**
+This page describes production behavior at the 2026-11-06 C11 baseline, not a
+hypothetical single-header policy. The business gateway is installed by
+`backend/srw/api/app.py` when the **validated** opt-in flag is ON; it is
+`backend/srw/runtime/business_session_gateway.py`, not a reuse of the
+Host lifecycle `X-SRW-Session` secret.
 
-## What problem it solves - and what it does not
+## Actual authentication boundary
 
-| Threat | Today | After enabling the gate |
-|---|---|---|
-| Cross-site page / DNS rebinding against `127.0.0.1` | Mitigated by the local boundary | Still mitigated; a valid token does not bypass the origin check |
-| **Another process or user on the same machine** calling the API | **Not mitigated** - no credential at all | Mitigated: the caller must present the session token |
-| Same-origin script / extension already inside the page | Not mitigated | **Still not mitigated.** A token cannot be hidden from same-origin script |
+| Threat | With enforcement OFF (default) | M3A ON |
+| --- | --- | --- |
+| Cross-site page / loopback DNS rebinding | LocalBoundaryMiddleware filters origin/Host | LocalBoundaryMiddleware remains authoritative; business session adds checks |
+| Another local process calling protected Core business APIs | No business session credential | Requires valid paired business Cookie; cannot self-pair by visiting the static shell |
+| Same-origin malicious script / extension | Not protected by origin checks alone | Still dangerous: HttpOnly prevents direct extraction of the business Cookie by ordinary JS, **not authenticated same-origin actions** |
 
-The gate is therefore "minimal authentication against local processes", not
-"authenticated sessions" in the web sense, and must never be described as the latter.
+This is opt-in local access protection, **not** an OS identity system,
+enterprise login or evidence that every Native/Browser carrier is securely
+attached to one Core.
 
-## Contract
+## Effective production contract
 
-* `RECRUITMENT_SESSION_ENFORCE=1` enables the gate. Only the literal `1`; every other
-  value and the absent variable leave it disabled. Default **off** so the Native WPF
-  Host, which sends no `Origin` and no token today, keeps working unchanged.
-* Credential: `X-SRW-Session` header, compared in constant time. It is **never**
-  accepted from the query string: query strings end up in logs and history. Detection
-  parses query **keys**, decodes them up to five rounds (`%5f`, `%255f`,
-  `%252573ession`), refuses any key that still cannot be decoded, and never inspects
-  values, so `description=mysession=note` stays an ordinary filter. Refusing
-  undecodable keys is the decisive rule: a name cannot hide behind another encoding
-  layer.
-* Anonymous `GET`/`HEAD` allowlist (exact match): `/health/live`, `/health/ready`,
-  `/api/v1/runtime/ready`, `/api/v1/runtime/capabilities`, plus the local static bundle
-  `/v1` and `/v1/...`. `/api/v1/info`, `/api/v1/runtime/info` and
-  `/api/v1/runtime/live` expose instance/release/session identifiers and are **not**
-  anonymous.
-* Every other path and every other method (including `OPTIONS`) requires the token.
-* Cross-origin (`Origin` not in the configured set, or `Sec-Fetch-Site` equal to
-  `cross-site` **or** `same-site`) is refused with `403` even when the token is valid:
-  `same-site` is not `same-origin`, so another loopback port is still a different
-  origin. A caller that sends no Fetch Metadata at all (the Native Host) is not
-  rejected for the absence. If the gate is enabled without a configured origin set,
-  browser-originated (`Origin`-bearing) requests are refused, while the Origin-less
-  Host path still works.
-* Enabling the gate with no token configured fails closed: non-anonymous requests get
-  `401 session_token_not_configured` instead of falling open.
-* Ambiguous paths are **refused, not normalised** (`400 ambiguous_path`): percent
-  encoding, back slashes, duplicate slashes, `.`/`..` segments, `;`, `?`, `#`,
-  control/non-ASCII characters, trailing dots or spaces, and over-long paths. A decoder
-  that rewrites the path would give an attacker a second parser to disagree with.
-* `SessionPolicy.rotated(new)` returns a policy that accepts the new token and rejects
-  the old one; `revoked` tokens are rejected with `401 session_token_invalid`.
-* Decisions carry only `allowed` / `status_code` / `reason`. The module imports nothing
-  but `hmac`, `dataclasses`, `typing` and the pure `urllib.parse` decoder, so a rejected
-  request cannot write, log or
-  audit anything. **No audit event is produced by authorization failures.**
+* `RECRUITMENT_SESSION_ENFORCE` follows the **three-way parser** in
+  `SessionPolicy.from_environ`: unset / blank / trimmed `0` → OFF;
+  trimmed `1` → ON; **all other non-empty values** (`true`, `yes`,
+  `01`, `2`) and non-string values raise a fixed `ValueError`
+  without echoing the supplied value. `app.py` checks this before creating
+  the data directory or opening SQLite. Invalid ON cannot silently become OFF.
+* OFF leaves the legacy local WPF/API behavior unchanged, with no business
+  gateway installed. This compatibility mode is **not** an authenticated
+  business-session deployment.
+* ON Local Web requires explicit human pairing: `scripts/start_local_web.py`
+  prints a random one-use, 60-second code only to a trusted interactive
+  terminal. The same-origin POST
+  `/api/v1/runtime/business-attach` consumes it (bounded attempts/body)
+  and issues a revocable `SessionRegistry` session in
+  `srw_business_session` (HttpOnly, SameSite=Strict, Path=/).
+  The separate `srw_csrf` is readable for the browser to echo as
+  `X-SRW-CSRF` on mutating operations. A static GET never mints a session.
+* Protected reads require an authorized live **Cookie** with read scope;
+  mutating operations also require write scope, valid CSRF and same-origin
+  `Origin`. Query-carried credentials, raw duplicate or ambiguous Cookie
+  headers, repeated CSRF headers, foreign/expired/revoked sessions or
+  cross-origin writes are refused **before** business/SQLite/audit effects.
+  Exact anonymous static/liveness/attach paths are specified in
+  `BusinessSessionGateway.ANONYMOUS_EXACT` and `ANONYMOUS_PREFIXES`.
+  Sensitive `/api/v1/info`, `/api/v1/runtime/info`, project, backup
+  and workbench routes are not anonymous under ON.
+* **Host lifecycle is separate from business authorization**:
+  `RECRUITMENT_SESSION_TOKEN` and `X-SRW-Session` currently belong to
+  `POST /api/v1/runtime/shutdown` and the existing
+  `desktop/SRW.Desktop/Runtime/RuntimeApiClient.cs`.
+  They must not be copied into business Cookie/JS/URL/logs. A valid
+  business Cookie alone cannot shut down the Core.
+* `SessionPolicy.evaluate` remains a pure, legacy *single-token model*
+  with separate tests; its header-based decision contract is **not the
+  current production M3A business auth mechanism**. The top-level legacy
+  docstrings in `session_policy.py` include pre-M3A terminology; the
+  implemented `from_environ` parser and `BusinessSessionGateway` are
+  authoritative until that source-level documentation is corrected.
+* **M3B remains incomplete**: WPF and an external Browser are not yet two
+  independently attached/revocable clients of a persistent shared Core;
+  Host shutdown lifetime, lease ownership and same-machine T1–T10 require
+  separate real Windows tests. Source/Chromium CI alone is never WPF proof.
 
-## Integration checklist (Track A)
+## Rollback and acceptance
 
-1. Middleware placed after `LocalBoundaryMiddleware`, opt-in, applied to all methods.
-2. `/api/v1/runtime/info` adds `businessSessionTokenRequired`, so a client can detect the
-   requirement before its first failing call.
-3. `401` responses carry `WWW-Authenticate: SRW-session` and a "reopen from the Host"
-   hint for the SPA; the SPA must render that state rather than a blank page.
-4. `RECRUITMENT_SESSION_ENFORCE=0` (or unset) is the 30-second rollback; it needs no data
-   migration and changes no Schema.
+Explicit `RECRUITMENT_SESSION_ENFORCE=0` is the supported M3A no-Schema-change
+rollback. Malformed configuration must refuse startup, not silently roll back.
+Regression proof lives in the `convergence_tests/test_session_gate_http.py`
+and policy/registry tests plus real Chromium; all denied attempts must leave
+project/candidate/audit state unchanged. #43 remains OPEN until real WPF +
+Browser concurrently operate on the **same authoritative Core**.
 
 ## Tests
 
