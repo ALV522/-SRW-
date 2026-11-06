@@ -8,24 +8,25 @@ SRW（Smart Recruitment Workbench）是一套 **local-first、evidence-centered�
 
 ## 当前产品化状态（2026-11-06，SHA 固定快照）
 
-> 本段是 **main `2c8516441dacda09cd1548f435baab37216d5091`** 的历史定位，不会自动随未来合并更新。实时工作状态以 [#103 协作板](https://github.com/ALV522/-SRW-/issues/103)、[PR 队列](https://github.com/ALV522/-SRW-/pulls) 和 [GitHub Actions](https://github.com/ALV522/-SRW-/actions) 的准确 SHA 为准。根 Source Manifest **443 项**；该提交的 main push CI 在本次文档编写时并未全部结束，**不预报六项 PASS**。
+> 本段是 **main `aa82863528d0ee78d102371433e6cb679429516e`** 的历史定位，不会自动随未来合并更新。实时工作状态以 [#103 协作板](https://github.com/ALV522/-SRW-/issues/103)、[PR 队列](https://github.com/ALV522/-SRW-/pulls) 和 [GitHub Actions](https://github.com/ALV522/-SRW-/actions) 的准确 SHA 为准。根 Source Manifest **446 项**；该提交的 main push CI 在本次文档编写时并未全部结束，**不预报六项 PASS**。
 
 | 维度 | 已合入 main / 尚缺证据 |
 | --- | --- |
 | 产品身份 | `1.0.0-alpha10-convergence11` / Schema `v1_0014` / development；非 RC/GA。历史 `v0.8.12-R2` 为功能保真对照。 |
 | 招聘业务 | #207/#209/#211/#212/#220 交付无内部 Criteria ID 的面试/面评可用路径；[#221](https://github.com/ALV522/-SRW-/pull/221) 完成 IA-1 侧栏 6→3、项目页签 8→3；[#224](https://github.com/ALV522/-SRW-/pull/224) 生产 Scorecard 已使用 project/candidate/event scoped Core GET。 |
 | 已确认合流 | [#227](https://github.com/ALV522/-SRW-/pull/227) 已合并：跨项目面评阻断→准确原候选人/面试事件一键恢复→返回原项目并保留筛选，Core 归属 TOCTOU 仍 fail-closed；对应 PR HEAD Ubuntu/Windows Source、Ubuntu Chromium、Governance 和 B/C Windows 单文件复核全通过。**主线新 SHA 与 Native WPF 需独立验证**。 |
-| 已集成的回归与开放 PR | [#223](https://github.com/ALV522/-SRW-/pull/223) 人工 Claim 持久化与 Scorecard 隔离浏览器回归已通过准确合流 HEAD 四项 CI、B/C 真 Windows 复核并合入本 main；[#226](https://github.com/ALV522/-SRW-/pull/226) Windows Wheelhouse 人工审阅字节锁仍待新主线合流；[#228](https://github.com/ALV522/-SRW-/pull/228) Windows Chromium **单文件+全套** 新门禁 HEAD `a303b71a`，Windows 作业已实跑 17 条+51 条成功，但全 PR 合并门禁仍需独立确认。 |
+| 已集成的回归与 Windows 工具链 | [#223](https://github.com/ALV522/-SRW-/pull/223) Claim 持久化/Scorecard 隔离回归已入主线；[#226](https://github.com/ALV522/-SRW-/pull/226) Windows Wheelhouse 13 个依赖固定哈希的校验已入主线；[#228](https://github.com/ALV522/-SRW-/pull/228) Windows Chromium 独立单文件 `test_flows.py` **17 条**与全套 **52 条（2 skip）** 双验收已入主线；以上各 PR 精确 HEAD CI 已全绿，**不代表新 main 的 WPF Native 实测**。 |
 | 当前发行阻断 | #42 新 SHA Windows WPF/完整招聘业务及真实备份恢复、#43 EXE+Browser 同 Core 会话、#124 私有 Runtime/五库许可与第二故障域、#130 物理恢复；均不得从 Source 或 Chromium PASS 推出已完成。 |
 
-**当前执行队列**：先完成 #226/#228 的准确 HEAD CI、相互冲突的 Source Manifest 合流及审查；再推进 Windows 新 Native 候选验收与 #43 会话契约。IA-2/IA-3 暂不以新界面取代上述业务闭环。普通工程更改由 A 执行，涉及产品不变量与正式发行再向负责人升级。
+**当前执行队列**：#227/#223/#226/#228 已集成；下一优先是 #42 最新 main Windows Native 组装及完整招聘/恢复实机、#43 M3B 单一 Core 的 WPF+Browser 会话同源验收、#124 受许可 Runtime/Knowledge 保管与 #130 物理恢复；#159 Windows graceful-stop 诊断仍需独立跟进。IA-2/IA-3 暂不以新界面取代上述业务闭环。普通工程更改由 A 执行，涉及产品不变量与正式发行再向负责人升级。
 
 ## Native 体积与保管
 
-主线 `7f8e6dd` 的只读 Git tree 实测：**444 个 blob、3,072,510 B 未压缩源码与文档（Manifest 443 条）**；2026-11-04 旧基线 `70756e2` 为 437 个 blob / 2,916,869 B，`8e7f9b6` 为 439 个 blob / 2,993,287 B。这些是 Git 源码原始字节，**不是** Native ZIP 的压缩体积或实际可删字节；不同 SHA 不可混算。完整审计及安全裁剪的先决条件见 [仓库与 Native 体积审计](docs/REPOSITORY_FOOTPRINT_20261104.md)。
+主线 `aa828635` 的只读 Git tree 实测：**447 个 blob、3,083,875 B 未压缩源码与文档（Manifest 446 条）**；2026-11-04 旧基线 `70756e2` 为 437 个 blob / 2,916,869 B，`8e7f9b6` 为 439 个 blob / 2,993,287 B。复算方法：GitHub `GET /repos/ALV522/-SRW-/git/trees/aa82863528d0ee78d102371433e6cb679429516e?recursive=1`，确认 `truncated=false`、只计 `type=blob` 的 `size` 之和。**这不是** Native ZIP 的压缩体积或实际可删字节；不同 SHA 不可混算。完整审计及安全裁剪的先决条件见 [仓库与 Native 体积审计](docs/REPOSITORY_FOOTPRINT_20261104.md)。
 
 历史完整 Native ZIP 约 100 MB 的主要载荷来自**独立的 Python Runtime、五个 Knowledge 库和 Host**；Source Manifest 当前同时决定 SOURCE ZIP 与 Native 候选允许文件集，不能直接删除测试、审计文件或私有依赖来假装瘦身。#124 的 Runtime/Knowledge 保管、许可与第二故障域仍需独立验证，私有字节不上传 Git。详情见 [Native 外部资产保管](docs/NATIVE_ARTIFACT_CUSTODY_AND_REPRODUCIBILITY.md)。
 
+\nWindows Wheelhouse 的 13 个 wheel 已由 #226 采用人工审阅 SHA256 固定。未来升级依赖必须单独提出 PR，取得原始下载字节、独立核对来源及实际哈希后**人工修改** `build-lock/windows-c11-wheelhouse.sha256`，再运行 Windows Wheelhouse 离线安装/导入校验；不可让 CI 自动下载新包、自动改锁、再用自己刚写的锁自证。\n
 新增只读、离线的 [Native ZIP 体积分析器](scripts/report_native_zip_footprint.py)：`python scripts/report_native_zip_footprint.py --zip <旧候选.zip> --zip <新候选.zip>`。它只扫描 ZIP central directory、统计 Runtime/Knowledge/Host/Source 分组压缩字节并计算整包 SHA256，不解压、修改、运行或上传私有文件。该报告**不代表** ZIP 完整性验收，必须另用 `scripts/native_payload.py audit-zip`；在实际取得前后大小及真实 Windows 验收之前，不能宣称已瘦身。
 
 

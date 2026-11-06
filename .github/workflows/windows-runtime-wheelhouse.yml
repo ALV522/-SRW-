@@ -7,6 +7,8 @@ on:
       - 'requirements-ci.txt'
       - 'scripts/upgrade_embedded_runtime.py'
       - 'scripts/check_embedded_runtime_compatibility.py'
+      - 'scripts/verify_windows_wheelhouse_lock.py'
+      - 'build-lock/windows-c11-wheelhouse.sha256'
       - '.github/workflows/windows-runtime-wheelhouse.yml'
   push:
     branches: [main]
@@ -30,6 +32,11 @@ jobs:
           New-Item -ItemType Directory -Force artifacts/wheelhouse | Out-Null
           python -m pip download --disable-pip-version-check --only-binary=:all: -r requirements-ci.txt --dest artifacts/wheelhouse
           if ($LASTEXITCODE -ne 0) { throw 'One or more Windows C11 dependency wheels unavailable' }
+      - name: Verify downloaded wheel bytes against reviewed pin
+        shell: pwsh
+        run: |
+          python scripts/verify_windows_wheelhouse_lock.py --wheelhouse artifacts/wheelhouse --lock build-lock/windows-c11-wheelhouse.sha256
+          if ($LASTEXITCODE -ne 0) { throw 'Windows Wheelhouse differs from reviewed SHA-256 pin' }
       - name: Create reproducible wheel integrity inventory
         shell: pwsh
         run: |
