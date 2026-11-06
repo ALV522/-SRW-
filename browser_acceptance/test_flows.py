@@ -537,7 +537,13 @@ class RecruitmentBrowserAcceptance(unittest.TestCase):
         )
         self.assertEqual(wrong_project.status, 200, wrong_project.text())
         wrong_pid = wrong_project.json()["project_id"]
-        self.page.evaluate("pid => window.openProject(pid)", wrong_pid)
+        self.page.evaluate(
+            "async pid => {await window.openProject(pid); await window.setProjectTab('candidates')}",
+            wrong_pid,
+        )
+        self.page.locator("#cand-q").fill("return-only-filter")
+        self.page.get_by_role("button", name="应用筛选").click()
+        expect(self.page.locator("#cand-q")).to_have_value("return-only-filter")
         # The refused UI action must not touch persisted audit or scorecards.
         db_path = Path(self.tmp.name) / "data" / "srw_v1.db"
         with sqlite3.connect(db_path) as db:
@@ -587,6 +593,18 @@ class RecruitmentBrowserAcceptance(unittest.TestCase):
             self.assertEqual(recovered_read.value.status, 200)
             expect(self.page.locator("#modal-root")).to_contain_text("模拟面试官甲")
             expect(self.page.locator("#modal-root")).to_contain_text("模拟面试官乙")
+            self.assertEqual(wrong_project_reads, [expected_read])
+            with sqlite3.connect(db_path) as db:
+                self.assertEqual(db.execute(
+                    "SELECT COUNT(*) FROM audit_event").fetchone()[0], before_audit)
+                self.assertEqual(db.execute(
+                    "SELECT COUNT(*) FROM interview_scorecard_submission"
+                ).fetchone()[0], before_scores)
+            # Return is a real UI click to the original project and filters;
+            # it must not restore the foreign candidate drawer or touch scores.
+            self.page.get_by_role("button", name="返回原项目").click()
+            expect(self.page.locator("#cand-q")).to_have_value("return-only-filter")
+            expect(self.page.locator("#content")).to_contain_text("Synthetic Wrong Project")
             self.assertEqual(wrong_project_reads, [expected_read])
             with sqlite3.connect(db_path) as db:
                 self.assertEqual(db.execute(

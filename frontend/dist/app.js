@@ -339,6 +339,11 @@ window.openScorecards=async(cid,eid)=>{
     const owner=await api(`/api/v1/candidates/${cid}/summary`);
     if(!owner||!owner.project_id||owner.project_id!==state.projectId){
       if(!owner||!owner.project_id)throw uiError('无法确认候选人所属项目，已阻止读取面评');
+      // Capture a return route, but never restore a mismatched candidate drawer.
+      const origin={projectId:state.projectId,projectTab:state.projectTab,
+        candidateView:state.candidateView,candidateQuery:state.candidateQuery,
+        candidateArchive:state.candidateArchive,candidateMaterial:state.candidateMaterial,
+        candidateStage:state.candidateStage,candidatePage:state.candidatePage};
       modal('独立 Interview Scorecard',
         '<div class="notice danger" role="alert"><strong>候选人所属项目与当前项目不一致，已阻止读取</strong><div class="subtle" style="margin-top:6px">本次未读取评分或写入数据。可前往候选人所属项目，重新核对原面试记录。</div></div>',
         '<button class="btn" onclick="closeModal()">关闭</button><button class="btn primary" id="sc-open-owner">前往所属项目并查看本次面评</button>');
@@ -354,6 +359,28 @@ window.openScorecards=async(cid,eid)=>{
           await window.setCandidateSection('process');
           // This explicit recovery action opens the original event, not just a candidate list.
           await window.openScorecards(cid,eid);
+          // Keep the operator's original project/filter route available after
+          // recovery, without restoring an unverified candidate identity.
+          const footer=$('#modal-root .modal-foot');
+          if(footer){
+            const back=document.createElement('button');
+            back.type='button';back.className='btn';back.textContent='返回原项目';
+            back.addEventListener('click',async()=>{
+              try{
+                closeModal();
+                state.candidateQuery=origin.candidateQuery;
+                state.candidateArchive=origin.candidateArchive;
+                state.candidateMaterial=origin.candidateMaterial;
+                state.candidateStage=origin.candidateStage;
+                state.candidatePage=origin.candidatePage;
+                await window.openProject(origin.projectId);
+                await window.setProjectTab(origin.projectTab);
+                state.candidateView=origin.candidateView;
+                if(origin.projectTab==='candidates'&&origin.candidateView!=='all')await projectWorkspace();
+              }catch(e){blockedNotice('无法返回原项目',e.message||'原项目暂不可访问','请从招聘项目列表重新进入；本次没有写入面评。')}
+            });
+            footer.prepend(back);
+          }
         }catch(e){blockedNotice('无法打开候选人所属项目',e.message||'项目导航失败','请从招聘项目列表重新查找该候选人；本次没有写入面评。')}
       });
       return;
