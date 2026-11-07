@@ -63,7 +63,7 @@ async function projectsPage(){syncTopbar();const d=await api('/api/v1/projects')
 window.openScheduledInterview=async(pid,cid,eid)=>{
   if(state.page!=='projects'||state.projectId!==pid||!cid||!eid){toast('请先进入对应招聘项目。',true);return}
   try{
-    const scoped=await api('/api/v1/projects/'+encodeURIComponent(pid)+'/pipeline');
+    const scoped=await api(`/api/v1/projects/${encodeURIComponent(pid)}/pipeline`);
     if(state.page!=='projects'||state.projectId!==pid)return;
     if(!(scoped.scheduled_events||[]).some(x=>x.candidate_id===cid&&x.event_id===eid)){
       toast('面试已变化或不属于当前项目，请刷新后重新选择。',true);return;
