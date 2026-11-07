@@ -337,7 +337,10 @@ class UiHierarchyTests(unittest.TestCase):
         # async business-session/health/dashboard bootstrap. Calling it at
         # that point races init(), which can replace the project DOM later.
         expect(self.page.locator("#content h1")).to_have_text("今日待办")
-        self.page.evaluate("pid => window.openProject(pid)", pid)
+        # Reopen through visible HR navigation, not a scripted deep link.
+        self.page.locator("aside .nav-item", has_text="招聘项目").click()
+        self.page.locator("tr").filter(has_text=title).get_by_role(
+            "button", name="进入工作区").click()
         expect(self.page.locator(".project-banner")).to_be_visible()
         expect(self.page.locator(f'[data-scorecard-event="{eid}"]')).to_have_count(1)
         self.page.locator(f'[data-scorecard-event="{eid}"]').click()
