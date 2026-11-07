@@ -327,9 +327,18 @@ class UiHierarchyTests(unittest.TestCase):
                 (foreign_cid,)).fetchone()[0], 0)
         # Reopen the browser page and verify persisted, independently scoped
         # history rather than relying on the modal's in-memory state.
+        # Scorecard submission does not complete the scheduled interview.
+        # Verify the server projection independently of the browser bootstrap.
+        scheduled_after = self.context.request.get(
+            self.base + f"/api/v1/projects/{pid}/pipeline").json()["scheduled_events"]
+        self.assertIn(eid, {item["event_id"] for item in scheduled_after})
         self.page.reload(wait_until="domcontentloaded")
-        self.page.wait_for_function("Boolean(window.openProject)")
+        # A module-level window.openProject exists before init() finishes its
+        # async business-session/health/dashboard bootstrap. Calling it at
+        # that point races init(), which can replace the project DOM later.
+        expect(self.page.locator("#content h1")).to_have_text("今日待办")
         self.page.evaluate("pid => window.openProject(pid)", pid)
+        expect(self.page.locator(".project-banner")).to_be_visible()
         expect(self.page.locator(f'[data-scorecard-event="{eid}"]')).to_have_count(1)
         self.page.locator(f'[data-scorecard-event="{eid}"]').click()
         expect(self.page.locator("#modal-root .scorecard-history")).to_contain_text("合成面试官乙")
