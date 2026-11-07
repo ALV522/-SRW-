@@ -9,6 +9,7 @@ Browser acceptance on the synthetic workspace. NOT WPF/WebView2 acceptance.
 from __future__ import annotations
 
 import json
+import sqlite3
 import os
 import socket
 import subprocess
@@ -283,6 +284,12 @@ class UiHierarchyTests(unittest.TestCase):
             "button", name="查看相关列表")).to_be_visible()
         scheduled = self.page.locator(f'[data-scheduled-event="{eid}"]')
         expect(scheduled).to_have_count(1)
+        # Start the operator click budget from the project list, not a hidden
+        # script-invoked workspace. Enter project = click 1.
+        self.page.locator("#top-back").click()
+        self.page.locator("tr").filter(has_text=title).get_by_role(
+            "button", name="进入工作区").click()
+        expect(self.page.locator(f'[data-scorecard-event="{eid}"]')).to_have_count(1)
 
         # A foreign candidate cannot reuse B's event ID to enter this project.
         self.page.evaluate("""async ([pid,cid,eid]) =>
@@ -290,7 +297,47 @@ class UiHierarchyTests(unittest.TestCase):
             [pid, foreign_cid, eid])
         expect(self.page.locator(".project-banner")).to_be_visible()
         expect(self.page.locator(".candidate-workspace-page")).to_have_count(0)
+        self.page.evaluate("""async ([pid,cid,eid]) =>
+            await window.openScheduledInterview(pid,cid,eid,true)""",
+            [pid, foreign_cid, eid])
+        expect(self.page.locator("#modal-root .modal")).to_have_count(0)
 
+        # Project overview → exact B Scorecard = click 2; submit = click 3.
+        # No UUID/criterion_key is typed by the operator.
+        self.page.locator(f'[data-scorecard-event="{eid}"]').click()
+        expect(self.page.locator("#content h1")).to_have_text("面试目标乙")
+        modal = self.page.locator("#modal-root .modal")
+        expect(modal.locator("#sc-criteria .criterion-block")).to_have_count(1)
+        modal.locator("#sc-evaluator").fill("合成面试官乙")
+        modal.locator(".c-rating").select_option("strong")
+        modal.locator(".c-obs").fill("合成观察：清晰描述了方法")
+        modal.locator("#sc-rec").fill("advance")
+        modal.get_by_role("button", name="提交并锁定").click()
+        expect(self.page.locator("#modal-root .modal")).to_have_count(0)
+        with sqlite3.connect(Path(self.tmp.name) / "data" / "srw_v1.db") as db:
+            rows = db.execute(
+                "SELECT candidate_id, event_id, feedback_json FROM interview_scorecard_submission "
+                "WHERE event_id=?", (eid,)).fetchall()
+            self.assertEqual(len(rows), 1)
+            self.assertEqual(rows[0][0], cid_b)
+            self.assertEqual(rows[0][1], eid)
+            self.assertEqual(json.loads(rows[0][2])[0]["criterion_key"], "research_reasoning")
+            self.assertEqual(db.execute(
+                "SELECT COUNT(*) FROM interview_scorecard_submission WHERE candidate_id=?",
+                (foreign_cid,)).fetchone()[0], 0)
+        # Reopen the browser page and verify persisted, independently scoped
+        # history rather than relying on the modal's in-memory state.
+        self.page.reload(wait_until="domcontentloaded")
+        self.page.wait_for_function("Boolean(window.openProject)")
+        self.page.evaluate("pid => window.openProject(pid)", pid)
+        expect(self.page.locator(f'[data-scorecard-event="{eid}"]')).to_have_count(1)
+        self.page.locator(f'[data-scorecard-event="{eid}"]').click()
+        expect(self.page.locator("#modal-root .scorecard-history")).to_contain_text("合成面试官乙")
+        self.page.locator("#modal-root").get_by_role("button", name="关闭").click()
+        self.page.locator("#top-back").click()
+        expect(self.page.locator(".next-action-card")).to_be_visible()
+
+        scheduled = self.page.locator(f'[data-scheduled-event="{eid}"]')
         scheduled.click()
         expect(self.page.locator("#content h1")).to_have_text("面试目标乙")
         expect(self.page.locator(f'.timeline-item[data-event-id="{eid}"]')).to_contain_text(
