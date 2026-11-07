@@ -200,6 +200,26 @@ class UiHierarchyTests(unittest.TestCase):
         self.assertLess(box["y"], 500, f"next action moved down to y={box['y']} on revisit")
 
 
+    def test_dashboard_direct_project_entry_preserves_candidate_and_active_nav(self) -> None:
+        # Reproduces #237 exact HEAD Chromium regression: openProject from
+        # dashboard must enter the projects route before scoped candidate reads.
+        pid, title = self._seed_project()
+        cid = self._post(f"/api/v1/projects/{pid}/candidates",
+                         {"display_name": "跨页入口候选人"})["candidate_id"]
+        self.page.goto(self.base + "/v1", wait_until="domcontentloaded")
+        self.page.wait_for_function("Boolean(window.openProject && window.openCandidate)")
+        self.page.evaluate("""async ([pid,cid]) => {
+          await window.openProject(pid);
+          await window.openCandidate(cid);
+        }""", [pid, cid])
+        expect(self.page.locator("#content h1")).to_have_text("跨页入口候选人")
+        expect(self.page.locator(".candidate-steps")).to_be_visible()
+        expect(self.page.locator("aside .nav-item.active")).to_contain_text("招聘项目")
+        expect(self.page.locator("#top-crumb")).to_contain_text(title)
+        self.page.locator("#top-back").click()
+        expect(self.page.locator(".project-banner")).to_be_visible()
+        expect(self.page.locator("#top-crumb")).not_to_contain_text("跨页入口候选人")
+
     def test_topbar_workbench_and_candidate_identity_are_scoped(self) -> None:
         pid, title = self._seed_project()
         second = self._post(f"/api/v1/projects/{pid}/candidates",

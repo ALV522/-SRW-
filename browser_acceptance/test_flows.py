@@ -390,7 +390,10 @@ class RecruitmentBrowserAcceptance(unittest.TestCase):
         expect(self.page.locator(".source-card")).to_contain_text(material)
         before = self.get_json(f"/api/v1/candidates/{cid}/workspace")
         counts = self.get_json("/api/v1/dashboard")
-        self.page.get_by_role("button", name="← 返回项目工作区").click()
+        # #235 has one canonical topbar return; the deleted duplicate must not be required.
+        expect(self.page.locator("#top-back")).to_be_visible()
+        self.page.locator("#top-back").click()
+        expect(self.page.locator(".project-banner")).to_be_visible()
         self.page.locator(".tabs").get_by_role("button", name="候选人").click()
         row = self.page.locator(f'tr[data-candidate-id="{cid}"]')
         row.get_by_role("button", name="归档", exact=True).click()
