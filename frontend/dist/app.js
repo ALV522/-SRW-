@@ -454,20 +454,40 @@ window.openScorecards=async(cid,eid)=>{
       return;
     }
     modal('独立 Interview Scorecard',`${existing}<div class="divider"></div><div class="form-grid"><div class="field"><label>评价者</label><input id="sc-evaluator" class="input"></div><div class="field"><label>总体建议</label><input id="sc-rec" class="input" placeholder="advance / hold / reject"></div></div><div id="sc-criteria" style="margin-top:12px">${criterionFeedbackRows(ctx.keys,ctx.names,ctx.definitions)}</div><p class="subtle">不同评价者意见独立保存；系统不会自动平均成总分。</p>`,`<button class="btn" onclick="closeModal()">关闭</button><button class="btn primary" onclick="saveScorecard('${cid}','${eid}')">提交并锁定</button>`)
+    // Bind the visible form to its Core candidate/event/project identity.
+    // A stale callback must not submit observations to another interview.
+    const scorecardModal=$('#modal-root .modal');
+    if(scorecardModal){
+      scorecardModal.dataset.scorecardCandidateId=cid;
+      scorecardModal.dataset.scorecardEventId=eid;
+      scorecardModal.dataset.scorecardProjectId=state.projectId;
+    }
   }catch(e){blockedNotice('独立 Interview Scorecard',e.message||'无法读取该面试记录','请从正确项目的候选人工作台重新打开；本次未提交任何评分。')}
 };
 
 
 window.saveScorecard=async(cid,eid)=>{
   try{
-    const ctx=await eventWriteContext(cid,eid);
-    const allowed=new Set(ctx.keys);
-    const evaluator=($('#sc-evaluator').value||'').trim();
+    const formModal=$('#modal-root .modal'),projectId=state.projectId;
+    if(!formModal||state.page!=='projects'
+       ||formModal.dataset.scorecardCandidateId!==cid
+       ||formModal.dataset.scorecardEventId!==eid
+       ||formModal.dataset.scorecardProjectId!==projectId)
+      throw uiError('面评窗口与目标候选人/事件不一致，已阻止提交');
+    // Snapshot the actual visible form BEFORE asynchronous Core reads.
+    const evaluator=(formModal.querySelector('#sc-evaluator')?.value||'').trim();
     if(!evaluator)throw uiError('请填写评价者');
     const feedback=collectCriterionFeedback('#sc-criteria');
+    const recommendation=formModal.querySelector('#sc-rec')?.value||'';
     if(!feedback.length)throw uiError('请至少填写一条标准评价');
-    if(feedback.some(f=>!f.criterion_key||!allowed.has(f.criterion_key)))throw uiError('评价与面试原始标准不一致，已阻止提交');
-    await api(`/api/v1/events/${eid}/scorecards`,{method:'POST',body:JSON.stringify({evaluator,feedback,recommendation:$('#sc-rec').value,submit:true})});
+    const ctx=await eventWriteContext(cid,eid);
+    if($('#modal-root .modal')!==formModal||state.page!=='projects'
+       ||state.projectId!==projectId||ctx.pid!==projectId)
+      throw uiError('面评窗口或项目已变化，请重新打开后提交');
+    const allowed=new Set(ctx.keys);
+    if(feedback.some(f=>!f.criterion_key||!allowed.has(f.criterion_key)))
+      throw uiError('评价与面试原始标准不一致，已阻止提交');
+    await api(`/api/v1/events/${eid}/scorecards`,{method:'POST',body:JSON.stringify({evaluator,feedback,recommendation,submit:true})});
     closeModal();toast('Scorecard 已独立提交并锁定')
   }catch(e){toast(e.message||'提交失败',true)}
 };

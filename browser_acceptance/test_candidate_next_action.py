@@ -666,6 +666,19 @@ class CandidateNextActionBrowserTests(unittest.TestCase):
         modal.locator("#sc-evaluator").fill("独立面试官")
         modal.locator(".c-obs").fill("仅属于第二位候选人的观察")
         modal.locator("#sc-rec").fill("advance")
+        # Negative: a stale callback for a second interview must not reuse
+        # this visible first-event form, even when both share Published keys.
+        other_event = self.post(f"/api/v1/candidates/{second}/events", {
+            "event_type": "interview", "event_state": "scheduled",
+            "title": "Different interview", "metadata": {
+                "protocol_revision_id": published["current_revision_id"],
+                "questions": [{"criterion_key": KEY, "question": "不同面试"}]}})
+        before_wrong = self.counts(second)
+        self.page.evaluate("args => window.saveScorecard(args.cid,args.eid)",
+                           {"cid": second, "eid": other_event["event_id"]})
+        expect(self.page.locator("#toast-root")).to_contain_text("面评窗口与目标候选人/事件不一致")
+        self.assertEqual(self.counts(second), before_wrong)
+        expect(modal).to_be_visible()
         modal.get_by_role("button", name="提交并锁定").click()
         expect(self.page.locator("#modal-root .modal")).to_have_count(0)
         with closing(self.db()) as connection:
