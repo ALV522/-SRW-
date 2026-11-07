@@ -280,8 +280,7 @@ class UiHierarchyTests(unittest.TestCase):
         eid = next(x["event_id"] for x in events if x["title"] == "乙的真实合成面试")
         self.page.locator("#top-back").click()
         self.page.locator(".tabs").get_by_role("button", name="概览").click()
-        expect(self.page.locator(".next-action-card").get_by_role(
-            "button", name="查看相关列表")).to_be_visible()
+        expect(self.page.locator(".next-action-card #project-next-action")).to_be_visible()
         scheduled = self.page.locator(f'[data-scheduled-event="{eid}"]')
         expect(scheduled).to_have_count(1)
         # Start the operator click budget from the project list, not a hidden
