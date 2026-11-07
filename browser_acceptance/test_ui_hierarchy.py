@@ -362,5 +362,94 @@ class UiHierarchyTests(unittest.TestCase):
             self.base + f"/api/v1/candidates/{foreign_cid}/events").json()["events"], [])
 
 
+    def test_primary_action_uses_exact_candidate_and_rejects_stale_material(self) -> None:
+        """Real Core targets one candidate; a stale card cannot open the wrong person."""
+        pid, title = self._seed_project()
+        self._post(f"/api/v1/projects/{pid}/candidates", {"display_name": "材料待补乙"})
+        foreign_pid, _ = self._seed_project()
+        foreign_target = self.context.request.get(
+            self.base + f"/api/v1/projects/{foreign_pid}/pipeline"
+        ).json()["workflow_summary"]["next_action"]["target"]["candidate_id"]
+        self._open_project(title)
+        pipeline = self.context.request.get(
+            self.base + f"/api/v1/projects/{pid}/pipeline").json()
+        action = pipeline["workflow_summary"]["next_action"]
+        self.assertEqual(action["key"], "complete_materials")
+        first = action["target"]["candidate_id"]
+        self.assertNotEqual(first, foreign_target)
+        expect(self.page.locator("#project-next-action")).to_contain_text("补齐材料")
+
+        # Another operator resolves the first item after the card was rendered.
+        self._post(f"/api/v1/candidates/{first}/sources/text",
+                   {"text_content": "合成材料更新", "publish_material": True})
+        self.page.locator("#project-next-action").click()
+        expect(self.page.locator("#toast-root")).to_contain_text("项目待办已变化")
+        expect(self.page.locator(".candidate-workspace-page")).to_have_count(0)
+        fresh = self.context.request.get(
+            self.base + f"/api/v1/projects/{pid}/pipeline").json()
+        second = fresh["workflow_summary"]["next_action"]["target"]
+        self.assertNotEqual(second["candidate_id"], first)
+        self.assertNotEqual(second["candidate_id"], foreign_target)
+        self.page.locator("#project-next-action").click()
+        expect(self.page.locator("#content h1")).to_have_text(second["candidate_name"])
+        expect(self.page.locator("#top-crumb")).to_contain_text(second["candidate_name"])
+        self.page.locator("#top-back").click()
+        expect(self.page.locator(".next-action-card")).to_be_visible()
+        expect(self.page.locator(".candidate-workspace-page")).to_have_count(0)
+
+    def test_primary_action_opens_completed_interview_exact_scorecard(self) -> None:
+        """Core event target -> visible candidate -> Scorecard -> SQLite, no IDs typed."""
+        pid, title = self._seed_project()
+        cid = self.context.request.get(
+            self.base + f"/api/v1/projects/{pid}/pipeline"
+        ).json()["workflow_summary"]["next_action"]["target"]["candidate_id"]
+        self._open_project(title)
+        self.page.locator(".tabs").get_by_role("button", name="候选人").click()
+        self.page.locator("tr[data-candidate-id]").filter(
+            has_text="层级候选人").get_by_role("button", name="打开工作台").click()
+        self.page.locator(".candidate-step").filter(has_text="面试").click()
+        self.page.get_by_role("button", name="＋ 面试排期").click()
+        self.page.locator("#e-title").fill("待反馈的合成面试")
+        self.page.locator(".c-q").fill("请描述研究方法")
+        self.page.locator("#e-state").select_option("completed")
+        self.page.locator("#modal-root").get_by_role(
+            "button", name="保存", exact=True).click()
+        expect(self.page.locator("#modal-root .modal")).to_have_count(0)
+        events = self.context.request.get(
+            self.base + f"/api/v1/candidates/{cid}/events").json()["events"]
+        event = next(x for x in events if x["title"] == "待反馈的合成面试")
+        eid = event["event_id"]
+        self.assertEqual(event["event_state"], "completed")
+        self.page.locator("#top-back").click()
+        self.page.locator(".tabs").get_by_role("button", name="概览").click()
+        pipeline = self.context.request.get(
+            self.base + f"/api/v1/projects/{pid}/pipeline").json()
+        action = pipeline["workflow_summary"]["next_action"]
+        self.assertEqual(action["key"], "submit_feedback", action)
+        self.assertEqual(action["target"]["candidate_id"], cid)
+        self.assertEqual(action["target"]["event_id"], eid)
+        expect(self.page.locator("#project-next-action")).to_contain_text("填写面评")
+        self.page.locator("#project-next-action").click()
+        expect(self.page.locator("#content h1")).to_have_text("层级候选人")
+        modal = self.page.locator("#modal-root .modal")
+        expect(modal.locator("#sc-criteria .criterion-block")).to_have_count(1)
+        modal.locator("#sc-evaluator").fill("合成面试官")
+        modal.locator(".c-rating").select_option("strong")
+        modal.locator(".c-obs").fill("合成观察：明确的方法论")
+        modal.locator("#sc-rec").fill("advance")
+        modal.get_by_role("button", name="提交并锁定").click()
+        expect(self.page.locator("#modal-root .modal")).to_have_count(0)
+        with sqlite3.connect(Path(self.tmp.name) / "data" / "srw_v1.db") as db:
+            rows = db.execute(
+                "SELECT candidate_id, event_id, feedback_json FROM interview_scorecard_submission "
+                "WHERE event_id=?", (eid,)).fetchall()
+            self.assertEqual(len(rows), 1)
+            self.assertEqual(rows[0][0], cid)
+            self.assertEqual(rows[0][1], eid)
+            self.assertEqual(json.loads(rows[0][2])[0]["criterion_key"], "research_reasoning")
+        self.page.locator("#top-back").click()
+        expect(self.page.locator(".next-action-card")).to_be_visible()
+
+
 if __name__ == "__main__":
     unittest.main()
