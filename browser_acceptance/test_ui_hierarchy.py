@@ -145,6 +145,34 @@ class UiHierarchyTests(unittest.TestCase):
                 }""")
                 self.assertTrue(order, f"{width}x{height}: next action is not the first block")
 
+                # Exact-HEAD synthetic operator evidence is uploaded by browser-e2e.yml
+                # on both OSes. These are after-only captures, not a main before/after.
+                evidence_dir = ROOT / "artifacts" / "browser"
+                evidence_dir.mkdir(parents=True, exist_ok=True)
+                stem = f"ui235-after-{width}x{height}"
+                self.page.screenshot(path=str(evidence_dir / f"{stem}-viewport.png"))
+                self.page.screenshot(path=str(evidence_dir / f"{stem}-full.png"),
+                                     full_page=True)
+                metrics = self.page.evaluate("""() => {
+                  const card = document.querySelector('.next-action-card');
+                  const rect = card.getBoundingClientRect();
+                  return {
+                    viewport: {width: innerWidth, height: innerHeight},
+                    next_action: {top: rect.top, bottom: rect.bottom,
+                      visible: rect.top >= 0 && rect.top < innerHeight},
+                    document_scroll_height: document.documentElement.scrollHeight,
+                    main_scroll_height: document.querySelector('.main').scrollHeight,
+                    kpi_count: document.querySelectorAll('#project-tab-body .kpi-card').length,
+                    nav_count: document.querySelectorAll('aside .nav-item').length,
+                    primary_action: document.querySelector('#project-next-action').textContent.trim(),
+                    visible_back_count: [...document.querySelectorAll('#top-back')]
+                      .filter(x => getComputedStyle(x).display !== 'none' && !x.hidden).length
+                  };
+                }""")
+                (evidence_dir / f"{stem}-metrics.json").write_text(
+                    json.dumps(metrics, ensure_ascii=False, indent=2) + "\n",
+                    encoding="utf-8")
+
     def test_exactly_one_back_entry_per_context(self) -> None:
         _pid, title = self._seed_project()
         self.page.set_viewport_size({"width": 1440, "height": 900})
