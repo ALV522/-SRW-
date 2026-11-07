@@ -229,6 +229,37 @@ class CandidateNextActionBrowserTests(unittest.TestCase):
                 "WHERE candidate_id=? ORDER BY rowid DESC LIMIT 1", (cid,)).fetchone()
         return row[0], json.loads(row[1])
 
+    def test_delayed_assessment_cannot_repaint_another_candidate(self):
+        """A late Core assessment response cannot restore the previous HR workspace."""
+        other = self.post(f"/api/v1/projects/{self.pid}/candidates",
+                          {"display_name": "Synthetic Other"})["candidate_id"]
+        self.post(f"/api/v1/candidates/{other}/sources/text",
+                  {"text_content": TEXT, "publish_material": True})
+        workspace = self.get(f"/api/v1/candidates/{self.cid}/workspace")
+        self.assertTrue(workspace.get("decision_context_hash"),
+                        "synthetic Published/material fixture must exercise assessment GET")
+        # Delay only one real HTTP response. Every other Core/SQLite read stays real.
+        self.page.evaluate("""cid => {
+          const originalFetch = window.fetch.bind(window);
+          window.__assessmentHeld = false;
+          window.__releaseAssessment = null;
+          window.fetch = async (...args) => {
+            if (String(args[0]).includes('/api/v1/candidates/' + cid + '/assessment')) {
+              window.__assessmentHeld = true;
+              await new Promise(resolve => { window.__releaseAssessment = resolve; });
+            }
+            return originalFetch(...args);
+          };
+        }""", self.cid)
+        self.page.evaluate("cid => { void window.openCandidate(cid); }", self.cid)
+        self.page.wait_for_function("window.__assessmentHeld === true")
+        self.page.evaluate("cid => { void window.openCandidate(cid); }", other)
+        expect(self.page.locator("#content h1")).to_have_text("Synthetic Other")
+        self.page.evaluate("window.__releaseAssessment()")
+        self.page.wait_for_timeout(300)
+        expect(self.page.locator("#content h1")).to_have_text("Synthetic Other")
+        expect(self.page.locator("#top-crumb")).to_contain_text("Synthetic Other")
+
     # ------------------------------------------------------------------- S1a UI
     def test_row_opens_the_workspace_and_the_stepper_shows_the_next_action(self):
         self.page.evaluate("window.setProjectTab('candidates')")
@@ -642,7 +673,8 @@ class CandidateNextActionBrowserTests(unittest.TestCase):
         self.assertEqual(rows[0][0], second)
         self.assertEqual(json.loads(rows[0][1])["questions"][0]["criterion_key"], KEY)
         self.assertEqual(self.counts(self.cid), before_a)
-        self.page.get_by_role("button", name="← 返回项目工作区").click()
+        expect(self.page.locator("#top-back")).to_be_visible()
+        self.page.locator("#top-back").click()
         expect(self.page.locator("#cand-q")).to_have_value("Synthetic")
         expect(self.page.locator(f'tr[data-candidate-id="{second}"]')).to_be_visible()
 
@@ -665,6 +697,19 @@ class CandidateNextActionBrowserTests(unittest.TestCase):
         modal.locator("#sc-evaluator").fill("独立面试官")
         modal.locator(".c-obs").fill("仅属于第二位候选人的观察")
         modal.locator("#sc-rec").fill("advance")
+        # Negative: a stale callback for a second interview must not reuse
+        # this visible first-event form, even when both share Published keys.
+        other_event = self.post(f"/api/v1/candidates/{second}/events", {
+            "event_type": "interview", "event_state": "scheduled",
+            "title": "Different interview", "metadata": {
+                "protocol_revision_id": published["current_revision_id"],
+                "questions": [{"criterion_key": KEY, "question": "不同面试"}]}})
+        before_wrong = self.counts(second)
+        self.page.evaluate("args => window.saveScorecard(args.cid,args.eid)",
+                           {"cid": second, "eid": other_event["event_id"]})
+        expect(self.page.locator("#toast-root")).to_contain_text("面评窗口与目标候选人/事件不一致")
+        self.assertEqual(self.counts(second), before_wrong)
+        expect(modal).to_be_visible()
         modal.get_by_role("button", name="提交并锁定").click()
         expect(self.page.locator("#modal-root .modal")).to_have_count(0)
         with closing(self.db()) as connection:
@@ -675,8 +720,17 @@ class CandidateNextActionBrowserTests(unittest.TestCase):
         self.assertEqual((rows[0][0], rows[0][1]), (second, event["event_id"]))
         self.assertEqual(json.loads(rows[0][2])[0]["criterion_key"], KEY)
         self.assertEqual(self.counts(self.cid), before_a)
-        self.page.get_by_role("button", name="← 返回项目工作区").click()
-        self.page.locator(f'tr[data-candidate-id="{second}"] [data-quick-action="scorecard"]').click()
+        expect(self.page.locator("#top-back")).to_be_visible()
+        self.page.locator("#top-back").click()
+        # A second event now exists. The list shortcut must refuse to guess
+        # which interview to reopen; select the original event in the UI.
+        row = self.page.locator(f'tr[data-candidate-id="{second}"]')
+        row.get_by_role("button", name="打开工作台").click()
+        expect(self.page.locator(".candidate-workspace-head h1")).to_have_text("Synthetic Second")
+        self.page.locator(".candidate-step").filter(has_text="面试").click()
+        original = self.page.locator(f'[data-event-id="{event["event_id"]}"]')
+        expect(original).to_be_visible()
+        original.get_by_role("button", name="独立 Scorecard").click()
         expect(self.page.locator(".modal")).to_contain_text("仅属于第二位候选人的观察")
 
     def test_list_quick_actions_do_not_write_when_no_interview_exists(self):
@@ -687,7 +741,8 @@ class CandidateNextActionBrowserTests(unittest.TestCase):
         expect(self.page.locator("#toast-root")).to_contain_text("尚无可填写面评的面试记录")
         expect(self.page.locator(".candidate-workspace-head h1")).to_have_text("Synthetic Person")
         self.assertEqual(self.counts(self.cid), before)
-        self.page.get_by_role("button", name="← 返回项目工作区").click()
+        expect(self.page.locator("#top-back")).to_be_visible()
+        self.page.locator("#top-back").click()
         row = self.page.locator(f'tr[data-candidate-id="{self.cid}"]')
         row.locator('[data-quick-action="verify"]').click()
         expect(self.page.locator(".candidate-workspace-head h1")).to_have_text("Synthetic Person")

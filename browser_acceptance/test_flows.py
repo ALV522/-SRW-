@@ -390,7 +390,10 @@ class RecruitmentBrowserAcceptance(unittest.TestCase):
         expect(self.page.locator(".source-card")).to_contain_text(material)
         before = self.get_json(f"/api/v1/candidates/{cid}/workspace")
         counts = self.get_json("/api/v1/dashboard")
-        self.page.get_by_role("button", name="← 返回项目工作区").click()
+        # #235 has one canonical topbar return; the deleted duplicate must not be required.
+        expect(self.page.locator("#top-back")).to_be_visible()
+        self.page.locator("#top-back").click()
+        expect(self.page.locator(".project-banner")).to_be_visible()
         self.page.locator(".tabs").get_by_role("button", name="候选人").click()
         row = self.page.locator(f'tr[data-candidate-id="{cid}"]')
         row.get_by_role("button", name="归档", exact=True).click()
@@ -413,7 +416,8 @@ class RecruitmentBrowserAcceptance(unittest.TestCase):
         expect(self.page.locator(".source-card")).to_contain_text(material)
         self.assertEqual(self.get_json(f"/api/v1/candidates/{cid}/workspace")["sources"], before["sources"])
 
-        self.page.get_by_role("button", name="← 返回项目工作区").click()
+        expect(self.page.locator("#top-back")).to_be_visible()
+        self.page.locator("#top-back").click()
         self.page.once("dialog", lambda dialog: dialog.dismiss())
         self.page.get_by_role("button", name="归档项目", exact=True).click()
         self.assertEqual(self.get_json("/api/v1/dashboard")["metrics"]["candidates"], counts["metrics"]["candidates"])
@@ -962,7 +966,30 @@ class RecruitmentBrowserAcceptance(unittest.TestCase):
         expect(self.page.get_by_role(
             "button", name="基于当前版本创建新草案"
         )).to_be_visible()
-        self.page.get_by_role("button", name="基于当前版本创建新草案").click()
+        # A draft fork is asynchronous: do not edit rows from the still-visible
+        # Published revision while the new draft is being fetched and rendered.
+        before_fork = self.get_json(f"/api/v1/projects/{pid}/protocol-workspace")
+        self.assertFalse(before_fork.get("draft_revision_id"))
+        with self.page.expect_response(
+            lambda response: response.url.endswith(f"/api/v1/projects/{pid}/protocol-drafts")
+            and response.request.method == "POST"
+        ) as forked_response:
+            self.page.get_by_role("button", name="基于当前版本创建新草案").click()
+        self.assertIn(forked_response.value.status, (200, 201))
+        forked = self.wait_for_json(
+            f"/api/v1/projects/{pid}/protocol-workspace",
+            lambda w: bool(w.get("draft_revision_id"))
+            and w["draft_revision_id"] != before_fork.get("draft_revision_id")
+            and bool(w.get("draft")),
+            label="new revision persisted before editing criteria",
+        )
+        fork_revision = forked["draft_revision_id"]
+        self.page.wait_for_function("""revision => {
+            const save = [...document.querySelectorAll('button')]
+                .find(b => (b.textContent || '').trim() === '保存草案');
+            return save && save.getAttribute('onclick') === `saveCriteria('${revision}')`
+                && document.querySelectorAll('.criterion-row').length === 1;
+        }""", arg=fork_revision)
         expect(self.page.locator(".criterion-row")).to_have_count(1)
         self.page.get_by_role("button", name="＋ 添加标准").click()
         expect(self.page.locator(".criterion-row")).to_have_count(2)
