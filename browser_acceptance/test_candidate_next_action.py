@@ -229,6 +229,37 @@ class CandidateNextActionBrowserTests(unittest.TestCase):
                 "WHERE candidate_id=? ORDER BY rowid DESC LIMIT 1", (cid,)).fetchone()
         return row[0], json.loads(row[1])
 
+    def test_delayed_assessment_cannot_repaint_another_candidate(self):
+        """A late Core assessment response cannot restore the previous HR workspace."""
+        other = self.post(f"/api/v1/projects/{self.pid}/candidates",
+                          {"display_name": "Synthetic Other"})["candidate_id"]
+        self.post(f"/api/v1/candidates/{other}/sources/text",
+                  {"text_content": TEXT, "publish_material": True})
+        workspace = self.get(f"/api/v1/candidates/{self.cid}/workspace")
+        self.assertTrue(workspace.get("decision_context_hash"),
+                        "synthetic Published/material fixture must exercise assessment GET")
+        # Delay only one real HTTP response. Every other Core/SQLite read stays real.
+        self.page.evaluate("""cid => {
+          const originalFetch = window.fetch.bind(window);
+          window.__assessmentHeld = false;
+          window.__releaseAssessment = null;
+          window.fetch = async (...args) => {
+            if (String(args[0]).includes('/api/v1/candidates/' + cid + '/assessment')) {
+              window.__assessmentHeld = true;
+              await new Promise(resolve => { window.__releaseAssessment = resolve; });
+            }
+            return originalFetch(...args);
+          };
+        }""", self.cid)
+        self.page.evaluate("cid => { void window.openCandidate(cid); }", self.cid)
+        self.page.wait_for_function("window.__assessmentHeld === true")
+        self.page.evaluate("cid => { void window.openCandidate(cid); }", other)
+        expect(self.page.locator("#content h1")).to_have_text("Synthetic Other")
+        self.page.evaluate("window.__releaseAssessment()")
+        self.page.wait_for_timeout(300)
+        expect(self.page.locator("#content h1")).to_have_text("Synthetic Other")
+        self.assertEqual(self.page.evaluate("window.state?.candidateId || null"), other)
+
     # ------------------------------------------------------------------- S1a UI
     def test_row_opens_the_workspace_and_the_stepper_shows_the_next_action(self):
         self.page.evaluate("window.setProjectTab('candidates')")
