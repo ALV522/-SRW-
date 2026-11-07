@@ -691,7 +691,15 @@ class CandidateNextActionBrowserTests(unittest.TestCase):
         self.assertEqual(self.counts(self.cid), before_a)
         expect(self.page.locator("#top-back")).to_be_visible()
         self.page.locator("#top-back").click()
-        self.page.locator(f'tr[data-candidate-id="{second}"] [data-quick-action="scorecard"]').click()
+        # A second event now exists. The list shortcut must refuse to guess
+        # which interview to reopen; select the original event in the UI.
+        row = self.page.locator(f'tr[data-candidate-id="{second}"]')
+        row.get_by_role("button", name="打开工作台").click()
+        expect(self.page.locator(".candidate-workspace-head h1")).to_have_text("Synthetic Second")
+        self.page.locator(".candidate-step").filter(has_text="面试").click()
+        original = self.page.locator(f'[data-event-id="{event["event_id"]}"]')
+        expect(original).to_be_visible()
+        original.get_by_role("button", name="独立 Scorecard").click()
         expect(self.page.locator(".modal")).to_contain_text("仅属于第二位候选人的观察")
 
     def test_list_quick_actions_do_not_write_when_no_interview_exists(self):
