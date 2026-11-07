@@ -213,6 +213,7 @@ function collectInterviewQuestions(){return Array.from(document.querySelectorAll
 function collectCriterionFeedback(scope){return Array.from(document.querySelectorAll(`${scope} .criterion-block`)).map(b=>({criterion_key:b.dataset.criterion||'',rating:(b.querySelector('.c-rating')?.value||'unknown'),observation:(b.querySelector('.c-obs')?.value||'').trim(),supporting_evidence:(b.querySelector('.c-support')?.value||'').trim(),counter_evidence:(b.querySelector('.c-counter')?.value||'').trim(),recommendation:(b.querySelector('.c-rec')?.value||'').trim()}))}
 async function candidateDrawer(cid,p=null){syncTopbar();
   if(!cid)return;
+  const requestedProjectId=state.projectId;
   state.candidateId=cid;
   p=p||state.projects.find(x=>x.project_id===state.projectId)||{};
   const [contact,pipe,offers,actionPlan,events,reevaluations,w]=await Promise.all([
@@ -224,7 +225,7 @@ async function candidateDrawer(cid,p=null){syncTopbar();
     api(`/api/v1/candidates/${cid}/reevaluations`).catch(()=>({drafts:[]})),
     api(`/api/v1/candidates/${cid}/workspace`).catch(()=>null)
   ]);
-  if(state.page!=='projects'||state.candidateId!==cid)return;
+  if(state.page!=='projects'||state.projectId!==requestedProjectId||state.candidateId!==cid)return;
   state.currentCandidateId=cid;
   state.currentCandidateName=contact.display_name||null;
   syncTopbar();
@@ -232,6 +233,9 @@ async function candidateDrawer(cid,p=null){syncTopbar();
   // requesting an assessment then raises an expected 409. Avoid that
   // unnecessary backend call while still showing Source intake.
   const assessment=w?.decision_context_hash?await api(`/api/v1/candidates/${cid}/assessment`).catch(()=>null):null;
+  // A second awaited read can finish after the operator switches candidate/project.
+  // Never paint an old candidate over the currently selected workspace.
+  if(state.page!=='projects'||state.projectId!==requestedProjectId||state.candidateId!==cid)return;
   const latest=offers.offers?.[0],section=state.candidateSection||'evidence';
   const evidenceBody=`${w?candidateWorkspaceHtml(w,assessment):'<div class="empty"><strong>尚无当前材料</strong>先上传简历、扫描件或录音。支持 PDF/DOCX/XLSX/TXT/图片/OCR/音频/ASR。</div>'}<div class="divider"></div><div class="two"><div class="field"><label>粘贴文本材料</label><textarea id="paste-material" class="textarea" placeholder="简历文本、电话记录、补充材料" oninput="cacheMaterialDraft('${cid}',this.value)">${esc(materialDrafts.get(cid)||'')}</textarea><button class="btn" onclick="pasteMaterial('${cid}')">保存并发布材料版本</button></div><div class="field"><label>上传文件 / OCR / ASR</label><input id="candidate-file" class="input" type="file" accept=".pdf,.docx,.xlsx,.txt,.md,.csv,.png,.jpg,.jpeg,.mp3,.wav,.m4a,.mp4,.webm"><button class="btn primary" onclick="uploadCandidateFile('${cid}')">上传并处理</button><small class="subtle">图片和扫描 PDF 走 OCR；音频/视频走 ASR。Provider 未配置时原文件仍会保存。</small></div></div>`;
   const processBody=`<div class="candidate-process-grid"><section class="panel"><div class="panel-head"><h3>联系方式与跟进</h3><div class="actions"><button class="btn small" onclick="openContact('${cid}')">编辑联系方式</button><button class="btn small primary" onclick="openActionPlan('${cid}')">编辑下一步</button></div></div><div class="panel-body"><div class="quick-list"><div class="quick-item"><span>电话</span><strong>${esc(contact.phone||'未录入')}</strong></div><div class="quick-item"><span>邮箱</span><strong>${esc(contact.email||'未录入')}</strong></div><div class="quick-item"><span>人工确认</span><strong>${contact.user_confirmed?'已确认':'待确认'}</strong></div><div class="quick-item"><span>联系优先级 / 负责人</span><strong>${esc(actionPlan?.priority||'normal')} · ${esc(actionPlan?.owner||'未指定')}</strong></div><div class="quick-item"><span>联系状态</span><strong>${esc(actionPlan?.contact_status||'to_contact')}</strong></div><div class="quick-item"><span>下次联系</span><strong>${esc(actionPlan?.next_contact_at||'未安排')}</strong></div></div><p class="subtle" style="margin-bottom:0">${esc(actionPlan?.reason||'尚未填写下一步说明')}</p><div class="actions" style="margin-top:12px"><button class="btn" onclick="openPhoneScript('${cid}')">电话脚本 / 核实思路</button><button class="btn" onclick="openCandidateProjectFlow()">项目级招聘流程</button></div></div></section><section class="panel"><div class="panel-head"><h3>Pipeline 历史</h3><span class="status ${statusClass(pipe.current_stage)}">${stageLabel(pipe.current_stage)}</span></div><div class="panel-body">${pipe.transitions.length?`<div class="timeline">${pipe.transitions.slice().reverse().map(x=>`<div class="timeline-item"><strong>${stageLabel(x.from_stage)} → ${stageLabel(x.to_stage)}</strong><small>${esc(x.actor)} · ${new Date(x.created_at).toLocaleString()}</small><div class="subtle">${esc(x.reason||'')}</div></div>`).join('')}</div>`:'<div class="empty">尚无阶段变更</div>'}</div></section></div><div class="two">${candidateEventsHtml(cid,events)}${candidateReevaluationHtml(cid,reevaluations)}</div>`;
