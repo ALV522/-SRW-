@@ -333,7 +333,7 @@ class UiHierarchyTests(unittest.TestCase):
         expect(self.page.locator(f'[data-scorecard-event="{eid}"]')).to_have_count(1)
         self.page.locator(f'[data-scorecard-event="{eid}"]').click()
         expect(self.page.locator("#modal-root .scorecard-history")).to_contain_text("合成面试官乙")
-        self.page.locator("#modal-root").get_by_role("button", name="关闭").click()
+        self.page.locator("#modal-root .modal-head .x").click()
         self.page.locator("#top-back").click()
         expect(self.page.locator(".next-action-card")).to_be_visible()
 
