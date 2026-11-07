@@ -258,7 +258,7 @@ class CandidateNextActionBrowserTests(unittest.TestCase):
         self.page.evaluate("window.__releaseAssessment()")
         self.page.wait_for_timeout(300)
         expect(self.page.locator("#content h1")).to_have_text("Synthetic Other")
-        self.assertEqual(self.page.evaluate("window.state?.candidateId || null"), other)
+        expect(self.page.locator("#top-crumb")).to_contain_text("Synthetic Other")
 
     # ------------------------------------------------------------------- S1a UI
     def test_row_opens_the_workspace_and_the_stepper_shows_the_next_action(self):
