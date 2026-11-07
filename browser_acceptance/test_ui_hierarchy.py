@@ -254,5 +254,54 @@ class UiHierarchyTests(unittest.TestCase):
 
 
 
+    def test_project_scheduled_interview_targets_exact_candidate_and_event(self) -> None:
+        """Real Core + Chromium: one project overview click targets B's event, never A."""
+        from datetime import datetime, timedelta, timezone
+
+        pid, title = self._seed_project()
+        cid_b = self._post(f"/api/v1/projects/{pid}/candidates",
+                           {"display_name": "面试目标乙"})["candidate_id"]
+        foreign_pid, _ = self._seed_project()
+        foreign_cid = self._post(f"/api/v1/projects/{foreign_pid}/candidates",
+                                 {"display_name": "外项目候选人"})["candidate_id"]
+        self._open_project(title)
+        self.page.locator(".tabs").get_by_role("button", name="候选人").click()
+        row = self.page.locator("tr[data-candidate-id]").filter(has_text="面试目标乙")
+        row.get_by_role("button", name="打开工作台").click()
+        self.page.locator(".candidate-step").filter(has_text="面试").click()
+        self.page.get_by_role("button", name="＋ 面试排期").click()
+        self.page.locator("#e-title").fill("乙的真实合成面试")
+        future = datetime.now(timezone.utc) + timedelta(days=30)
+        self.page.locator("#e-time").fill(future.strftime("%Y-%m-%dT%H:%M"))
+        self.page.locator("#modal-root").get_by_role("button", name="保存", exact=True).click()
+        expect(self.page.locator("#modal-root .modal")).to_have_count(0)
+        events = self.context.request.get(self.base + f"/api/v1/candidates/{cid_b}/events").json()["events"]
+        eid = next(x["event_id"] for x in events if x["title"] == "乙的真实合成面试")
+        self.page.locator("#top-back").click()
+        self.page.locator(".tabs").get_by_role("button", name="概览").click()
+        expect(self.page.locator(".next-action-card").get_by_role(
+            "button", name="查看相关列表")).to_be_visible()
+        scheduled = self.page.locator(f'[data-scheduled-event="{eid}"]')
+        expect(scheduled).to_have_count(1)
+
+        # A foreign candidate cannot reuse B's event ID to enter this project.
+        self.page.evaluate("""async ([pid,cid,eid]) =>
+            await window.openScheduledInterview(pid,cid,eid)""",
+            [pid, foreign_cid, eid])
+        expect(self.page.locator(".project-banner")).to_be_visible()
+        expect(self.page.locator(".candidate-workspace-page")).to_have_count(0)
+
+        scheduled.click()
+        expect(self.page.locator("#content h1")).to_have_text("面试目标乙")
+        expect(self.page.locator(f'.timeline-item[data-event-id="{eid}"]')).to_contain_text(
+            "乙的真实合成面试")
+        expect(self.page.locator(".candidate-step.active")).to_contain_text("面试")
+        self.page.locator("#top-back").click()
+        expect(self.page.locator(".next-action-card")).to_be_visible()
+        expect(self.page.locator(".candidate-workspace-page")).to_have_count(0)
+        self.assertEqual(self.context.request.get(
+            self.base + f"/api/v1/candidates/{foreign_cid}/events").json()["events"], [])
+
+
 if __name__ == "__main__":
     unittest.main()
