@@ -389,6 +389,50 @@ class UiHierarchyTests(unittest.TestCase):
             self.base + f"/api/v1/candidates/{foreign_cid}/events").json()["events"], [])
 
 
+
+    def test_archived_candidate_never_becomes_an_active_interview_target(self) -> None:
+        """An archived person's future event remains historical, not an active CTA."""
+        from datetime import datetime, timedelta, timezone
+
+        pid, title = self._seed_project()
+        cid = self.context.request.get(
+            self.base + f"/api/v1/projects/{pid}/pipeline"
+        ).json()["workflow_summary"]["next_action"]["target"]["candidate_id"]
+        self._open_project(title)
+        self.page.locator(".tabs").get_by_role("button", name="候选人").click()
+        self.page.locator(f'tr[data-candidate-id="{cid}"]').get_by_role(
+            "button", name="打开工作台").click()
+        self.page.locator(".candidate-step").filter(has_text="面试").click()
+        self.page.get_by_role("button", name="＋ 面试排期").click()
+        self.page.locator("#e-title").fill("归档前已排期的合成面试")
+        future = datetime.now(timezone.utc) + timedelta(days=30)
+        self.page.locator("#e-time").fill(future.strftime("%Y-%m-%dT%H:%M"))
+        self.page.locator("#modal-root").get_by_role(
+            "button", name="保存", exact=True).click()
+        expect(self.page.locator("#modal-root .modal")).to_have_count(0)
+        events = self.context.request.get(
+            self.base + f"/api/v1/candidates/{cid}/events").json()["events"]
+        eid = next(x["event_id"] for x in events if x["title"] == "归档前已排期的合成面试")
+        before = self.context.request.get(
+            self.base + f"/api/v1/projects/{pid}/pipeline").json()
+        self.assertIn(eid, {x["event_id"] for x in before["scheduled_events"]})
+
+        # The event must remain in history; only the active project action
+        # projection excludes its archived candidate.
+        self._post(f"/api/v1/candidates/{cid}/archive", {})
+        after = self.context.request.get(
+            self.base + f"/api/v1/projects/{pid}/pipeline").json()
+        self.assertEqual(after["workflow_summary"]["candidate_count"], 0)
+        self.assertEqual(after["workflow_summary"]["upcoming_interviews"], 0)
+        self.assertNotIn(eid, {x["event_id"] for x in after["scheduled_events"]})
+        self.assertEqual(after["workflow_summary"]["next_action"]["key"], "intake_candidates")
+        history = self.context.request.get(
+            self.base + f"/api/v1/candidates/{cid}/events").json()["events"]
+        self.assertIn(eid, {x["event_id"] for x in history})
+        self._open_project(title)
+        expect(self.page.locator(f'[data-scheduled-event="{eid}"]')).to_have_count(0)
+        expect(self.page.locator("#project-next-action")).to_contain_text("导入首批候选人")
+
     def test_primary_action_uses_exact_candidate_and_rejects_stale_material(self) -> None:
         """Real Core targets one candidate; a stale card cannot open the wrong person."""
         pid, title = self._seed_project()

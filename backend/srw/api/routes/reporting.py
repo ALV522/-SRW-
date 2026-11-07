@@ -93,7 +93,9 @@ def reporting_routes(*, factory, evaluation_policy_revision: str) -> list[Route]
             event_rows=s.execute(
                 select(RecruitmentEvent,Candidate.display_name)
                 .join(Candidate,Candidate.id==RecruitmentEvent.candidate_id)
-                .where(Candidate.project_id==pid,RecruitmentEvent.event_state=="scheduled",RecruitmentEvent.scheduled_at.is_not(None),RecruitmentEvent.scheduled_at>=now)
+                .where(Candidate.project_id==pid,Candidate.archived.is_(False),
+                       RecruitmentEvent.event_state=="scheduled",
+                       RecruitmentEvent.scheduled_at.is_not(None),RecruitmentEvent.scheduled_at>=now)
                 .order_by(RecruitmentEvent.scheduled_at,RecruitmentEvent.id).limit(20)
             ).all()
             scheduled=[{
