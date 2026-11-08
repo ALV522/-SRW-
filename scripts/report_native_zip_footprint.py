@@ -52,7 +52,7 @@ def _validate_member(info: zipfile.ZipInfo) -> None:
     """
     name = info.filename
     logical = name[:-1] if info.is_dir() else name
-    if (not logical or logical.startswith("/") or "\\\\" in logical
+    if (not logical or logical.startswith("/") or "\\" in logical
             or ":" in logical
             or any(part in ("", ".", "..") for part in logical.split("/"))):
         raise ValueError("ZIP has noncanonical member path")

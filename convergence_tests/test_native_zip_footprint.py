@@ -76,6 +76,12 @@ class NativeZipFootprintTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "noncanonical"):
             profile_zip(traversal)
 
+        backslash = self.root / "backslash.zip"
+        with zipfile.ZipFile(backslash, "w") as out:
+            out.writestr("runtime\\\\private-data", b"synthetic")
+        with self.assertRaisesRegex(ValueError, "noncanonical"):
+            profile_zip(backslash)
+
         linked = self.root / "symlink.zip"
         with zipfile.ZipFile(linked, "w") as out:
             info = zipfile.ZipInfo("runtime/link")
