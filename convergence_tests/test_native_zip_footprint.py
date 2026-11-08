@@ -11,6 +11,7 @@ import warnings
 import zipfile
 from pathlib import Path
 
+from scripts import report_native_zip_footprint as reporter
 from scripts.report_native_zip_footprint import compare, profile_zip
 
 
@@ -68,6 +69,25 @@ class NativeZipFootprintTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "duplicate"):
             profile_zip(new)
 
+
+    def test_directory_reader_receives_the_open_file_not_a_path(self):
+        # Regression: directory metadata and full-archive digest must use
+        # the same pinned file handle. Reopening by path allows TOCTOU swaps.
+        path = self.root / "same-handle.zip"
+        self.make_zip(path)
+        opened = []
+        real_zipfile = zipfile.ZipFile
+
+        def check_file_handle(file, *args, **kwargs):
+            self.assertTrue(hasattr(file, "fileno"), "ZIP reader reopened pathname")
+            self.assertFalse(file.closed)
+            opened.append(file.fileno())
+            return real_zipfile(file, *args, **kwargs)
+
+        with patch.object(reporter.zipfile, "ZipFile", side_effect=check_file_handle):
+            report = profile_zip(path)
+        self.assertEqual(len(opened), 1)
+        self.assertEqual(report["zip_sha256"], hashlib.sha256(path.read_bytes()).hexdigest())
 
     def test_directory_traversal_and_symlink_labels_fail_closed(self):
         traversal = self.root / "traversal.zip"
