@@ -1,0 +1,60 @@
+name: SRW Windows 159 Shutdown Loop Experiment
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - 'scripts/run_local.py'
+      - 'scripts/shutdown_phase_probe.py'
+      - 'convergence_tests/test_real_restore_restart.py'
+      - '.github/workflows/shutdown159-experiment.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  compare-windows-loop:
+    name: synthetic-restore-shutdown-${{ matrix.loop }}-windows
+    runs-on: windows-latest
+    timeout-minutes: 25
+    strategy:
+      fail-fast: false
+      matrix:
+        loop: [default, selector]
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: pip
+          cache-dependency-path: requirements-ci.txt
+      - name: Install pinned synthetic test dependencies
+        run: python -m pip install -r requirements-ci.txt
+      - name: Repeat real synthetic restore and shutdown without softening assertions
+        shell: pwsh
+        env:
+          PYTHONPATH: backend
+          SRW_TEST_WINDOWS_EVENT_LOOP: ${{ matrix.loop }}
+        run: |
+          New-Item -ItemType Directory -Force artifacts | Out-Null
+          $failed = 0
+          for ($trial = 1; $trial -le 4; $trial++) {
+            $name = "artifacts/shutdown-${{ matrix.loop }}-$trial.log"
+            Write-Host "SRW #159 mode=${{ matrix.loop }} trial=$trial"
+            python -m unittest discover -s convergence_tests -p test_real_restore_restart.py -v 2>&1 |
+              Tee-Object -FilePath $name
+            $exitCode = $LASTEXITCODE
+            Add-Content -Path artifacts/summary.txt -Value "loop=${{ matrix.loop }} trial=$trial exit=$exitCode"
+            if ($exitCode -ne 0) { $failed++ }
+          }
+          if ($failed -ne 0) {
+            throw "SRW #159: $failed of 4 synthetic restore-shutdown trials failed"
+          }
+      - name: Upload synthetic log and count evidence (no actual workspace)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: srw-shutdown159-${{ matrix.loop }}-${{ github.event.pull_request.head.sha }}
+          path: artifacts/
+          if-no-files-found: warn
