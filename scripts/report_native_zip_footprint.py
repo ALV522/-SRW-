@@ -8,6 +8,8 @@ from __future__ import annotations
 
 import argparse
 import hashlib
+import os
+import stat
 import json
 import zipfile
 from pathlib import Path
@@ -37,30 +39,66 @@ def _group(name: str) -> str:
     return "other"
 
 
+def _identity(st) -> tuple[int, int, int, int]:
+    """Identity + mutation indicators, shared by path and its opened handle."""
+    return (st.st_dev, st.st_ino, st.st_size, st.st_mtime_ns)
+
+
+def _validate_member(info: zipfile.ZipInfo) -> None:
+    """Reject misleading or nonportable labels before classifying ZIP members.
+
+    This is a footprint *sanity check*, not an extraction or integrity audit.
+    It never prints member names, even on malformed private ZIP input.
+    """
+    name = info.filename
+    logical = name[:-1] if info.is_dir() else name
+    if (not logical or logical.startswith("/") or "\\\\" in logical
+            or ":" in logical
+            or any(part in ("", ".", "..") for part in logical.split("/"))):
+        raise ValueError("ZIP has noncanonical member path")
+    if stat.S_IFMT(info.external_attr >> 16) == stat.S_IFLNK:
+        raise ValueError("ZIP has symbolic-link member")
+
+
 def profile_zip(archive: Path) -> dict:
-    """Aggregate ZIP byte counts without opening members or printing names."""
+    """Read directory and SHA from the SAME opened ZIP, without member reads.
+
+    A historical two-open implementation could combine directory sizes from
+    one inode with the SHA of a replacement file at the same path. Check
+    pathname vs handle identity before and after to fail closed in that case.
+    """
     if not archive.is_file() or archive.is_symlink():
         raise ValueError("ZIP must be an existing regular file (not a symlink)")
+    initial = archive.stat()
     groups = {name: {"files": 0, "uncompressed_bytes": 0, "compressed_bytes": 0}
               for name in _GROUPS}
     seen: set[str] = set()
-    with zipfile.ZipFile(archive) as reader:
-        for info in reader.infolist():
-            if info.is_dir():
-                continue
-            collision_key = info.filename.casefold()
-            if collision_key in seen:
-                raise ValueError("ZIP has duplicate or case-colliding members")
-            seen.add(collision_key)
-            summary = groups[_group(info.filename)]
-            summary["files"] += 1
-            summary["uncompressed_bytes"] += info.file_size
-            summary["compressed_bytes"] += info.compress_size
-    digest = hashlib.sha256()
     with archive.open("rb") as stream:
+        pinned = os.fstat(stream.fileno())
+        if _identity(initial) != _identity(pinned):
+            raise ValueError("ZIP identity changed before reading")
+        with zipfile.ZipFile(stream) as reader:
+            for info in reader.infolist():
+                _validate_member(info)
+                if info.is_dir():
+                    continue
+                collision_key = info.filename.casefold()
+                if collision_key in seen:
+                    raise ValueError("ZIP has duplicate or case-colliding members")
+                seen.add(collision_key)
+                summary = groups[_group(info.filename)]
+                summary["files"] += 1
+                summary["uncompressed_bytes"] += info.file_size
+                summary["compressed_bytes"] += info.compress_size
+        stream.seek(0)
+        digest = hashlib.sha256()
         for part in iter(lambda: stream.read(1024 * 1024), b""):
             digest.update(part)
-    size = archive.stat().st_size
+        if _identity(os.fstat(stream.fileno())) != _identity(pinned):
+            raise ValueError("ZIP identity changed while reading")
+    if archive.is_symlink() or _identity(archive.stat()) != _identity(pinned):
+        raise ValueError("ZIP identity changed after reading")
+    size = pinned.st_size
     compressed = sum(group["compressed_bytes"] for group in groups.values())
     return {
         "schema": "srw.native-zip-footprint.v1",

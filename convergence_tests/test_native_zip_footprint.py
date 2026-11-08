@@ -2,6 +2,9 @@
 from __future__ import annotations
 
 import hashlib
+import stat
+from types import SimpleNamespace
+from unittest.mock import patch
 import tempfile
 import unittest
 import warnings
@@ -64,6 +67,49 @@ class NativeZipFootprintTests(unittest.TestCase):
                 z.writestr("runtime/python.exe", b"duplicate")
         with self.assertRaisesRegex(ValueError, "duplicate"):
             profile_zip(new)
+
+
+    def test_directory_traversal_and_symlink_labels_fail_closed(self):
+        traversal = self.root / "traversal.zip"
+        with zipfile.ZipFile(traversal, "w") as out:
+            out.writestr("runtime/../private-data", b"synthetic")
+        with self.assertRaisesRegex(ValueError, "noncanonical"):
+            profile_zip(traversal)
+
+        linked = self.root / "symlink.zip"
+        with zipfile.ZipFile(linked, "w") as out:
+            info = zipfile.ZipInfo("runtime/link")
+            info.create_system = 3
+            info.external_attr = (stat.S_IFLNK | 0o777) << 16
+            out.writestr(info, b"synthetic target")
+        with self.assertRaisesRegex(ValueError, "symbolic-link"):
+            profile_zip(linked)
+
+    def test_path_handle_identity_must_match_without_private_path_leaks(self):
+        # Deterministically simulate a replacement between Path.stat() checks.
+        # Works on Windows even when real rename over an open file is blocked.
+        path = self.root / "candidate.zip"
+        self.make_zip(path)
+        original_stat = Path.stat
+        probes = [0]
+
+        def changed_identity(candidate, *args, **kwargs):
+            st = original_stat(candidate, *args, **kwargs)
+            if candidate == path:
+                probes[0] += 1
+                if probes[0] >= 2:
+                    return SimpleNamespace(
+                        st_mode=st.st_mode, st_dev=st.st_dev,
+                        st_ino=st.st_ino + 1, st_size=st.st_size,
+                        st_mtime_ns=st.st_mtime_ns,
+                    )
+            return st
+
+        with patch.object(Path, "stat", changed_identity):
+            with self.assertRaisesRegex(ValueError, "identity changed") as result:
+                profile_zip(path)
+        self.assertGreaterEqual(probes[0], 2)
+        self.assertNotIn(str(path), str(result.exception))
 
 
 if __name__ == "__main__":
