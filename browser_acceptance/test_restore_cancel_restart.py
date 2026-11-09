@@ -48,6 +48,12 @@ ROOT = Path(__file__).resolve().parents[1]
 if str(ROOT / "convergence_tests") not in sys.path:
     sys.path.insert(0, str(ROOT / "convergence_tests"))
 
+# Reuse the already-tested bounded/redacted #159 failure contract. Import only
+# functions: unittest discovery must not collect the real-process TestCase twice.
+from test_real_restore_restart import (  # noqa: E402
+    describe_shutdown_timeout, read_stderr_tail, safe_lease_state,
+)
+
 from knowledge_fixture import create_minimal_knowledge_tree  # noqa: E402
 from srw.workspace_lease import ABSENT, inspect_lease  # noqa: E402
 
@@ -140,7 +146,21 @@ class RestoreCancelRestartAcceptance(unittest.TestCase):
         would turn this test into a false failure - so it is asserted explicitly.
         """
         self.api("POST", "/api/v1/runtime/shutdown", {})
-        self.assertEqual(proc.wait(timeout=25), 0)
+        started = time.monotonic()
+        try:
+            code = proc.wait(timeout=25)
+        except subprocess.TimeoutExpired:
+            # A 202/25-second timeout is still a HARD FAIL. Capture only the
+            # bounded and redacted state of this synthetic workspace before
+            # cleanup, without waiting again or dumping the Popen command/env.
+            self.fail(describe_shutdown_timeout(
+                elapsed_seconds=time.monotonic() - started,
+                returncode=proc.poll(),
+                lease_state=safe_lease_state(self.data),
+                stderr_tail=read_stderr_tail(
+                    self.stderr.name, workspace_root=self.root),
+            ))
+        self.assertEqual(code, 0)
         self.assertEqual(inspect_lease(self.data).state, ABSENT)
 
     # ------------------------------------------------------------------- http
