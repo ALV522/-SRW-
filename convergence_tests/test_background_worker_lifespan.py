@@ -176,6 +176,20 @@ class BackgroundWorkerLifespanTests(unittest.TestCase):
         self.database.rename(moved)
         moved.rename(self.database)
 
+    def test_worker_stop_failure_does_not_claim_engine_disposal(self):
+        # #159: a synthetic failed bounded worker join must leave the engine
+        # untouched. The last safe diagnostic marker is worker_stop_exit;
+        # no engine_dispose_* marker may falsely claim SQLite was released.
+        os.environ[WORKER_ENV] = "0"
+        app = self._build_app()
+        stages = []
+        app.state.srw_shutdown_phase_hook = stages.append
+        app.state.srw_stop_worker = lambda: False
+        with TestClient(app):
+            pass
+        self.assertEqual(stages, ["worker_stop_enter", "worker_stop_exit"])
+        self.assertTrue(self.database.exists())
+
     def test_shutdown_joins_the_worker_and_releases_the_database(self):
         os.environ[WORKER_ENV] = "1"
         app = self._build_app()
