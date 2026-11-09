@@ -229,6 +229,182 @@ class CandidateNextActionBrowserTests(unittest.TestCase):
                 "WHERE candidate_id=? ORDER BY rowid DESC LIMIT 1", (cid,)).fetchone()
         return row[0], json.loads(row[1])
 
+    def test_delayed_assessment_cannot_repaint_another_candidate(self):
+        """A late Core assessment response cannot restore the previous HR workspace."""
+        other = self.post(f"/api/v1/projects/{self.pid}/candidates",
+                          {"display_name": "Synthetic Other"})["candidate_id"]
+        self.post(f"/api/v1/candidates/{other}/sources/text",
+                  {"text_content": TEXT, "publish_material": True})
+        workspace = self.get(f"/api/v1/candidates/{self.cid}/workspace")
+        self.assertTrue(workspace.get("decision_context_hash"),
+                        "synthetic Published/material fixture must exercise assessment GET")
+        # Delay only one real HTTP response. Every other Core/SQLite read stays real.
+        self.page.evaluate("""cid => {
+          const originalFetch = window.fetch.bind(window);
+          window.__assessmentHeld = false;
+          window.__releaseAssessment = null;
+          window.fetch = async (...args) => {
+            if (String(args[0]).includes('/api/v1/candidates/' + cid + '/assessment')) {
+              window.__assessmentHeld = true;
+              await new Promise(resolve => { window.__releaseAssessment = resolve; });
+            }
+            return originalFetch(...args);
+          };
+        }""", self.cid)
+        self.page.evaluate("cid => { void window.openCandidate(cid); }", self.cid)
+        self.page.wait_for_function("window.__assessmentHeld === true")
+        self.page.evaluate("cid => { void window.openCandidate(cid); }", other)
+        expect(self.page.locator("#content h1")).to_have_text("Synthetic Other")
+        self.page.evaluate("window.__releaseAssessment()")
+        self.page.wait_for_timeout(300)
+        expect(self.page.locator("#content h1")).to_have_text("Synthetic Other")
+        expect(self.page.locator("#top-crumb")).to_contain_text("Synthetic Other")
+
+
+    def test_late_scorecard_read_cannot_overlay_another_candidate(self):
+        """A delayed real Scorecard GET cannot reopen A's modal over candidate B."""
+        event_id, _ = self.schedule_interview()
+        other = self.post(f"/api/v1/projects/{self.pid}/candidates",
+                          {"display_name": "Synthetic Other"})["candidate_id"]
+        self.post(f"/api/v1/candidates/{other}/sources/text",
+                  {"text_content": TEXT, "publish_material": True})
+        before_a, before_b = self.counts(self.cid), self.counts(other)
+        self.page.evaluate("""args => {
+          const originalFetch = window.fetch.bind(window);
+          window.__originalScorecardFetch = originalFetch;
+          window.__scorecardHeld = false;
+          window.__releaseScorecard = null;
+          window.fetch = async (...requestArgs) => {
+            const url = String(requestArgs[0]);
+            const expected = '/api/v1/projects/' + args.pid + '/candidates/' +
+                             args.cid + '/events/' + args.eid + '/scorecards';
+            if (url.includes(expected) &&
+                (!requestArgs[1]?.method || requestArgs[1].method === 'GET')) {
+              window.__scorecardHeld = true;
+              await new Promise(resolve => { window.__releaseScorecard = resolve; });
+            }
+            return originalFetch(...requestArgs);
+          };
+        }""", {"pid": self.pid, "cid": self.cid, "eid": event_id})
+        self.page.evaluate("""args => {
+          window.__scorecardDone = false;
+          void window.openScorecards(args.cid, args.eid)
+            .finally(() => { window.__scorecardDone = true; });
+        }""", {"cid": self.cid, "eid": event_id})
+        self.page.wait_for_function("window.__scorecardHeld === true")
+        self.page.evaluate("cid => window.openCandidate(cid)", other)
+        expect(self.page.locator("#content h1")).to_have_text("Synthetic Other")
+        self.page.evaluate("window.__releaseScorecard()")
+        self.page.wait_for_function("window.__scorecardDone === true")
+        expect(self.page.locator("#modal-root .modal")).to_have_count(0)
+        expect(self.page.locator("#top-crumb")).to_contain_text("Synthetic Other")
+        self.assertEqual(self.counts(self.cid), before_a)
+        self.assertEqual(self.counts(other), before_b)
+
+        # Even an already-open A form cannot submit after the workspace moves.
+        self.page.evaluate("window.fetch = window.__originalScorecardFetch")
+        self.page.evaluate("cid => window.openCandidate(cid)", self.cid)
+        self.page.evaluate("args => window.openScorecards(args.cid,args.eid)",
+                           {"cid": self.cid, "eid": event_id})
+        modal = self.page.locator("#modal-root .modal")
+        expect(modal).to_be_visible()
+        modal.locator("#sc-evaluator").fill("Synthetic Reviewer")
+        modal.locator(".c-obs").fill("Observation for A only")
+        self.page.evaluate("cid => window.openCandidate(cid)", other)
+        self.page.evaluate("args => window.saveScorecard(args.cid,args.eid)",
+                           {"cid": self.cid, "eid": event_id})
+        expect(self.page.locator("#toast-root")).to_contain_text("已阻止提交")
+        self.assertEqual(self.counts(self.cid), before_a)
+        self.assertEqual(self.counts(other), before_b)
+
+    def test_pending_scorecard_read_cannot_replace_newer_interview_dialog(self):
+        """A delayed Scorecard GET must not overwrite a newer HR dialog in the same workspace."""
+        event_id, _ = self.schedule_interview()
+        before = self.counts(self.cid)
+        self.page.evaluate("""args => {
+          const originalFetch = window.fetch.bind(window);
+          window.__originalScorecardFetch = originalFetch;
+          window.__scorecardHeld = false;
+          window.fetch = async (...requestArgs) => {
+            const url = String(requestArgs[0]);
+            const expected = '/api/v1/projects/' + args.pid + '/candidates/' +
+                             args.cid + '/events/' + args.eid + '/scorecards';
+            if (url.includes(expected) &&
+                (!requestArgs[1]?.method || requestArgs[1].method === 'GET')) {
+              window.__scorecardHeld = true;
+              await new Promise(resolve => { window.__releaseScorecard = resolve; });
+            }
+            return originalFetch(...requestArgs);
+          };
+        }""", {"pid": self.pid, "cid": self.cid, "eid": event_id})
+        self.page.evaluate("""args => {
+          window.__scorecardDone = false;
+          void window.openScorecards(args.cid, args.eid)
+            .finally(() => { window.__scorecardDone = true; });
+        }""", {"cid": self.cid, "eid": event_id})
+        self.page.wait_for_function("window.__scorecardHeld === true")
+        # A new interview dialog is an explicit later operator action.
+        self.page.evaluate("cid => window.openEvent(cid, 'interview')", self.cid)
+        expect(self.page.locator("#modal-root .modal h3")).to_have_text("新增结构化面试")
+        self.page.evaluate("window.__releaseScorecard()")
+        self.page.wait_for_function("window.__scorecardDone === true")
+        expect(self.page.locator("#modal-root .modal h3")).to_have_text("新增结构化面试")
+        self.page.evaluate("window.closeModal()")
+        self.assertEqual(self.counts(self.cid), before)
+
+    def test_pending_scorecard_post_does_not_close_newer_interview_dialog(self):
+        """A successful older Scorecard POST must not discard a newer unsaved HR form."""
+        event_id, _ = self.schedule_interview()
+        before = self.counts(self.cid)
+        self.page.evaluate("args => window.openScorecards(args.cid,args.eid)",
+                           {"cid": self.cid, "eid": event_id})
+        modal = self.page.locator("#modal-root .modal")
+        expect(modal.locator("h3")).to_have_text("独立 Interview Scorecard")
+        modal.locator("#sc-evaluator").fill("Synthetic Reviewer")
+        modal.locator(".c-obs").fill("Observed interview only")
+
+        # Hold the real HTTP POST before sending it; release it after the HR
+        # opens and edits another modal in the same candidate workspace.
+        self.page.evaluate("""eid => {
+          const originalFetch = window.fetch.bind(window);
+          window.__scorecardPostHeld = false;
+          window.__releaseScorecardPost = null;
+          window.fetch = async (...args) => {
+            const url = String(args[0]);
+            if (url.includes('/api/v1/events/' + eid + '/scorecards') &&
+                String(args[1]?.method || 'GET').toUpperCase() === 'POST') {
+              window.__scorecardPostHeld = true;
+              await new Promise(resolve => { window.__releaseScorecardPost = resolve; });
+            }
+            return originalFetch(...args);
+          };
+        }""", event_id)
+        self.page.evaluate("""args => {
+          window.__scorecardSubmitDone = false;
+          void window.saveScorecard(args.cid,args.eid)
+            .finally(() => { window.__scorecardSubmitDone = true; });
+        }""", {"cid": self.cid, "eid": event_id})
+        self.page.wait_for_function("window.__scorecardPostHeld === true")
+        self.page.evaluate("cid => window.openEvent(cid, 'interview')", self.cid)
+        newer = self.page.locator("#modal-root .modal")
+        expect(newer.locator("h3")).to_have_text("新增结构化面试")
+        newer.locator(".c-q").fill("UNSAVED synthetic follow-up question")
+
+        self.page.evaluate("window.__releaseScorecardPost()")
+        self.page.wait_for_function("window.__scorecardSubmitDone === true")
+        expect(newer.locator("h3")).to_have_text("新增结构化面试")
+        expect(newer.locator(".c-q")).to_have_value("UNSAVED synthetic follow-up question")
+        after = self.counts(self.cid)
+        self.assertEqual(after["scorecards"], before["scorecards"] + 1)
+        self.assertEqual(after["events"], before["events"])
+        with closing(self.db()) as connection:
+            row = connection.execute(
+                "SELECT event_id FROM interview_scorecard_submission "
+                "WHERE candidate_id=? ORDER BY rowid DESC LIMIT 1",
+                (self.cid,)).fetchone()
+        self.assertEqual(row[0], event_id)
+        self.page.evaluate("window.closeModal()")
+
     # ------------------------------------------------------------------- S1a UI
     def test_row_opens_the_workspace_and_the_stepper_shows_the_next_action(self):
         self.page.evaluate("window.setProjectTab('candidates')")
@@ -520,12 +696,36 @@ class CandidateNextActionBrowserTests(unittest.TestCase):
         expect(self.page.locator(".modal .notice.danger")).to_be_visible()
         self.assertEqual(self.counts(cid)["events"], 0)
 
+    def test_same_project_other_candidate_scorecard_is_refused_before_read(self):
+        """A valid event for B must not open over A's visible candidate workspace."""
+        other = self.post(f"/api/v1/projects/{self.pid}/candidates",
+                          {"display_name": "Other Same-Project Person"})["candidate_id"]
+        event_id, _ = self.schedule_interview(other, question="B 的真实面试问题")
+        self.open_step(self.cid)
+        expect(self.page.locator(".candidate-workspace-head h1")).to_have_text(
+            "Synthetic Person")
+        reads = []
+        self.page.on("request", lambda request: reads.append(request.url)
+                     if request.method == "GET" and request.url.endswith("/scorecards")
+                     else None)
+        self.page.evaluate(
+            "args => window.openScorecards(args.cid, args.eid)",
+            {"cid": other, "eid": event_id})
+        modal = self.page.locator(".modal")
+        expect(modal.locator(".notice.danger")).to_be_visible()
+        expect(modal.locator(".notice.danger")).to_contain_text(
+            "当前工作区候选人与面评目标不一致")
+        self.assertEqual(modal.get_by_role("button", name="提交并锁定").count(), 0)
+        self.assertEqual(reads, [], "mismatched drawer must not fetch another candidate's scorecard")
+        self.assertEqual(self.counts(self.cid)["scorecards"], 0)
+        self.assertEqual(self.counts(other)["scorecards"], 0)
+
     # ------------------------------------ (b) candidate ownership under switching
     def test_event_and_scorecard_stay_bound_to_the_opening_candidate(self):
         """Ownership survives a candidate switch and is refused when ids disagree.
 
-        (1) A scorecard modal opened for B keeps writing to B even after the
-            workspace underneath is switched to A.
+        (1) A scorecard modal opened for B cannot be submitted after the
+            workspace underneath switches to A; reopen B to submit safely.
         (2) A dashboard deep link whose candidate id and event id disagree is
             refused instead of silently scoring somebody else's interview.
         """
@@ -540,6 +740,25 @@ class CandidateNextActionBrowserTests(unittest.TestCase):
         # (1) switch the visible workspace to the other candidate mid-modal
         self.page.evaluate("cid => window.openCandidate(cid)", self.cid)
         expect(self.page.locator(".candidate-steps")).to_be_visible()
+        modal.locator("#sc-evaluator").fill("面试官B")
+        modal.locator(".c-obs").fill("只应归属第二个候选人")
+        modal.locator(".c-rec").fill("advance")
+        self.page.get_by_role("button", name="提交并锁定").click()
+        expect(self.page.locator("#toast-root")).to_contain_text("已阻止提交")
+        expect(self.page.locator("#modal-root .modal")).to_have_count(1)
+        with closing(self.db()) as connection:
+            rows = connection.execute(
+                "SELECT candidate_id, event_id FROM interview_scorecard_submission").fetchall()
+        self.assertEqual(rows, [], "switching candidate must not submit B while A is visible")
+        self.assertEqual(self.counts(self.cid)["scorecards"], 0)
+
+        # Reopen B's exact event and submit there: safety must not block valid HR work.
+        self.page.evaluate("window.closeModal()")
+        self.open_step(other, "面试")
+        self.page.locator(".timeline-item").filter(has_text="面试").get_by_role(
+            "button", name="独立 Scorecard").click()
+        modal = self.page.locator(".modal")
+        expect(modal.locator(".criterion-block")).to_have_count(1)
         modal.locator("#sc-evaluator").fill("面试官B")
         modal.locator(".c-obs").fill("只应归属第二个候选人")
         modal.locator(".c-rec").fill("advance")
@@ -642,7 +861,8 @@ class CandidateNextActionBrowserTests(unittest.TestCase):
         self.assertEqual(rows[0][0], second)
         self.assertEqual(json.loads(rows[0][1])["questions"][0]["criterion_key"], KEY)
         self.assertEqual(self.counts(self.cid), before_a)
-        self.page.get_by_role("button", name="← 返回项目工作区").click()
+        expect(self.page.locator("#top-back")).to_be_visible()
+        self.page.locator("#top-back").click()
         expect(self.page.locator("#cand-q")).to_have_value("Synthetic")
         expect(self.page.locator(f'tr[data-candidate-id="{second}"]')).to_be_visible()
 
@@ -665,6 +885,19 @@ class CandidateNextActionBrowserTests(unittest.TestCase):
         modal.locator("#sc-evaluator").fill("独立面试官")
         modal.locator(".c-obs").fill("仅属于第二位候选人的观察")
         modal.locator("#sc-rec").fill("advance")
+        # Negative: a stale callback for a second interview must not reuse
+        # this visible first-event form, even when both share Published keys.
+        other_event = self.post(f"/api/v1/candidates/{second}/events", {
+            "event_type": "interview", "event_state": "scheduled",
+            "title": "Different interview", "metadata": {
+                "protocol_revision_id": published["current_revision_id"],
+                "questions": [{"criterion_key": KEY, "question": "不同面试"}]}})
+        before_wrong = self.counts(second)
+        self.page.evaluate("args => window.saveScorecard(args.cid,args.eid)",
+                           {"cid": second, "eid": other_event["event_id"]})
+        expect(self.page.locator("#toast-root")).to_contain_text("面评窗口与目标候选人/事件不一致")
+        self.assertEqual(self.counts(second), before_wrong)
+        expect(modal).to_be_visible()
         modal.get_by_role("button", name="提交并锁定").click()
         expect(self.page.locator("#modal-root .modal")).to_have_count(0)
         with closing(self.db()) as connection:
@@ -675,8 +908,17 @@ class CandidateNextActionBrowserTests(unittest.TestCase):
         self.assertEqual((rows[0][0], rows[0][1]), (second, event["event_id"]))
         self.assertEqual(json.loads(rows[0][2])[0]["criterion_key"], KEY)
         self.assertEqual(self.counts(self.cid), before_a)
-        self.page.get_by_role("button", name="← 返回项目工作区").click()
-        self.page.locator(f'tr[data-candidate-id="{second}"] [data-quick-action="scorecard"]').click()
+        expect(self.page.locator("#top-back")).to_be_visible()
+        self.page.locator("#top-back").click()
+        # A second event now exists. The list shortcut must refuse to guess
+        # which interview to reopen; select the original event in the UI.
+        row = self.page.locator(f'tr[data-candidate-id="{second}"]')
+        row.get_by_role("button", name="打开工作台").click()
+        expect(self.page.locator(".candidate-workspace-head h1")).to_have_text("Synthetic Second")
+        self.page.locator(".candidate-step").filter(has_text="面试").click()
+        original = self.page.locator(f'[data-event-id="{event["event_id"]}"]')
+        expect(original).to_be_visible()
+        original.get_by_role("button", name="独立 Scorecard").click()
         expect(self.page.locator(".modal")).to_contain_text("仅属于第二位候选人的观察")
 
     def test_list_quick_actions_do_not_write_when_no_interview_exists(self):
@@ -687,7 +929,8 @@ class CandidateNextActionBrowserTests(unittest.TestCase):
         expect(self.page.locator("#toast-root")).to_contain_text("尚无可填写面评的面试记录")
         expect(self.page.locator(".candidate-workspace-head h1")).to_have_text("Synthetic Person")
         self.assertEqual(self.counts(self.cid), before)
-        self.page.get_by_role("button", name="← 返回项目工作区").click()
+        expect(self.page.locator("#top-back")).to_be_visible()
+        self.page.locator("#top-back").click()
         row = self.page.locator(f'tr[data-candidate-id="{self.cid}"]')
         row.locator('[data-quick-action="verify"]').click()
         expect(self.page.locator(".candidate-workspace-head h1")).to_have_text("Synthetic Person")
@@ -712,6 +955,192 @@ class CandidateNextActionBrowserTests(unittest.TestCase):
         expect(self.page.locator("#toast-root")).to_contain_text("有多场面试")
         expect(self.page.locator("#modal-root .modal")).to_have_count(0)
         self.assertEqual(self.counts(second), before)
+
+    def test_delayed_list_quick_action_never_replaces_newer_candidate_form(self):
+        """A delayed A summary cannot displace B's unsaved interview form."""
+        second = self.post(f"/api/v1/projects/{self.pid}/candidates",
+                           {"display_name": "Synthetic Second"})["candidate_id"]
+        self.page.locator("#top-back").click()
+        self.page.evaluate("window.setProjectTab('candidates')")
+        self.page.locator(f'tr[data-candidate-id="{second}"]').wait_for()
+        self.page.evaluate("""cid => {
+          const originalFetch = window.fetch.bind(window);
+          const originalAction = window.openCandidateQuickAction;
+          window.__oldQuickHeld = false;
+          window.__oldQuickDone = false;
+          window.fetch = async (...args) => {
+            if (!window.__oldQuickHeld &&
+                String(args[0]).includes('/api/v1/candidates/' + cid + '/summary')) {
+              window.__oldQuickHeld = true;
+              await new Promise(resolve => { window.__releaseOldQuick = resolve; });
+            }
+            return originalFetch(...args);
+          };
+          window.openCandidateQuickAction = (id, kind) => {
+            const pending = originalAction(id, kind);
+            if (id === cid) pending.finally(() => { window.__oldQuickDone = true; });
+            return pending;
+          };
+        }""", self.cid)
+        self.page.locator(
+            f'tr[data-candidate-id="{self.cid}"] [data-quick-action="schedule"]').click()
+        self.page.wait_for_function("window.__oldQuickHeld === true")
+        self.page.locator(
+            f'tr[data-candidate-id="{second}"] [data-quick-action="schedule"]').click()
+        expect(self.page.locator(".candidate-workspace-head h1")).to_have_text("Synthetic Second")
+        modal = self.page.locator("#modal-root .modal")
+        expect(modal.locator("h3")).to_have_text("新增结构化面试")
+        modal.locator("#e-title").fill("B 的未保存面试")
+        self.page.evaluate("window.__releaseOldQuick()")
+        self.page.wait_for_function("window.__oldQuickDone === true")
+        expect(self.page.locator(".candidate-workspace-head h1")).to_have_text("Synthetic Second")
+        expect(modal.locator("#e-title")).to_have_value("B 的未保存面试")
+        self.assertEqual(self.counts(self.cid)["events"], 0)
+        self.assertEqual(self.counts(second)["events"], 0)
+
+    def test_delayed_interview_protocol_cannot_open_stale_modal(self):
+        """A delayed Published GET cannot overwrite B's workspace or a later form."""
+        second = self.post(f"/api/v1/projects/{self.pid}/candidates",
+                           {"display_name": "Synthetic Second"})["candidate_id"]
+        self.page.locator(".candidate-step").filter(has_text="面试").click()
+        self.page.evaluate("""pid => {
+          const originalFetch = window.fetch.bind(window);
+          const originalEvent = window.openEvent;
+          window.__oldEventHeld = false;
+          window.__oldEventDone = false;
+          window.fetch = async (...args) => {
+            if (!window.__oldEventHeld &&
+                String(args[0]).includes('/api/v1/projects/' + pid + '/protocol-workspace')) {
+              window.__oldEventHeld = true;
+              await new Promise(resolve => { window.__releaseOldEvent = resolve; });
+            }
+            return originalFetch(...args);
+          };
+          window.openEvent = (cid, type) => {
+            const pending = originalEvent(cid, type);
+            pending.finally(() => { window.__oldEventDone = true; });
+            return pending;
+          };
+        }""", self.pid)
+        self.page.get_by_role("button", name="＋ 面试排期").click()
+        self.page.wait_for_function("window.__oldEventHeld === true")
+        self.page.evaluate("cid => window.openCandidate(cid)", second)
+        expect(self.page.locator(".candidate-workspace-head h1")).to_have_text("Synthetic Second")
+        self.page.evaluate("window.__releaseOldEvent()")
+        self.page.wait_for_function("window.__oldEventDone === true")
+        expect(self.page.locator("#modal-root .modal")).to_have_count(0)
+        expect(self.page.locator(".candidate-workspace-head h1")).to_have_text("Synthetic Second")
+        self.assertEqual(self.counts(self.cid)["events"], 0)
+        self.assertEqual(self.counts(second)["events"], 0)
+
+        # The project-level flow remains a supported legitimate entry.
+        self.page.locator("#top-back").click()
+        self.page.evaluate("window.setProjectTab('candidates')")
+        self.page.evaluate("window.setCandidateView('flow')")
+        self.page.get_by_role("button", name="＋ 面试排期").click()
+        expect(self.page.locator("#modal-root .modal h3")).to_have_text("新增结构化面试")
+
+    def test_delayed_interview_save_never_uses_another_candidate_form(self):
+        """An A save held in Published GET must not read or write B's later modal."""
+        second = self.post(f"/api/v1/projects/{self.pid}/candidates",
+                           {"display_name": "Synthetic Second"})["candidate_id"]
+        self.open_step(self.cid)
+        self.page.get_by_role("button", name="＋ 面试排期").click()
+        expect(self.page.locator("#modal-root .modal .criterion-block")).to_have_count(1)
+        self.page.locator("#e-title").fill("A original draft")
+        self.page.evaluate("""pid => {
+          const originalFetch = window.fetch.bind(window);
+          const originalSave = window.saveEvent;
+          window.__oldSaveHeld = false;
+          window.__oldSaveDone = false;
+          window.__holdSaveOnce = true;
+          window.fetch = async (...args) => {
+            if (window.__holdSaveOnce &&
+                String(args[0]).includes('/api/v1/projects/' + pid + '/protocol-workspace')) {
+              window.__holdSaveOnce = false;
+              window.__oldSaveHeld = true;
+              await new Promise(resolve => { window.__releaseOldSave = resolve; });
+            }
+            return originalFetch(...args);
+          };
+          window.saveEvent = (cid, type) => {
+            const pending = originalSave(cid, type);
+            pending.finally(() => { window.__oldSaveDone = true; });
+            return pending;
+          };
+        }""", self.pid)
+        self.page.get_by_role("button", name="保存").click()
+        self.page.wait_for_function("window.__oldSaveHeld === true")
+        self.page.evaluate("window.closeModal()")
+        self.open_step(second)
+        self.page.get_by_role("button", name="＋ 面试排期").click()
+        modal = self.page.locator("#modal-root .modal")
+        expect(modal.locator("h3")).to_have_text("新增结构化面试")
+        modal.locator("#e-title").fill("B unsaved draft")
+        modal.locator(".c-q").fill("B unsaved question")
+        self.page.evaluate("window.__releaseOldSave()")
+        self.page.wait_for_function("window.__oldSaveDone === true")
+        expect(self.page.locator(".candidate-workspace-head h1")).to_have_text("Synthetic Second")
+        expect(modal.locator("#e-title")).to_have_value("B unsaved draft")
+        expect(modal.locator(".c-q")).to_have_value("B unsaved question")
+        self.assertEqual(self.counts(self.cid)["events"], 0,
+                         "A must not receive B's unsaved fields")
+        self.assertEqual(self.counts(second)["events"], 0)
+
+    def test_delayed_completion_save_never_uses_other_candidate_feedback(self):
+        """A completion waiting for Core must not PATCH A with B's feedback."""
+        second = self.post(f"/api/v1/projects/{self.pid}/candidates",
+                           {"display_name": "Synthetic Second"})["candidate_id"]
+        event_a, _ = self.schedule_interview(self.cid)
+        event_b, _ = self.schedule_interview(second)
+        self.open_step(self.cid)
+        self.page.locator(".timeline-item").filter(has_text="面试").get_by_role(
+            "button", name="完成").first.click()
+        modal = self.page.locator("#modal-root .modal")
+        expect(modal.locator(".criterion-block")).to_have_count(1)
+        modal.locator(".c-obs").fill("A own feedback")
+        self.page.evaluate("""cid => {
+          const originalFetch = window.fetch.bind(window);
+          const originalSave = window.saveEventCompletion;
+          window.__oldCompletionHeld = false;
+          window.__oldCompletionDone = false;
+          window.__holdCompletionOnce = true;
+          window.fetch = async (...args) => {
+            if (window.__holdCompletionOnce &&
+                String(args[0]).includes('/api/v1/candidates/' + cid + '/events')) {
+              window.__holdCompletionOnce = false;
+              window.__oldCompletionHeld = true;
+              await new Promise(resolve => { window.__releaseOldCompletion = resolve; });
+            }
+            return originalFetch(...args);
+          };
+          window.saveEventCompletion = (cid, id, plain) => {
+            const pending = originalSave(cid, id, plain);
+            pending.finally(() => { window.__oldCompletionDone = true; });
+            return pending;
+          };
+        }""", self.cid)
+        self.page.get_by_role("button", name="完成").last.click()
+        self.page.wait_for_function("window.__oldCompletionHeld === true")
+        self.page.evaluate("window.closeModal()")
+        self.open_step(second)
+        self.page.locator(".timeline-item").filter(has_text="面试").get_by_role(
+            "button", name="完成").first.click()
+        modal = self.page.locator("#modal-root .modal")
+        expect(modal.locator(".criterion-block")).to_have_count(1)
+        modal.locator(".c-obs").fill("B unsaved feedback")
+        self.page.evaluate("window.__releaseOldCompletion()")
+        self.page.wait_for_function("window.__oldCompletionDone === true")
+        expect(self.page.locator(".candidate-workspace-head h1")).to_have_text("Synthetic Second")
+        expect(modal.locator(".c-obs")).to_have_value("B unsaved feedback")
+        with closing(self.db()) as connection:
+            rows = connection.execute(
+                "SELECT id, event_state, metadata_json FROM recruitment_event "
+                "WHERE id IN (?, ?)", (event_a, event_b)).fetchall()
+        self.assertEqual(len(rows), 2)
+        for eid, status, metadata in rows:
+            self.assertEqual(status, "scheduled", eid)
+            self.assertFalse(json.loads(metadata).get("feedback"), eid)
 
     def test_list_stale_archived_row_is_blocked_by_fresh_core_summary(self):
         second = self.post(f"/api/v1/projects/{self.pid}/candidates",
