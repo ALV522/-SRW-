@@ -141,6 +141,41 @@ class BackgroundWorkerLifespanTests(unittest.TestCase):
             self.assertEqual(self._live_workers(), [],
                              f"cycle {cycle} left a worker thread behind")
 
+    def test_shutdown_phase_hook_marks_worker_and_engine_subphases(self):
+        os.environ[WORKER_ENV] = "0"
+        app = self._build_app()
+        stages = []
+        app.state.srw_shutdown_phase_hook = stages.append
+        with TestClient(app):
+            pass
+        self.assertEqual(stages, [
+            "worker_stop_enter", "worker_stop_exit",
+            "engine_dispose_enter", "engine_dispose_exit",
+        ])
+        moved = self.database.with_name("srw_v1.phase-probe-moved.db")
+        self.database.rename(moved)
+        moved.rename(self.database)
+
+    def test_broken_shutdown_phase_hook_cannot_change_shutdown(self):
+        os.environ[WORKER_ENV] = "0"
+        app = self._build_app()
+        stages = []
+
+        def broken_hook(stage):
+            stages.append(stage)
+            raise RuntimeError("synthetic diagnostic sink failure")
+
+        app.state.srw_shutdown_phase_hook = broken_hook
+        with TestClient(app):
+            pass
+        self.assertEqual(stages, [
+            "worker_stop_enter", "worker_stop_exit",
+            "engine_dispose_enter", "engine_dispose_exit",
+        ])
+        moved = self.database.with_name("srw_v1.broken-probe-moved.db")
+        self.database.rename(moved)
+        moved.rename(self.database)
+
     def test_shutdown_joins_the_worker_and_releases_the_database(self):
         os.environ[WORKER_ENV] = "1"
         app = self._build_app()
