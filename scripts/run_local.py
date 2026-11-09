@@ -107,6 +107,15 @@ def main() -> int:
         os.environ["RECRUITMENT_RUNTIME_MODE"] = "desktop" if args.edition == "windows" else "browser"
         os.environ["SRW_BACKGROUND_WORKER"] = "1"
 
+        # #159 diagnostic A/B only: the synthetic restore fixture opts into
+        # phase tracing, and only that process may select Windows Selector.
+        # The product/Host default continues to use Uvicorn's own event loop.
+        if (os.environ.get("SRW_TEST_SHUTDOWN_PHASE_PROBE") == "1"
+                and os.environ.get("SRW_TEST_WINDOWS_EVENT_LOOP") == "selector"
+                and sys.platform == "win32"):
+            import asyncio
+            asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
+
         import uvicorn
         from srw.api.app import create_v1_app
 
@@ -117,7 +126,13 @@ def main() -> int:
             knowledge_dir=knowledge,
         )
         config = uvicorn.Config(app, host=args.host, port=args.port, log_level="info")
-        server = uvicorn.Server(config)
+        if os.environ.get("SRW_TEST_SHUTDOWN_PHASE_PROBE") == "1":
+            # Only synthetic acceptance enables aggregate lifecycle tracing.
+            # All product launchers retain the existing Uvicorn implementation.
+            from shutdown_phase_probe import ShutdownPhaseProbeServer
+            server = ShutdownPhaseProbeServer(config)
+        else:
+            server = uvicorn.Server(config)
         app.state.shutdown_callback = lambda: setattr(server, "should_exit", True)
         server.run()
     return 0
