@@ -1,8 +1,10 @@
 # SRW 产品与架构总路线图
 
-状态：ACTIVE · 2026-11-06 进度复核（目标与退出条件不变）
+状态：ACTIVE · 2026-11-09 进度复核（目标与退出条件不变）
 
 本路线图以 [PRODUCT_CHARTER](PRODUCT_CHARTER.md)、[ADR-0001](decisions/ADR-0001-single-authoritative-core.md) 和 [ADR-0002](decisions/ADR-0002-api-first-modular-monolith.md) 为约束。当前开发主线是 `main`；历史 v0.8.12-R2 是功能保真对照，不是当前源码身份。
+
+> **2026-11-09 当前主线与执行优先序（main `f4afefc6f5caed0a9cbfcbb8ed1b414c4890e414`，非 RC）**：VERSION=`1.0.0-alpha10-convergence11`、Schema=`v1_0014`、development；该 main 的 Source Ubuntu/Windows、Chromium Ubuntu/Windows、Governance、Repository Integrity、Windows Host Build、Offline Wheelhouse push 工作流均已完成并成功。#63 的 [PR #241](https://github.com/ALV522/-SRW-/pull/241) 已合入只读 Native ZIP footprint 同文件身份取证工具，解决“目录统计与 SHA 可来自不同路径重开文件”的 TOCTOU 证据缺口；它不是 Native 裁剪器，也没有证明 Runtime/Knowledge 可删除、可再分发或完整 ZIP 已减小。产品 P0 [#235](https://github.com/ALV522/-SRW-/issues/235) 的第一结构切片 [#237](https://github.com/ALV522/-SRW-/pull/237) 仍 OPEN/HOLD；本次路线图更新开始时 HEAD=`43ef1fab2479aaa64a34887b07726f08313dbb10`，最新增量仅为真实 Chromium 场景测试/Manifest，没有新增生产字节。B/C 暂不可用时 A 不代签独立 reviewer，不将旧 HEAD CI 或历史 Native 证据迁移到新 HEAD。[#240](https://github.com/ALV522/-SRW-/issues/240) 作为下一独立 UX 切片，等 #237 正式集成后从新 main 开始，目标处理首页 9 次显式点击的可比较路径而不删除人工/审计门禁。#159 偶发 Windows Core 退出仍 UNKNOWN；#43/#124/#130/#159 继续阻断 RC。以下 11-06 及更早段落均作为带 SHA 的历史快照保留。
 
 > **2026-11-06 真实进展与下一阶段优先序（主线 `3f6dc196ba45b493cee0eee4be02db0ea162fdbf`）**：#42 指定完整 Native ZIP（SHA256 `829d1264e65854d20aac00d1c9abf227f10e05927cd930361ed314505dfb7858`）已在实际 Windows WPF/WebView2 完成发布 Criteria→候选人→核实/Judgment→人工 advance→独立双面评、备份→恢复、正常关闭与锁释放。该证据替代下面旧的“新主线 WPF/备份恢复未跑”历史判断，但 Offer/Provider、#43 T1–T10 双载体、#130 断电、#124 许可/第二故障域未完成。**新增 P0 用户可用性门禁 [#235](https://github.com/ALV522/-SRW-/issues/235)**：现有产品的页面骨架与信息层级必须可逆改进且经过相同合成数据截图/真实 Chromium/Native 验收，不是另起新 UI 设计体系。近期顺序：[#232/PR #234](https://github.com/ALV522/-SRW-/pull/234) 已合并 main `b1afe24b`，PR merge-ref `80088e03` 的实机窗口、退出、DB 独占 PASS；main `b1afe24b` 的正式 Native ZIP 仍待新 SHA 复验。B/C 单执行者现在推进 #235 首页/项目工作区有界结构 PR；此前误判的 [#233](https://github.com/ALV522/-SRW-/issues/233) CSS 裁切归因已撤回关闭。A 独占 #230 WPF Host attach 的安全复核及后续 #43 双载体 Core 附着、#231/#159 退出超时诊断、主线合流与 #124/#130 发行边界。当前 #230 精确 HEAD CI 已绿但复核/Native ON 待测，#231 CI 已绿但 #159 根因未知；不得将这些源码绿灯升级为 RC/GA。以下按更旧 SHA 的进展仍保留为历史，不能直接作为当前否定或证明。
 
@@ -160,15 +162,15 @@ operator outcome
 - SaaS、云登录、多租户；
 - 因架构拆分删除成熟 Evidence/Decision/Knowledge/AI/OCR/ASR/Backup 能力。
 
-## 10. 当前执行顺序（2026-10-29）
+## 10. 当前执行顺序（2026-11-09）
 
-1. **#42/#123/#124：准确工件的 Windows 验收与可恢复性。** 最新 Source+Host kit 已构建，下一步是保留受限原 Prepared ZIP、装配新完整候选并做真实 WPF/招聘/恢复验证；外部独立副本、干净重建和 Knowledge 许可未完成。
-2. **#43：从纯组件进入跨载体安全接线。** #145/#158/#165 已交付 policy/registry 与输入边界；先确认 Host 身份、Browser attach/CSRF、重复原始 header、生命周期 token 分离合同，再把 #148 的 HTTP RED 合同与实现原子推进。现有 gate 默认 OFF；不另造第二 Core。
-3. **#41/#63：在真实业务缺口上继续应用层与 feature 收口。** API inventory、多轮 route 拆分、共享 API client、重评估和建岗 feature 已有交付，不再把“第一刀路由/第一个 feature”列成未来任务。R3/R4 未整体完成；保持现有技术栈与功能保真。
-4. **#154/#159：保留时序故障的诊断与关闭条件。** #156/#164 已改善失败信息；不因重跑成功关闭未知根因。
-5. **#166：清单工具的小范围改进。** 增量写入与 Windows/index 字节一致性，继续全量验 SHA；正式七域权威迁移暂不实施，不占用 P0/P1 产品化关键路径。
+1. **#235 / PR #237：先收口第一结构切片，不再无限增补。** 精确 HEAD CI、真实异步候选人/事件/Scorecard 负例与同 fixture 视觉证据必须绑定同一 SHA；B/C 暂不可用期间保持 OPEN/HOLD，不以 A 同账号自审代替独立工作轨结论。正式集成后再创建 #240 分支。
+2. **#240：把首页到可验证人力动作的纯导航中转压缩。** 目标是把可比较场景的首页 9 次显式点击降到 ≤6；Core target、project/candidate/event ownership、旧 Published revision、人工核实/提交/审计必须保留，不能用前端缓存猜对象。
+3. **#159：继续做可判别的 Windows 退出诊断，而不是放宽 15/25 秒门槛或强杀进程。** 保留历史真实 FAIL 与通过 rerun 的区别；测试专用 Proactor/Selector 对照若未复现，只能说明该轮未复现，不能关闭根因。
+4. **#63：做真正有数据依据的仓库/Native 瘦身。** 源码 Git tree 只有约 3 MB 量级，约 100 MB Native 包的主要体积不在源码；先用 #241 工具对 Runtime/Knowledge/Host/Source 的压缩字节做准确分项，再在 #124 许可/保管边界内决定可裁剪项。README/ROADMAP/DEVELOPMENT_STATE 只保留一个“当前”事实入口，旧 SHA 保留为历史证据，不再让旧快照冒充现状。
+5. **#43/#124/#130：作为发行阻断并行保留。** 一个 Core 两载体真实交叉写入、私有 Runtime/Knowledge 合法保管、物理断电恢复均需独立 Windows/工件证据；Source/Chromium 绿灯不能替代。
 
-以上按风险和可用证据并行推进；不以目录、PR 数或治理文档数量作为产品完成度。版本迁移 #44 和 RC/GA 仍须独立门禁及负责人裁决。
+以上按“操作者结果 → Core/API 不变量 → 客户端 → 真实载体验收”的顺序推进；不以 PR 数、文档数量或目录移动量作为完成度。版本迁移 #44 和 RC/GA 仍须独立门禁及负责人裁决。
 
 ## 11. 最终 1.0.0 判定
 
