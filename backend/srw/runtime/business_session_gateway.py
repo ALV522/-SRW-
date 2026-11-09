@@ -51,6 +51,7 @@ COOKIE_NAME = "srw_business_session"
 CSRF_COOKIE_NAME = "srw_csrf"
 CSRF_HEADER = "x-srw-csrf"
 PAIRING_PATH = "/api/v1/runtime/business-attach"
+HOST_ATTACH_PATH = "/api/v1/runtime/host-business-attach"
 LOGOUT_PATH = "/api/v1/runtime/business-logout"
 #: The Host lifecycle route keeps its own independent secret. A business cookie
 #: must never become a shutdown credential, so the gateway steps aside and lets
@@ -74,7 +75,8 @@ MUTATING_METHODS = frozenset({"POST", "PUT", "PATCH", "DELETE"})
 #: Anonymous, credential-free surfaces. They carry no business data: liveness,
 #: the static shell and its assets, the pairing endpoint and the lifecycle route.
 ANONYMOUS_EXACT = frozenset({"/", "/v1", "/health/live", "/health/ready",
-                             PAIRING_PATH, LIFECYCLE_PATH})
+                             "/api/v1/runtime/ready", PAIRING_PATH,
+                             HOST_ATTACH_PATH, LIFECYCLE_PATH})
 ANONYMOUS_PREFIXES = ("/v1/",)
 
 DENY_FLAG = "enforcement_disabled"
@@ -172,6 +174,7 @@ class BusinessSessionGateway:
         self._pairing: tuple[bytes, float] | None = None
         self._attempts = 0
         self._csrf: dict[str, str] = {}
+        self._host_nonces: set[str] = set()
 
     # ---------------------------------------------------------------- pairing
     def issue_pairing_code(self) -> str:
@@ -209,6 +212,21 @@ class BusinessSessionGateway:
             raise PairingDenied(DENY_PAIRING)
         # Single use: the code dies with the attempt that consumed it.
         self._pairing = None
+        return self._mint_business_session()
+
+    def issue_host_session(self, nonce: str) -> tuple[str, str]:
+        """Mint only once for a validated Host HMAC nonce (never the raw secret)."""
+        if (not isinstance(nonce, str) or len(nonce) != 64
+                or any(ch not in "0123456789abcdef" for ch in nonce)):
+            raise PairingDenied("host_nonce_invalid")
+        if nonce in self._host_nonces:
+            raise PairingDenied("host_nonce_replayed")
+        if len(self._host_nonces) >= 128:
+            raise PairingDenied("host_attach_limit")
+        self._host_nonces.add(nonce)
+        return self._mint_business_session()
+
+    def _mint_business_session(self) -> tuple[str, str]:
         token, session = self._registry.issue(BUSINESS_SCOPES)
         self._csrf[session.session_id] = secrets.token_urlsafe(32)
         return token, self._csrf[session.session_id]

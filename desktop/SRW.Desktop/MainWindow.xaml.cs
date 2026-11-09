@@ -53,6 +53,17 @@ public partial class MainWindow : Window
             var environment = await CoreWebView2Environment.CreateAsync(userDataFolder: userData);
             await Browser.EnsureCoreWebView2Async(environment);
             _controller.LogEvent("webview_initialized");
+            // Install only Core-minted business Cookies. Never inject the Host
+            // lifecycle secret into the renderer, URL or JavaScript.
+            foreach (var cookie in _controller.BrowserCookies)
+            {
+                var browserCookie = Browser.CoreWebView2.CookieManager.CreateCookie(
+                    cookie.Name, cookie.Value, "127.0.0.1", cookie.Path);
+                browserCookie.IsHttpOnly = cookie.HttpOnly;
+                browserCookie.IsSecure = cookie.Secure;
+                browserCookie.SameSite = CoreWebView2CookieSameSiteKind.Strict;
+                Browser.CoreWebView2.CookieManager.AddOrUpdateCookie(browserCookie);
+            }
             Browser.CoreWebView2.NavigationCompleted += (_, args) =>
             {
                 if (args.IsSuccess)

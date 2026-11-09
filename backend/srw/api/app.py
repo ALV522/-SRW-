@@ -3,7 +3,7 @@ from __future__ import annotations
 from dataclasses import asdict
 from contextlib import asynccontextmanager
 from pathlib import Path
-import hashlib, json, os, uuid
+import hashlib, hmac, json, os, uuid
 from time import perf_counter
 from typing import Any
 
@@ -35,6 +35,7 @@ from srw.runtime.business_session_gateway import (
     BusinessSessionGateway,
     BusinessSessionMiddleware,
     COOKIE_NAME,
+    HOST_ATTACH_PATH,
     MAX_PAIRING_BODY,
     PairingDenied,
     clear_cookie_headers,
@@ -245,6 +246,52 @@ def create_v1_app(
             for header in clear_cookie_headers():
                 response.headers.append("set-cookie", header)
             return response
+
+        # M3B incremental WPF attach: the native Host's private control client
+        # receives business Cookies via a one-use HMAC proof; neither the SPA nor
+        # an external browser receives the Host lifecycle secret. Default OFF has no such route.
+        if runtime_mode == "desktop" and edition == "windows":
+            async def host_business_attach(request: Request) -> Response:
+                raw = request.scope.get("headers") or []
+                nonces = [value for name, value in raw
+                          if name.lower() == b"x-srw-host-nonce"]
+                proofs = [value for name, value in raw
+                          if name.lower() == b"x-srw-host-proof"]
+                # The lifecycle secret itself must NEVER be transmitted before
+                # the Host validates runtime identity. A one-use HMAC proof
+                # avoids sending it to a spoofed loopback listener at startup.
+                browser_envelope = any(name.lower() in (
+                    b"cookie", b"origin", b"referer", b"sec-fetch-site",
+                    b"x-srw-session") for name, _ in raw)
+                nonce = nonces[0].decode("latin1") if len(nonces) == 1 else ""
+                proof = proofs[0].decode("latin1") if len(proofs) == 1 else ""
+                if (not runtime_session_token or len(nonces) != 1
+                        or len(proofs) != 1 or browser_envelope
+                        or len(nonce) != 64 or len(proof) != 64
+                        or any(ch not in "0123456789abcdef" for ch in nonce + proof)
+                        or not runtime_session_token.isascii()):
+                    return JSONResponse({"detail": "host attachment refused"},
+                                        status_code=403)
+                expected = hmac.new(
+                    runtime_session_token.encode("ascii"),
+                    ("srw-host-attach-v1:" + nonce).encode("ascii"),
+                    hashlib.sha256,
+                ).hexdigest()
+                if not hmac.compare_digest(proof, expected):
+                    return JSONResponse({"detail": "host attachment refused"},
+                                        status_code=403)
+                try:
+                    token, csrf = business_gateway.issue_host_session(nonce)
+                except PairingDenied:
+                    return JSONResponse({"detail": "host attachment refused"},
+                                        status_code=403)
+                response = JSONResponse({"status": "attached"})
+                response.headers.append("set-cookie", session_cookie_header(token))
+                response.headers.append("set-cookie", csrf_cookie_header(csrf))
+                return response
+
+            app.routes.insert(0, Route(HOST_ATTACH_PATH, host_business_attach,
+                                       methods=["POST"]))
 
         app.routes.insert(0, Route("/api/v1/runtime/business-attach",
                                    business_attach, methods=["POST"]))
