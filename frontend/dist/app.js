@@ -8,13 +8,13 @@ const $=s=>document.querySelector(s); const esc=s=>String(s??'').replace(/[&<>"'
 const fmt=n=>new Intl.NumberFormat('zh-CN').format(Number(n||0));
 const api=(path,opts)=>window.srwApi(path,opts); /* R4: implementation lives in api-client.js */
 function toast(msg,err=false){const root=$('#toast-root');root.innerHTML=`<div class="toast ${err?'error':''}">${esc(msg)}</div>`;setTimeout(()=>root.innerHTML='',3200)}
-function modal(title,body,foot=''){const root=$('#modal-root');root.innerHTML=`<div class="modal-backdrop"><div class="modal"><div class="modal-head"><h3>${title}</h3><button class="x" onclick="closeModal()">×</button></div><div class="modal-body">${body}</div>${foot?`<div class="modal-foot">${foot}</div>`:''}</div></div>`}
-window.closeModal=()=>{state.eventDraft=null;$('#modal-root').innerHTML=''};
+function modal(title,body,foot=''){state.modalGeneration=(state.modalGeneration||0)+1;const root=$('#modal-root');root.innerHTML=`<div class="modal-backdrop"><div class="modal"><div class="modal-head"><h3>${title}</h3><button class="x" onclick="closeModal()">×</button></div><div class="modal-body">${body}</div>${foot?`<div class="modal-foot">${foot}</div>`:''}</div></div>`}
+window.closeModal=()=>{state.modalGeneration=(state.modalGeneration||0)+1;state.eventDraft=null;$('#modal-root').innerHTML=''};
 function statusClass(s){if(['succeeded','confirmed','published','ready','active','open','hired','accepted','completed','approved'].includes(s))return'good';if(['failed','rejected','conflict','declined','withdrawn','cancelled','closed'].includes(s))return'bad';if(['waiting_provider','draft','missing','partial','paused','offer','scheduled','shortlisted'].includes(s))return'warn';return'info'}
 const stageLabels={new:'新候选人',screening:'简历筛选',shortlisted:'短名单',phone_screen:'电话筛选',interview:'面试',offer:'Offer',hired:'录用',rejected:'拒绝',talent_pool:'人才池',withdrawn:'候选人退出'};const projectStatusLabels={draft:'草案',open:'招聘中',paused:'暂停招聘',filled:'已招满',closed:'已关闭',archived:'已归档'};const offerLabels={draft:'草案',approved:'已批准',sent:'已发送',accepted:'已接受',declined:'已拒绝',withdrawn:'已撤回'};const offerNextStatuses={draft:['approved','withdrawn'],approved:['sent','withdrawn'],sent:['accepted','declined','withdrawn'],accepted:[],declined:[],withdrawn:[]};function stageLabel(s){return stageLabels[s]||s||'—'};const workbenchActionLabels={RESOLVE_CONFLICT:'处理证据冲突',VERIFY_CRITERION:'核实评价标准',RUN_SCREEN:'完成简历筛选',PREPARE_INTERVIEW:'准备结构化面试',REVIEW_REEVALUATION:'复核重新评价',MAKE_DECISION:'提交人工决定'};function workbenchActionLabel(s){return workbenchActionLabels[s]||s||'待处理'}
 const icons={dashboard:'▦',projects:'▣',templates:'▤',knowledge:'⌕',tasks:'⟳',settings:'⚙'};
-function shell(){return `<div class="app-shell"><aside class="sidebar"><div class="logo"><div class="logo-mark">SRW</div><div><strong>智能招聘工作台</strong><small>v1.0 Convergence 11 · Business Workflow Closure</small></div></div><div id="restore-banner-host">${restoreBannerHtml()}</div><div class="nav-group">Recruitment OS</div>${[['dashboard','今日待办'],['projects','招聘项目'],['settings','设置']].map(([k,l])=>`<button class="nav-item ${(state.page===k||(k==='settings'&&['settings','templates','knowledge','tasks'].includes(state.page)))?'active':''}" onclick="go('${k}')"><span class="nav-icon">${icons[k]}</span><span>${l}</span></button>`).join('')}<div class="side-footer">本地优先 · 业务闭环 · 证据可追溯<br>AI 建议 ≠ 人工决定<br><span id="side-health">正在检查服务…</span></div></aside><main class="main"><header class="topbar"><div class="top-title" id="top-title"></div><div class="top-right"><span id="service-health-badge" class="badge" role="status" aria-live="polite"><span id="service-health-dot" class="dot ${state.health?'good':''}"></span><span id="service-health-text">${state.health?'服务正常':'服务检查中'}</span></span><span class="badge">v1_0014</span></div></header><div class="content" id="content"></div></main></div>`}
-window.go=async p=>{state.page=p;state.candidateId=null;state.candidateSection='evidence';document.body.innerHTML=shell()+`<div id="modal-root"></div><div id="toast-root"></div>`;await renderPage()};window.openWorkbenchItem=async(pid,cid,type)=>{state.page='projects';state.projectId=pid;state.candidateReturnTab=type==='PREPARE_INTERVIEW'?'flow':'cockpit';state.projectTab=state.candidateReturnTab;state.flowCandidateId=type==='PREPARE_INTERVIEW'?(cid||null):null;state.candidateId=type==='PREPARE_INTERVIEW'?null:cid;state.candidateSection='evidence';document.body.innerHTML=shell()+`<div id="modal-root"></div><div id="toast-root"></div>`;await renderPage()};window.openOperationalItem=async(kind,pid,cid,eid)=>{state.page='projects';state.projectId=pid;state.candidateReturnTab='overview';state.projectTab=kind==='pending_interview_feedback'?'flow':'overview';state.flowCandidateId=kind==='pending_interview_feedback'?(cid||null):null;state.candidateId=['overdue_contact','today_contact'].includes(kind)?(cid||null):null;state.candidateSection='process';document.body.innerHTML=shell()+`<div id="modal-root"></div><div id="toast-root"></div>`;await renderPage();if(['overdue_contact','today_contact'].includes(kind)&&cid)await openActionPlan(cid);if(kind==='pending_interview_feedback'&&eid&&cid)await openScorecards(cid,eid)};window.openReviewItem=async(kind,pid,cid,reviewId='',claimId='')=>{
+function shell(){return `<div class="app-shell"><aside class="sidebar"><div class="logo"><div class="logo-mark">SRW</div><div><strong>智能招聘工作台</strong><small>v1.0 Convergence 11 · Business Workflow Closure</small></div></div><div id="restore-banner-host">${restoreBannerHtml()}</div><div class="nav-group">Recruitment OS</div>${[['dashboard','今日待办'],['projects','招聘项目'],['settings','设置']].map(([k,l])=>`<button class="nav-item ${(state.page===k||(k==='settings'&&['settings','templates','knowledge','tasks'].includes(state.page)))?'active':''}" onclick="go('${k}')"><span class="nav-icon">${icons[k]}</span><span>${l}</span></button>`).join('')}<div class="side-footer">本地优先 · 业务闭环 · 证据可追溯<br>AI 建议 ≠ 人工决定<br><span id="side-health">正在检查服务…</span></div></aside><main class="main"><header class="topbar"><div class="top-left"><button type="button" class="top-back" id="top-back" onclick="topBack()" hidden>&larr; 返回</button><span class="top-title" id="top-title"></span><span class="crumb-tail" id="top-crumb"></span></div><div class="top-right"><span id="service-health-badge" class="badge" role="status" aria-live="polite"><span id="service-health-dot" class="dot ${state.health?'good':''}"></span><span id="service-health-text">${state.health?'服务正常':'服务检查中'}</span></span><span class="badge">v1_0014</span></div></header><div class="content" id="content"></div></main></div>`}
+window.go=async p=>{state.page=p;if(p!=='projects'){state.projectId=null;state.flowCandidateId=null;state.overviewSection=null;}state.candidateId=null;state.currentCandidateId=null;state.currentCandidateName=null;state.candidateSection='evidence';document.body.innerHTML=shell()+`<div id="modal-root"></div><div id="toast-root"></div>`;await renderPage()};window.openWorkbenchItem=async(pid,cid,type)=>{state.page='projects';state.projectId=pid;state.candidateReturnTab=type==='PREPARE_INTERVIEW'?'flow':'cockpit';state.projectTab=state.candidateReturnTab;state.flowCandidateId=type==='PREPARE_INTERVIEW'?(cid||null):null;state.candidateId=type==='PREPARE_INTERVIEW'?null:cid;state.candidateSection='evidence';document.body.innerHTML=shell()+`<div id="modal-root"></div><div id="toast-root"></div>`;await renderPage()};window.openOperationalItem=async(kind,pid,cid,eid)=>{state.page='projects';state.projectId=pid;state.candidateReturnTab='overview';state.projectTab=kind==='pending_interview_feedback'?'flow':'overview';state.flowCandidateId=kind==='pending_interview_feedback'?(cid||null):null;state.candidateId=['overdue_contact','today_contact'].includes(kind)?(cid||null):null;state.candidateSection='process';document.body.innerHTML=shell()+`<div id="modal-root"></div><div id="toast-root"></div>`;await renderPage();if(['overdue_contact','today_contact'].includes(kind)&&cid)await openActionPlan(cid);if(kind==='pending_interview_feedback'&&eid&&cid)await openScorecards(cid,eid)};window.openReviewItem=async(kind,pid,cid,reviewId='',claimId='')=>{
   state.page='projects';state.projectId=pid;state.candidateReturnTab='quality';
   state.projectTab=kind==='unreviewed_claim'?'candidates':'quality';
   state.candidateId=kind==='unreviewed_claim'?(cid||null):null;
@@ -31,13 +31,75 @@ window.go=async p=>{state.page=p;state.candidateId=null;state.candidateSection='
   if(button)button.focus({preventScroll:true});
 };
 async function init(){try{await ensureBusinessSession()}catch(e){document.getElementById('app').textContent=e.message;return}try{await api('/health/ready');state.health=true}catch{}await refreshRestoreStatus();document.body.innerHTML=shell()+`<div id="modal-root"></div><div id="toast-root"></div>`;await renderPage();}
-async function renderPage(){const t={dashboard:'今日待办',projects:'招聘项目',templates:'设置 · 岗位模板',knowledge:'设置 · 知识库',tasks:'设置 · 后台任务',settings:'设置'}[state.page]||'工作台';$('#top-title').textContent=t;if($('#side-health'))$('#side-health').textContent=state.health?'服务已就绪 · 本地数据':'服务状态待确认';const healthText=$('#service-health-text'),healthDot=$('#service-health-dot');if(healthText)healthText.textContent=state.health?'服务正常':'服务检查中';if(healthDot)healthDot.classList.toggle('good',Boolean(state.health));const fn={dashboard:dashboardPage,projects:projectsPage,templates:templatesPage,knowledge:knowledgePage,tasks:tasksPage,settings:settingsPage}[state.page];try{await fn()}catch(e){$('#content').innerHTML=`<div class="panel"><div class="panel-body empty"><strong>页面加载失败</strong>${esc(e.message)}</div></div>`}}
+
+function syncTopbar(){
+  const host=$('#top-crumb'),back=$('#top-back');
+  if(!host&&!back)return;
+  const inProject=state.page==='projects'&&Boolean(state.projectId);
+  const p=inProject?(state.projects||[]).find(x=>x.project_id===state.projectId):null;
+  const name=inProject&&state.candidateId&&state.currentCandidateId===state.candidateId?state.currentCandidateName:null;
+  const parts=[];
+  if(inProject){
+    parts.push('<button type="button" class="crumb-link" onclick="go(\'dashboard\')">工作台</button>');
+    parts.push('<button type="button" class="crumb-link" onclick="closeProject()">'+esc((p&&p.title)||'项目')+'</button>');
+    if(state.candidateId)parts.push('<span class="crumb-current">'+esc(name||'候选人')+'</span>');
+  }
+  if(host)host.innerHTML=parts.join('<span class="crumb-sep">/</span>');
+  if(back)back.hidden=!inProject;
+}
+window.topBack=async()=>{
+  if(state.page!=='projects')return window.go('dashboard');
+  if(state.candidateId)return window.closeCandidateWorkspace();
+  if(state.projectId)return window.closeProject();
+  return window.go('dashboard');
+};
+async function renderPage(){syncTopbar();const t={dashboard:'今日待办',projects:'招聘项目',templates:'设置 · 岗位模板',knowledge:'设置 · 知识库',tasks:'设置 · 后台任务',settings:'设置'}[state.page]||'工作台';$('#top-title').textContent=t;if($('#side-health'))$('#side-health').textContent=state.health?'服务已就绪 · 本地数据':'服务状态待确认';const healthText=$('#service-health-text'),healthDot=$('#service-health-dot');if(healthText)healthText.textContent=state.health?'服务正常':'服务检查中';if(healthDot)healthDot.classList.toggle('good',Boolean(state.health));const fn={dashboard:dashboardPage,projects:projectsPage,templates:templatesPage,knowledge:knowledgePage,tasks:tasksPage,settings:settingsPage}[state.page];try{await fn()}catch(e){$('#content').innerHTML=`<div class="panel"><div class="panel-body empty"><strong>页面加载失败</strong>${esc(e.message)}</div></div>`}}
 function head(title,desc,actions=''){return `<div class="page-head"><div><h1>${title}</h1><p>${desc}</p></div><div class="actions">${actions}</div></div>`}
-async function dashboardPage(){const d=await api('/api/v1/dashboard');let providers;try{providers=await api('/api/v1/settings/providers')}catch{};const req=d.requisitions_by_status||{},st=d.candidates_by_stage||{},offers=d.offers_by_status||{};const wb=d.decision_workbench||{items:[],total:0,conflict_count:0,verify_count:0,ready_count:0};const oq=d.operational_queue||{items:[],total:0};const rq=d.review_queue||{items:[],total:0,identity_count:0,judgment_count:0,claim_count:0};$('#content').innerHTML=head('今日待办','按优先级汇总今天要处理的候选人、面试、证据核实与 Offer，点一下直达对应动作。',`<button class="btn primary" onclick="openNewProject()">＋ 新建招聘项目</button>`)+`<div class="grid kpi">${[['逾期联系',d.operational_todos?.overdue_contacts||0,'今天优先处理的联系待办'],['待提交反馈',d.operational_todos?.pending_interview_feedback||0,'已完成面试但尚未提交独立 Scorecard'],['身份复核',d.operational_todos?.pending_identity_reviews||0,'可能重复候选人等待人工判定'],['判断纠错',d.operational_todos?.open_judgment_reviews||0,'标准执行偏差与纠错队列'],['招聘中职位',req.open||0,'当前 open requisition'],['待确认事实',d.evidence_review_backlog||0,'AI / Source Claim 等待人工确认']].map(x=>`<div class="kpi-card"><div class="kpi-label">${x[0]}</div><div class="kpi-value">${fmt(x[1])}</div><div class="kpi-note">${x[2]}</div></div>`).join('')}</div><section class="panel" style="margin-bottom:16px"><div class="panel-head"><div><h2>今日业务队列</h2><span class="subtle">每位候选人只显示当前最高优先级动作，避免被低价值待办淹没。</span></div><div class="pill-row"><span class="status bad">冲突 ${fmt(wb.conflict_count||0)}</span><span class="status warn">待核实 ${fmt(wb.verify_count||0)}</span><span class="status good">可决定 ${fmt(wb.ready_count||0)}</span><span class="status info">共 ${fmt(wb.total||0)} 人</span></div></div><div class="panel-body">${wb.items.length?`<div class="quick-list">${wb.items.map(x=>`<div class="quick-item"><div><div class="quick-title">${esc(x.candidate_name)} · ${esc(x.project_title)}</div><div class="quick-note">${esc(workbenchActionLabel(x.action_type))}${x.criterion_name?` · ${esc(x.criterion_name)}`:''}${x.reason?` · ${esc(x.reason)}`:''}</div></div><button class="btn small primary" onclick="openWorkbenchItem('${x.project_id}','${x.candidate_id}','${x.action_type}')">处理</button></div>`).join('')}</div>`:'<div class="empty"><strong>当前没有决策待办</strong>新候选人进入评价流程后，这里会自动汇总每人的下一步。</div>'}</div></section><section class="panel" style="margin-bottom:16px"><div class="panel-head"><div><h2>运营执行队列</h2><span class="subtle">把逾期联系、今日联系和已完成面试的待反馈项直接带回业务动作。</span></div><span class="status info">${fmt(oq.total||0)} 项</span></div><div class="panel-body">${oq.items.length?`<div class="quick-list">${oq.items.map(x=>`<div class="quick-item"><div><div class="quick-title">${esc(x.title)} · ${esc(x.candidate_name)}</div><div class="quick-note">${esc(x.project_title)}${x.detail?` · ${esc(x.detail)}`:''}</div></div><button class="btn small primary" onclick="openOperationalItem('${x.kind}','${x.project_id}','${x.candidate_id||''}','${x.event_id||''}')">处理</button></div>`).join('')}</div>`:'<div class="empty"><strong>当前没有今日/逾期联系或待反馈面试</strong>运营待办会在这里自动出现。</div>'}</div></section><section class="panel" style="margin-bottom:16px"><div class="panel-head"><div><h2>复核中心</h2><span class="subtle">把身份、判断纠错和 AI / Source Claim 的人工复核集中到一个入口。</span></div><div class="pill-row"><span class="status warn">身份 ${fmt(rq.identity_count||0)}</span><span class="status info">纠错 ${fmt(rq.judgment_count||0)}</span><span class="status">事实 ${fmt(rq.claim_count||0)}</span><span class="status good">共 ${fmt(rq.total||0)} 项</span></div></div><div class="panel-body">${rq.items.length?`<div class="quick-list">${rq.items.map(x=>`<div class="quick-item"><div><div class="quick-title">${esc(x.title)}${x.candidate_name?` · ${esc(x.candidate_name)}`:''}</div><div class="quick-note">${esc(x.project_title)}${x.detail?` · ${esc(x.detail)}`:''}</div></div><button class="btn small primary" onclick="openReviewItem('${x.kind}','${x.project_id}','${x.candidate_id||''}','${x.review_id||''}','${x.claim_id||''}')">复核</button></div>`).join('')}</div>`:'<div class="empty"><strong>当前没有人工复核积压</strong>身份、判断纠错与待确认事实都会汇总到这里。</div>'}</div></section><div class="two"><section class="panel"><div class="panel-head"><h2>招聘漏斗</h2><button class="btn small" onclick="go('projects')">进入项目</button></div><div class="panel-body"><div class="funnel-grid">${['new','screening','shortlisted','phone_screen','interview','offer','hired'].map(k=>`<div class="funnel-step"><strong>${fmt(st[k]||0)}</strong><span>${stageLabel(k)}</span></div>`).join('')}</div><div class="divider"></div><div class="pill-row"><span class="status info">人才池 ${fmt(st.talent_pool||0)}</span><span class="status bad">拒绝 ${fmt(st.rejected||0)}</span><span class="status">退出 ${fmt(st.withdrawn||0)}</span></div></div></section><section class="panel"><div class="panel-head"><h2>Offer 管理</h2></div><div class="panel-body"><div class="quick-list">${['draft','approved','sent','accepted','declined','withdrawn'].map(k=>`<div class="quick-item"><span>${offerLabels[k]}</span><strong>${fmt(offers[k]||0)}</strong></div>`).join('')}</div></div></section></div><div class="split"><section class="panel"><div class="panel-head"><h2>近期活动</h2><button class="btn small" onclick="renderPage()">刷新</button></div><div class="panel-body">${(d.recent_activity||d.recent||[]).length?`<div class="timeline">${(d.recent_activity||d.recent).map(x=>`<div class="timeline-item"><strong>${esc(x.event_type)}</strong><small>${esc(x.actor||x.entity_type)} · ${new Date(x.created_at).toLocaleString()}</small></div>`).join('')}</div>`:'<div class="empty"><strong>暂无活动</strong>创建项目后，这里会显示关键操作时间线。</div>'}</div></section><section class="panel"><div class="panel-head"><h2>Provider / 任务</h2></div><div class="panel-body"><div class="quick-list">${providers?Object.values(providers.profiles).map(p=>`<div class="quick-item"><div><div class="quick-title">${p.name==='text_ai'?'文本 AI':p.name.toUpperCase()}</div><div class="quick-note">${esc(p.model)}</div></div><span class="status ${p.api_key_configured?'good':'warn'}">${p.api_key_configured?'已配置':'待配置'}</span></div>`).join(''):''}<div class="quick-item"><div><div class="quick-title">开放后台任务</div><div class="quick-note">等待 Provider、失败与运行中</div></div><strong>${fmt(d.metrics?.open_tasks||0)}</strong></div></div></div></section></div>`}
+async function dashboardPage(){const d=await api('/api/v1/dashboard');let providers;try{providers=await api('/api/v1/settings/providers')}catch{};const req=d.requisitions_by_status||{},st=d.candidates_by_stage||{},offers=d.offers_by_status||{};const wb=d.decision_workbench||{items:[],total:0,conflict_count:0,verify_count:0,ready_count:0};const oq=d.operational_queue||{items:[],total:0};const rq=d.review_queue||{items:[],total:0,identity_count:0,judgment_count:0,claim_count:0};$('#content').innerHTML=head('今日待办','按优先级汇总今天要处理的候选人、面试、证据核实与 Offer，点一下直达对应动作。',`<button class="btn primary" onclick="openNewProject()">＋ 新建招聘项目</button>`)+`<div class="grid kpi">${[['逾期联系',d.operational_todos?.overdue_contacts||0,'今天优先处理的联系待办'],['待提交反馈',d.operational_todos?.pending_interview_feedback||0,'已完成面试但尚未提交独立 Scorecard'],['身份复核',d.operational_todos?.pending_identity_reviews||0,'可能重复候选人等待人工判定'],['判断纠错',d.operational_todos?.open_judgment_reviews||0,'标准执行偏差与纠错队列'],['招聘中职位',req.open||0,'当前 open requisition'],['待确认事实',d.evidence_review_backlog||0,'AI / Source Claim 等待人工确认']].map(x=>`<div class="kpi-card"><div class="kpi-label">${x[0]}</div><div class="kpi-value">${fmt(x[1])}</div><div class="kpi-note">${x[2]}</div></div>`).join('')}</div><section class="panel" style="margin-bottom:16px"><div class="panel-head"><div><h2>今日业务队列</h2><span class="subtle">每位候选人只显示当前最高优先级动作，避免被低价值待办淹没。</span></div><div class="pill-row"><span class="status bad">冲突 ${fmt(wb.conflict_count||0)}</span><span class="status warn">待核实 ${fmt(wb.verify_count||0)}</span><span class="status good">可决定 ${fmt(wb.ready_count||0)}</span><span class="status info">共 ${fmt(wb.total||0)} 人</span></div></div><div class="panel-body">${wb.items.length?`<div class="quick-list">${wb.items.map(x=>`<div class="quick-item"><div><div class="quick-title">${esc(x.candidate_name)} · ${esc(x.project_title)}</div><div class="quick-note">${esc(workbenchActionLabel(x.action_type))}${x.criterion_name?` · ${esc(x.criterion_name)}`:''}${x.reason?` · ${esc(x.reason)}`:''}</div></div><button class="btn small primary" onclick="openWorkbenchItem('${x.project_id}','${x.candidate_id}','${x.action_type}')">处理</button></div>`).join('')}</div>`:'<div class="empty"><strong>当前没有决策待办</strong>新候选人进入评价流程后，这里会自动汇总每人的下一步。</div>'}</div></section><section class="panel" style="margin-bottom:16px"><div class="panel-head"><div><h2>运营执行队列</h2><span class="subtle">把逾期联系、今日联系和已完成面试的待反馈项直接带回业务动作。</span></div><span class="status info">${fmt(oq.total||0)} 项</span></div><div class="panel-body">${oq.items.length?`<div class="quick-list">${oq.items.map(x=>`<div class="quick-item"><div><div class="quick-title">${esc(x.title)} · ${esc(x.candidate_name)}</div><div class="quick-note">${esc(x.project_title)}${x.detail?` · ${esc(x.detail)}`:''}</div></div><button class="btn small primary" onclick="openOperationalItem('${x.kind}','${x.project_id}','${x.candidate_id||''}','${x.event_id||''}')">处理</button></div>`).join('')}</div>`:'<div class="empty"><strong>当前没有今日/逾期联系或待反馈面试</strong>运营待办会在这里自动出现。</div>'}</div></section><section class="panel" style="margin-bottom:16px"><div class="panel-head"><div><h2>复核中心</h2><span class="subtle">把身份、判断纠错和 AI / Source Claim 的人工复核集中到一个入口。</span></div><div class="pill-row"><span class="status warn">身份 ${fmt(rq.identity_count||0)}</span><span class="status info">纠错 ${fmt(rq.judgment_count||0)}</span><span class="status">事实 ${fmt(rq.claim_count||0)}</span><span class="status good">共 ${fmt(rq.total||0)} 项</span></div></div><div class="panel-body">${rq.items.length?`<div class="quick-list">${rq.items.map(x=>`<div class="quick-item"><div><div class="quick-title">${esc(x.title)}${x.candidate_name?` · ${esc(x.candidate_name)}`:''}</div><div class="quick-note">${esc(x.project_title)}${x.detail?` · ${esc(x.detail)}`:''}</div></div><button class="btn small primary" onclick="openReviewItem('${x.kind}','${x.project_id}','${x.candidate_id||''}','${x.review_id||''}','${x.claim_id||''}')">复核</button></div>`).join('')}</div>`:'<div class="empty"><strong>当前没有人工复核积压</strong>身份、判断纠错与待确认事实都会汇总到这里。</div>'}</div></section><div class="two"><section class="panel"><div class="panel-head"><h2>招聘漏斗</h2><button class="btn small" onclick="go('projects')">进入项目</button></div><div class="panel-body"><div class="funnel-grid">${['new','screening','shortlisted','phone_screen','interview','offer','hired'].map(k=>`<div class="funnel-step"><strong>${fmt(st[k]||0)}</strong><span>${stageLabel(k)}</span></div>`).join('')}</div><div class="divider"></div><div class="pill-row"><span class="status info">人才池 ${fmt(st.talent_pool||0)}</span><span class="status bad">拒绝 ${fmt(st.rejected||0)}</span><span class="status">退出 ${fmt(st.withdrawn||0)}</span></div></div></section><section class="panel"><div class="panel-head"><h2>Offer 管理</h2></div><div class="panel-body"><div class="quick-list">${['draft','approved','sent','accepted','declined','withdrawn'].map(k=>`<div class="quick-item"><span>${offerLabels[k]}</span><strong>${fmt(offers[k]||0)}</strong></div>`).join('')}</div></div></section></div><div class="split"><section class="panel"><div class="panel-head"><h2>近期活动</h2><button class="btn small" onclick="renderPage()">刷新</button></div><div class="panel-body">${(d.recent_activity||d.recent||[]).length?`<div class="timeline">${(d.recent_activity||d.recent).map(x=>`<div class="timeline-item"><strong>${esc(x.event_type)}</strong><small>${esc(x.actor||x.entity_type)} · ${new Date(x.created_at).toLocaleString()}</small></div>`).join('')}</div>`:'<div class="empty"><strong>暂无活动</strong>创建项目后，这里会显示关键操作时间线。</div>'}</div></section><section class="panel"><div class="panel-head"><h2>Provider / 任务</h2></div><div class="panel-body"><div class="quick-list">${providers?Object.values(providers.profiles).map(p=>`<div class="quick-item"><div><div class="quick-title">${p.name==='text_ai'?'文本 AI':p.name.toUpperCase()}</div><div class="quick-note">${esc(p.model)}</div></div><span class="status ${p.api_key_configured?'good':'warn'}">${p.api_key_configured?'已配置':'待配置'}</span></div>`).join(''):''}<div class="quick-item"><div><div class="quick-title">开放后台任务</div><div class="quick-note">等待 Provider、失败与运行中</div></div><strong>${fmt(d.metrics?.open_tasks||0)}</strong></div></div></div></section></div>`;const dashboardKpis=$('#content > .grid.kpi');const dashboardQueuePanels=[...document.querySelectorAll('#content > section.panel')];if(dashboardKpis&&dashboardQueuePanels.length===3){dashboardQueuePanels.forEach(panel=>$('#content').insertBefore(panel,dashboardKpis));}}
 window.openNewProject=()=>modal('新建招聘项目',`<div class="form-grid"><div class="field"><label>项目名称</label><input id="np-title" class="input" placeholder="例如：2026 产品经理招聘"></div><div class="field"><label>岗位名称</label><input id="np-role" class="input" placeholder="产品经理"></div><div class="field full"><label>岗位摘要</label><textarea id="np-summary" class="textarea" placeholder="业务目标、团队背景、关键职责"></textarea></div></div>`,`<button class="btn" onclick="closeModal()">取消</button><button class="btn primary" onclick="createProject()">创建并进入项目</button>`);
 window.createProject=async()=>{try{const r=await api('/api/v1/projects',{method:'POST',body:JSON.stringify({title:$('#np-title').value,role_title:$('#np-role').value,brief_summary:$('#np-summary').value})});closeModal();state.projectId=r.project_id;state.page='projects';state.projectTab='criteria';toast('项目已创建');await go('projects')}catch(e){toast(e.message,true)}};
-async function projectsPage(){const d=await api('/api/v1/projects');state.projects=d.projects||[];if(state.projectId){return projectWorkspace()}$('#content').innerHTML=head('招聘项目','把每个招聘项目作为一条职位生命周期管理：草案 → 招聘中 → 暂停 / 招满 / 关闭。',`<button class="btn" onclick="c08OpenProjectImport()">导入完整项目包</button><button class="btn primary" onclick="openNewProject()">＋ 新建项目</button>`)+`<section class="panel"><div class="panel-head"><h2>职位生命周期</h2><span class="subtle">${state.projects.length} 个项目</span></div><div class="table-wrap"><table class="table"><thead><tr><th>项目 / 职位</th><th>招聘状态</th><th>标准</th><th>候选人</th><th>待办</th><th></th></tr></thead><tbody>${state.projects.length?state.projects.map(p=>`<tr><td><strong>${esc(p.title)}</strong><div class="subtle">${esc(p.protocol_title||'—')}</div></td><td><span class="status ${statusClass(p.status)}">${esc(projectStatusLabels[p.status]||p.status)}</span></td><td><span class="status ${statusClass(p.protocol_state)}">${esc(p.protocol_state)}</span></td><td>${p.candidate_count}</td><td>${p.open_work_count}</td><td class="right"><button class="btn small primary" onclick="openProject('${p.project_id}')">进入工作区</button></td></tr>`).join(''):`<tr><td colspan="6"><div class="empty"><strong>还没有招聘项目</strong>先新建职位，再发布招聘标准。</div></td></tr>`}</tbody></table></div></section>`}
-window.openProject=async id=>{state.projectId=id;state.projectTab='overview';state.overviewSection=null;state.candidateView='all';state.candidateId=null;state.candidateSection='evidence';await projectsPage()};window.closeProject=async()=>{state.projectId=null;state.candidateId=null;state.candidateSection='evidence';await projectsPage()};window.setProjectTab=async t=>{state.projectTab=t;state.overviewSection=null;state.candidateView='all';state.flowCandidateId=null;state.candidateId=null;state.candidateSection='evidence';await projectWorkspace()};
+async function projectsPage(){syncTopbar();const d=await api('/api/v1/projects');if(state.page!=='projects')return;state.projects=d.projects||[];syncTopbar();if(state.projectId){return projectWorkspace()}$('#content').innerHTML=head('招聘项目','把每个招聘项目作为一条职位生命周期管理：草案 → 招聘中 → 暂停 / 招满 / 关闭。',`<button class="btn" onclick="c08OpenProjectImport()">导入完整项目包</button><button class="btn primary" onclick="openNewProject()">＋ 新建项目</button>`)+`<section class="panel"><div class="panel-head"><h2>职位生命周期</h2><span class="subtle">${state.projects.length} 个项目</span></div><div class="table-wrap"><table class="table"><thead><tr><th>项目 / 职位</th><th>招聘状态</th><th>标准</th><th>候选人</th><th>待办</th><th></th></tr></thead><tbody>${state.projects.length?state.projects.map(p=>`<tr><td><strong>${esc(p.title)}</strong><div class="subtle">${esc(p.protocol_title||'—')}</div></td><td><span class="status ${statusClass(p.status)}">${esc(projectStatusLabels[p.status]||p.status)}</span></td><td><span class="status ${statusClass(p.protocol_state)}">${esc(p.protocol_state)}</span></td><td>${p.candidate_count}</td><td>${p.open_work_count}</td><td class="right"><button class="btn small primary" onclick="openProject('${p.project_id}')">进入工作区</button></td></tr>`).join(''):`<tr><td colspan="6"><div class="empty"><strong>还没有招聘项目</strong>先新建职位，再发布招聘标准。</div></td></tr>`}</tbody></table></div></section>`}
+// #235: only a server-scoped, still-scheduled interview can be opened here.
+window.openScheduledInterview=async(pid,cid,eid,openIndependentScorecard=false)=>{
+  // A delayed Core pipeline response must not select an older candidate after
+  // the operator switches tabs, opens another form or clicks a newer event.
+  const requestedTab=state.projectTab,requestedCandidateId=state.candidateId;
+  const requestedModalGeneration=state.modalGeneration||0;
+  const seq=(state.scheduledInterviewOpenSeq||0)+1;
+  state.scheduledInterviewOpenSeq=seq;
+  const stillOnSource=()=>state.page==='projects'&&state.projectId===pid
+    &&state.projectTab===requestedTab&&state.candidateId===requestedCandidateId
+    &&(state.modalGeneration||0)===requestedModalGeneration
+    &&state.scheduledInterviewOpenSeq===seq;
+  if(!stillOnSource()||!cid||!eid){toast('请先进入对应招聘项目。',true);return}
+  try{
+    const scoped=await api(`/api/v1/projects/${encodeURIComponent(pid)}/pipeline`);
+    if(!stillOnSource())return;
+    const scheduledEvent=(scoped.scheduled_events||[]).find(x=>x.candidate_id===cid&&x.event_id===eid);
+    if(!scheduledEvent){
+      toast('面试已变化或不属于当前项目，请刷新后重新选择。',true);return;
+    }
+    if(openIndependentScorecard&&scheduledEvent.event_type!=='interview'){
+      toast('电话筛选不适用独立面评，请查看筛选记录。',true);return;
+    }
+    state.candidateReturnTab='overview';
+    state.candidateId=cid;
+    state.candidateSection='process';
+    await candidateDrawer(cid);
+    if(state.page!=='projects'||state.projectId!==pid||state.candidateId!==cid
+       ||state.scheduledInterviewOpenSeq!==seq
+       ||(state.modalGeneration||0)!==requestedModalGeneration)return;
+    const target=[...document.querySelectorAll('.timeline-item[data-event-id]')].find(x=>x.dataset.eventId===eid);
+    if(!target){toast('面试记录已变化，请重新选择。',true);await window.closeCandidateWorkspace();return}
+    target.classList.add('review-item-focused');
+    target.scrollIntoView({block:'center',behavior:'auto'});
+    target.querySelector('button')?.focus({preventScroll:true});
+    // Open only after Core revalidates this project/candidate/event tuple.
+    // The scoped Scorecard reader independently checks ownership and revision.
+    if(openIndependentScorecard)await window.openScorecards(cid,eid);
+  }catch(e){toast(e.message,true)}
+};
+window.openProject=async id=>{const fromOtherPage=state.page!=='projects';state.page='projects';state.projectId=id;state.projectTab='overview';state.overviewSection=null;state.candidateView='all';state.candidateId=null;state.candidateSection='evidence';if(fromOtherPage){document.body.innerHTML=shell()+`<div id="modal-root"></div><div id="toast-root"></div>`;await renderPage()}else await projectsPage()};window.closeProject=async()=>{state.page='projects';state.projectId=null;state.candidateId=null;state.currentCandidateId=null;state.currentCandidateName=null;state.flowCandidateId=null;state.candidateSection='evidence';await projectsPage()};window.setProjectTab=async t=>{state.projectTab=t;state.overviewSection=null;state.candidateView='all';state.flowCandidateId=null;state.candidateId=null;state.candidateSection='evidence';await projectWorkspace()};
 const CANDIDATE_VIEWS=[['all','全部'],['flow','面试'],['ops','待办'],['quality','数据质量']];
 window.setCandidateView=v=>{state.candidateView=v;state.candidateId=null;state.overviewSection=null;projectWorkspace()};
 async function candidatesHubTab(el,p){
@@ -57,10 +119,60 @@ async function overviewTab(el,p){
 }
 function settingsNavHtml(){return `<section class="panel"><div class="panel-head"><div><h2>工作台设置</h2><span class="subtle">岗位模板、知识库、后台任务与诊断从这里进入（原侧栏 6 项已收拢为 3 项）</span></div></div><div class="panel-body"><div class="four">${[['templates','岗位模板','沉淀可复用的岗位标准'],['knowledge','知识库','检索并应用到当前项目'],['tasks','后台任务','查看提取/复评等异步任务']].map(([k,t,d])=>`<div class="provider-card"><div class="provider-title"><h3>${t}</h3></div><div class="provider-sub">${d}</div><div class="actions" style="margin-top:10px"><button class="btn small primary" onclick="go('${k}')">进入${t}</button></div></div>`).join('')}<div class="provider-card"><div class="provider-title"><h3>运行诊断</h3></div><div class="provider-sub">数据库、对象存储与版本自检</div><div class="actions" style="margin-top:10px"><button class="btn small" onclick="showDiagnostics()">打开诊断</button></div></div></div></div></section>`}
 function projectTabs(){return [['overview','概览'],['criteria','岗位与标准'],['candidates','候选人']].map(([k,l])=>`<button class="tab ${state.projectTab===k?'active':''}" onclick="setProjectTab('${k}')">${l}</button>`).join('')}
-async function projectWorkspace(){const LEGACY={cockpit:['overview','cockpit'],audit:['overview','audit'],flow:['candidates','flow'],ops:['candidates','ops'],quality:['candidates','quality']};if(LEGACY[state.projectTab]){const m=LEGACY[state.projectTab];state.projectTab=m[0];if(m[0]==='overview'){state.overviewSection=m[1]}else{state.candidateView=m[1]}}const p=state.projects.find(x=>x.project_id===state.projectId)||{};if(state.candidateId){await candidateDrawer(state.candidateId,p);return}$('#content').innerHTML=`<div class="project-banner"><div><button class="btn small" onclick="closeProject()">← 返回项目列表</button><h2>${esc(p.title||'项目工作区')}</h2><div class="project-meta"><span class="badge">岗位：${esc(p.protocol_title||'—')}</span><span class="badge">状态：${esc(projectStatusLabels[p.status]||p.status||'—')}</span><span class="badge">协议：${esc(p.protocol_state||'—')}</span><span class="badge">候选人：${p.candidate_count||0}</span></div></div><div class="actions"><button class="btn" onclick="openProjectStatus('${p.status||'draft'}')">职位生命周期</button><button class="btn" onclick="archiveProject('${state.projectId}')">归档项目</button></div></div><div class="panel"><div class="tabs">${projectTabs()}</div><div class="panel-body" id="project-tab-body"><div class="empty">加载中…</div></div></div>`;const fn={overview:overviewTab,criteria:criteriaTab,candidates:candidatesHubTab}[state.projectTab]||projectOverview;try{await fn($('#project-tab-body'),p)}catch(e){$('#project-tab-body').innerHTML=`<div class="empty"><strong>加载失败</strong>${esc(e.message)}</div>`}}
+async function projectWorkspace(){syncTopbar();const LEGACY={cockpit:['overview','cockpit'],audit:['overview','audit'],flow:['candidates','flow'],ops:['candidates','ops'],quality:['candidates','quality']};if(LEGACY[state.projectTab]){const m=LEGACY[state.projectTab];state.projectTab=m[0];if(m[0]==='overview'){state.overviewSection=m[1]}else{state.candidateView=m[1]}}const p=state.projects.find(x=>x.project_id===state.projectId)||{};if(state.candidateId){await candidateDrawer(state.candidateId,p);return}$('#content').innerHTML=`<div class="project-banner"><div><h2>${esc(p.title||'项目工作区')}</h2><div class="project-meta"><span class="badge">岗位：${esc(p.protocol_title||'—')}</span><span class="badge">状态：${esc(projectStatusLabels[p.status]||p.status||'—')}</span><span class="badge">协议：${esc(p.protocol_state||'—')}</span><span class="badge">候选人：${p.candidate_count||0}</span></div></div><div class="actions"><button class="btn" onclick="openProjectStatus('${p.status||'draft'}')">职位生命周期</button><button class="btn" onclick="archiveProject('${state.projectId}')">归档项目</button></div></div><div class="panel"><div class="tabs">${projectTabs()}</div><div class="panel-body" id="project-tab-body"><div class="empty">加载中…</div></div></div>`;const fn={overview:overviewTab,criteria:criteriaTab,candidates:candidatesHubTab}[state.projectTab]||projectOverview;try{await fn($('#project-tab-body'),p)}catch(e){$('#project-tab-body').innerHTML=`<div class="empty"><strong>加载失败</strong>${esc(e.message)}</div>`}}
 window.openProjectStatus=current=>modal('职位生命周期',`<div class="field"><label>职位状态</label><select id="project-status" class="select">${[['draft','草案'],['open','招聘中'],['paused','暂停招聘'],['filled','已招满'],['closed','关闭职位']].map(([v,l])=>`<option value="${v}" ${v===current?'selected':''}>${l}</option>`).join('')}</select></div><div class="field" style="margin-top:10px"><label>变更理由</label><textarea id="project-status-reason" class="textarea" placeholder="例如：HC 已批准 / 暂停招聘 / 已完成录用"></textarea></div>`,`<button class="btn" onclick="closeModal()">取消</button><button class="btn primary" onclick="saveProjectStatus()">确认变更</button>`);window.saveProjectStatus=async()=>{try{await api(`/api/v1/projects/${state.projectId}/status`,{method:'POST',body:JSON.stringify({status:$('#project-status').value,reason:$('#project-status-reason').value||'人工更新职位状态',actor:'human'})});closeModal();toast('职位状态已更新');await refreshProjects();await projectWorkspace()}catch(e){toast(e.message,true)}};
 window.archiveProject=async id=>{if(!confirm('归档该项目？数据不会删除。'))return;try{await api(`/api/v1/projects/${id}/archive`,{method:'POST'});state.projectId=null;toast('项目已归档');await projectsPage()}catch(e){toast(e.message,true)}};
-async function projectOverview(el,p){const [pipe,proto]=await Promise.all([api(`/api/v1/projects/${state.projectId}/pipeline`),api(`/api/v1/projects/${state.projectId}/protocol-workspace`).catch(()=>null)]);const s=pipe.stages||{},o=pipe.offers_by_status||{};const w=pipe.workflow_summary||{next_action:{tab:'candidates',label:'继续推进候选人',reason:''}};el.innerHTML=`<div class="actions" style="margin-bottom:12px"><button class="btn primary" onclick="openContactWorkbench()">联系工作台</button><button class="btn" onclick="openRankedShortlist('${state.projectId}')">证据短名单</button><button class="btn" onclick="openProjectAiRuns('${state.projectId}')">AI 运行账本</button><button class="btn" onclick="openHandoff()">项目交接摘要</button><button class="btn" onclick="c08ExportProjectPackage('${state.projectId}')">完整项目包</button><a class="btn" href="/api/v1/projects/${state.projectId}/contact-list.csv">电话联系清单</a></div><div class="grid kpi">${[['候选人',pipe.total_candidates,'当前项目全部在库候选人'],['短名单',s.shortlisted||0,'待电话筛选 / 面试'],['近期面试',pipe.upcoming_interviews||0,'已排期未完成'],['Offer',Object.values(o).reduce((a,b)=>a+Number(b||0),0),'草案到接受的完整状态']].map(x=>`<div class="kpi-card"><div class="kpi-label">${x[0]}</div><div class="kpi-value">${x[1]}</div><div class="kpi-note">${x[2]}</div></div>`).join('')}</div><section class="panel"><div class="panel-head"><h3>招聘漏斗</h3><span class="status ${statusClass(pipe.project_status)}">${esc(projectStatusLabels[pipe.project_status]||pipe.project_status)}</span></div><div class="panel-body"><div class="funnel-grid">${['new','screening','shortlisted','phone_screen','interview','offer','hired'].map(k=>`<button class="funnel-step clickable" onclick="state.candidateStage='${k}';setProjectTab('candidates')"><strong>${s[k]||0}</strong><span>${stageLabel(k)}</span></button>`).join('')}</div><div class="pill-row" style="margin-top:12px"><span class="status info">人才池 ${s.talent_pool||0}</span><span class="status bad">拒绝 ${s.rejected||0}</span><span class="status">退出 ${s.withdrawn||0}</span></div></div></section><div class="two"><section class="panel"><div class="panel-head"><h3>近期面试</h3><button class="btn small" onclick="setProjectTab('flow')">招聘流程</button></div><div class="panel-body">${pipe.scheduled_events?.length?`<div class="quick-list">${pipe.scheduled_events.slice(0,6).map(x=>`<div class="quick-item"><div><div class="quick-title">${esc(x.candidate_name)} · ${esc(x.title||x.event_type)}</div><div class="quick-note">${new Date(x.scheduled_at).toLocaleString()} · ${esc(x.interviewer||'待指定面试官')} · ${esc(x.location||'待指定地点')}</div></div><span class="status warn">已排期</span></div>`).join('')}</div>`:'<div class="empty">近期没有已排期面试</div>'}</div></section><section class="panel"><div class="panel-head"><div><h3>项目推进</h3><span class="subtle">系统根据当前真实业务状态给出一个优先动作，不替代人工招聘判断。</span></div></div><div class="panel-body"><div class="quick-list"><div class="quick-item"><span>招聘标准</span><strong>${w.criteria_published?'已发布':'待发布'}</strong></div><div class="quick-item"><span>候选人 / 缺材料</span><strong>${fmt(w.candidate_count||0)} / ${fmt(w.candidates_without_material||0)}</strong></div><div class="quick-item"><span>决策待办 / 待确认事实</span><strong>${fmt(w.decision_work_candidates||0)} / ${fmt(w.unreviewed_claims||0)}</strong></div><div class="quick-item"><span>待反馈面试 / 已排期</span><strong>${fmt(w.pending_interview_feedback||0)} / ${fmt(w.upcoming_interviews||0)}</strong></div><div class="quick-item"><span>Offer 待跟进</span><strong>${fmt(w.offer_followups||0)}</strong></div></div><div class="provider-card" style="margin-top:12px"><div class="provider-title"><div><h3>${esc(w.next_action?.label||'继续推进候选人')}</h3><div class="provider-sub">${esc(w.next_action?.reason||'')}</div></div><button class="btn primary" onclick="setProjectTab('${w.next_action?.tab||'candidates'}')">现在处理</button></div></div></div></section></div>`}
+async function projectOverview(el,p){const [pipe,proto]=await Promise.all([api(`/api/v1/projects/${state.projectId}/pipeline`),api(`/api/v1/projects/${state.projectId}/protocol-workspace`).catch(()=>null)]);const s=pipe.stages||{},o=pipe.offers_by_status||{};const w=pipe.workflow_summary||{next_action:{tab:'candidates',label:'继续推进候选人',reason:''}};if(state.page!=='projects'||state.projectId!==p.project_id)return;const next=w.next_action||{},nextTarget=next.target||{};const exactTarget=Boolean(nextTarget.candidate_id)&&(['complete_materials','review_evidence'].includes(next.key)||(['submit_feedback','advance_interviews'].includes(next.key)&&Boolean(nextTarget.event_id)));const nextDisabled=Boolean(next.disabled)||pipe.project_status==='archived';const nextButtonLabel=exactTarget?({complete_materials:'补齐材料',review_evidence:'核实证据',submit_feedback:'填写面评',advance_interviews:nextTarget.event_type==='phone_screen'?'查看电话筛选':'查看面试'}[next.key]+' · '+esc(nextTarget.candidate_name||'候选人')):esc(next.label||'查看相关列表');el.innerHTML=`<section class="next-action-card"><div class="nac-main"><div class="nac-kicker">下一项待办</div><div class="nac-title">${esc(w.next_action?.label||'继续推进候选人')}</div><div class="nac-reason">${esc(w.next_action?.reason||'')}</div><div class="nac-meta"><span class="nac-meta-label">项目推进</span><span>决策待办 ${fmt(w.decision_work_candidates||0)} · 待确认事实 ${fmt(w.unreviewed_claims||0)} · 待反馈面试 ${fmt(w.pending_interview_feedback||0)} · Offer 跟进 ${fmt(w.offer_followups||0)}</span></div></div><button class="btn primary" id="project-next-action" ${nextDisabled?'disabled aria-disabled="true"':''}>${nextButtonLabel}</button></section><div class="actions tool-row" style="margin-bottom:12px"><button class="btn primary" onclick="openContactWorkbench()">联系工作台</button><button class="btn" onclick="openRankedShortlist('${state.projectId}')">证据短名单</button><button class="btn" onclick="openProjectAiRuns('${state.projectId}')">AI 运行账本</button><button class="btn" onclick="openHandoff()">项目交接摘要</button><button class="btn" onclick="c08ExportProjectPackage('${state.projectId}')">完整项目包</button><a class="btn" href="/api/v1/projects/${state.projectId}/contact-list.csv">电话联系清单</a></div><div class="grid kpi">${[['候选人',pipe.total_candidates,'当前项目全部在库候选人'],['短名单',s.shortlisted||0,'待电话筛选 / 面试'],['近期排期',pipe.upcoming_interviews||0,'电话筛选与面试的未来安排'],['Offer',Object.values(o).reduce((a,b)=>a+Number(b||0),0),'草案到接受的完整状态']].map(x=>`<div class="kpi-card"><div class="kpi-label">${x[0]}</div><div class="kpi-value">${x[1]}</div><div class="kpi-note">${x[2]}</div></div>`).join('')}</div><section class="panel"><div class="panel-head"><h3>招聘漏斗</h3><span class="status ${statusClass(pipe.project_status)}">${esc(projectStatusLabels[pipe.project_status]||pipe.project_status)}</span></div><div class="panel-body"><div class="funnel-grid">${['new','screening','shortlisted','phone_screen','interview','offer','hired'].map(k=>`<button class="funnel-step clickable" onclick="state.candidateStage='${k}';setProjectTab('candidates')"><strong>${s[k]||0}</strong><span>${stageLabel(k)}</span></button>`).join('')}</div><div class="pill-row" style="margin-top:12px"><span class="status info">人才池 ${s.talent_pool||0}</span><span class="status bad">拒绝 ${s.rejected||0}</span><span class="status">退出 ${s.withdrawn||0}</span></div></div></section><div class="two"><section class="panel"><div class="panel-head"><h3>近期排期</h3><button class="btn small" onclick="setProjectTab('flow')">招聘流程</button></div><div class="panel-body">${pipe.scheduled_events?.length?`<div class="quick-list">${pipe.scheduled_events.slice(0,6).map(x=>`<div class="quick-item"><div><div class="quick-title">${esc(x.candidate_name)} · ${esc(x.title||x.event_type)}</div><div class="quick-note">${new Date(x.scheduled_at).toLocaleString()} · ${esc(x.interviewer||'待指定面试官')} · ${esc(x.location||'待指定地点')}</div></div><span class="status warn">已排期</span>${x.candidate_id&&x.event_id?`<button type="button" class="btn small" data-scheduled-candidate="${esc(x.candidate_id)}" data-scheduled-event="${esc(x.event_id)}">${x.event_type==='phone_screen'?'查看电话筛选':'查看该面试'}</button>${x.event_type==='interview'?'<button type="button" class="btn small primary" data-scorecard-candidate="'+esc(x.candidate_id)+'" data-scorecard-event="'+esc(x.event_id)+'">独立面评</button>':''}`:''} </div>`).join('')}</div>`:'<div class="empty">近期没有已排期面试</div>'}</div></section></div>`;
+  el.querySelector("#project-next-action")?.addEventListener("click",async()=>{
+    if(nextDisabled)return;
+    const pid=state.projectId,cid=nextTarget.candidate_id||'',eid=nextTarget.event_id||'';
+    // The Core recheck is asynchronous. An older CTA must not select A after
+    // HR has moved to B, switched tabs, or opened a newer unsaved dialog.
+    const requestedTab=state.projectTab,requestedCandidateId=state.candidateId;
+    const requestedModalGeneration=state.modalGeneration||0;
+    const seq=(state.projectNextActionSeq||0)+1;
+    state.projectNextActionSeq=seq;
+    const stillOnSource=()=>state.page==='projects'&&state.projectId===pid
+      &&state.projectTab===requestedTab&&state.candidateId===requestedCandidateId
+      &&(state.modalGeneration||0)===requestedModalGeneration
+      &&state.projectNextActionSeq===seq;
+    const stillOnTarget=()=>state.page==='projects'&&state.projectId===pid
+      &&state.candidateId===cid
+      &&(state.modalGeneration||0)===requestedModalGeneration
+      &&state.projectNextActionSeq===seq;
+    if(!stillOnSource())return;
+    try{
+      // Recheck *all* cards, including generic list links, before navigation.
+      // An archived project must not retain an actionable stale primary CTA.
+      const fresh=await api(`/api/v1/projects/${encodeURIComponent(pid)}/pipeline`);
+      if(!stillOnSource())return;
+      const current=fresh.workflow_summary?.next_action||{},target=current.target||{};
+      if(current.disabled||fresh.project_status==='archived'||current.key!==next.key||(exactTarget&&(target.candidate_id!==cid||(target.event_id||'')!==eid))){
+        toast('项目待办已变化，请重新查看最新任务。',true);
+        await projectWorkspace();return;
+      }
+      if(!exactTarget){await setProjectTab(current.tab||'candidates');return}
+      const owner=await api(`/api/v1/candidates/${encodeURIComponent(cid)}/summary`);
+      if(!stillOnSource())return;
+      if(owner?.project_id!==pid){toast('候选人不属于当前项目，已阻止跳转。',true);return}
+      if(next.key==='advance_interviews'){
+        await window.openScheduledInterview(pid,cid,eid);return;
+      }
+      state.candidateReturnTab='overview';
+      state.candidateId=cid;
+      state.candidateSection=next.key==='submit_feedback'?'process':'evidence';
+      await candidateDrawer(cid);
+      if(!stillOnTarget())return;
+      if(next.key==='submit_feedback'){
+        const row=[...document.querySelectorAll('.timeline-item[data-event-id]')].find(x=>x.dataset.eventId===eid);
+        if(!row){toast('面试记录已变化，请刷新后重新选择。',true);await window.closeCandidateWorkspace();return}
+        await window.openScorecards(cid,eid);
+      }
+    }catch(e){if(stillOnSource()||stillOnTarget())toast(e.message||'无法打开当前待办',true)}
+  });
+  el.querySelectorAll("[data-scheduled-event]").forEach(button=>button.addEventListener("click",()=>window.openScheduledInterview(state.projectId,button.dataset.scheduledCandidate,button.dataset.scheduledEvent)));
+  el.querySelectorAll("[data-scorecard-event]").forEach(button=>button.addEventListener("click",()=>window.openScheduledInterview(state.projectId,button.dataset.scorecardCandidate,button.dataset.scorecardEvent,true)));
+}
 const defaultAssessmentStages=[
   {stage_key:'resume',name:'简历筛选',criteria:[]},
   {stage_key:'phone_screen',name:'电话筛选',criteria:[]},
@@ -111,7 +223,7 @@ window.compareSelected=async()=>{const ids=[...document.querySelectorAll('.cand-
 window.openCandidate=async id=>{state.candidateReturnTab=state.projectTab||'candidates';state.candidateId=id;state.candidateSection='evidence';await candidateDrawer(id)};window.closeCandidateWorkspace=async()=>{state.candidateId=null;state.candidateSection='evidence';state.projectTab=state.candidateReturnTab||'candidates';await projectWorkspace()};window.setCandidateSection=async section=>{state.candidateSection=section;await candidateDrawer(state.candidateId)};window.setFlowCandidate=v=>{state.flowCandidateId=v||null;projectWorkspace()};window.openCandidateProjectFlow=async()=>{const cid=state.candidateId;state.candidateId=null;state.flowCandidateId=cid||state.flowCandidateId;state.projectTab='flow';await projectWorkspace()};
 async function fileToBase64(file){return await new Promise((res,rej)=>{const r=new FileReader();r.onload=()=>res(String(r.result).split(',')[1]);r.onerror=rej;r.readAsDataURL(file)})}
 async function uploadFile(cid,file){const b64=await fileToBase64(file);return api(`/api/v1/candidates/${cid}/files`,{method:'POST',body:JSON.stringify({filename:file.name,media_type:file.type||'application/octet-stream',base64:b64,source_kind:'resume'})})}
-function candidateEventsHtml(cid,ev){const rows=ev?.events||[];return `<section class="panel"><div class="panel-head"><div><h3>电话筛选与面试</h3><span class="subtle">排期、完成记录和独立 Scorecard 都保留在候选人上下文中。</span></div><div class="actions"><button class="btn small" onclick="openEvent('${cid}','phone_screen')">＋ 电话筛选</button><button class="btn small primary" onclick="openEvent('${cid}','interview')">＋ 面试排期</button></div></div><div class="panel-body">${rows.length?`<div class="timeline">${rows.map(x=>`<div class="timeline-item"><strong>${esc(x.title||x.event_type)} <span class="status ${statusClass(x.event_state)}">${esc(x.event_state)}</span></strong><small>${x.scheduled_at?new Date(x.scheduled_at).toLocaleString():new Date(x.created_at).toLocaleString()} · ${x.duration_minutes||0} 分钟 · ${esc(x.interviewer||'未指定')}</small><div>${esc(x.notes||'')}</div><div class="subtle">地点：${esc(x.location||'—')} · outcome：${esc(x.outcome||'—')}</div><div class="actions" style="margin-top:6px">${x.event_type==='interview'?`<button class="btn small" onclick="openScorecards('${cid}','${x.event_id}')">独立 Scorecard</button>`:''}${x.editable_evidence_source?`<button class="btn small" onclick="correctEvent('${cid}','${x.event_id}')">更正证据记录</button>`:''}${x.event_state==='scheduled'?`<button class="btn small primary" onclick="completeEvent('${cid}','${x.event_id}')">完成并反馈</button><button class="btn small" onclick="cancelEvent('${x.event_id}')">取消</button>`:''}</div></div>`).join('')}</div>`:'<div class="empty"><strong>暂无电话/面试记录</strong>可以直接为该候选人创建电话筛选或结构化面试。</div>'}</div></section>`}
+function candidateEventsHtml(cid,ev){const rows=ev?.events||[];return `<section class="panel"><div class="panel-head"><div><h3>电话筛选与面试</h3><span class="subtle">排期、完成记录和独立 Scorecard 都保留在候选人上下文中。</span></div><div class="actions"><button class="btn small" onclick="openEvent('${cid}','phone_screen')">＋ 电话筛选</button><button class="btn small primary" onclick="openEvent('${cid}','interview')">＋ 面试排期</button></div></div><div class="panel-body">${rows.length?`<div class="timeline">${rows.map(x=>`<div class="timeline-item" data-event-id="${esc(x.event_id)}"><strong>${esc(x.title||x.event_type)} <span class="status ${statusClass(x.event_state)}">${esc(x.event_state)}</span></strong><small>${x.scheduled_at?new Date(x.scheduled_at).toLocaleString():new Date(x.created_at).toLocaleString()} · ${x.duration_minutes||0} 分钟 · ${esc(x.interviewer||'未指定')}</small><div>${esc(x.notes||'')}</div><div class="subtle">地点：${esc(x.location||'—')} · outcome：${esc(x.outcome||'—')}</div><div class="actions" style="margin-top:6px">${x.event_type==='interview'?`<button class="btn small" onclick="openScorecards('${cid}','${x.event_id}')">独立 Scorecard</button>`:''}${x.editable_evidence_source?`<button class="btn small" onclick="correctEvent('${cid}','${x.event_id}')">更正证据记录</button>`:''}${x.event_state==='scheduled'?`<button class="btn small primary" onclick="completeEvent('${cid}','${x.event_id}')">完成并反馈</button><button class="btn small" onclick="cancelEvent('${x.event_id}')">取消</button>`:''}</div></div>`).join('')}</div>`:'<div class="empty"><strong>暂无电话/面试记录</strong>可以直接为该候选人创建电话筛选或结构化面试。</div>'}</div></section>`}
 
 function candidateReevaluationHtml(cid,re){const rows=re?.drafts||[];return `<section class="panel"><div class="panel-head"><div><h3>复评与上下文变化</h3><span class="subtle">复评草案不会自动覆盖人工决定。</span></div><button class="btn small primary" onclick="openReeval('${cid}')">＋ 复评草案</button></div><div class="panel-body">${rows.length?`<div class="quick-list">${rows.map(x=>`<div class="quick-item"><div><div class="quick-title">${esc(x.summary||'复评草案')}</div><div class="quick-note">${esc(x.state)} · ${new Date(x.created_at).toLocaleString()}</div></div>${x.state==='draft'?`<button class="btn small" onclick="applyReeval('${cid}','${x.draft_id}')">查看/应用差异</button>`:''}</div>`).join('')}</div>`:'<div class="empty">暂无复评草案</div>'}</div></section>`}
 
@@ -122,26 +234,43 @@ window.openCandidateNext=async id=>{const c=(state.candidateRows||[]).find(x=>x.
 /* S1b: one-click candidate actions. The list never guesses an authoritative
    state from pipeline_stage: ownership and event state are read from Core. */
 window.openCandidateQuickAction=async(id,kind)=>{
+  // A list action may outlive its summary or drawer GET. Never let an older
+  // click select A or open A's form after the operator has moved to B.
+  const requestedProjectId=state.projectId,requestedCandidateId=state.candidateId;
+  const requestedTab=state.projectTab,requestedView=state.candidateView;
+  const seq=(state.quickActionSeq||0)+1;
+  state.quickActionSeq=seq;
+  const onList=()=>state.page==='projects'&&state.projectId===requestedProjectId
+    &&state.projectTab===requestedTab&&state.candidateView===requestedView
+    &&state.candidateId===requestedCandidateId&&state.quickActionSeq===seq;
+  const onCandidate=()=>state.page==='projects'&&state.projectId===requestedProjectId
+    &&state.candidateId===id&&state.quickActionSeq===seq;
   try{
     if(!['verify','schedule','scorecard'].includes(kind))throw uiError('不支持的候选人操作');
     const row=(state.candidateRows||[]).find(x=>x.candidate_id===id);
     if(!row||row.archived)throw uiError('候选人不在当前可操作列表中，请刷新后重试');
     const summary=await api(`/api/v1/candidates/${id}/summary`);
-    if(!summary||summary.project_id!==state.projectId)throw uiError('候选人已不属于当前项目，已阻止跳转');
+    if(!onList())return;
+    if(!summary||summary.project_id!==requestedProjectId)throw uiError('候选人已不属于当前项目，已阻止跳转');
     if(summary.archived)throw uiError('候选人已归档，请先恢复后再操作');
     state.candidateReturnTab='candidates';
     state.candidateId=id;
     state.candidateSection=kind==='verify'?'evidence':'process';
     await candidateDrawer(id);
+    if(!onCandidate())return;
     if(kind==='schedule'){await window.openEvent(id,'interview');return}
     if(kind==='scorecard'){
       const result=await api(`/api/v1/candidates/${id}/events`);
+      if(!onCandidate())return;
       const eligible=(result.events||[]).filter(e=>e.event_type==='interview'&&!['cancelled','no_show'].includes(e.event_state));
       if(eligible.length===1){await window.openScorecards(id,eligible[0].event_id);return}
       if(eligible.length>1){toast('该候选人有多场面试，请在当前面试面板选择准确的记录',true);return}
       toast('该候选人尚无可填写面评的面试记录，请先安排面试',true);
     }
-  }catch(e){toast(e.message||'无法打开候选人操作',true)}
+  }catch(e){
+    if(state.page==='projects'&&state.projectId===requestedProjectId&&state.quickActionSeq===seq)
+      toast(e.message||'无法打开候选人操作',true);
+  }
 };
 function workspaceNextAction(w,events,offers){if(!w)return{label:'导入材料',section:'evidence',hint:'先导入简历或材料',action:"setCandidateSection('evidence')"};if(w.blocking_count>0)return{label:'核实关键事实',section:'evidence',hint:`还有 ${w.blocking_count} 条标准缺证据`,action:"setCandidateSection('evidence')"};if(!(events.events||[]).length)return{label:'安排面试',section:'process',hint:'还没有面试或电话记录',action:`openEvent('${w.candidate_id}','interview')`};if(!w.decision_label){if(!w.decision_context_hash)return{label:'完善材料后再决定',section:'evidence',hint:'材料或标准尚未发布',action:''};return{label:'记录人工决定',section:'evidence',hint:'面试记录已就绪',action:`openDecision('${w.candidate_id}')`}}if(!(offers.offers||[]).length)return{label:'创建 Offer',section:'offer',hint:'人工决定已记录',action:`openOffer('${w.candidate_id}')`};return{label:'更新 Offer 状态',section:'offer',hint:'',action:''}}
 function uiError(message){const e=new Error(message);e.userFacing=true;return e}
@@ -161,8 +290,9 @@ async function eventContext(cid,eid){if(!cid||!eid)throw uiError('缺少面试�
 async function eventWriteContext(cid,eid,prefetched){const ev=prefetched||await eventContext(cid,eid);const meta=ev.metadata||{};const keys=Array.from(new Set((meta.questions||[]).map(q=>q&&q.criterion_key).filter(Boolean)));if(!keys.length)throw uiError('这条面试记录没有绑定岗位标准，无法提交结构化反馈；请重新安排面试并在提纲中选择标准');const pid=await candidateProjectId(cid);const p=await loadPublishedProtocol(pid);const pinned=String(meta.protocol_revision_id||'');if(!pinned)throw uiError('这条面试记录没有保存创建时的标准版本，无法安全提交结构化反馈；请查看原记录，或重新安排面试');if(pinned!==p.revisionId)throw uiError('该面试按旧的标准版本创建，当前已发布版本已经变化；为避免把旧记录改写成新标准，已阻止提交。请查看原记录，或重新安排面试');const current=new Set(p.criteria.map(c=>c.criterion_key));if(keys.some(k=>!current.has(k)))throw uiError('面试记录里的标准已不在当前发布版本中，已阻止提交结构化反馈');const snap={};(meta.criteria_snapshot||[]).forEach(c=>{if(c&&c.criterion_key)snap[c.criterion_key]=c});const names={},definitions={};keys.forEach(k=>{names[k]=(snap[k]&&snap[k].name)||'';definitions[k]=(snap[k]&&snap[k].definition)||''});p.criteria.forEach(c=>{if(!names[c.criterion_key]){names[c.criterion_key]=c.name||'';definitions[c.criterion_key]=c.definition||''}});return{ev,meta,keys,names,definitions,pid,revisionId:pinned,currentRevisionId:p.revisionId}}
 function collectInterviewQuestions(){return Array.from(document.querySelectorAll('#e-criteria .criterion-block')).map(b=>({criterion_key:b.dataset.criterion||'',question:(b.querySelector('.c-q')?.value||'').trim(),purpose:(b.querySelector('.c-p')?.value||'').trim()})).filter(q=>q.question)}
 function collectCriterionFeedback(scope){return Array.from(document.querySelectorAll(`${scope} .criterion-block`)).map(b=>({criterion_key:b.dataset.criterion||'',rating:(b.querySelector('.c-rating')?.value||'unknown'),observation:(b.querySelector('.c-obs')?.value||'').trim(),supporting_evidence:(b.querySelector('.c-support')?.value||'').trim(),counter_evidence:(b.querySelector('.c-counter')?.value||'').trim(),recommendation:(b.querySelector('.c-rec')?.value||'').trim()}))}
-async function candidateDrawer(cid,p=null){
+async function candidateDrawer(cid,p=null){syncTopbar();
   if(!cid)return;
+  const requestedProjectId=state.projectId;
   state.candidateId=cid;
   p=p||state.projects.find(x=>x.project_id===state.projectId)||{};
   const [contact,pipe,offers,actionPlan,events,reevaluations,w]=await Promise.all([
@@ -174,16 +304,23 @@ async function candidateDrawer(cid,p=null){
     api(`/api/v1/candidates/${cid}/reevaluations`).catch(()=>({drafts:[]})),
     api(`/api/v1/candidates/${cid}/workspace`).catch(()=>null)
   ]);
+  if(state.page!=='projects'||state.projectId!==requestedProjectId||state.candidateId!==cid)return;
+  state.currentCandidateId=cid;
+  state.currentCandidateName=contact.display_name||null;
+  syncTopbar();
   // A just-created candidate has no published material/decision context;
   // requesting an assessment then raises an expected 409. Avoid that
   // unnecessary backend call while still showing Source intake.
   const assessment=w?.decision_context_hash?await api(`/api/v1/candidates/${cid}/assessment`).catch(()=>null):null;
+  // A second awaited read can finish after the operator switches candidate/project.
+  // Never paint an old candidate over the currently selected workspace.
+  if(state.page!=='projects'||state.projectId!==requestedProjectId||state.candidateId!==cid)return;
   const latest=offers.offers?.[0],section=state.candidateSection||'evidence';
   const evidenceBody=`${w?candidateWorkspaceHtml(w,assessment):'<div class="empty"><strong>尚无当前材料</strong>先上传简历、扫描件或录音。支持 PDF/DOCX/XLSX/TXT/图片/OCR/音频/ASR。</div>'}<div class="divider"></div><div class="two"><div class="field"><label>粘贴文本材料</label><textarea id="paste-material" class="textarea" placeholder="简历文本、电话记录、补充材料" oninput="cacheMaterialDraft('${cid}',this.value)">${esc(materialDrafts.get(cid)||'')}</textarea><button class="btn" onclick="pasteMaterial('${cid}')">保存并发布材料版本</button></div><div class="field"><label>上传文件 / OCR / ASR</label><input id="candidate-file" class="input" type="file" accept=".pdf,.docx,.xlsx,.txt,.md,.csv,.png,.jpg,.jpeg,.mp3,.wav,.m4a,.mp4,.webm"><button class="btn primary" onclick="uploadCandidateFile('${cid}')">上传并处理</button><small class="subtle">图片和扫描 PDF 走 OCR；音频/视频走 ASR。Provider 未配置时原文件仍会保存。</small></div></div>`;
   const processBody=`<div class="candidate-process-grid"><section class="panel"><div class="panel-head"><h3>联系方式与跟进</h3><div class="actions"><button class="btn small" onclick="openContact('${cid}')">编辑联系方式</button><button class="btn small primary" onclick="openActionPlan('${cid}')">编辑下一步</button></div></div><div class="panel-body"><div class="quick-list"><div class="quick-item"><span>电话</span><strong>${esc(contact.phone||'未录入')}</strong></div><div class="quick-item"><span>邮箱</span><strong>${esc(contact.email||'未录入')}</strong></div><div class="quick-item"><span>人工确认</span><strong>${contact.user_confirmed?'已确认':'待确认'}</strong></div><div class="quick-item"><span>联系优先级 / 负责人</span><strong>${esc(actionPlan?.priority||'normal')} · ${esc(actionPlan?.owner||'未指定')}</strong></div><div class="quick-item"><span>联系状态</span><strong>${esc(actionPlan?.contact_status||'to_contact')}</strong></div><div class="quick-item"><span>下次联系</span><strong>${esc(actionPlan?.next_contact_at||'未安排')}</strong></div></div><p class="subtle" style="margin-bottom:0">${esc(actionPlan?.reason||'尚未填写下一步说明')}</p><div class="actions" style="margin-top:12px"><button class="btn" onclick="openPhoneScript('${cid}')">电话脚本 / 核实思路</button><button class="btn" onclick="openCandidateProjectFlow()">项目级招聘流程</button></div></div></section><section class="panel"><div class="panel-head"><h3>Pipeline 历史</h3><span class="status ${statusClass(pipe.current_stage)}">${stageLabel(pipe.current_stage)}</span></div><div class="panel-body">${pipe.transitions.length?`<div class="timeline">${pipe.transitions.slice().reverse().map(x=>`<div class="timeline-item"><strong>${stageLabel(x.from_stage)} → ${stageLabel(x.to_stage)}</strong><small>${esc(x.actor)} · ${new Date(x.created_at).toLocaleString()}</small><div class="subtle">${esc(x.reason||'')}</div></div>`).join('')}</div>`:'<div class="empty">尚无阶段变更</div>'}</div></section></div><div class="two">${candidateEventsHtml(cid,events)}${candidateReevaluationHtml(cid,reevaluations)}</div>`;
   const offerBody=`<section class="panel"><div class="panel-head"><div><h3>Offer 管理</h3><span class="subtle">Offer 状态与候选人 Pipeline 分开记录；接受 Offer 不会自动改写录用决定。</span></div><button class="btn primary" onclick="openOffer('${cid}')" ${['interview','offer'].includes(pipe.current_stage)?'':'disabled title="候选人需进入面试或 Offer 阶段"'}>＋ 创建 Offer</button></div><div class="panel-body">${offers.offers?.length?`<div class="quick-list">${offers.offers.map(x=>`<div class="quick-item"><div><div class="quick-title">${esc(x.title)} · ${esc(offerLabels[x.status]||x.status)}</div><div class="quick-note">目标入职：${esc(x.target_start_date||'待定')} · ${esc(x.compensation_note||'暂无薪酬说明')}</div></div><button class="btn small" onclick="openOfferStatus('${x.offer_id}','${x.status}','${cid}')" ${offerNextStatuses[x.status]?.length?'':'disabled title="Offer 已处于终态"'}>更新状态</button></div>`).join('')}</div>`:'<div class="empty"><strong>尚无 Offer</strong>候选人进入面试或 Offer 阶段后，可在这里创建并跟踪草案、批准、发送和接受状态。</div>'}</div></section>`;
   const sectionBody=section==='process'?processBody:section==='offer'?offerBody:`<section class="panel"><div class="panel-head"><div><h3>证据与判断</h3><span class="subtle">材料、Claim、评价标准、人工核实与最终人工决定集中在同一工作面。</span></div>${w?`<button class="btn primary" onclick="extractAllClaims('${cid}')">AI 提取当前材料事实</button>`:''}</div><div class="panel-body">${evidenceBody}</div></section>`;
-  $('#content').innerHTML=`<div class="candidate-workspace-page"><div class="candidate-workspace-breadcrumb"><button class="btn small" onclick="closeCandidateWorkspace()">← 返回项目工作区</button><span class="subtle">${esc(p.title||'招聘项目')} / 候选人</span></div><div class="candidate-workspace-head"><div><div class="pill-row"><span class="status ${statusClass(pipe.current_stage)}">${stageLabel(pipe.current_stage)}</span>${w?.readiness_label?`<span class="status info">${esc(w.readiness_label)}</span>`:''}</div><h1>${esc(contact.display_name)}</h1><div class="subtle">${esc(contact.phone||'未录电话')} · ${esc(contact.email||'未录邮箱')} · ${contact.user_confirmed?'联系方式已人工确认':'联系方式待人工确认'}</div></div><div class="actions"><button class="btn" onclick="openCandidateBrief('${cid}')">候选人简报</button><button class="btn" onclick="openContact('${cid}')">联系方式</button><button class="btn" onclick="openActionPlan('${cid}')">行动计划</button><button class="btn primary" onclick="openStage('${cid}','${pipe.current_stage}')">推进阶段</button></div></div><div class="candidate-summary-strip"><div><small>当前阶段</small><strong>${stageLabel(pipe.current_stage)}</strong></div><div><small>决策状态</small><strong>${esc(w?.readiness_label||'待材料/标准')}</strong></div><div><small>当前决定</small><strong>${esc(w?.decision_label||'未决定')}</strong></div><div><small>Offer</small><strong>${latest?esc(offerLabels[latest.status]||latest.status):'尚无 Offer'}</strong></div><div><small>下次联系</small><strong>${esc(actionPlan?.next_contact_at||'未安排')}</strong></div></div>${(()=>{const na=workspaceNextAction(w,events,offers);const steps=[['evidence','资料','材料、Claim 与核实',!!w],['process','面试','安排、记录与 Scorecard',(events.events||[]).length>0],['offer','决定','人工决定与 Offer',!!(offers.offers||[]).length||!!w?.decision_label]];return `<div class="next-action"><div><small>当前要做</small><strong>${esc(na.label)}</strong>${na.hint?`<span class="subtle"> · ${esc(na.hint)}</span>`:''}</div><div class="actions">${na.action?`<button class="btn primary" onclick="${na.action}">${esc(na.label)}</button>`:''}<button class="btn" onclick="setCandidateSection('${na.section}')">打开面板</button></div></div><div class="candidate-steps">${steps.map(([k,t,d,done],i)=>`<button class="candidate-step ${section===k?'active':''} ${done&&section!==k?'done':''}" onclick="setCandidateSection('${k}')"><span>${i+1}</span><div><strong>${t}</strong><small>${d}</small></div></button>`).join('')}</div>`})()}<div class="candidate-workspace-content">${sectionBody}</div></div>`}
+  $('#content').innerHTML=`<div class="candidate-workspace-page"><div class="candidate-workspace-breadcrumb"><span class="subtle">${esc(p.title||'招聘项目')} / 候选人</span></div><div class="candidate-workspace-head"><div><div class="pill-row"><span class="status ${statusClass(pipe.current_stage)}">${stageLabel(pipe.current_stage)}</span>${w?.readiness_label?`<span class="status info">${esc(w.readiness_label)}</span>`:''}</div><h1>${esc(contact.display_name)}</h1><div class="subtle">${esc(contact.phone||'未录电话')} · ${esc(contact.email||'未录邮箱')} · ${contact.user_confirmed?'联系方式已人工确认':'联系方式待人工确认'}</div></div><div class="actions"><button class="btn" onclick="openCandidateBrief('${cid}')">候选人简报</button><button class="btn" onclick="openContact('${cid}')">联系方式</button><button class="btn" onclick="openActionPlan('${cid}')">行动计划</button><button class="btn primary" onclick="openStage('${cid}','${pipe.current_stage}')">推进阶段</button></div></div><div class="candidate-summary-strip"><div><small>当前阶段</small><strong>${stageLabel(pipe.current_stage)}</strong></div><div><small>决策状态</small><strong>${esc(w?.readiness_label||'待材料/标准')}</strong></div><div><small>当前决定</small><strong>${esc(w?.decision_label||'未决定')}</strong></div><div><small>Offer</small><strong>${latest?esc(offerLabels[latest.status]||latest.status):'尚无 Offer'}</strong></div><div><small>下次联系</small><strong>${esc(actionPlan?.next_contact_at||'未安排')}</strong></div></div>${(()=>{const na=workspaceNextAction(w,events,offers);const steps=[['evidence','资料','材料、Claim 与核实',!!w],['process','面试','安排、记录与 Scorecard',(events.events||[]).length>0],['offer','决定','人工决定与 Offer',!!(offers.offers||[]).length||!!w?.decision_label]];return `<div class="next-action"><div><small>当前要做</small><strong>${esc(na.label)}</strong>${na.hint?`<span class="subtle"> · ${esc(na.hint)}</span>`:''}</div><div class="actions">${na.action?`<button class="btn primary" onclick="${na.action}">${esc(na.label)}</button>`:''}<button class="btn" onclick="setCandidateSection('${na.section}')">打开面板</button></div></div><div class="candidate-steps">${steps.map(([k,t,d,done],i)=>`<button class="candidate-step ${section===k?'active':''} ${done&&section!==k?'done':''}" onclick="setCandidateSection('${k}')"><span>${i+1}</span><div><strong>${t}</strong><small>${d}</small></div></button>`).join('')}</div>`})()}<div class="candidate-workspace-content">${sectionBody}</div></div>`}
 
 window.openContact=async cid=>{try{const c=await api(`/api/v1/candidates/${cid}/contact`);modal('候选人联系方式',`<div class="form-grid"><div class="field"><label>姓名</label><input id="ct-name" class="input" value="${esc(c.display_name)}"></div><div class="field"><label>电话</label><input id="ct-phone" class="input" value="${esc(c.phone)}"></div><div class="field full"><label>邮箱</label><input id="ct-email" class="input" value="${esc(c.email)}"></div><label class="field full"><span>人工确认</span><span><input id="ct-confirm" type="checkbox" ${c.user_confirmed?'checked':''}> 我已人工核对以上联系方式</span></label></div>`,`<button class="btn" onclick="closeModal()">取消</button><button class="btn primary" onclick="saveContact('${cid}')">保存</button>`)}catch(e){toast(e.message,true)}};window.saveContact=async cid=>{try{await api(`/api/v1/candidates/${cid}/contact`,{method:'PATCH',body:JSON.stringify({display_name:$('#ct-name').value,phone:$('#ct-phone').value,email:$('#ct-email').value,user_confirmed:$('#ct-confirm').checked,actor:'human'})});toast('联系方式已保存');closeModal();await candidateDrawer(cid)}catch(e){toast(e.message,true)}};
 window.openStage=(cid,current)=>modal('候选人阶段',`<div class="field"><label>当前阶段</label><div class="status ${statusClass(current)}">${stageLabel(current)}</div></div><div class="field" style="margin-top:10px"><label>推进到</label><select id="stage-next" class="select">${Object.entries(stageLabels).map(([v,l])=>`<option value="${v}" ${v===current?'selected':''}>${l}</option>`).join('')}</select></div><div class="field" style="margin-top:10px"><label>人工理由</label><textarea id="stage-reason" class="textarea"></textarea></div><p class="subtle">阶段推进属于人工业务动作。AI 不能自动改变 Pipeline。</p>`,`<button class="btn" onclick="closeModal()">取消</button><button class="btn primary" onclick="saveStage('${cid}')">确认推进</button>`);window.saveStage=async cid=>{try{await api(`/api/v1/candidates/${cid}/stage`,{method:'POST',body:JSON.stringify({stage:$('#stage-next').value,reason:$('#stage-reason').value||'人工推进',actor:'human'})});toast('候选人阶段已更新');closeModal();await projectWorkspace()}catch(e){toast(e.message,true)}};
@@ -203,10 +340,23 @@ window.saveDecision=async cid=>{try{await api(`/api/v1/candidates/${cid}/decisio
 async function flowTab(el,p){let candidates=[];try{candidates=(await api(`/api/v1/projects/${state.projectId}/candidate-search?q=${encodeURIComponent(state.flowQuery)}&limit=20`)).candidates||[]}catch{};let cid=state.flowCandidateId;if(cid&&!candidates.some(x=>x.candidate_id===cid)){try{const x=await api(`/api/v1/candidates/${cid}/summary`);candidates.unshift(x)}catch{cid=null}}if(!cid)cid=candidates[0]?.candidate_id;if(cid)state.flowCandidateId=cid;if(!cid){el.innerHTML=`<div class="searchbar"><input id="flow-q" class="input" placeholder="搜索候选人"><button class="btn" onclick="flowSearchCandidates()">搜索</button></div><div class="empty"><strong>暂无匹配候选人</strong>通过姓名搜索候选人，而不是固定加载前 100/200 人。</div>`;return}const [ev,re,pipe]=await Promise.all([api(`/api/v1/candidates/${cid}/events`),api(`/api/v1/candidates/${cid}/reevaluations`),api(`/api/v1/candidates/${cid}/pipeline`)]);el.innerHTML=`<div class="panel-head" style="padding:0 0 12px;border:0"><div><h3>招聘流程 · ${stageLabel(pipe.current_stage)}</h3><div class="searchbar"><input id="flow-q" class="input" value="${esc(state.flowQuery)}" placeholder="搜索候选人"><button class="btn small" onclick="flowSearchCandidates()">搜索</button><select class="select" onchange="setFlowCandidate(this.value)">${candidates.map(x=>`<option value="${x.candidate_id}" ${x.candidate_id===cid?'selected':''}>${esc(x.display_name)} · ${stageLabel(x.pipeline_stage)}</option>`).join('')}</select></div></div><div class="actions"><button class="btn" onclick="openContactWorkbench()">联系工作台</button><button class="btn" onclick="openPhoneScript('${cid}')">电话脚本</button><button class="btn" onclick="openEvent('${cid}','phone_screen')">＋ 电话筛选</button><button class="btn primary" onclick="openEvent('${cid}','interview')">＋ 面试排期</button><button class="btn" onclick="openReeval('${cid}')">＋ 复评草案</button></div></div><div class="two"><section><h3>面试 / 电话排期</h3>${ev.events.length?`<div class="timeline">${ev.events.map(x=>`<div class="timeline-item"><strong>${esc(x.title||x.event_type)} <span class="status ${statusClass(x.event_state)}">${esc(x.event_state)}</span></strong><small>${x.scheduled_at?new Date(x.scheduled_at).toLocaleString():new Date(x.created_at).toLocaleString()} · ${x.duration_minutes||0} 分钟 · ${esc(x.interviewer||'未指定')}</small><div>${esc(x.notes)}</div><div class="subtle">地点：${esc(x.location||'—')} · outcome：${esc(x.outcome||'—')}</div>${x.event_type==='interview'?`<div class="actions" style="margin-top:6px"><button class="btn small" onclick="openScorecards('${cid}','${x.event_id}')">独立 Scorecard</button></div>`:''}${x.editable_evidence_source?`<div class="actions" style="margin-top:6px"><button class="btn small" onclick="correctEvent('${cid}','${x.event_id}')">更正证据记录</button></div>`:''}${x.event_state==='scheduled'?`<div class="actions" style="margin-top:6px"><button class="btn small primary" onclick="completeEvent('${cid}','${x.event_id}')">完成并提交结构化反馈</button><button class="btn small" onclick="cancelEvent('${x.event_id}')">取消</button></div>`:''}</div>`).join('')}</div>`:'<div class="empty">暂无电话/面试记录</div>'}</section><section><h3>复评草案</h3>${re.drafts.length?re.drafts.map(x=>`<div class="quick-item"><div><div class="quick-title">${esc(x.summary||'复评草案')}</div><div class="quick-note">${esc(x.state)} · ${new Date(x.created_at).toLocaleString()}</div></div>${x.state==='draft'?`<button class="btn small" onclick="applyReeval('${cid}','${x.draft_id}')">查看/应用差异</button>`:''}</div>`).join(''):'<div class="empty">暂无复评草案</div>'}</section></div>`}
 window.flowSearchCandidates=()=>{state.flowQuery=$('#flow-q')?.value||'';state.flowCandidateId=null;projectWorkspace()};
 window.openEvent=async(cid,type)=>{
+  // An in-flight Published-protocol GET must not reopen an older candidate's
+  // form, or overwrite a newer dialog, after HR changes the workspace.
+  const requestedProjectId=state.projectId,requestedCandidateId=state.candidateId;
+  const requestedFlowCandidateId=state.flowCandidateId;
+  const requestedModalGeneration=state.modalGeneration||0;
+  const stillCurrent=()=>state.page==='projects'&&state.projectId===requestedProjectId
+    &&(state.modalGeneration||0)===requestedModalGeneration
+    &&((requestedCandidateId===cid&&state.candidateId===cid)
+       ||(!requestedCandidateId&&!state.candidateId&&state.projectTab==='candidates'
+          &&state.candidateView==='flow'&&requestedFlowCandidateId===cid
+          &&state.flowCandidateId===cid));
+  if(!stillCurrent())return;
   let ctx=null,error='';
   try{ctx=await interviewDraftContext(cid,type)}
   catch(e){if(type==='phone_screen'){ctx={cid,type,structured:false,rows:[],keys:[],revisionId:null,projectId:null,revision:null}}
            else{error='无法读取已发布的岗位标准（'+((e&&e.message)||'网络或服务异常')+'），已阻止创建结构化面试'}}
+  if(!stillCurrent())return;
   if(error){state.eventDraft=null;blockedNotice('新增结构化面试',error,'没有已发布标准时不会创建结构化面试，也不会写入任何记录。请先到「建岗与标准」保存并发布面试核实项。');return}
   state.eventDraft={cid,type,projectId:ctx.projectId,revisionId:ctx.revisionId,revision:ctx.revision,keys:[...ctx.keys],structured:ctx.structured,snapshot:ctx.rows.map(c=>({criterion_key:c.criterion_key,name:c.name||'',definition:c.definition||''}))};
   const outline=ctx.structured
@@ -216,60 +366,109 @@ window.openEvent=async(cid,type)=>{
 function parseInterviewQuestions(v){return String(v||'').split(/\n+/).map(x=>x.trim()).filter(Boolean).map(line=>{const a=line.split('|').map(x=>x.trim());return {criterion_key:a[0]||'',question:a[1]||a[0]||'',purpose:a[2]||''}})}
 window.saveEvent=async(cid,type)=>{
   const draft=state.eventDraft;
-  if(!draft||draft.cid!==cid||draft.type!==type){toast('面试上下文已失效，请关闭窗口后重新打开',true);return}
+  // Pin the visible form and workspace across asynchronous Published GET and
+  // event POST. Otherwise A's pending save can read B's later unsaved inputs.
+  const formModal=$('#modal-root .modal'),requestedProjectId=state.projectId;
+  const requestedCandidateId=state.candidateId,requestedFlowCandidateId=state.flowCandidateId;
+  const requestedModalGeneration=state.modalGeneration||0;
+  const stillCurrent=()=>state.page==='projects'&&state.projectId===requestedProjectId
+    &&state.candidateId===requestedCandidateId
+    &&state.flowCandidateId===requestedFlowCandidateId
+    &&(state.modalGeneration||0)===requestedModalGeneration
+    &&$('#modal-root .modal')===formModal&&state.eventDraft===draft;
+  if(!draft||draft.cid!==cid||draft.type!==type||!formModal||!stillCurrent()){
+    toast('面试上下文已失效，请关闭窗口后重新打开',true);return
+  }
   try{
     let questions=[];
     if(draft.structured){
       const pid=await candidateProjectId(cid);
+      if(!stillCurrent())return;
       if(pid!==draft.projectId)throw uiError('候选人所属项目已变化，已阻止保存');
       const fresh=await loadPublishedProtocol(draft.projectId);
+      if(!stillCurrent())return;
       if(fresh.revisionId!==draft.revisionId)throw uiError('岗位标准已更新为新版本，请关闭本窗口、重新打开面试提纲后再提交');
       const allowed=new Set(fresh.criteria.map(c=>c.criterion_key));
       questions=collectInterviewQuestions();
       if(!questions.length)throw uiError('请至少保留一条面试问题；如果只是电话记录，请改用「电话筛选」');
       if(questions.some(q=>!q.criterion_key||!allowed.has(q.criterion_key)))throw uiError('面试问题与已发布标准不一致，请重新打开面试提纲');
     }
+    if(!stillCurrent())return;
     const body={event_type:type,title:$('#e-title').value,notes:$('#e-notes').value,
       scheduled_at:$('#e-time').value?new Date($('#e-time').value).toISOString():'',
       duration_minutes:Number($('#e-duration').value||0),interviewer:$('#e-interviewer').value,
       location:$('#e-location').value,event_state:$('#e-state').value};
     if(questions.length)body.metadata={questions,protocol_revision_id:draft.revisionId,criteria_snapshot:draft.snapshot};
     await api(`/api/v1/candidates/${cid}/events`,{method:'POST',body:JSON.stringify(body)});
+    // A successful earlier POST must not close B's newer unsaved dialog.
+    if(!stillCurrent()){toast('原面试已保存，当前操作窗口保持不变');return}
     state.eventDraft=null;toast('流程记录已保存');closeModal();await candidateDrawer(cid)
-  }catch(e){toast(e.message||'保存失败',true)}
+  }catch(e){if(stillCurrent())toast(e.message||'保存失败',true)}
 };
+function bindCompletionModal(cid,eid,pid){
+  const form=$('#modal-root .modal');
+  if(form){form.dataset.completionCandidateId=cid;form.dataset.completionEventId=eid;form.dataset.completionProjectId=pid||''}
+}
 window.completeEvent=async(cid,eid)=>{
+  const pid=state.projectId,selected=state.candidateId,flow=state.flowCandidateId;
+  const generation=state.modalGeneration||0;
+  const stillCurrent=()=>state.page==='projects'&&state.projectId===pid
+    &&state.candidateId===selected&&state.flowCandidateId===flow
+    &&(state.modalGeneration||0)===generation;
   try{
     const ev=await eventContext(cid,eid);
+    if(!stillCurrent())return;
     const meta=ev.metadata||{};
     const keys=Array.from(new Set((meta.questions||[]).map(q=>q&&q.criterion_key).filter(Boolean)));
     if(!keys.length){
       if(ev.event_type==='interview')throw uiError('这条面试记录没有绑定岗位标准，无法提交结构化反馈；请重新安排面试并在提纲中选择标准');
       modal('完成电话筛选',`<div class="field"><label>Outcome</label><select id="event-outcome" class="select"><option value="proceed">建议推进</option><option value="hold">暂缓</option><option value="reject">建议拒绝</option><option value="completed">已完成</option></select></div><div class="field" style="margin-top:10px"><label>记录</label><textarea id="event-notes" class="textarea"></textarea></div><p class="subtle">电话筛选只记录结果与备注，不产生结构化反馈，也不会改写岗位标准。</p>`,`<button class="btn" onclick="closeModal()">取消</button><button class="btn primary" onclick="saveEventCompletion('${cid}','${eid}','plain')">完成</button>`);
+      bindCompletionModal(cid,eid,pid);
       return;
     }
     const ctx=await eventWriteContext(cid,eid,ev);
-    modal('完成面试 / 电话筛选',`<div class="field"><label>Outcome</label><select id="event-outcome" class="select"><option value="proceed">建议推进</option><option value="hold">暂缓</option><option value="reject">建议拒绝</option><option value="completed">已完成</option></select></div><div class="field" style="margin-top:10px"><label>逐标准反馈（按该面试记录的标准）</label><div id="ev-criteria">${criterionFeedbackRows(ctx.keys,ctx.names,ctx.definitions)}</div></div><div class="field" style="margin-top:10px"><label>总体建议</label><input id="event-overall" class="input" placeholder="advance / hold / reject"></div><div class="field" style="margin-top:10px"><label>记录</label><textarea id="event-notes" class="textarea"></textarea></div>`,`<button class="btn" onclick="closeModal()">取消</button><button class="btn primary" onclick="saveEventCompletion('${cid}','${eid}')">完成</button>`)
-  }catch(e){blockedNotice('完成面试',e.message||'无法读取该面试记录','未写入任何数据。')}
+    if(!stillCurrent())return;
+    modal('完成面试 / 电话筛选',`<div class="field"><label>Outcome</label><select id="event-outcome" class="select"><option value="proceed">建议推进</option><option value="hold">暂缓</option><option value="reject">建议拒绝</option><option value="completed">已完成</option></select></div><div class="field" style="margin-top:10px"><label>逐标准反馈（按该面试记录的标准）</label><div id="ev-criteria">${criterionFeedbackRows(ctx.keys,ctx.names,ctx.definitions)}</div></div><div class="field" style="margin-top:10px"><label>总体建议</label><input id="event-overall" class="input" placeholder="advance / hold / reject"></div><div class="field" style="margin-top:10px"><label>记录</label><textarea id="event-notes" class="textarea"></textarea></div>`,`<button class="btn" onclick="closeModal()">取消</button><button class="btn primary" onclick="saveEventCompletion('${cid}','${eid}')">完成</button>`);
+    bindCompletionModal(cid,eid,pid);
+  }catch(e){if(stillCurrent())blockedNotice('完成面试',e.message||'无法读取该面试记录','未写入任何数据。')}
 };
 
 function parseInterviewFeedback(v){return String(v||'').split(/\n+/).map(x=>x.trim()).filter(Boolean).map(line=>{const a=line.split('|').map(x=>x.trim());return {criterion_key:a[0]||'',rating:a[1]||'unknown',observation:a[2]||'',supporting_evidence:a[3]||'',counter_evidence:a[4]||'',recommendation:a[5]||''}})}
 window.saveEventCompletion=async(cid,id,plain)=>{
+  const form=$('#modal-root .modal'),pid=state.projectId,selected=state.candidateId;
+  const flow=state.flowCandidateId,generation=state.modalGeneration||0;
+  const stillCurrent=()=>state.page==='projects'&&state.projectId===pid
+    &&state.candidateId===selected&&state.flowCandidateId===flow
+    &&(state.modalGeneration||0)===generation&&$('#modal-root .modal')===form
+    &&form?.dataset.completionCandidateId===cid
+    &&form?.dataset.completionEventId===id
+    &&form?.dataset.completionProjectId===(pid||'');
+  if(!stillCurrent()){toast('面试反馈上下文已失效，请重新打开原记录',true);return}
   try{
     if(plain==='plain'){
-      await api(`/api/v1/events/${id}`,{method:'PATCH',body:JSON.stringify({event_state:'completed',outcome:$('#event-outcome').value,notes:$('#event-notes').value})});
+      const body={event_state:'completed',outcome:form.querySelector('#event-outcome').value,
+        notes:form.querySelector('#event-notes').value};
+      await api(`/api/v1/events/${id}`,{method:'PATCH',body:JSON.stringify(body)});
+      if(!stillCurrent()){toast('原电话筛选已完成，当前窗口保持不变');return}
       toast('电话筛选已完成');closeModal();await candidateDrawer(cid);return;
     }
     const ctx=await eventWriteContext(cid,id);
+    if(!stillCurrent())return;
+    if(ctx.pid!==pid)throw uiError('面试记录与当前项目不一致，已阻止提交');
     const allowed=new Set(ctx.keys);
     const feedback=collectCriterionFeedback('#ev-criteria');
     if(!feedback.length)throw uiError('请至少填写一条标准反馈');
     if(feedback.some(f=>!f.criterion_key||!allowed.has(f.criterion_key)))throw uiError('反馈与面试原始标准不一致，已阻止提交');
-    const merged=Object.assign({},ctx.meta,{feedback,overall_recommendation:$('#event-overall').value});
-    const before=await api(`/api/v1/events/${id}`,{method:'PATCH',body:JSON.stringify({event_state:'completed',outcome:$('#event-outcome').value,notes:$('#event-notes').value,metadata:merged})});
-    toast(before.source_id?'已完成并发布结构化面试 Source':'面试已完成');closeModal();await candidateDrawer(cid)
-  }catch(e){toast(e.message||'提交失败',true)}
-};window.correctEvent=async(cid,id)=>{try{const data=await api(`/api/v1/candidates/${cid}/events`);const e=(data.events||[]).find(x=>x.event_id===id);if(!e||!e.editable_evidence_source){toast('此记录没有可更正的事件原生证据',true);return}window.correctionEventData=e;const fields=(e.metadata?.questions||[]).map((q,i)=>`<div class="field"><label>问题 ${i+1} · ${esc(q.question||'')}</label><textarea class="textarea" data-corr-answer="${i}">${esc(q.answer||'')}</textarea></div>`).join('');modal('更正已完成面试证据',`<p class="subtle">更正只修改记录备注及已有问题的回答。旧 Source 和材料版本保留历史；已有人工决定需重新核实。</p><div class="field"><label>更正记录备注</label><textarea class="textarea" id="corr-notes">${esc(e.notes||'')}</textarea></div>${fields}`,`<button class="btn" onclick="closeModal()">取消</button><button class="btn primary" onclick="saveEventCorrection('${cid}','${id}','${e.source_id}')">保存更正并发布新证据</button>`)}catch(e){toast(e.message,true)}};
+    const merged=Object.assign({},ctx.meta,{feedback,overall_recommendation:form.querySelector('#event-overall').value});
+    const body={event_state:'completed',outcome:form.querySelector('#event-outcome').value,
+      notes:form.querySelector('#event-notes').value,metadata:merged};
+    const before=await api(`/api/v1/events/${id}`,{method:'PATCH',body:JSON.stringify(body)});
+    if(!stillCurrent()){toast('原面试反馈已提交，当前窗口保持不变');return}
+    toast(before.source_id?'已完成并发布结构化面试 Source':'面试已完成');
+    closeModal();await candidateDrawer(cid)
+  }catch(e){if(stillCurrent())toast(e.message||'提交失败',true)}
+};
+window.correctEvent=async(cid,id)=>{try{const data=await api(`/api/v1/candidates/${cid}/events`);const e=(data.events||[]).find(x=>x.event_id===id);if(!e||!e.editable_evidence_source){toast('此记录没有可更正的事件原生证据',true);return}window.correctionEventData=e;const fields=(e.metadata?.questions||[]).map((q,i)=>`<div class="field"><label>问题 ${i+1} · ${esc(q.question||'')}</label><textarea class="textarea" data-corr-answer="${i}">${esc(q.answer||'')}</textarea></div>`).join('');modal('更正已完成面试证据',`<p class="subtle">更正只修改记录备注及已有问题的回答。旧 Source 和材料版本保留历史；已有人工决定需重新核实。</p><div class="field"><label>更正记录备注</label><textarea class="textarea" id="corr-notes">${esc(e.notes||'')}</textarea></div>${fields}`,`<button class="btn" onclick="closeModal()">取消</button><button class="btn primary" onclick="saveEventCorrection('${cid}','${id}','${e.source_id}')">保存更正并发布新证据</button>`)}catch(e){toast(e.message,true)}};
 window.saveEventCorrection=async(cid,id,previousSourceId)=>{try{const e=window.correctionEventData;if(!e||e.event_id!==id||e.source_id!==previousSourceId||!e.editable_evidence_source)throw Error('更正上下文已经失效');const metadata=e.metadata||{};const questions=(metadata.questions||[]).map((q,i)=>{const field=document.querySelector(`[data-corr-answer="${i}"]`);if(!field)throw Error('问题编辑器缺失');return{...q,answer:field.value}});const updated=await api(`/api/v1/events/${id}`,{method:'PATCH',body:JSON.stringify({notes:$('#corr-notes').value,metadata:{...metadata,questions}})});window.correctionEventData=null;toast(updated.source_id===previousSourceId?'本次内容没有实质变更':'已保存更正；原证据与旧决定保留历史');closeModal();await projectWorkspace()}catch(e){toast(e.message,true)}};
 window.cancelEvent=async id=>{if(!confirm('取消该排期？'))return;try{await api(`/api/v1/events/${id}`,{method:'PATCH',body:JSON.stringify({event_state:'cancelled'})});toast('排期已取消');await projectWorkspace()}catch(e){toast(e.message,true)}};
 const reevaluationFeature=createReevaluationFeature({api,$,esc,modal,toast,closeModal:()=>window.closeModal(),refresh:projectWorkspace});
@@ -332,12 +531,26 @@ function scorecardHistoryHtml(list,ev){
   return list.map(s=>`<div class="scorecard-history"><div class="scorecard-head"><strong>${esc(s.evaluator)}</strong><span class="status ${s.state==='submitted'?'good':''}">${esc(s.state)}</span>${s.recommendation?`<span class="subtle">总体建议：${esc(s.recommendation)}</span>`:''}</div>${(s.feedback||[]).length?`<div class="table-wrap"><table class="table compact"><thead><tr><th>标准</th><th>评价</th><th>行为观察</th><th>支持证据</th><th>反对证据</th><th>逐项建议</th></tr></thead><tbody>${s.feedback.map(f=>`<tr><td><strong>${esc(label(f.criterion_key))}</strong></td><td>${esc(ratings[f.rating]||f.rating||'—')}</td><td>${esc(f.observation||'—')}</td><td>${esc(f.supporting_evidence||'—')}</td><td>${esc(f.counter_evidence||'—')}</td><td>${esc(f.recommendation||'—')}</td></tr>`).join('')}</tbody></table></div>`:'<div class="subtle">该评分没有逐标准明细</div>'}</div>`).join('');
 }
 window.openScorecards=async(cid,eid)=>{
+  // Delayed Core reads must not reopen an old Scorecard over another candidate
+  // or overwrite a newer Scorecard request in the same workspace.
+  const requestedProjectId=state.projectId,requestedCandidateId=state.candidateId;
+  const requestedModalGeneration=state.modalGeneration||0;
+  const requestSeq=(state.scorecardOpenSeq||0)+1;
+  state.scorecardOpenSeq=requestSeq;
+  const stillCurrent=()=>state.page==='projects'&&state.projectId===requestedProjectId
+    &&state.candidateId===requestedCandidateId&&state.scorecardOpenSeq===requestSeq
+    &&(state.modalGeneration||0)===requestedModalGeneration;
   try{
     // The selected project is UI state, not proof of candidate ownership.
     // Verify it against Core before any candidate-scoped Scorecard GET.
     if(!cid||!state.projectId)throw uiError('缺少候选人或项目上下文，已阻止读取面评');
+    // A valid event belonging to the same project is not permission to display
+    // or submit its Scorecard while another candidate's drawer is selected.
+    if(requestedCandidateId&&requestedCandidateId!==cid)
+      throw uiError('当前工作区候选人与面评目标不一致，已阻止读取');
     const owner=await api(`/api/v1/candidates/${cid}/summary`);
-    if(!owner||!owner.project_id||owner.project_id!==state.projectId){
+    if(!stillCurrent())return;
+    if(!owner||!owner.project_id||owner.project_id!==requestedProjectId){
       if(!owner||!owner.project_id)throw uiError('无法确认候选人所属项目，已阻止读取面评');
       // Capture a return route, but never restore a mismatched candidate drawer.
       const origin={projectId:state.projectId,projectTab:state.projectTab,
@@ -387,34 +600,68 @@ window.openScorecards=async(cid,eid)=>{
     }
     let ev=null;
     try{ev=await eventContext(cid,eid)}
-    catch(e){blockedNotice('独立 Interview Scorecard',e.message||'无法读取该面试记录','未读取该面试的任何反馈，也未写入数据。');return}
-    const r=await api(`/api/v1/projects/${state.projectId}/candidates/${cid}/events/${eid}/scorecards`);
+    catch(e){if(!stillCurrent())return;blockedNotice('独立 Interview Scorecard',e.message||'无法读取该面试记录','未读取该面试的任何反馈，也未写入数据。');return}
+    if(!stillCurrent())return;
+    const r=await api(`/api/v1/projects/${requestedProjectId}/candidates/${cid}/events/${eid}/scorecards`);
+    if(!stillCurrent())return;
     const existing=scorecardHistoryHtml(r.scorecards,ev);
     /* Ownership is enough to READ history; only a new write needs the pinned
        revision. A changed Published revision makes the record read-only, not
        invisible. */
     let ctx=null,readonly='';
     try{ctx=await eventWriteContext(cid,eid,ev)}catch(e){readonly=e.message||'该记录当前不可编辑'}
+    if(!stillCurrent())return;
     if(readonly){
       modal('独立 Interview Scorecard',`${existing}<div class="notice" role="status" style="margin-top:12px"><strong>只读</strong><div class="subtle" style="margin-top:6px">${esc(readonly)}</div><div class="subtle" style="margin-top:6px">历史评分仍可查看；本次不会新增或修改任何记录。</div></div>`,`<button class="btn" onclick="closeModal()">关闭</button>`);
       return;
     }
     modal('独立 Interview Scorecard',`${existing}<div class="divider"></div><div class="form-grid"><div class="field"><label>评价者</label><input id="sc-evaluator" class="input"></div><div class="field"><label>总体建议</label><input id="sc-rec" class="input" placeholder="advance / hold / reject"></div></div><div id="sc-criteria" style="margin-top:12px">${criterionFeedbackRows(ctx.keys,ctx.names,ctx.definitions)}</div><p class="subtle">不同评价者意见独立保存；系统不会自动平均成总分。</p>`,`<button class="btn" onclick="closeModal()">关闭</button><button class="btn primary" onclick="saveScorecard('${cid}','${eid}')">提交并锁定</button>`)
-  }catch(e){blockedNotice('独立 Interview Scorecard',e.message||'无法读取该面试记录','请从正确项目的候选人工作台重新打开；本次未提交任何评分。')}
+    // Bind the visible form to its Core candidate/event/project identity.
+    // A stale callback must not submit observations to another interview.
+    const scorecardModal=$('#modal-root .modal');
+    if(scorecardModal){
+      scorecardModal.dataset.scorecardCandidateId=cid;
+      scorecardModal.dataset.scorecardEventId=eid;
+      scorecardModal.dataset.scorecardProjectId=requestedProjectId;
+      scorecardModal.dataset.scorecardWorkspaceCandidateId=requestedCandidateId||'';
+    }
+  }catch(e){if(!stillCurrent())return;blockedNotice('独立 Interview Scorecard',e.message||'无法读取该面试记录','请从正确项目的候选人工作台重新打开；本次未提交任何评分。')}
 };
 
 
 window.saveScorecard=async(cid,eid)=>{
   try{
-    const ctx=await eventWriteContext(cid,eid);
-    const allowed=new Set(ctx.keys);
-    const evaluator=($('#sc-evaluator').value||'').trim();
+    const formModal=$('#modal-root .modal'),projectId=state.projectId;
+    if(!formModal||state.page!=='projects'
+       ||formModal.dataset.scorecardCandidateId!==cid
+       ||formModal.dataset.scorecardEventId!==eid
+       ||formModal.dataset.scorecardProjectId!==projectId
+       ||formModal.dataset.scorecardWorkspaceCandidateId!==(state.candidateId||''))
+      throw uiError('面评窗口与目标候选人/事件不一致，已阻止提交');
+    // Snapshot the actual visible form BEFORE asynchronous Core reads.
+    const evaluator=(formModal.querySelector('#sc-evaluator')?.value||'').trim();
     if(!evaluator)throw uiError('请填写评价者');
     const feedback=collectCriterionFeedback('#sc-criteria');
+    const recommendation=formModal.querySelector('#sc-rec')?.value||'';
     if(!feedback.length)throw uiError('请至少填写一条标准评价');
-    if(feedback.some(f=>!f.criterion_key||!allowed.has(f.criterion_key)))throw uiError('评价与面试原始标准不一致，已阻止提交');
-    await api(`/api/v1/events/${eid}/scorecards`,{method:'POST',body:JSON.stringify({evaluator,feedback,recommendation:$('#sc-rec').value,submit:true})});
-    closeModal();toast('Scorecard 已独立提交并锁定')
+    const ctx=await eventWriteContext(cid,eid);
+    if($('#modal-root .modal')!==formModal||state.page!=='projects'
+       ||state.projectId!==projectId||ctx.pid!==projectId
+       ||formModal.dataset.scorecardWorkspaceCandidateId!==(state.candidateId||''))
+      throw uiError('面评窗口或项目已变化，请重新打开后提交');
+    const allowed=new Set(ctx.keys);
+    if(feedback.some(f=>!f.criterion_key||!allowed.has(f.criterion_key)))
+      throw uiError('评价与面试原始标准不一致，已阻止提交');
+    await api(`/api/v1/events/${eid}/scorecards`,{method:'POST',body:JSON.stringify({evaluator,feedback,recommendation,submit:true})});
+    // The POST can finish after the operator opens a different dialog. Keep
+    // that newer unsaved form intact; only close the submitted Scorecard itself.
+    if($('#modal-root .modal')===formModal&&state.page==='projects'
+       &&state.projectId===projectId
+       &&formModal.dataset.scorecardWorkspaceCandidateId===(state.candidateId||'')){
+      closeModal();toast('Scorecard 已独立提交并锁定');
+    }else{
+      toast('原面评已提交，当前操作窗口保持不变');
+    }
   }catch(e){toast(e.message||'提交失败',true)}
 };
 function candidateBriefHtml(r){const contact=r.contact||{},plan=r.action_plan||{},criteria=r.criteria||[],v=r.version_context||{};return `<div class="business-strip"><div><small>候选人</small><strong>${esc(r.display_name||'—')}</strong></div><div><small>当前阶段</small><strong>${esc(stageLabel(r.pipeline_stage))}</strong></div><div><small>联系方式</small><strong>${contact.user_confirmed?'已人工确认':'待确认'}</strong></div></div><div class="two"><section><h3>联系方式</h3><div class="quick-list"><div class="quick-item"><span>电话</span><strong>${esc(contact.phone||'未录入')}</strong></div><div class="quick-item"><span>邮箱</span><strong>${esc(contact.email||'未录入')}</strong></div></div></section><section><h3>当前行动计划</h3>${plan?`<div class="quick-list"><div class="quick-item"><span>优先级 / 负责人</span><strong>${esc(plan.priority||'normal')} · ${esc(plan.owner||'未指定')}</strong></div><div class="quick-item"><span>联系状态</span><strong>${esc(plan.contact_status||'to_contact')}</strong></div><div class="quick-item"><span>下次联系</span><strong>${esc(plan.next_contact_at||'未安排')}</strong></div></div><p class="subtle">${esc(plan.reason||'')}</p>`:'<div class="empty">暂无行动计划</div>'}</section></div><div class="divider"></div><h3>评价摘要</h3>${criteria.length?`<table class="table"><thead><tr><th>标准</th><th>判断</th><th>证据</th><th>理由 / 缺口</th></tr></thead><tbody>${criteria.map(x=>`<tr><td>${esc(x.criterion_key)}</td><td>${esc(x.status)}</td><td>${esc(x.evidence_level)}</td><td>${esc(x.reason||x.gap||'—')}</td></tr>`).join('')}</tbody></table>`:'<div class="empty">当前没有评价结果</div>'}<details style="margin-top:12px"><summary>审计上下文</summary><div class="codebox" style="margin-top:8px">${esc(JSON.stringify(v,null,2))}</div></details>`}

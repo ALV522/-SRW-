@@ -269,5 +269,57 @@ class IANavigationBrowserTests(unittest.TestCase):
         self.assertNotIn("加载失败", self.tab_body())
 
 
+    def test_07_other_sections_have_no_stale_project_back_action(self):
+        """#235: leaving a project must not show a misleading project return.
+
+        The main branch has no topbar back button; a new topbar must not
+        expose the stale projectId when navigating to other top-level pages.
+        This is a UI-only check, with no business mutation or auto-selection.
+        """
+        page = self.page
+        for destination, title in (("dashboard", "今日待办"), ("settings", "设置")):
+            with self.subTest(destination=destination):
+                self.open_project()
+                # Exercise the visible sidebar, not a direct window.go call.
+                page.locator(".nav-item").filter(has_text=title).click()
+                expect(page.locator("#top-title")).to_have_text(title)
+                expect(page.locator("#content h1")).to_have_text(title)
+                expect(page.locator("#content .project-banner")).to_have_count(0)
+                self.assertEqual(
+                    page.locator("#top-back:visible").count(), 0,
+                    f"{destination}: back must not point to a previous project",
+                )
+                self.assertEqual(
+                    page.locator("#top-crumb .crumb-link").count(), 0,
+                    f"{destination}: stale project/candidate breadcrumb",
+                )
+                self.assertEqual(page.locator(".nav-item.active").count(), 1)
+                self.assertIn(title, page.locator(".nav-item.active").inner_text())
+
+
+    def test_08_topbar_workbench_breadcrumb_does_not_retain_project(self):
+        """#235: exercise the actual breadcrumb link, not only the sidebar.
+
+        Pre-#235 main has no breadcrumb, so its existing navigation is still
+        checked by test_07. On the UI PR, the breadcrumb must clear context.
+        """
+        page = self.page
+        self.open_project()
+        workbench = page.locator("#top-crumb .crumb-link").filter(has_text="工作台")
+        if workbench.count() == 0:
+            self.assertEqual(page.locator("#top-back").count(), 0)
+            return
+        expect(workbench).to_be_visible()
+        workbench.click()
+        expect(page.locator("#top-title")).to_have_text("今日待办")
+        expect(page.locator("#content h1")).to_have_text("今日待办")
+        expect(page.locator("#content .project-banner")).to_have_count(0)
+        expect(page.locator("#top-back:visible")).to_have_count(0)
+        expect(page.locator("#top-crumb .crumb-link")).to_have_count(0)
+        self.assertEqual(page.locator(".nav-item.active").count(), 1)
+        self.assertIn("今日待办", page.locator(".nav-item.active").inner_text())
+
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)

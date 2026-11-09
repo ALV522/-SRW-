@@ -93,7 +93,9 @@ def reporting_routes(*, factory, evaluation_policy_revision: str) -> list[Route]
             event_rows=s.execute(
                 select(RecruitmentEvent,Candidate.display_name)
                 .join(Candidate,Candidate.id==RecruitmentEvent.candidate_id)
-                .where(Candidate.project_id==pid,RecruitmentEvent.event_state=="scheduled",RecruitmentEvent.scheduled_at.is_not(None),RecruitmentEvent.scheduled_at>=now)
+                .where(Candidate.project_id==pid,Candidate.archived.is_(False),
+                       RecruitmentEvent.event_state=="scheduled",
+                       RecruitmentEvent.scheduled_at.is_not(None),RecruitmentEvent.scheduled_at>=now)
                 .order_by(RecruitmentEvent.scheduled_at,RecruitmentEvent.id).limit(20)
             ).all()
             scheduled=[{
@@ -132,18 +134,64 @@ def reporting_routes(*, factory, evaluation_policy_revision: str) -> list[Route]
             offer_followups=sum(int(offers.get(status,0) or 0) for status in ("draft","approved","sent"))
             stages=base.get("stages") or {}
             interview_flow=int(stages.get("shortlisted",0) or 0)+int(stages.get("phone_screen",0) or 0)+int(stages.get("interview",0) or 0)
-            if not project or not project.current_protocol_revision_id:
+            if project and project.status=="archived":
+                next_action={"key":"project_archived","label":"项目已归档","tab":"overview","disabled":True,
+                             "reason":"此项目已归档；历史记录仍可查看，但不能从这里继续推进招聘。"}
+            elif not project or not project.current_protocol_revision_id:
                 next_action={"key":"publish_criteria","label":"完善并发布招聘标准","tab":"criteria","reason":"当前项目还没有已发布的招聘标准；先固定岗位要求和评价口径。"}
             elif int(active_candidates)==0:
                 next_action={"key":"intake_candidates","label":"导入首批候选人","tab":"candidates","reason":"招聘标准已经发布，但项目还没有在库候选人。"}
             elif int(candidates_without_material)>0:
                 next_action={"key":"complete_materials","label":"补齐候选人材料","tab":"candidates","reason":f"{int(candidates_without_material)} 位候选人尚无当前材料版本。"}
+                missing = s.execute(
+                    select(Candidate.id, Candidate.display_name)
+                    .where(Candidate.project_id==pid,Candidate.archived.is_(False),
+                           Candidate.current_material_revision_id.is_(None))
+                    .order_by(Candidate.id).limit(1)
+                ).first()
+                if missing:
+                    next_action["target"]={"candidate_id":missing.id,"candidate_name":missing.display_name}
             elif decision_work>0 or int(unreviewed_claims)>0:
                 next_action={"key":"review_evidence","label":"处理证据与判断","tab":"cockpit","reason":f"{decision_work} 位候选人存在当前决策待办，{int(unreviewed_claims)} 条事实等待人工确认。"}
+                if project_workbench:
+                    item=project_workbench[0]
+                    next_action["target"]={"candidate_id":item.candidate_id,"candidate_name":item.candidate_name}
+                elif int(unreviewed_claims)>0:
+                    # Claim review can be pending without any current decision WorkItem.
+                    # The primary action must still open the exact candidate, not an
+                    # empty decision cockpit. Archived candidates are never targets.
+                    claim_target=s.execute(
+                        select(Claim.candidate_id,Candidate.display_name)
+                        .join(Candidate,Candidate.id==Claim.candidate_id)
+                        .where(Candidate.project_id==pid,Candidate.archived.is_(False),
+                               Claim.confirmation_state=="unreviewed")
+                        .order_by(Claim.created_at,Claim.id).limit(1)
+                    ).first()
+                    if claim_target:
+                        next_action["target"]={"candidate_id":claim_target.candidate_id,
+                                               "candidate_name":claim_target.display_name}
             elif int(pending_feedback)>0:
                 next_action={"key":"submit_feedback","label":"提交面试反馈","tab":"flow","reason":f"{int(pending_feedback)} 场已完成面试仍缺少已提交 Scorecard。"}
+                pending = s.execute(
+                    select(RecruitmentEvent.id,RecruitmentEvent.candidate_id,Candidate.display_name)
+                    .join(Candidate,Candidate.id==RecruitmentEvent.candidate_id)
+                    .where(Candidate.project_id==pid,Candidate.archived.is_(False),
+                           RecruitmentEvent.event_state=="completed",
+                           RecruitmentEvent.event_type=="interview",
+                           ~RecruitmentEvent.id.in_(select(InterviewScorecardSubmission.event_id)
+                               .where(InterviewScorecardSubmission.state=="submitted")))
+                    .order_by(RecruitmentEvent.id).limit(1)
+                ).first()
+                if pending:
+                    next_action["target"]={"candidate_id":pending.candidate_id,
+                                           "candidate_name":pending.display_name,"event_id":pending.id}
             elif interview_flow>0 or len(scheduled)>0:
                 next_action={"key":"advance_interviews","label":"推进电话筛选与面试","tab":"flow","reason":f"{interview_flow} 位候选人处于短名单/电话筛选/面试阶段；未来已排期 {len(scheduled)} 场。"}
+                if scheduled:
+                    first=scheduled[0]
+                    next_action["target"]={"candidate_id":first["candidate_id"],
+                                           "candidate_name":first["candidate_name"],"event_id":first["event_id"],
+                                           "event_type":first["event_type"]}
             elif offer_followups>0:
                 next_action={"key":"follow_up_offers","label":"跟进 Offer","tab":"candidates","reason":f"{offer_followups} 份 Offer 仍处于草案、已批准或已发送状态。"}
             else:

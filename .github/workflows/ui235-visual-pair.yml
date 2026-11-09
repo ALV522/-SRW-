@@ -1,0 +1,141 @@
+name: SRW UI235 Same-Fixture Visual Pair
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - 'frontend/dist/**'
+      - 'backend/srw/api/routes/reporting.py'
+      - '.github/workflows/ui235-visual-pair.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  compare-ui:
+    name: synthetic-main-before-pr-after-ubuntu
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          path: candidate
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.base.sha }}
+          path: baseline
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: pip
+          cache-dependency-path: candidate/requirements-ci.txt
+      - name: Install pinned Core and Chromium dependencies
+        run: |
+          python -m pip install -r candidate/requirements-ci.txt
+          python -m pip install playwright==1.56.0
+          python -m playwright install --with-deps chromium
+      - name: Capture exact base and head with identical synthetic fixture specification
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import json
+          import sys
+          from pathlib import Path
+          sys.path.insert(0, str(Path('candidate/browser_acceptance').resolve()))
+          import test_ui_hierarchy as ui
+
+          evidence = Path('evidence').resolve()
+          summary = {}
+          for label, checkout in (('before', 'baseline'), ('after', 'candidate')):
+              ui.ROOT = Path(checkout).resolve()
+              ui.UiHierarchyTests.setUpClass()
+              case = ui.UiHierarchyTests('test_next_action_is_the_first_block_on_screen')
+              try:
+                  case.setUp()
+                  try:
+                      _, title = case._seed_project()
+                      summary[label] = {}
+                      for width, height in ui.VIEWPORTS:
+                          case.page.set_viewport_size({'width': width, 'height': height})
+                          # The dashboard changed after the initial project-only visual pair.
+                          # Capture both first views against each checkout's real Core.
+                          case.page.goto(case.base + '/v1', wait_until='domcontentloaded')
+                          ui.expect(case.page.locator('#content h1')).to_have_text('今日待办')
+                          out = evidence / label
+                          out.mkdir(parents=True, exist_ok=True)
+                          dash_stem = f'{label}-dashboard-{width}x{height}'
+                          case.page.screenshot(path=str(out / f'{dash_stem}-viewport.png'))
+                          case.page.screenshot(path=str(out / f'{dash_stem}-full.png'), full_page=True)
+                          dash = case.page.evaluate('''() => {
+                              const content = document.querySelector('#content');
+                              const queues = [...content.querySelectorAll(':scope > section.panel')];
+                              const kpi = content.querySelector(':scope > .grid.kpi');
+                              return {
+                                  viewport: [innerWidth, innerHeight],
+                                  queue_count: queues.length,
+                                  first_queue_title: queues[0]?.querySelector('h2')?.textContent?.trim() || null,
+                                  first_queue_top: queues[0]?.getBoundingClientRect().top ?? null,
+                                  kpi_top: kpi?.getBoundingClientRect().top ?? null,
+                                  queue_before_kpi: queues.length === 3 && !!kpi && queues.every(p =>
+                                      Boolean(p.compareDocumentPosition(kpi) & Node.DOCUMENT_POSITION_FOLLOWING)),
+                                  kpi_count: kpi?.querySelectorAll('.kpi-card').length ?? null,
+                                  document_scroll_height: document.documentElement.scrollHeight,
+                                  main_scroll_height: document.querySelector('.main')?.scrollHeight ?? null
+                              };
+                          }''')
+                          (out / f'{dash_stem}-metrics.json').write_text(
+                              json.dumps(dash, ensure_ascii=False, indent=2) + '\n', encoding='utf-8')
+                          summary[label][f'dashboard-{width}x{height}'] = dash
+                          case._open_project(title)
+                          out = evidence / label
+                          out.mkdir(parents=True, exist_ok=True)
+                          stem = f'{label}-{width}x{height}'
+                          case.page.screenshot(path=str(out / f'{stem}-viewport.png'))
+                          case.page.screenshot(path=str(out / f'{stem}-full.png'), full_page=True)
+                          metrics = case.page.evaluate('''() => {
+                              const card = document.querySelector('.next-action-card');
+                              const rect = card?.getBoundingClientRect();
+                              return {
+                                  viewport: [innerWidth, innerHeight],
+                                  next_action_top: rect ? rect.top : null,
+                                  document_scroll_height: document.documentElement.scrollHeight,
+                                  main_scroll_height: document.querySelector('.main')?.scrollHeight || null,
+                                  kpi_count: document.querySelectorAll('#project-tab-body .kpi-card').length,
+                                  nav_count: document.querySelectorAll('aside .nav-item').length,
+                                  visible_back_count: [...document.querySelectorAll('button')]
+                                      .filter(b => b.getClientRects().length && /返回/.test(b.textContent || '')).length,
+                                  primary_action: document.querySelector('#project-next-action')?.textContent?.trim() || null
+                              };
+                          }''')
+                          (out / f'{stem}-metrics.json').write_text(
+                              json.dumps(metrics, ensure_ascii=False, indent=2) + '\n', encoding='utf-8')
+                          summary[label][f'{width}x{height}'] = metrics
+                  finally:
+                      case.tearDown()
+              finally:
+                  ui.UiHierarchyTests.tearDownClass()
+          for width, height in ui.VIEWPORTS:
+              after = summary['after'][f'{width}x{height}']
+              if after['next_action_top'] is None or after['next_action_top'] >= height / 2:
+                  raise AssertionError(f'{width}x{height}: next action not in upper half')
+              if after['visible_back_count'] != 1:
+                  raise AssertionError(f'{width}x{height}: duplicate/missing back action')
+              dashboard = summary['after'][f'dashboard-{width}x{height}']
+              if not dashboard['queue_before_kpi'] or dashboard['kpi_count'] != 6:
+                  raise AssertionError(f'{width}x{height}: dashboard queues/KPIs regressed: {dashboard}')
+              if dashboard['first_queue_top'] is None or dashboard['first_queue_top'] >= height / 2:
+                  raise AssertionError(f'{width}x{height}: dashboard queue not in first view: {dashboard}')
+          (evidence / 'comparison.json').write_text(
+              json.dumps(summary, ensure_ascii=False, indent=2) + '\n', encoding='utf-8')
+          print(json.dumps(summary, ensure_ascii=False, indent=2))
+          PY
+          printf 'base=%s\nhead=%s\n' '${{ github.event.pull_request.base.sha }}' '${{ github.event.pull_request.head.sha }}' > evidence/exact-refs.txt
+      - name: Upload synthetic before/after screenshots and DOM metrics
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: srw-ui235-visual-pair-${{ github.event.pull_request.head.sha }}
+          path: evidence/
+          if-no-files-found: warn
