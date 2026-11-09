@@ -1,54 +1,70 @@
-# GitHub 分支盘点快照（2026-10-19）
+# GitHub 分支治理与清理快照
 
-GitHub API 返回 **36 条分支（含 `main`）**。创建本次文档工作分支前为 35 条；当前多出 `docs/repository-status-readme-20261019`。此文件是**时点快照**，各分支 HEAD 会随未来的提交发生变化。
+状态：ACTIVE · 2026-11-09  
+权威产品主线：`main`。本文件记录**治理方法和带日期快照**，不再维护一张会迅速过期的几百行分支表。
 
-分类：`dev/` 23，`fix/` 7，`docs/` 2，`explore/` 1，`integration/` 1，`repair/` 1，`main` 1。
+## 1. 当前事实
 
-| 分支 | 审计 Head（短 SHA） | 性质 |
-|---|---|---|
-| `main` | `c9d70cd48d03` | 当前唯一整合源码主线 |
-| `dev/c11-backup-integrity-restore` | `e669c5301bbd` | 历史业务/交付专项开发现场 |
-| `dev/c11-browser-e2e-business` | `9cb1294bd996` | 历史业务/交付专项开发现场 |
-| `dev/c11-isolated-runtime-overlay` | `5384da1354c3` | 历史业务/交付专项开发现场 |
-| `dev/c11-native-payload-closure` | `8c899ff0cc2b` | 历史业务/交付专项开发现场 |
-| `dev/c11-offer-scorecard-browser-closure` | `5e6a1a23731a` | 历史业务/交付专项开发现场 |
-| `dev/c11-prepared-native-smoke` | `d7e4ba72a9e3` | 历史业务/交付专项开发现场 |
-| `dev/c11-recover-external-dependencies` | `b4d9feb49bda` | 历史业务/交付专项开发现场 |
-| `dev/c11-source-host-native-assembly` | `94933655a4eb` | 历史业务/交付专项开发现场 |
-| `dev/c11-windows-gui-log-acceptance` | `328cf65094a0` | 历史业务/交付专项开发现场 |
-| `dev/candidate-workspace-continuity` | `2c5f940cb9d0` | 历史业务/交付专项开发现场 |
-| `dev/convergence09` | `bc1d3ca04f21` | 历史业务/交付专项开发现场 |
-| `dev/convergence10-system-integrity` | `c68249c397ab` | 历史业务/交付专项开发现场 |
-| `dev/convergence11-backup-truth` | `d1f9fdbff59a` | 历史业务/交付专项开发现场 |
-| `dev/convergence11-business-workflow-closure` | `2ae639dccb3a` | 历史业务/交付专项开发现场 |
-| `dev/convergence11-candidate-interview-workspace` | `160100ffee76` | 历史业务/交付专项开发现场 |
-| `dev/convergence11-candidate-workspace-page` | `d149a4af9631` | 历史业务/交付专项开发现场 |
-| `dev/convergence11-criteria-editor-preservation` | `88baeec303f5` | 历史业务/交付专项开发现场 |
-| `dev/convergence11-job-setup-wizard` | `d063b8277142` | 历史业务/交付专项开发现场 |
-| `dev/convergence11-operational-action-center` | `21cb3d826b5a` | 历史业务/交付专项开发现场 |
-| `dev/convergence11-operator-briefing-ui` | `742fcc6965da` | 历史业务/交付专项开发现场 |
-| `dev/convergence11-project-guidance` | `ca08283bb306` | 历史业务/交付专项开发现场 |
-| `dev/convergence11-review-center` | `df64b44dd107` | 历史业务/交付专项开发现场 |
-| `dev/convergence11-review-resolution` | `08dd6b76088d` | 历史业务/交付专项开发现场 |
-| `fix/c09-windows-sqlite-lifecycle` | `f3dc42b44a5a` | 历史缺陷/修复工作现场 |
-| `fix/c11-active-queue-and-local-day` | `24cf90101a6b` | 历史缺陷/修复工作现场 |
-| `fix/c11-exact-review-deeplinks` | `4addee785948` | 历史缺陷/修复工作现场 |
-| `fix/c11-native-package-allowlist` | `4ea2788d87f0` | 历史缺陷/修复工作现场 |
-| `fix/c11-portable-input-preflight` | `41ff247e3b75` | 历史缺陷/修复工作现场 |
-| `fix/c11-windows-smoke-repeatability` | `dbe0e505c70b` | 历史缺陷/修复工作现场 |
-| `fix/ci-notification-noise` | `dcc44921d7aa` | 历史缺陷/修复工作现场 |
-| `docs/repository-governance-legacy-20261018` | `a1d256ceb6fb` | 文档、历史治理或本轮 README PR |
-| `docs/repository-status-readme-20261019` | `deed1fe0a9a0` | 文档、历史治理或本轮 README PR |
-| `explore/html-site-prototype` | `2c366e5941c1` | E1–E5/Native SOURCE Lab 隔离实验 |
-| `integration/c09-stable` | `63c8ac6d7183` | 历史 C09 整合 |
-| `repair/c08-source-and-ci` | `6072d74b1883` | 历史 C08 恢复 |
+本轮清理开始前，GitHub API 返回 **203 条分支（含 main）**；创建本任务分支后会临时再增加 1 条，因此“分支总数”本身不是交付指标。清理前的前缀分布为：
 
-## 管理结论
+| 前缀 | 数量 |
+| --- | ---: |
+| `fix/` | 75 |
+| `dev/` | 31 |
+| `feat/` | 26 |
+| `feature/` | 20 |
+| `a/` | 18 |
+| `docs/` | 13 |
+| `test/` | 12 |
+| 其他（含 main） | 8 |
 
-1. **只有 `main` 是整合产品源码主线**。历史 `dev/` / `fix/` 不等同于正在维护的发行版本，也不能直接作为 Portable 的基础。
-2. `explore/html-site-prototype` 保留 E1–E5 和 Native SOURCE Lab 的大量试验与特定 CI 证据。不得直接与 `main` 整体合并；应按业务依赖逐项审查、重新实现安全权限/数据库迁移并附测试。
-3. 新增的本次 `docs/repository-status-readme-20261019` 是文档治理工作分支，审查后由 PR 合入主线，不单独发布软件版本。
-4. **不根据分支前缀、是否已合并 PR 或是否过时自动删除**。清理前必须 compare `main...branch`、核对唯一文件、已合并历史、业务证据、下载工件与 SHA。此列表**不对任何分支作“可以安全删除”判断**。
-5. 只有经过对应 CI + 实机工件验证的明确 SHA 才能提升交付状态；历史 `v0.8` Release 仅是历史 Web Portable。
+同一轮读取了 191 个 CLOSED PR；其中 167 个是本仓库分支已合并 PR，且其 head branch **仍然存在**。仓库设置 `delete_branch_on_merge=false`，所以大量已合并工作分支持续累积是结构性原因，而不是当前仍有 167 个活跃开发任务。
 
-入口：[主 README](../README.md) · [仓库治理](REPOSITORY_GOVERNANCE.md) · [正式路线图](ROADMAP.md) · [发布规程](RELEASE_PROCESS.md)。
+2026-11-09 本轮快照中的真实 OPEN PR 工作分支只有：
+
+- #230 `feature/43-m3b-wpf-business-session-20261106`：#43 Host/session，高风险，HOLD；
+- #231 `a/159-browser-shutdown-timeout-evidence-20261106`：#159 Windows Chromium 退出诊断；
+- #237 `feat/235-workbench-hierarchy`：当前 P0 产品路径，收口中；
+- #238 `a/159-shutdown-phase-probe-20261106`：#159 shutdown phase 合成诊断。
+
+动态状态仍以 GitHub OPEN PR、[#103](https://github.com/ALV522/-SRW-/issues/103) 和准确 SHA Actions 为准。
+
+## 2. 分支分类
+
+### A. 必须保留的活动引用
+
+- `main`；
+- 所有 OPEN PR 的 head branch；
+- 明确承担隔离实验、且主线文档仍引用其证据的分支（当前至少包括 `explore/html-site-prototype`）；
+- 产品负责人或治理文件明确标记的未完成恢复/发行工作分支。
+
+### B. 已合并、可进入删除候选队列的引用
+
+同时满足以下条件才列为候选：
+
+1. 对应 PR 已 `merged_at != null`；
+2. head branch 仍存在且不是 `main`；
+3. 不属于任何 OPEN PR；
+4. PR/Issue 已记录准确 head SHA、关键 CI/工件证据和回滚入口；
+5. 删除的是**分支引用**，不是删除 main 中已合入的代码，也不得删除历史 PR、Actions、release/artifact 证据。
+
+本轮统计有 **167 条**满足“已合并且分支仍存在”的基础条件；这只是候选集合，不能无检查批量删除。尤其 squash merge 的原分支提交与 main 提交身份不同，清理前必须确认关键证据已经以 SHA/PR/Actions 链接固化。
+
+### C. 历史未合并分支
+
+`dev/`、`fix/`、`feature/` 等前缀不能自动判定为垃圾。未合并分支必须先 compare `main...branch`，检查唯一文件、业务证据、恢复输入和是否被文档引用；没有等价主线/历史归档前不删。
+
+## 3. 清理顺序
+
+1. 先清当前产品入口与文档重复，避免开发者读错主线；
+2. 再清“已合并且证据已固化”的分支引用；
+3. 最后逐项审历史未合并分支，不做按前缀的一键删除；
+4. 每次分支治理不得与产品 PR 的 `app.js`、Core/Host、Schema、Runtime/Knowledge 改动混在同一 PR。
+
+本轮已经把固定在 2026-10-19 的根目录 `README_FIRST.md` 作为冗余入口退役；唯一入口保持 [README](../README.md)，状态与路线分别由 [DEVELOPMENT_STATE](../DEVELOPMENT_STATE.md) 与 [ROADMAP](ROADMAP.md) 提供。
+
+## 4. 自动清理建议
+
+仓库当前 `delete_branch_on_merge=false`。在确认 GitHub 的分支保护/审计策略后，可启用“合并 PR 后自动删除 head branch”，把未来增长从源头截断；历史 167 条候选仍需按上述规则单独清理。
+
+当前连接器没有 delete-ref / repository-settings mutation，因此本文件**不声称**已经删除这些远端分支；只记录已核验的候选集合与后续安全清理合同。分支数量也不属于 SRW 产品质量或 Native 体积指标。
