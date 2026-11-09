@@ -129,7 +129,8 @@ def main() -> int:
         if os.environ.get("SRW_TEST_SHUTDOWN_PHASE_PROBE") == "1":
             # Only synthetic acceptance enables aggregate lifecycle tracing.
             # All product launchers retain the existing Uvicorn implementation.
-            from shutdown_phase_probe import ShutdownPhaseProbeServer
+            from shutdown_phase_probe import ShutdownPhaseProbeServer, emit_stage
+            app.state.srw_shutdown_phase_hook = emit_stage
             server = ShutdownPhaseProbeServer(config)
         else:
             server = uvicorn.Server(config)

@@ -178,18 +178,37 @@ def create_v1_app(
         starter = getattr(_app.state, "srw_start_worker", None)
         if starter is not None:
             starter()
+        def shutdown_stage(name: str) -> None:
+            # #159 test-only visibility. Production never installs this hook.
+            # Fixed stage names carry no workspace, candidate, path or token data,
+            # and a broken diagnostic sink must never change shutdown semantics.
+            hook = getattr(_app.state, "srw_shutdown_phase_hook", None)
+            if callable(hook):
+                try:
+                    hook(name)
+                except Exception:
+                    pass
+
         worker_stopped = True
         try:
             yield
         finally:
             stopper = getattr(_app.state, "srw_stop_worker", None)
             if stopper is not None:
-                worker_stopped = bool(stopper())
+                shutdown_stage("worker_stop_enter")
+                try:
+                    worker_stopped = bool(stopper())
+                finally:
+                    shutdown_stage("worker_stop_exit")
             if worker_stopped:
                 # SQLite keeps file handles in pooled connections even after
                 # each request Session closes. Disposing the application-owned
                 # Engine is required for Windows to delete/move its workspace.
-                engine.dispose()
+                shutdown_stage("engine_dispose_enter")
+                try:
+                    engine.dispose()
+                finally:
+                    shutdown_stage("engine_dispose_exit")
             # When a job outlived the bounded join, disposing the pool under a
             # live daemon thread would turn a slow shutdown into a SQLite crash.
             # The carrier exits the process; the engine is left to it on purpose.
