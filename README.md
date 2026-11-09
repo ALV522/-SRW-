@@ -175,9 +175,13 @@ Browser ──────┘
 
 ## 近期路线
 
-按 #103 当前队列：IA-1 已由 #221 合入，#223 回归已合入，#224/#227 已将 scoped Scorecard GET 与跨项目一键恢复/返回带回主线；接下来集成 #226 Windows wheel 字节锁及 #228 Windows 浏览器单文件验收，同时推动 #42/#43/#124/#130 新 SHA Native/双载体验收。#63 保持渐进式 Core 模块化，不重写 0.8.x 成熟业务、不删除旧深链。
+截至 2026-11-09 的主线事实：`main=f4afefc6f5caed0a9cbfcbb8ed1b414c4890e414`，VERSION 仍为 `1.0.0-alpha10-convergence11`、Schema `v1_0014`、development；该 main 的 Source/Chromium/Governance/Repository Integrity/Windows Host/Offline Wheelhouse 六类 push CI 已完成并成功，但这**不等于**当前 SHA 的 WPF/Native GUI、Provider、物理断电恢复或双载体实机 PASS。
 
-版本迁移 #44 独立进行；本架构转向不自动修改 VERSION。
+当前产品 P0 是 [#235](https://github.com/ALV522/-SRW-/issues/235) 的工作台信息层级与主任务路径。第一切片 [PR #237](https://github.com/ALV522/-SRW-/pull/237) 仍为 OPEN/HOLD；本次文档更新开始时准确 HEAD 为 `43ef1fab2479aaa64a34887b07726f08313dbb10`，相对已验证的 `164f996d` 只增加真实 Chromium 场景测试与 Manifest 更新，生产代码未继续扩张。B/C 暂不可用期间不以 A 自己的同账号复核冒充独立 reviewer，也不继续向 #237 叠普通 UI 微优化。
+
+下一产品切片是 [#240](https://github.com/ALV522/-SRW-/issues/240)：在 #237 正式集成后，从**新的 main** 将“首页起 9 次显式点击”的可比较面试/面评路径压缩到目标 ≤6；不得为凑点击数删除人工核实、对象归属、版本/审计和人类决定门禁。A 同期独立推进 [#159](https://github.com/ALV522/-SRW-/issues/159) Windows Core 偶发退出诊断与 [#63](https://github.com/ALV522/-SRW-/issues/63) 的小步模块化/体积取证/仓库治理；[#241](https://github.com/ALV522/-SRW-/pull/241) 已合入只读 Native ZIP footprint 取证工具，但尚无证据证明完整 Native ZIP 已实际瘦身。
+
+发行阻断保持：[#43](https://github.com/ALV522/-SRW-/issues/43) 双载体共享 Core 实机、[#124](https://github.com/ALV522/-SRW-/issues/124) Runtime/Knowledge 工件保管与许可、[#130](https://github.com/ALV522/-SRW-/issues/130) 物理恢复、[#159](https://github.com/ALV522/-SRW-/issues/159) 偶发退出根因。版本迁移 #44 独立进行；任何文档/架构清理都不自动修改 VERSION。
 
 完整路线见 [ROADMAP.md](docs/ROADMAP.md)；重构细节见 [API_FIRST_MODULAR_CORE_ROADMAP.md](docs/API_FIRST_MODULAR_CORE_ROADMAP.md)。
 
