@@ -297,20 +297,18 @@ class IANavigationBrowserTests(unittest.TestCase):
                 self.assertIn(title, page.locator(".nav-item.active").inner_text())
 
 
-    def test_08_topbar_workbench_breadcrumb_does_not_retain_project(self):
-        """#235: exercise the actual breadcrumb link, not only the sidebar.
+    def _required_workbench_breadcrumb(self):
+        """A missing workbench return is a regression, not a skipped test."""
+        link = self.page.locator("#top-crumb .crumb-link").filter(has_text="工作台")
+        expect(link).to_have_count(1, timeout=2000)
+        expect(link).to_be_visible()
+        return link
 
-        Pre-#235 main has no breadcrumb, so its existing navigation is still
-        checked by test_07. On the UI PR, the breadcrumb must clear context.
-        """
+    def test_08_topbar_workbench_breadcrumb_does_not_retain_project(self):
+        """#235: a real project must expose exactly one working return link."""
         page = self.page
         self.open_project()
-        workbench = page.locator("#top-crumb .crumb-link").filter(has_text="工作台")
-        if workbench.count() == 0:
-            self.assertEqual(page.locator("#top-back").count(), 0)
-            return
-        expect(workbench).to_be_visible()
-        workbench.click()
+        self._required_workbench_breadcrumb().click()
         expect(page.locator("#top-title")).to_have_text("今日待办")
         expect(page.locator("#content h1")).to_have_text("今日待办")
         expect(page.locator("#content .project-banner")).to_have_count(0)
@@ -319,6 +317,19 @@ class IANavigationBrowserTests(unittest.TestCase):
         self.assertEqual(page.locator(".nav-item.active").count(), 1)
         self.assertIn("今日待办", page.locator(".nav-item.active").inner_text())
 
+
+    def test_09_missing_workbench_breadcrumb_must_fail_closed(self):
+        """Mutation negative: removing the required link must fail the same guard."""
+        self.open_project()
+        self._required_workbench_breadcrumb()
+        self.page.evaluate("""() => {
+            const link = [...document.querySelectorAll('#top-crumb .crumb-link')]
+                .find(el => el.textContent.includes('工作台'));
+            if (!link) throw new Error('fixture missing expected breadcrumb');
+            link.remove();
+        }""")
+        with self.assertRaises(AssertionError):
+            self._required_workbench_breadcrumb()
 
 
 if __name__ == "__main__":
