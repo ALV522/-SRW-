@@ -89,9 +89,9 @@ class BrowserShutdownReportTests(unittest.TestCase):
             # The real-process fixture now requires per-Core phase evidence.
             # Keep this pure unit test's synthetic clean-exit contract aligned.
             (root / "backend.stderr.log").write_text(
-                "SRW_TEST_CORE_INSTANCE ordinal=1\\n"
-                "SRW_SHUTDOWN_PHASE stage=drain_enter\\n"
-                "SRW_SHUTDOWN_PHASE stage=lifespan_exit\\n",
+                "SRW_TEST_CORE_INSTANCE ordinal=1\n"
+                "SRW_SHUTDOWN_PHASE stage=drain_enter\n"
+                "SRW_SHUTDOWN_PHASE stage=lifespan_exit\n",
                 encoding="utf-8",
             )
             case = self.make_case(root)
@@ -106,11 +106,11 @@ class BrowserShutdownReportTests(unittest.TestCase):
         with tempfile.TemporaryDirectory(prefix="srw-shutdown-fixture-") as tmp:
             root = Path(tmp)
             (root / "backend.stderr.log").write_text(
-                "SRW_TEST_CORE_INSTANCE ordinal=1\\n"
-                "SRW_SHUTDOWN_PHASE stage=drain_enter\\n"
-                "SRW_SHUTDOWN_PHASE stage=lifespan_exit\\n"
-                "SRW_TEST_CORE_INSTANCE ordinal=2\\n"
-                "SRW_SHUTDOWN_PHASE stage=drain_enter\\n",
+                "SRW_TEST_CORE_INSTANCE ordinal=1\n"
+                "SRW_SHUTDOWN_PHASE stage=drain_enter\n"
+                "SRW_SHUTDOWN_PHASE stage=lifespan_exit\n"
+                "SRW_TEST_CORE_INSTANCE ordinal=2\n"
+                "SRW_SHUTDOWN_PHASE stage=drain_enter\n",
                 encoding="utf-8",
             )
             case = self.make_case(root)
