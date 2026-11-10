@@ -1,10 +1,8 @@
 # SRW 产品与架构总路线图
 
-> **2026-11-10 主线身份快照（合并 #251 后）**：main [`2a330d354fcff7b0e920892ec3cc477b27286632`](https://github.com/ALV522/-SRW-/commit/2a330d354fcff7b0e920892ec3cc477b27286632)，VERSION `1.0.0-alpha10-convergence11`，Schema `v1_0014`，development，**非 RC/GA**。#248（浏览器 API client fail-closed 依赖）和 [#251](https://github.com/ALV522/-SRW-/pull/251)（SQLite/browser fixture 清理、面包屑负例）已合并；对合并前准确 HEAD 的 Source/Chromium/Governance CI 完成成功，新 main 的 push CI 与新 Windows ZIP 应以其自己的 SHA/工件重新验证，不继承旧结果。[#250](https://github.com/ALV522/-SRW-/pull/250) 已合流至此 main，准确 HEAD `390bc84995cd06dad0d95b2c39b2d78bbe5a6ecc`，源/浏览器 CI 执行中、非作者对新 HEAD 的复核待办；[#252](https://github.com/ALV522/-SRW-/pull/252) UX-2a 旧 HEAD `fa4b0321` 内容复核 ACCEPT，但 Windows [#159](https://github.com/ALV522/-SRW-/issues/159) 25 秒真实退出失败与旧基线仍使其 HOLD。B/C 暂不可用，A 先处理非冲突事务；同帐号工作轨非独立 GitHub 审批。#43/#124/#130/#159 继续阻断 RC。动态实况以 [#103](https://github.com/ALV522/-SRW-/issues/103)、[Actions](https://github.com/ALV522/-SRW-/actions) 和目标 PR 准确 HEAD 为准。
+> **动态状态只维护一个入口**：当前 main、PR、CI 与 Windows 工件请看 [README 的事实入口](../README.md#事实入口与带-sha-的历史检查点)、[#103](https://github.com/ALV522/-SRW-/issues/103) 及 [Actions](https://github.com/ALV522/-SRW-/actions)。本页以下带日期或 SHA 的段落都是当时的历史检查点，不代表当前已验收能力；本页负责长期 Track/退出标准，不再复制 README 的动态状态段。
 
-> **2026-11-10 同 SHA 仓库体积审计**：读取上述 main 的 Git tree（`recursive=1`, `truncated=false`），454 个源码/文档 blob，未压缩共 **3,228,618 B**；最大单文件 `frontend/dist/app.js` 为 157,511 B，`backend/srw/api/fullworkbench.py` 为 55,021 B。这**不是 Native ZIP**。已知上一正式 Windows ZIP 对应旧 main `8a99d7f8`，102,260,233 B、SHA256 `7299031f563c05a4eecea45354bed18e673906a7110b69f7d3f31a6d428f6f74`，在 1920×1200/135% 目标机完成窗口、侧栏、退出、DB 独占四项 PASS（见 [#42](https://github.com/ALV522/-SRW-/issues/42)），但不等于当前 main 的 WPF/全业务/跨载体验收。未取得同一工件的 Runtime/Knowledge 压缩分项与许可/可删证明，不宣称 ZIP 已瘦身，不清理私有工件。
-
-状态：ACTIVE · 2026-11-10 新索引（下方 11-09 与更早 SHA 均是历史快照）
+状态：ACTIVE · 长期架构路线（历史记录注明日期/SHA）
 
 本路线图以 [PRODUCT_CHARTER](PRODUCT_CHARTER.md)、[ADR-0001](decisions/ADR-0001-single-authoritative-core.md) 和 [ADR-0002](decisions/ADR-0002-api-first-modular-monolith.md) 为约束。当前开发主线是 `main`；历史 v0.8.12-R2 是功能保真对照，不是当前源码身份。
 
@@ -30,7 +28,7 @@
 - 清楚的版本、Schema、源码和工件身份；
 - 不通过大重写牺牲 v0.8.x 已成熟能力。
 
-## 2. 当前基线与证据边界
+## 2. 历史基线与证据边界
 
 当前进度快照对应 main `979863218c7fbcfc2c3fd5ff041237f0110c4350`，VERSION `1.0.0-alpha10-convergence11`、Schema `v1_0014`、development。该段 SHA 为历史基线；准确 CI、工件链接及未验收边界请优先查看 [README 当前快照](../README.md) 和 [#103 实时协作板](https://github.com/ALV522/-SRW-/issues/103)，避免在多份文档重复维护测试计数。
 
@@ -166,7 +164,7 @@ operator outcome
 - SaaS、云登录、多租户；
 - 因架构拆分删除成熟 Evidence/Decision/Knowledge/AI/OCR/ASR/Backup 能力。
 
-## 10. 2026-11-09 的历史执行顺序
+## 10. 2026-11-09 历史执行顺序（不代表最新队列）
 
 1. **#235 / PR #237：先收口第一结构切片，不再无限增补。** 精确 HEAD CI、真实异步候选人/事件/Scorecard 负例与同 fixture 视觉证据必须绑定同一 SHA；B/C 暂不可用期间保持 OPEN/HOLD，不以 A 同账号自审代替独立工作轨结论。正式集成后再创建 #240 分支。
 2. **#240：把首页到可验证人力动作的纯导航中转压缩。** 目标是把可比较场景的首页 9 次显式点击降到 ≤6；Core target、project/candidate/event ownership、旧 Published revision、人工核实/提交/审计必须保留，不能用前端缓存猜对象。
