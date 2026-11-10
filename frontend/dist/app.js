@@ -16,7 +16,42 @@ function statusClass(s){if(['succeeded','confirmed','published','ready','active'
 const stageLabels={new:'新候选人',screening:'简历筛选',shortlisted:'短名单',phone_screen:'电话筛选',interview:'面试',offer:'Offer',hired:'录用',rejected:'拒绝',talent_pool:'人才池',withdrawn:'候选人退出'};const projectStatusLabels={draft:'草案',open:'招聘中',paused:'暂停招聘',filled:'已招满',closed:'已关闭',archived:'已归档'};const offerLabels={draft:'草案',approved:'已批准',sent:'已发送',accepted:'已接受',declined:'已拒绝',withdrawn:'已撤回'};const offerNextStatuses={draft:['approved','withdrawn'],approved:['sent','withdrawn'],sent:['accepted','declined','withdrawn'],accepted:[],declined:[],withdrawn:[]};function stageLabel(s){return stageLabels[s]||s||'—'};const workbenchActionLabels={RESOLVE_CONFLICT:'处理证据冲突',VERIFY_CRITERION:'核实评价标准',RUN_SCREEN:'完成简历筛选',PREPARE_INTERVIEW:'准备结构化面试',REVIEW_REEVALUATION:'复核重新评价',MAKE_DECISION:'提交人工决定'};function workbenchActionLabel(s){return workbenchActionLabels[s]||s||'待处理'}
 const icons={dashboard:'▦',projects:'▣',templates:'▤',knowledge:'⌕',tasks:'⟳',settings:'⚙'};
 function shell(){return `<div class="app-shell"><aside class="sidebar"><div class="logo"><div class="logo-mark">SRW</div><div><strong>智能招聘工作台</strong><small>v1.0 Convergence 11 · Business Workflow Closure</small></div></div><div id="restore-banner-host">${restoreBannerHtml()}</div><div class="nav-group">Recruitment OS</div>${[['dashboard','今日待办'],['projects','招聘项目'],['settings','设置']].map(([k,l])=>`<button class="nav-item ${(state.page===k||(k==='settings'&&['settings','templates','knowledge','tasks'].includes(state.page)))?'active':''}" onclick="go('${k}')"><span class="nav-icon">${icons[k]}</span><span>${l}</span></button>`).join('')}<div class="side-footer">本地优先 · 业务闭环 · 证据可追溯<br>AI 建议 ≠ 人工决定<br><span id="side-health">正在检查服务…</span></div></aside><main class="main"><header class="topbar"><div class="top-left"><button type="button" class="top-back" id="top-back" onclick="topBack()" hidden>&larr; 返回</button><span class="top-title" id="top-title"></span><span class="crumb-tail" id="top-crumb"></span></div><div class="top-right"><span id="service-health-badge" class="badge" role="status" aria-live="polite"><span id="service-health-dot" class="dot ${state.health?'good':''}"></span><span id="service-health-text">${state.health?'服务正常':'服务检查中'}</span></span><span class="badge">v1_0014</span></div></header><div class="content" id="content"></div></main></div>`}
-window.go=async p=>{state.page=p;if(p!=='projects'){state.projectId=null;state.flowCandidateId=null;state.overviewSection=null;}state.candidateId=null;state.currentCandidateId=null;state.currentCandidateName=null;state.candidateSection='evidence';document.body.innerHTML=shell()+`<div id="modal-root"></div><div id="toast-root"></div>`;await renderPage()};window.openWorkbenchItem=async(pid,cid,type)=>{state.page='projects';state.projectId=pid;state.candidateReturnTab=type==='PREPARE_INTERVIEW'?'flow':'cockpit';state.projectTab=state.candidateReturnTab;state.flowCandidateId=type==='PREPARE_INTERVIEW'?(cid||null):null;state.candidateId=type==='PREPARE_INTERVIEW'?null:cid;state.candidateSection='evidence';document.body.innerHTML=shell()+`<div id="modal-root"></div><div id="toast-root"></div>`;await renderPage()};window.openOperationalItem=async(kind,pid,cid,eid)=>{state.page='projects';state.projectId=pid;state.candidateReturnTab='overview';state.projectTab=kind==='pending_interview_feedback'?'flow':'overview';state.flowCandidateId=kind==='pending_interview_feedback'?(cid||null):null;state.candidateId=['overdue_contact','today_contact'].includes(kind)?(cid||null):null;state.candidateSection='process';document.body.innerHTML=shell()+`<div id="modal-root"></div><div id="toast-root"></div>`;await renderPage();if(['overdue_contact','today_contact'].includes(kind)&&cid)await openActionPlan(cid);if(kind==='pending_interview_feedback'&&eid&&cid)await openScorecards(cid,eid)};window.openReviewItem=async(kind,pid,cid,reviewId='',claimId='')=>{
+window.go=async p=>{state.page=p;if(p!=='projects'){state.projectId=null;state.flowCandidateId=null;state.overviewSection=null;}state.candidateId=null;state.currentCandidateId=null;state.currentCandidateName=null;state.candidateSection='evidence';document.body.innerHTML=shell()+`<div id="modal-root"></div><div id="toast-root"></div>`;await renderPage()};window.openWorkbenchItem=async(pid,cid,type)=>{state.page='projects';state.projectId=pid;state.candidateReturnTab=type==='PREPARE_INTERVIEW'?'flow':'cockpit';state.projectTab=state.candidateReturnTab;state.flowCandidateId=type==='PREPARE_INTERVIEW'?(cid||null):null;state.candidateId=type==='PREPARE_INTERVIEW'?null:cid;state.candidateSection='evidence';document.body.innerHTML=shell()+`<div id="modal-root"></div><div id="toast-root"></div>`;await renderPage()};window.openOperationalItem=async(kind,pid,cid,eid)=>{
+  // #253: a dashboard item is a Core-authored hint, not durable authority.
+  // Revalidate the exact completed-interview target before leaving home.
+  const seq=(state.operationalOpenSeq||0)+1;
+  state.operationalOpenSeq=seq;
+  const modalGeneration=state.modalGeneration||0;
+  const stillOnDashboard=()=>state.page==='dashboard'
+    &&state.operationalOpenSeq===seq&&(state.modalGeneration||0)===modalGeneration;
+  if(kind==='pending_interview_feedback'){
+    if(!stillOnDashboard()||!pid||!cid||!eid){
+      toast('待反馈面试缺少准确对象，请刷新今日待办。',true);return;
+    }
+    try{
+      const latest=await api('/api/v1/dashboard');
+      if(!stillOnDashboard())return;
+      const current=(latest.operational_queue?.items||[]).some(item=>
+        item.kind==='pending_interview_feedback'&&item.project_id===pid
+        &&item.candidate_id===cid&&item.event_id===eid);
+      if(!current){toast('待反馈面试已变化，请刷新今日待办。',true);return}
+    }catch(e){
+      if(stillOnDashboard())toast('无法重新核验待反馈面试，请刷新今日待办。',true);
+      return;
+    }
+  }
+  if(state.operationalOpenSeq!==seq||state.page!=='dashboard')return;
+  state.page='projects';state.projectId=pid;state.candidateReturnTab='overview';
+  state.projectTab=kind==='pending_interview_feedback'?'flow':'overview';
+  state.flowCandidateId=kind==='pending_interview_feedback'?(cid||null):null;
+  state.candidateId=['overdue_contact','today_contact'].includes(kind)?(cid||null):null;
+  state.candidateSection='process';
+  document.body.innerHTML=shell()+`<div id="modal-root"></div><div id="toast-root"></div>`;
+  await renderPage();
+  if(state.operationalOpenSeq!==seq||state.page!=='projects'||state.projectId!==pid)return;
+  if(['overdue_contact','today_contact'].includes(kind)&&cid)await openActionPlan(cid);
+  if(kind==='pending_interview_feedback'&&eid&&cid)await openScorecards(cid,eid);
+};window.openReviewItem=async(kind,pid,cid,reviewId='',claimId='')=>{
   state.page='projects';state.projectId=pid;state.candidateReturnTab='quality';
   state.projectTab=kind==='unreviewed_claim'?'candidates':'quality';
   state.candidateId=kind==='unreviewed_claim'?(cid||null):null;
