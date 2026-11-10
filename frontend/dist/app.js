@@ -40,7 +40,7 @@ window.go=async p=>{state.page=p;if(p!=='projects'){state.projectId=null;state.f
       return;
     }
   }
-  if(state.operationalOpenSeq!==seq||state.page!=='dashboard')return;
+  if(state.operationalOpenSeq!==seq)return;
   state.page='projects';state.projectId=pid;state.candidateReturnTab='overview';
   state.projectTab=kind==='pending_interview_feedback'?'flow':'overview';
   state.flowCandidateId=kind==='pending_interview_feedback'?(cid||null):null;
