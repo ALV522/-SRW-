@@ -1,14 +1,24 @@
 # SRW · 智能招聘工作台
 
+## 事实入口与带 SHA 的历史检查点
+
+**当前 main、PR 队列和 CI 终态**只以 [#103 协作频道](https://github.com/ALV522/-SRW-/issues/103)、[GitHub Actions](https://github.com/ALV522/-SRW-/actions) 及目标 [PR](https://github.com/ALV522/-SRW-/pulls) 的准确 HEAD 为准。本 README 只记明确注明日期和 Git SHA 的历史检查点；不得把下面任一快照当作会自动更新的「当前版本」。版本政策仍是 `1.0.0-alpha10-convergence11`、Schema `v1_0014`、`development`，不代表 RC/GA。
+
+> **历史检查点｜2026-11-10 约 23:56（UTC+8）｜main [`bafc9251d77523fb3a370b21e52abad502bd836e`](https://github.com/ALV522/-SRW-/commit/bafc9251d77523fb3a370b21e52abad502bd836e)**：#248、#251、[#250](https://github.com/ALV522/-SRW-/pull/250) 已合并；该固定 main 的 Source (Ubuntu/Windows)、Chromium (Ubuntu/Windows)、Governance、Repository Integrity、Windows Host build、Offline Wheelhouse 六类 push CI 已独立完成 SUCCESS。#250 增加 Core shutdown 测试诊断而非修复间歇退出。截止此检查点，[#252](https://github.com/ALV522/-SRW-/pull/252) UX-2a 仍旧基线且 Windows Chromium 25s 真实失败；[#230](https://github.com/ALV522/-SRW-/pull/230) 会话安全仍 HOLD；#43/#124/#130/#159 继续阻断 RC。此 SHA 的正式 Native ZIP/新 WPF GUI、同一 Core 的双载体 T1–T10、物理断电恢复均无对应完成验收，不继承先前工件通过结论。
+
+> **体积审计（仅限上述固定 SHA）**：Git tree recursive 非截断，454 个 blob、未压缩 **3,233,407 B**；`frontend/dist/app.js` **157,511 B**，`backend/srw/api/fullworkbench.py` **55,021 B**。这不是 Windows Native ZIP。另一个**旧**正式 Native ZIP 对应 main `8a99d7f8`，完整 ZIP **102,260,233 B**、SHA256 `7299031f563c05a4eecea45354bed18e673906a7110b69f7d3f31a6d428f6f74`，仅其指定 Windows 1920×1200/135% 四项窗口、侧栏、正常退出、SQLite 独占得到 PASS（[#42](https://github.com/ALV522/-SRW-/issues/42)）；没有证明新 main 的完整业务或 Runtime/Knowledge 可合法裁剪。
+
+下方旧版状态、历史路线与计数均按各自日期/SHA 解释，**不是今日活跃任务队列**。
+
 SRW（Smart Recruitment Workbench）是一套 **local-first、evidence-centered、AI-assisted** 的招聘执行工具。它的目标不是把招聘判断自动化，而是把岗位标准、候选人材料、证据核实、面试、人工决定、Offer、联系跟进、Knowledge、AI/OCR/ASR 和备份恢复放进一个可追溯的本地工作区。
 
 当前架构方向已经明确：**一个权威 SRW Core，Windows 与 Local Browser/HTML 只是两个客户端/载体；所有业务能力先进入 Core/API，再由前端调用。** 后续采用 API-first modular monolith 的渐进式重构，不另起新业务内核，不拆微服务，不建立两套数据库，也不为重构更换整套前端框架。详细设计见 [ADR-0002](docs/decisions/ADR-0002-api-first-modular-monolith.md) 与 [API-first 模块化 Core 路线图](docs/API_FIRST_MODULAR_CORE_ROADMAP.md)。
 
 > **Agent / 协作者必读**：修改前阅读 [AGENTS.md](AGENTS.md) 及关联 G1 文件。无主线保护期间允许 **Local Git 原 preflight** 或负责人批准的 **[GitHub API-native SHA→任务分支验证](docs/decisions/ADR-0003-github-api-native-preedit.md)**，后者无需在无 Git checkout 环境伪造 `git ls-remote`；两者均必须独立任务分支、更新 Source Manifest、PR、准确 HEAD CI 与复审，禁止 direct-push main。
 
-## 当前产品化状态（2026-11-06，SHA 固定快照）
+## 历史产品化状态（2026-11-06，SHA 固定快照）
 
-> **最新事实补充 · 2026-11-06（main `3f6dc196ba45b493cee0eee4be02db0ea162fdbf`；非 RC/GA）**：六类 main push CI 已对该 SHA 报告 SUCCESS；B/C 在由该 main 组装的完整 Native ZIP（**102,222,665 B，SHA256 `829d1264e65854d20aac00d1c9abf227f10e05927cd930361ed314505dfb7858`**）上实际操作了 WPF/WebView2：发布标准→创建候选人→人工核实与 Judgment→HumanDecision advance→两个面试事件与同一事件的两份独立 Scorecard，以及备份、恢复和正常退出/释放锁。**此 PASS 仅对指定 ZIP、机器和步骤有效**，不包括 Offer、真实 Provider、物理断电、双载体同 Core。实机又发现 **135% DPI 导致窗口标题栏和侧栏被屏幕裁切**：[PR #234](https://github.com/ALV522/-SRW-/pull/234) 对应 [#232](https://github.com/ALV522/-SRW-/issues/232)，有修复后 Win32 RECT；B/C 已在 PR merge-ref `80088e03` 的正式组装 ZIP（SHA256 `1eb71063b3081d60e01b9093341021a783a8dbe7d17f64773bb5b87773f8826c`）目标机复测三键、正常退出及 DB 独占 PASS。#234 已合并 main `b1afe24b`，其新主线身份的正式 ZIP 仍待独立重建和验收；[已关闭 #233](https://github.com/ALV522/-SRW-/issues/233) 的 CSS 横向滚动归因已被原始 DOM 测量推翻。另有独立的**用户验收阻断** [#235 工作台 UI 信息层级](https://github.com/ALV522/-SRW-/issues/235)：允许现有前端骨架的可逆重排，不重写 Core、删除能力或更换框架。A 的 [#230 WPF Host opt-in 会话附着](https://github.com/ALV522/-SRW-/pull/230) 精确 HEAD 源码/浏览器/Host CI 已绿，但非作者安全复核与新 Native 真实 ON 仍 PENDING；[#231 Windows Chromium 退出超时诊断](https://github.com/ALV522/-SRW-/pull/231) 精确 HEAD 源码/浏览器/Governance CI 已绿，但并未修复 #159 的偶发 hang。#124 许可及独立故障域、#130 物理恢复仍阻断发行。**下面 `aa828635` 表格继续作为其对应的历史快照，不可覆盖本段新事实。**
+> **历史事实补充 · 2026-11-06（main `3f6dc196ba45b493cee0eee4be02db0ea162fdbf`；非 RC/GA）**：六类 main push CI 已对该 SHA 报告 SUCCESS；B/C 在由该 main 组装的完整 Native ZIP（**102,222,665 B，SHA256 `829d1264e65854d20aac00d1c9abf227f10e05927cd930361ed314505dfb7858`**）上实际操作了 WPF/WebView2：发布标准→创建候选人→人工核实与 Judgment→HumanDecision advance→两个面试事件与同一事件的两份独立 Scorecard，以及备份、恢复和正常退出/释放锁。**此 PASS 仅对指定 ZIP、机器和步骤有效**，不包括 Offer、真实 Provider、物理断电、双载体同 Core。实机又发现 **135% DPI 导致窗口标题栏和侧栏被屏幕裁切**：[PR #234](https://github.com/ALV522/-SRW-/pull/234) 对应 [#232](https://github.com/ALV522/-SRW-/issues/232)，有修复后 Win32 RECT；B/C 已在 PR merge-ref `80088e03` 的正式组装 ZIP（SHA256 `1eb71063b3081d60e01b9093341021a783a8dbe7d17f64773bb5b87773f8826c`）目标机复测三键、正常退出及 DB 独占 PASS。#234 已合并 main `b1afe24b`，其新主线身份的正式 ZIP 仍待独立重建和验收；[已关闭 #233](https://github.com/ALV522/-SRW-/issues/233) 的 CSS 横向滚动归因已被原始 DOM 测量推翻。另有独立的**用户验收阻断** [#235 工作台 UI 信息层级](https://github.com/ALV522/-SRW-/issues/235)：允许现有前端骨架的可逆重排，不重写 Core、删除能力或更换框架。A 的 [#230 WPF Host opt-in 会话附着](https://github.com/ALV522/-SRW-/pull/230) 精确 HEAD 源码/浏览器/Host CI 已绿，但非作者安全复核与新 Native 真实 ON 仍 PENDING；[#231 Windows Chromium 退出超时诊断](https://github.com/ALV522/-SRW-/pull/231) 精确 HEAD 源码/浏览器/Governance CI 已绿，但并未修复 #159 的偶发 hang。#124 许可及独立故障域、#130 物理恢复仍阻断发行。**下面 `aa828635` 表格继续作为其对应的历史快照，不可覆盖本段新事实。**
 
 > 本段是 **main `aa82863528d0ee78d102371433e6cb679429516e`** 的历史定位，不会自动随未来合并更新。实时工作状态以 [#103 协作板](https://github.com/ALV522/-SRW-/issues/103)、[PR 队列](https://github.com/ALV522/-SRW-/pulls) 和 [GitHub Actions](https://github.com/ALV522/-SRW-/actions) 的准确 SHA 为准。根 Source Manifest **446 项**；该提交的 main push CI 在本次文档编写时并未全部结束，**不预报六项 PASS**。
 
@@ -20,7 +30,7 @@ SRW（Smart Recruitment Workbench）是一套 **local-first、evidence-centered�
 | 已集成的回归与 Windows 工具链 | [#223](https://github.com/ALV522/-SRW-/pull/223) Claim 持久化/Scorecard 隔离回归已入主线；[#226](https://github.com/ALV522/-SRW-/pull/226) Windows Wheelhouse 13 个依赖固定哈希的校验已入主线；[#228](https://github.com/ALV522/-SRW-/pull/228) Windows Chromium 独立单文件 `test_flows.py` **17 条**与全套 **52 条（2 skip）** 双验收已入主线；以上各 PR 精确 HEAD CI 已全绿，**不代表新 main 的 WPF Native 实测**。 |
 | 当前发行阻断 | #42 新 SHA Windows WPF/完整招聘业务及真实备份恢复、#43 EXE+Browser 同 Core 会话、#124 私有 Runtime/五库许可与第二故障域、#130 物理恢复；均不得从 Source 或 Chromium PASS 推出已完成。 |
 
-**当前执行队列**：#227/#223/#226/#228 已集成；下一优先是 #42 最新 main Windows Native 组装及完整招聘/恢复实机、#43 M3B 单一 Core 的 WPF+Browser 会话同源验收、#124 受许可 Runtime/Knowledge 保管与 #130 物理恢复；#159 Windows graceful-stop 诊断仍需独立跟进。IA-2/IA-3 暂不以新界面取代上述业务闭环。普通工程更改由 A 执行，涉及产品不变量与正式发行再向负责人升级。
+**该历史快照的执行队列**：#227/#223/#226/#228 已集成；下一优先是 #42 最新 main Windows Native 组装及完整招聘/恢复实机、#43 M3B 单一 Core 的 WPF+Browser 会话同源验收、#124 受许可 Runtime/Knowledge 保管与 #130 物理恢复；#159 Windows graceful-stop 诊断仍需独立跟进。IA-2/IA-3 暂不以新界面取代上述业务闭环。普通工程更改由 A 执行，涉及产品不变量与正式发行再向负责人升级。
 
 ## Native 体积与保管
 
@@ -173,7 +183,7 @@ Windows Host ─┐
 Browser ──────┘
 ```
 
-## 近期路线
+## 2026-11-09 历史路线快照
 
 截至 2026-11-09 的主线事实：`main=f4afefc6f5caed0a9cbfcbb8ed1b414c4890e414`，VERSION 仍为 `1.0.0-alpha10-convergence11`、Schema `v1_0014`、development；该 main 的 Source/Chromium/Governance/Repository Integrity/Windows Host/Offline Wheelhouse 六类 push CI 已完成并成功，但这**不等于**当前 SHA 的 WPF/Native GUI、Provider、物理断电恢复或双载体实机 PASS。
 

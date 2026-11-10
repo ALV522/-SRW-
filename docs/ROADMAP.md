@@ -1,10 +1,12 @@
 # SRW 产品与架构总路线图
 
-状态：ACTIVE · 2026-11-09 进度复核（目标与退出条件不变）
+> **动态状态只维护一个入口**：当前 main、PR、CI 与 Windows 工件请看 [README 的事实入口](../README.md#事实入口与带-sha-的历史检查点)、[#103](https://github.com/ALV522/-SRW-/issues/103) 及 [Actions](https://github.com/ALV522/-SRW-/actions)。本页以下带日期或 SHA 的段落都是当时的历史检查点，不代表当前已验收能力；本页负责长期 Track/退出标准，不再复制 README 的动态状态段。
+
+状态：ACTIVE · 长期架构路线（历史记录注明日期/SHA）
 
 本路线图以 [PRODUCT_CHARTER](PRODUCT_CHARTER.md)、[ADR-0001](decisions/ADR-0001-single-authoritative-core.md) 和 [ADR-0002](decisions/ADR-0002-api-first-modular-monolith.md) 为约束。当前开发主线是 `main`；历史 v0.8.12-R2 是功能保真对照，不是当前源码身份。
 
-> **2026-11-09 当前主线与执行优先序（main `f4afefc6f5caed0a9cbfcbb8ed1b414c4890e414`，非 RC）**：VERSION=`1.0.0-alpha10-convergence11`、Schema=`v1_0014`、development；该 main 的 Source Ubuntu/Windows、Chromium Ubuntu/Windows、Governance、Repository Integrity、Windows Host Build、Offline Wheelhouse push 工作流均已完成并成功。#63 的 [PR #241](https://github.com/ALV522/-SRW-/pull/241) 已合入只读 Native ZIP footprint 同文件身份取证工具，解决“目录统计与 SHA 可来自不同路径重开文件”的 TOCTOU 证据缺口；它不是 Native 裁剪器，也没有证明 Runtime/Knowledge 可删除、可再分发或完整 ZIP 已减小。产品 P0 [#235](https://github.com/ALV522/-SRW-/issues/235) 的第一结构切片 [#237](https://github.com/ALV522/-SRW-/pull/237) 仍 OPEN/HOLD；本次路线图更新开始时 HEAD=`43ef1fab2479aaa64a34887b07726f08313dbb10`，最新增量仅为真实 Chromium 场景测试/Manifest，没有新增生产字节。B/C 暂不可用时 A 不代签独立 reviewer，不将旧 HEAD CI 或历史 Native 证据迁移到新 HEAD。[#240](https://github.com/ALV522/-SRW-/issues/240) 作为下一独立 UX 切片，等 #237 正式集成后从新 main 开始，目标处理首页 9 次显式点击的可比较路径而不删除人工/审计门禁。#159 偶发 Windows Core 退出仍 UNKNOWN；#43/#124/#130/#159 继续阻断 RC。以下 11-06 及更早段落均作为带 SHA 的历史快照保留。
+> **2026-11-09 历史主线与执行优先序（main `f4afefc6f5caed0a9cbfcbb8ed1b414c4890e414`，非 RC）**：VERSION=`1.0.0-alpha10-convergence11`、Schema=`v1_0014`、development；该 main 的 Source Ubuntu/Windows、Chromium Ubuntu/Windows、Governance、Repository Integrity、Windows Host Build、Offline Wheelhouse push 工作流均已完成并成功。#63 的 [PR #241](https://github.com/ALV522/-SRW-/pull/241) 已合入只读 Native ZIP footprint 同文件身份取证工具，解决“目录统计与 SHA 可来自不同路径重开文件”的 TOCTOU 证据缺口；它不是 Native 裁剪器，也没有证明 Runtime/Knowledge 可删除、可再分发或完整 ZIP 已减小。产品 P0 [#235](https://github.com/ALV522/-SRW-/issues/235) 的第一结构切片 [#237](https://github.com/ALV522/-SRW-/pull/237) 仍 OPEN/HOLD；本次路线图更新开始时 HEAD=`43ef1fab2479aaa64a34887b07726f08313dbb10`，最新增量仅为真实 Chromium 场景测试/Manifest，没有新增生产字节。B/C 暂不可用时 A 不代签独立 reviewer，不将旧 HEAD CI 或历史 Native 证据迁移到新 HEAD。[#240](https://github.com/ALV522/-SRW-/issues/240) 作为下一独立 UX 切片，等 #237 正式集成后从新 main 开始，目标处理首页 9 次显式点击的可比较路径而不删除人工/审计门禁。#159 偶发 Windows Core 退出仍 UNKNOWN；#43/#124/#130/#159 继续阻断 RC。以下 11-06 及更早段落均作为带 SHA 的历史快照保留。
 
 > **2026-11-06 真实进展与下一阶段优先序（主线 `3f6dc196ba45b493cee0eee4be02db0ea162fdbf`）**：#42 指定完整 Native ZIP（SHA256 `829d1264e65854d20aac00d1c9abf227f10e05927cd930361ed314505dfb7858`）已在实际 Windows WPF/WebView2 完成发布 Criteria→候选人→核实/Judgment→人工 advance→独立双面评、备份→恢复、正常关闭与锁释放。该证据替代下面旧的“新主线 WPF/备份恢复未跑”历史判断，但 Offer/Provider、#43 T1–T10 双载体、#130 断电、#124 许可/第二故障域未完成。**新增 P0 用户可用性门禁 [#235](https://github.com/ALV522/-SRW-/issues/235)**：现有产品的页面骨架与信息层级必须可逆改进且经过相同合成数据截图/真实 Chromium/Native 验收，不是另起新 UI 设计体系。近期顺序：[#232/PR #234](https://github.com/ALV522/-SRW-/pull/234) 已合并 main `b1afe24b`，PR merge-ref `80088e03` 的实机窗口、退出、DB 独占 PASS；main `b1afe24b` 的正式 Native ZIP 仍待新 SHA 复验。B/C 单执行者现在推进 #235 首页/项目工作区有界结构 PR；此前误判的 [#233](https://github.com/ALV522/-SRW-/issues/233) CSS 裁切归因已撤回关闭。A 独占 #230 WPF Host attach 的安全复核及后续 #43 双载体 Core 附着、#231/#159 退出超时诊断、主线合流与 #124/#130 发行边界。当前 #230 精确 HEAD CI 已绿但复核/Native ON 待测，#231 CI 已绿但 #159 根因未知；不得将这些源码绿灯升级为 RC/GA。以下按更旧 SHA 的进展仍保留为历史，不能直接作为当前否定或证明。
 
@@ -26,7 +28,7 @@
 - 清楚的版本、Schema、源码和工件身份；
 - 不通过大重写牺牲 v0.8.x 已成熟能力。
 
-## 2. 当前基线与证据边界
+## 2. 历史基线与证据边界
 
 当前进度快照对应 main `979863218c7fbcfc2c3fd5ff041237f0110c4350`，VERSION `1.0.0-alpha10-convergence11`、Schema `v1_0014`、development。该段 SHA 为历史基线；准确 CI、工件链接及未验收边界请优先查看 [README 当前快照](../README.md) 和 [#103 实时协作板](https://github.com/ALV522/-SRW-/issues/103)，避免在多份文档重复维护测试计数。
 
@@ -162,7 +164,7 @@ operator outcome
 - SaaS、云登录、多租户；
 - 因架构拆分删除成熟 Evidence/Decision/Knowledge/AI/OCR/ASR/Backup 能力。
 
-## 10. 当前执行顺序（2026-11-09）
+## 10. 2026-11-09 历史执行顺序（不代表最新队列）
 
 1. **#235 / PR #237：先收口第一结构切片，不再无限增补。** 精确 HEAD CI、真实异步候选人/事件/Scorecard 负例与同 fixture 视觉证据必须绑定同一 SHA；B/C 暂不可用期间保持 OPEN/HOLD，不以 A 同账号自审代替独立工作轨结论。正式集成后再创建 #240 分支。
 2. **#240：把首页到可验证人力动作的纯导航中转压缩。** 目标是把可比较场景的首页 9 次显式点击降到 ≤6；Core target、project/candidate/event ownership、旧 Published revision、人工核实/提交/审计必须保留，不能用前端缓存猜对象。
