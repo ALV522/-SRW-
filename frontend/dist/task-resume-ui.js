@@ -7,7 +7,7 @@ export function selectResumeProjects(raw, limit = MAX_VISIBLE_PROJECTS) {
   const seen = new Set();
   for (const project of raw) {
     if (!project || typeof project.project_id !== 'string' ||
-        typeof project.title !== 'string' || !project.title.trim() ||
+        !project.project_id.trim() || typeof project.title !== 'string' || !project.title.trim() ||
         project.status === 'archived' || seen.has(project.project_id)) continue;
     seen.add(project.project_id);
     result.push({ id: project.project_id, title: project.title.trim() });
