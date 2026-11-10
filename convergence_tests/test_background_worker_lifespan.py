@@ -20,12 +20,14 @@ import tempfile
 import threading
 import time
 import unittest
+from unittest.mock import patch
 from pathlib import Path
 
 from starlette.testclient import TestClient
 
 from knowledge_fixture import create_minimal_knowledge_tree
 from srw.api.app import create_v1_app
+from srw.runtime.db.session import create_v1_engine
 
 ROOT = Path(__file__).resolve().parents[1]
 WORKER_ENV = "SRW_BACKGROUND_WORKER"
@@ -173,6 +175,42 @@ class BackgroundWorkerLifespanTests(unittest.TestCase):
             "engine_dispose_enter", "engine_dispose_exit",
         ])
         moved = self.database.with_name("srw_v1.broken-probe-moved.db")
+        self.database.rename(moved)
+        moved.rename(self.database)
+
+    def test_worker_stop_failure_does_not_claim_engine_disposal(self):
+        # #159: a failed bounded worker stop must neither dispose the engine
+        # nor emit engine_dispose_* markers. Use a real engine-specific spy:
+        # the SQLite file's existence alone proves neither assertion.
+        os.environ[WORKER_ENV] = "0"
+        engines = []
+
+        def capture_engine(*args, **kwargs):
+            engine = create_v1_engine(*args, **kwargs)
+            engines.append(engine)
+            return engine
+
+        with patch("srw.api.app.create_v1_engine", side_effect=capture_engine):
+            app = self._build_app()
+        self.assertEqual(len(engines), 1)
+        engine = engines[0]
+        # Registered after TemporaryDirectory cleanup, so this runs first
+        # even if an assertion fails; no synthetic SQLite handle is leaked.
+        self.addCleanup(engine.dispose)
+        stages = []
+        app.state.srw_shutdown_phase_hook = stages.append
+        app.state.srw_stop_worker = lambda: False
+        with patch.object(engine, "dispose", wraps=engine.dispose) as dispose_spy:
+            with TestClient(app):
+                pass
+            self.assertEqual(stages, ["worker_stop_enter", "worker_stop_exit"])
+            dispose_spy.assert_not_called()
+
+        # The test intentionally simulated a failed stop with no live worker.
+        # Release its pool only after the assertions, then check Windows can
+        # move the SQLite file without relying on ignore_cleanup_errors.
+        engine.dispose()
+        moved = self.database.with_name("srw_v1.failed-stop-moved.db")
         self.database.rename(moved)
         moved.rename(self.database)
 

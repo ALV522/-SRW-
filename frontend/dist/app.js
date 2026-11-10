@@ -1,3 +1,4 @@
+import './api-client.js'; // Explicit dependency: the global client must initialize before the workbench.
 import {ensureBusinessSession} from './session-entry.js';
 import {createReevaluationFeature} from './reevaluation.js';
 import {createJobSetupFeature} from './jobsetup.js';

@@ -99,6 +99,7 @@ class DashboardProjectResumeTests(unittest.TestCase):
         button = self.page.get_by_role(
             "button", name="进入工作区 · UX2a Resume Sentinel")
         expect(button).to_be_visible()
+        expect(self.page.locator("#dashboard-project-resume")).to_have_count(1)
         self.assertEqual(self.page.locator("#dashboard-project-resume .resume-entry").count(), 1)
         # One deliberate operator click: no projects index / project row detour.
         clicks = []
@@ -130,6 +131,28 @@ class DashboardProjectResumeTests(unittest.TestCase):
         }""")
         self.assertEqual([(p["id"], p["title"]) for p in result],
                          [("a", "A"), ("b", "B"), ("c", "C"), ("d", "D")])
+
+    def test_projects_fetch_failure_preserves_all_primary_core_queues(self):
+        """A failed secondary /projects read cannot hide primary Core queues."""
+        self.page.route(
+            "**/api/v1/projects",
+            lambda route: route.fulfill(
+                status=503,
+                content_type="application/json",
+                body='{"error":{"code":"synthetic_unavailable","message":"offline"}}',
+            ),
+        )
+        with self.page.expect_response(
+            lambda response: response.url.endswith("/api/v1/projects") and response.status == 503
+        ):
+            self.page.goto(self.base + "/v1", wait_until="domcontentloaded")
+        expect(self.page.locator("#top-title")).to_have_text("今日待办")
+        expect(self.page.get_by_role("heading", name="今日业务队列")).to_be_visible()
+        expect(self.page.get_by_role("heading", name="运营执行队列")).to_be_visible()
+        expect(self.page.get_by_role("heading", name="复核中心")).to_be_visible()
+        expect(self.page.locator("#dashboard-project-resume")).to_have_count(1)
+        expect(self.page.locator("#dashboard-project-resume .resume-entry")).to_have_count(0)
+        expect(self.page.locator("#content > .grid.kpi")).to_have_count(1)
 
 
 if __name__ == "__main__":

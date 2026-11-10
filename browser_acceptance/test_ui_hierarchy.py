@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import json
 import sqlite3
+from contextlib import closing
 import os
 import socket
 import subprocess
@@ -37,12 +38,12 @@ def free_loopback_port() -> int:
 class UiHierarchyTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls) -> None:
-        cls.tmp = tempfile.TemporaryDirectory(prefix="srw-ui235-", ignore_cleanup_errors=True)
+        cls.tmp = tempfile.TemporaryDirectory(prefix="srw-ui235-")
         cls.port = free_loopback_port()
         cls.base = f"http://127.0.0.1:{cls.port}"
         evidence = ROOT / "artifacts" / "browser"
         evidence.mkdir(parents=True, exist_ok=True)
-        cls.log = open(evidence / "ui235-server.log", "w", encoding="utf-8")
+        cls.log = open(evidence / f"ui235-server-{uuid.uuid4().hex}.log", "w", encoding="utf-8")
         cls.server = subprocess.Popen(
             [sys.executable, "-u", str(ROOT / "scripts" / "start_local_web.py"),
              "--workspace", cls.tmp.name, "--port", str(cls.port),
@@ -74,7 +75,9 @@ class UiHierarchyTests(unittest.TestCase):
             cls.server.wait(timeout=10)
         except subprocess.TimeoutExpired:
             cls.server.kill()
+            cls.server.wait(timeout=10)
         cls.log.close()
+        # Fail loudly on leaked Windows SQLite handles; the fixture is synthetic.
         cls.tmp.cleanup()
 
     def setUp(self) -> None:
@@ -367,7 +370,7 @@ class UiHierarchyTests(unittest.TestCase):
         modal.locator("#sc-rec").fill("advance")
         modal.get_by_role("button", name="提交并锁定").click()
         expect(self.page.locator("#modal-root .modal")).to_have_count(0)
-        with sqlite3.connect(Path(self.tmp.name) / "data" / "srw_v1.db") as db:
+        with closing(sqlite3.connect(Path(self.tmp.name) / "data" / "srw_v1.db")) as db:
             rows = db.execute(
                 "SELECT candidate_id, event_id, feedback_json FROM interview_scorecard_submission "
                 "WHERE event_id=?", (eid,)).fetchall()
@@ -529,7 +532,7 @@ class UiHierarchyTests(unittest.TestCase):
         expect(self.page.locator("#content h1")).to_have_text("电话筛选候选人乙")
         expect(self.page.locator(f'.timeline-item[data-event-id="{eid}"]')).to_contain_text(
             "乙的合成电话筛选")
-        with sqlite3.connect(Path(self.tmp.name) / "data" / "srw_v1.db") as db:
+        with closing(sqlite3.connect(Path(self.tmp.name) / "data" / "srw_v1.db")) as db:
             self.assertEqual(db.execute(
                 "SELECT COUNT(*) FROM interview_scorecard_submission WHERE event_id=?",
                 (eid,)).fetchone()[0], 0)
@@ -656,7 +659,7 @@ class UiHierarchyTests(unittest.TestCase):
         self.page.wait_for_timeout(350)
         expect(self.page.locator("#content h1")).to_have_text("异步目标乙")
         expect(modal.locator("#e-title")).to_have_value("B 的未保存面试")
-        with sqlite3.connect(Path(self.tmp.name) / "data" / "srw_v1.db") as db:
+        with closing(sqlite3.connect(Path(self.tmp.name) / "data" / "srw_v1.db")) as db:
             self.assertEqual(db.execute(
                 "SELECT COUNT(*) FROM recruitment_event WHERE candidate_id=?",
                 (second,)).fetchone()[0], 0)
@@ -719,7 +722,7 @@ class UiHierarchyTests(unittest.TestCase):
         self.page.locator("#project-next-action").click()
         expect(self.page.locator("#content h1")).to_have_text("层级候选人")
         expect(self.page.locator("#top-crumb")).to_contain_text("层级候选人")
-        with sqlite3.connect(Path(self.tmp.name) / "data" / "srw_v1.db") as db:
+        with closing(sqlite3.connect(Path(self.tmp.name) / "data" / "srw_v1.db")) as db:
             row = db.execute("SELECT candidate_id, confirmation_state FROM claim WHERE id=?",
                              (claim["claim_id"],)).fetchone()
             self.assertEqual(row, (cid, "unreviewed"))
@@ -780,7 +783,7 @@ class UiHierarchyTests(unittest.TestCase):
         modal.locator("#sc-rec").fill("advance")
         modal.get_by_role("button", name="提交并锁定").click()
         expect(self.page.locator("#modal-root .modal")).to_have_count(0)
-        with sqlite3.connect(Path(self.tmp.name) / "data" / "srw_v1.db") as db:
+        with closing(sqlite3.connect(Path(self.tmp.name) / "data" / "srw_v1.db")) as db:
             rows = db.execute(
                 "SELECT candidate_id, event_id, feedback_json FROM interview_scorecard_submission "
                 "WHERE event_id=?", (eid,)).fetchall()

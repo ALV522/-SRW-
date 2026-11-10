@@ -81,6 +81,10 @@ class RestoreCancelRestartAcceptance(unittest.TestCase):
             "RECRUITMENT_FRONTEND_DIST": str(ROOT / "frontend" / "dist"),
             "RECRUITMENT_KNOWLEDGE_DIR": str(knowledge),
             "PYTHONPATH": os.pathsep.join((str(ROOT / "backend"), str(ROOT / "scripts"))),
+            # #159: synthetic Browser restore/restart opts into existing
+            # Uvicorn drain/lifespan and worker/engine shutdown phase markers.
+            # No production default or 25-second hard-fail is changed.
+            "SRW_TEST_SHUTDOWN_PHASE_PROBE": "1",
         })
         self.processes: list[subprocess.Popen] = []
         self.addCleanup(self.stop_any_processes)
@@ -109,6 +113,14 @@ class RestoreCancelRestartAcceptance(unittest.TestCase):
                     proc.wait(timeout=5)
 
     def make_process(self) -> subprocess.Popen:
+        # One stderr file spans the original and restarted Core. A fixed,
+        # synthetic ordinal separates their phase traces without leaking IDs,
+        # paths, environment variables or process command lines.
+        self.stderr.seek(0, os.SEEK_END)
+        self.stderr.write(
+            f"SRW_TEST_CORE_INSTANCE ordinal={len(self.processes) + 1}\n".encode("ascii")
+        )
+        self.stderr.flush()
         proc = subprocess.Popen(
             [sys.executable, "-B", str(ROOT / "scripts" / "run_local.py"),
              "--host", "127.0.0.1", "--port", str(self.port),
@@ -162,6 +174,17 @@ class RestoreCancelRestartAcceptance(unittest.TestCase):
             ))
         self.assertEqual(code, 0)
         self.assertEqual(inspect_lease(self.data).state, ABSENT)
+        # A GREEN exit must prove that this particular Core emitted the
+        # test-only trace. Otherwise the next intermittent RED could be
+        # misattributed to markers left by the previous Core instance.
+        trace = Path(self.stderr.name).read_text(encoding="utf-8", errors="replace")
+        boundary = f"SRW_TEST_CORE_INSTANCE ordinal={self.processes.index(proc) + 1}\n"
+        self.assertTrue(boundary in trace, "test-only Core boundary missing")
+        instance_trace = trace.rsplit(boundary, 1)[-1]
+        self.assertTrue("SRW_SHUTDOWN_PHASE stage=drain_enter" in instance_trace,
+                        "test-only Uvicorn drain marker missing")
+        self.assertTrue("SRW_SHUTDOWN_PHASE stage=lifespan_exit" in instance_trace,
+                        "test-only lifespan exit marker missing")
 
     # ------------------------------------------------------------------- http
 
