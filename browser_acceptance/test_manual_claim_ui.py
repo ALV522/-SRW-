@@ -89,7 +89,7 @@ class ManualClaimBrowserAcceptance(unittest.TestCase):
         self.sid = self.post(f"/api/v1/candidates/{self.cid}/sources/text",
                              {"text_content": TEXT, "publish_material": True})["source_id"]
         self.page.goto(self.base + "/v1", wait_until="domcontentloaded")
-        self.page.wait_for_function("Boolean(window.openProject && window.openCandidate && window.srwManualClaimOpen)")
+        self.page.wait_for_function("Boolean(window.openProject && window.openCandidate && window.srwManualClaimOpen && typeof window.srwApi === 'function')")
         self.page.wait_for_function("document.querySelector('#top-title')?.textContent === '今日待办'")
         self.page.evaluate("""async ([pid,cid]) => {
             await window.openProject(pid);
@@ -195,7 +195,7 @@ class ManualClaimBrowserAcceptance(unittest.TestCase):
         expect(self.page.locator(".claim.unreviewed")).to_have_count(0)
 
         self.page.reload(wait_until="domcontentloaded")
-        self.page.wait_for_function("Boolean(window.openProject && window.openCandidate)")
+        self.page.wait_for_function("Boolean(window.openProject && window.openCandidate && typeof window.srwApi === 'function')")
         self.page.evaluate("""async ([pid, cid]) => {
             await window.openProject(pid);
             await window.openCandidate(cid);
@@ -215,7 +215,7 @@ class ManualClaimBrowserAcceptance(unittest.TestCase):
         expect(self.page.locator(".claim.confirmed")).to_have_count(1)
 
         self.page.reload(wait_until="domcontentloaded")
-        self.page.wait_for_function("Boolean(window.openProject && window.openCandidate)")
+        self.page.wait_for_function("Boolean(window.openProject && window.openCandidate && typeof window.srwApi === 'function')")
         self.page.evaluate("""async ([pid, cid]) => {
             await window.openProject(pid);
             await window.openCandidate(cid);
