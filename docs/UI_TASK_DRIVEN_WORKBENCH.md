@@ -38,7 +38,7 @@ UI 的基本对象层级：**今日需要完成的操作 → 项目 → 候选�
 
 Dashboard 的 `operational_queue` 增加 `ready_to_schedule_interview`：只投影招聘中项目、未归档且未合并候选人、当前 Published protocol 含有效面试阶段、当前 Published material 存在、且尚无已排期/已完成结构化面试的候选人。每位候选人单独成行；多个目标由 HR 明确选择，不按最近候选人或前端缓存默认选择。该快捷入口面向首轮面试；后续轮次仍从候选人工作区创建。
 
-点击时前端重新读取 Dashboard 并逐项比较 project/candidate/protocol/material identity；保存排期时 Core 再验证同一身份、项目状态、候选人归属、Published revision/material 及是否已有面试。目标过期、归档、跨项目、版本变化或重复排期均 fail closed，不创建 event/audit。快捷入口只减少定位步骤，排期、完成反馈和独立 Scorecard 的人工点击均保留。精确 HEAD 的 CI 和真实 Chromium 结果未出之前，不记为 PASS。
+点击时前端重新读取 Dashboard 并逐项比较 project/candidate/protocol/material identity；保存排期时 Core 再验证同一身份、项目状态、候选人归属、Published revision/material 及是否已有面试，并把 project/material revision identity 固化到该面试事件元数据。目标过期、归档、跨项目、版本变化或重复排期均 fail closed，不创建 event/audit。快捷入口只减少定位步骤，排期、完成反馈和独立 Scorecard 的人工点击均保留。精确 HEAD 的 CI 和真实 Chromium 结果未出之前，不记为 PASS。
 
 ### UX-2c：跨页面上下文纪律
 

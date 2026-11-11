@@ -601,10 +601,13 @@ class InterviewRouteTests(unittest.TestCase):
         fresh_target = fresh_targets[0]
         self.assertEqual(fresh_target["protocol_revision_id"], second_protocol_id)
         self.assertEqual(fresh_target["material_revision_id"], current_material_id)
+        wrong_project_target = {**fresh_target, "project_id": "foreign-project"}
+        wrong_project = post_target(wrong_project_target)
+        self.assertEqual(wrong_project.status_code, 409, wrong_project.text)
+        self.assertEqual(self.audit_count("RECRUITMENT_EVENT_CREATED"), 0)
 
         accepted = post_target(fresh_target)
         self.assertEqual(accepted.status_code, 200, accepted.text)
-        stored_metadata = json.loads(accepted.json()["metadata_json"]) if "metadata_json" in accepted.json() else None
         with self.factory() as session:
             stored_metadata = json.loads(session.get(RecruitmentEvent, accepted.json()["event_id"]).metadata_json)
         self.assertEqual(stored_metadata["project_id"], pid)

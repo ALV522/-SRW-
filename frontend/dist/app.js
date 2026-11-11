@@ -25,6 +25,9 @@ window.go=async p=>{state.page=p;if(p!=='projects'){state.projectId=null;state.f
   const stillOnDashboard=()=>state.page==='dashboard'
     &&state.operationalOpenSeq===seq&&(state.modalGeneration||0)===modalGeneration;
   let verifiedTarget=null;
+  if(kind==='ready_to_schedule_interview'&&!fromDashboard){
+    toast('面试安排目标只能从首页业务队列打开，请刷新今日待办。',true);return;
+  }
   if((kind==='pending_interview_feedback'||kind==='ready_to_schedule_interview')&&fromDashboard){
     const missingTarget=!pid||!cid||(kind==='pending_interview_feedback'&&!eid)
       ||(kind==='ready_to_schedule_interview'&&(!protocolRevisionId||!materialRevisionId));
