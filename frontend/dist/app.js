@@ -21,10 +21,11 @@ window.go=async p=>{state.page=p;if(p!=='projects'){state.projectId=null;state.f
   // Revalidate the exact completed-interview target before leaving home.
   const seq=(state.operationalOpenSeq||0)+1;
   state.operationalOpenSeq=seq;
+  const fromDashboard=state.page==='dashboard';
   const modalGeneration=state.modalGeneration||0;
   const stillOnDashboard=()=>state.page==='dashboard'
     &&state.operationalOpenSeq===seq&&(state.modalGeneration||0)===modalGeneration;
-  if(kind==='pending_interview_feedback'){
+  if(kind==='pending_interview_feedback'&&fromDashboard){
     if(!stillOnDashboard()||!pid||!cid||!eid){
       toast('待反馈面试缺少准确对象，请刷新今日待办。',true);return;
     }
