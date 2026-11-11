@@ -498,5 +498,130 @@ class InterviewRouteTests(unittest.TestCase):
         }])
 
 
+    def test_dashboard_first_interview_target_revalidates_project_protocol_and_material(self):
+        with self.factory.begin() as session:
+            project = session.get(Project, session.get(Candidate, self.cid).project_id)
+            project.status = "open"
+            first = ProtocolRevision(
+                project_id=project.id, revision=1, state="published",
+                payload_json=json.dumps({
+                    "criteria": [{"criterion_key": "comm", "name": "Communication",
+                                  "definition": "Cross-team communication"}],
+                    "assessment_stages": [{"stage_key": "interview", "name": "面试",
+                                           "criteria": ["comm"]}],
+                }), content_hash="a" * 64,
+            )
+            session.add(first)
+            session.flush()
+            project.current_protocol_revision_id = first.id
+            pid, first_protocol_id = project.id, first.id
+
+        created = self.client.post(
+            f"/api/v1/projects/{pid}/candidates",
+            json={"display_name": "Synthetic schedule target"},
+        )
+        self.assertEqual(created.status_code, 200, created.text)
+        target_candidate_id = created.json()["candidate_id"]
+        material = self.client.post(
+            f"/api/v1/candidates/{target_candidate_id}/sources/text",
+            json={"text_content": "Synthetic published candidate material",
+                  "publish_material": True},
+        )
+        self.assertEqual(material.status_code, 200, material.text)
+        with self.factory() as session:
+            first_material_id = session.get(Candidate, target_candidate_id).current_material_revision_id
+
+        dashboard = self.client.get("/api/v1/dashboard")
+        self.assertEqual(dashboard.status_code, 200, dashboard.text)
+        targets = [
+            item for item in dashboard.json()["operational_queue"]["items"]
+            if item["kind"] == "ready_to_schedule_interview"
+        ]
+        self.assertEqual([item["candidate_id"] for item in targets], [target_candidate_id])
+        first_target = targets[0]
+        self.assertEqual(first_target["project_id"], pid)
+        self.assertEqual(first_target["protocol_revision_id"], first_protocol_id)
+        self.assertEqual(first_target["material_revision_id"], first_material_id)
+
+        def post_target(target):
+            return self.client.post(
+                f"/api/v1/candidates/{target_candidate_id}/events",
+                json={
+                    "event_type": "interview",
+                    "event_state": "scheduled",
+                    "title": "Synthetic first interview",
+                    "scheduled_at": "2026-11-12T09:00:00+08:00",
+                    "expected_project_id": target["project_id"],
+                    "expected_protocol_revision_id": target["protocol_revision_id"],
+                    "expected_material_revision_id": target["material_revision_id"],
+                    "metadata": {
+                        "protocol_revision_id": target["protocol_revision_id"],
+                        "questions": [{"criterion_key": "comm", "question": "请描述一次跨团队协作"}],
+                    },
+                },
+            )
+
+        with self.factory.begin() as session:
+            first = session.get(ProtocolRevision, first_protocol_id)
+            first.state = "superseded"
+            second = ProtocolRevision(
+                project_id=pid, revision=2, state="published",
+                payload_json=first.payload_json, content_hash="b" * 64,
+            )
+            session.add(second)
+            session.flush()
+            session.get(Project, pid).current_protocol_revision_id = second.id
+            second_protocol_id = second.id
+        stale_protocol = post_target(first_target)
+        self.assertEqual(stale_protocol.status_code, 409, stale_protocol.text)
+        self.assertEqual(self.audit_count("RECRUITMENT_EVENT_CREATED"), 0)
+
+        material_update = self.client.post(
+            f"/api/v1/candidates/{target_candidate_id}/sources/text",
+            json={"text_content": "Synthetic replacement material", "publish_material": True},
+        )
+        self.assertEqual(material_update.status_code, 200, material_update.text)
+        with self.factory() as session:
+            current_material_id = session.get(Candidate, target_candidate_id).current_material_revision_id
+        stale_material_target = {
+            **first_target,
+            "protocol_revision_id": second_protocol_id,
+        }
+        stale_material = post_target(stale_material_target)
+        self.assertEqual(stale_material.status_code, 409, stale_material.text)
+        self.assertEqual(self.audit_count("RECRUITMENT_EVENT_CREATED"), 0)
+
+        fresh_dashboard = self.client.get("/api/v1/dashboard")
+        self.assertEqual(fresh_dashboard.status_code, 200, fresh_dashboard.text)
+        fresh_targets = [
+            item for item in fresh_dashboard.json()["operational_queue"]["items"]
+            if item["kind"] == "ready_to_schedule_interview"
+        ]
+        self.assertEqual(len(fresh_targets), 1)
+        fresh_target = fresh_targets[0]
+        self.assertEqual(fresh_target["protocol_revision_id"], second_protocol_id)
+        self.assertEqual(fresh_target["material_revision_id"], current_material_id)
+
+        accepted = post_target(fresh_target)
+        self.assertEqual(accepted.status_code, 200, accepted.text)
+        self.assertEqual(self.audit_count("RECRUITMENT_EVENT_CREATED"), 1)
+        duplicate = post_target(fresh_target)
+        self.assertEqual(duplicate.status_code, 409, duplicate.text)
+
+        archived = self.client.post(f"/api/v1/candidates/{target_candidate_id}/archive")
+        self.assertEqual(archived.status_code, 200, archived.text)
+        archived_candidate = post_target(fresh_target)
+        self.assertEqual(archived_candidate.status_code, 409, archived_candidate.text)
+
+        restored = self.client.post(f"/api/v1/candidates/{target_candidate_id}/restore")
+        self.assertEqual(restored.status_code, 200, restored.text)
+        with self.factory.begin() as session:
+            session.get(Project, pid).status = "archived"
+        archived_project = post_target(fresh_target)
+        self.assertEqual(archived_project.status_code, 409, archived_project.text)
+        self.assertEqual(self.audit_count("RECRUITMENT_EVENT_CREATED"), 1)
+        with self.factory() as session:
+            self.assertEqual(len(session.scalars(select(RecruitmentEvent)).all()), 1)
+
 if __name__ == "__main__":
     unittest.main()

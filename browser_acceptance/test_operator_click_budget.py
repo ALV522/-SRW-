@@ -282,6 +282,75 @@ class OperatorClickBudgetAcceptance(unittest.TestCase):
             expect(page.locator(".modal")).to_contain_text("只属于候选人B的面评")
             self.assertFalse(errors, errors)
 
+            # #253 UX-2b: the same first-interview precondition now opens the
+            # exact candidate's schedule form from one Core-verified home action.
+            schedule_project = api("POST", "/api/v1/projects",
+                                   {"title": "Operator Schedule Target", "role_title": "Engineer"})
+            schedule_pid = schedule_project["project_id"]
+            schedule_draft = schedule_project["draft_revision_id"]
+            api("PATCH", f"/api/v1/protocol-revisions/{schedule_draft}", {"payload": PROTOCOL})
+            api("POST", f"/api/v1/protocol-revisions/{schedule_draft}/publish", {})
+            schedule_a = api("POST", f"/api/v1/projects/{schedule_pid}/candidates",
+                             {"display_name": "Synthetic Schedule Candidate A"})["candidate_id"]
+            schedule_b = api("POST", f"/api/v1/projects/{schedule_pid}/candidates",
+                             {"display_name": "Synthetic Schedule Candidate B"})["candidate_id"]
+            api("POST", f"/api/v1/candidates/{schedule_b}/sources/text",
+                {"text_content": "Synthetic published material for schedule candidate B",
+                 "publish_material": True})
+            schedule_page = context.new_page()
+            schedule_errors = []
+            schedule_page.on("pageerror", lambda error: schedule_errors.append(str(error)))
+            schedule_page.goto(self.base + "/v1", wait_until="domcontentloaded")
+            expect(schedule_page.locator(".kpi-card").first).to_be_visible()
+            schedule_queue = schedule_page.locator("section.panel").filter(
+                has=schedule_page.get_by_role("heading", name="运营执行队列"))
+            schedule_row = schedule_queue.locator(".quick-item").filter(
+                has_text="Synthetic Schedule Candidate B")
+            expect(schedule_row).to_have_count(1)
+            expect(schedule_row).to_contain_text("待安排首轮面试")
+            schedule_clicks = []
+            click(schedule_row.get_by_role("button", name="安排面试"),
+                  "首页→准确候选人→安排面试表单", schedule_clicks)
+            expect(schedule_page.locator(".candidate-workspace-head h1")).to_have_text(
+                "Synthetic Schedule Candidate B")
+            schedule_modal = schedule_page.locator(".modal")
+            expect(schedule_modal).to_contain_text("新增结构化面试")
+            click(schedule_modal.get_by_role("button", name="保存"),
+                  "保存面试排期", schedule_clicks)
+            expect(schedule_page.locator("#modal-root .modal")).to_have_count(0)
+
+            schedule_timeline = schedule_page.locator(".timeline-item").filter(has_text="面试")
+            click(schedule_timeline.get_by_role("button", name="完成并反馈"),
+                  "打开完成反馈", schedule_clicks)
+            schedule_completion = schedule_page.locator(".modal")
+            schedule_completion.locator(".c-obs").fill("Synthetic interview observation")
+            schedule_completion.locator(".c-rec").fill("建议进入下一轮")
+            click(schedule_completion.get_by_role("button", name="完成"),
+                  "提交完成反馈", schedule_clicks)
+            expect(schedule_page.locator("#modal-root .modal")).to_have_count(0)
+
+            schedule_timeline = schedule_page.locator(".timeline-item").filter(has_text="面试")
+            click(schedule_timeline.get_by_role("button", name="独立 Scorecard"),
+                  "打开独立 Scorecard", schedule_clicks)
+            schedule_scorecard = schedule_page.locator(".modal")
+            schedule_scorecard.locator("#sc-evaluator").fill("Synthetic Schedule Interviewer")
+            schedule_scorecard.locator(".c-obs").fill("只属于候选人 B 的面试观察")
+            schedule_scorecard.locator(".c-rec").fill("建议继续")
+            schedule_scorecard.locator("#sc-rec").fill("advance")
+            click(schedule_scorecard.get_by_role("button", name="提交并锁定"),
+                  "提交并锁定独立面评", schedule_clicks)
+            expect(schedule_page.locator("#modal-root .modal")).to_have_count(0)
+            self.assertEqual(len(schedule_clicks), 6, schedule_clicks)
+            self.assertEqual(schedule_clicks[0], "首页→准确候选人→安排面试表单")
+            self.assertFalse(schedule_errors, schedule_errors)
+            schedule_page.goto(self.base + "/v1", wait_until="domcontentloaded")
+            expect(schedule_page.locator(".kpi-card").first).to_be_visible()
+            schedule_queue = schedule_page.locator("section.panel").filter(
+                has=schedule_page.get_by_role("heading", name="运营执行队列"))
+            expect(schedule_queue.locator(".quick-item").filter(
+                has_text="Synthetic Schedule Candidate B")).to_have_count(0)
+            schedule_page.close()
+
             evidence = ROOT / "artifacts" / "browser"
             evidence.mkdir(parents=True, exist_ok=True)
             (evidence / "operator-click-budget.json").write_text(

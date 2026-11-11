@@ -26,7 +26,7 @@ from srw.kernel.errors import V1InvariantError, V1NotFoundError
 from srw.kernel.hashing import content_hash
 from srw.modules.audit.repository import append_audit_event
 from srw.modules.candidate.commands import add_source
-from srw.modules.candidate.models import Candidate, Source
+from srw.modules.candidate.models import Candidate, MaterialRevision, Source
 from srw.modules.fullworkbench import RecruitmentEvent
 from srw.modules.protocol.models import Project
 from srw.modules.protocol.repository import ProtocolRepository
@@ -35,6 +35,66 @@ from srw.runtime.db.session import v1_session_scope
 
 EVENT_STATES = {"scheduled", "completed", "cancelled", "no_show"}
 SOURCE_BEARING_EVENT_TYPES = {"phone_screen", "interview", "feedback"}
+
+
+def require_dashboard_interview_target(
+    session, candidate: Candidate, body: dict, metadata: dict,
+    event_type: str, event_state: str,
+) -> None:
+    """Revalidate the dashboard's first-interview target at the write boundary.
+
+    Legacy event clients that do not send the expected_* identity tuple keep
+    their existing contract. The new dashboard shortcut sends all three
+    identities and receives a strict, one-use first-interview gate.
+    """
+    fields = (
+        "expected_project_id",
+        "expected_protocol_revision_id",
+        "expected_material_revision_id",
+    )
+    supplied = any(name in body for name in fields)
+    if not supplied:
+        return
+    expected = {name: str(body.get(name) or "").strip() for name in fields}
+    if any(not value for value in expected.values()):
+        raise V1InvariantError("dashboard interview target identity is incomplete")
+    if event_type != "interview" or event_state != "scheduled":
+        raise V1InvariantError("dashboard target only authorizes a scheduled interview")
+
+    if candidate.archived or candidate.merged_into_candidate_id:
+        raise V1InvariantError("candidate is archived or no longer canonical; refresh the dashboard")
+    project = session.get(Project, candidate.project_id)
+    if project is None:
+        raise V1NotFoundError(f"project not found: {candidate.project_id}")
+    if project.status != "open":
+        raise V1InvariantError("project is no longer open; refresh the dashboard")
+    if expected["expected_project_id"] != candidate.project_id:
+        raise V1InvariantError("candidate project ownership changed; refresh the dashboard")
+
+    protocol_id = expected["expected_protocol_revision_id"]
+    if (protocol_id != project.current_protocol_revision_id
+            or protocol_id != str(metadata.get("protocol_revision_id") or "")):
+        raise V1InvariantError("published protocol changed; reopen the interview target")
+
+    material_id = candidate.current_material_revision_id or ""
+    if not material_id or expected["expected_material_revision_id"] != material_id:
+        raise V1InvariantError("published candidate material changed; reopen the interview target")
+    material = session.get(MaterialRevision, material_id)
+    if (material is None or material.candidate_id != candidate.id
+            or material.published_at is None):
+        raise V1InvariantError("current published candidate material is unavailable")
+
+    prior_interview = session.scalar(
+        select(RecruitmentEvent.id)
+        .where(
+            RecruitmentEvent.candidate_id == candidate.id,
+            RecruitmentEvent.event_type == "interview",
+            RecruitmentEvent.event_state.in_(("scheduled", "completed")),
+        )
+        .limit(1)
+    )
+    if prior_interview:
+        raise V1InvariantError("an interview already exists; refresh the dashboard before scheduling")
 
 
 def parse_iso(value: str):
@@ -225,6 +285,7 @@ def interview_routes(*, factory) -> list[Route]:
                 if source.candidate_id != cid:
                     raise V1InvariantError("source belongs to another candidate")
             metadata = event_metadata(session, cid, event_type, body.get("metadata", {}))
+            require_dashboard_interview_target(session, candidate, body, metadata, event_type, state)
             row = RecruitmentEvent(
                 candidate_id=cid, event_type=event_type, title=s_field(body, "title"),
                 notes=s_field(body, "notes"), source_id=source_id,
