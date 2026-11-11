@@ -166,6 +166,27 @@ class OperatorClickBudgetAcceptance(unittest.TestCase):
             click(completion.get_by_role("button", name="完成"), "提交完成反馈")
             expect(page.locator("#modal-root .modal")).to_have_count(0)
 
+            # #253: Core-authored completed-interview task opens the exact
+            # independent Scorecard in one home click, without a project detour.
+            task_page = context.new_page()
+            task_errors = []
+            task_page.on("pageerror", lambda error: task_errors.append(str(error)))
+            task_page.goto(self.base + "/v1", wait_until="domcontentloaded")
+            queue = task_page.locator("section.panel").filter(
+                has=task_page.get_by_role("heading", name="运营执行队列"))
+            task_row = queue.locator(".quick-item").filter(has_text="Synthetic Candidate B")
+            expect(task_row).to_have_count(1)
+            expect(task_row).to_contain_text("待提交面试反馈")
+            task_row.get_by_role("button", name="处理").click()
+            expect(task_page.locator("#sc-evaluator")).to_be_visible()
+            expect(task_page.locator(".modal")).to_contain_text("独立 Interview Scorecard")
+            # Leave a stale dashboard item visible while another tab submits.
+            task_page.goto(self.base + "/v1", wait_until="domcontentloaded")
+            task_row = task_page.locator("section.panel").filter(
+                has=task_page.get_by_role("heading", name="运营执行队列")
+            ).locator(".quick-item").filter(has_text="Synthetic Candidate B")
+            expect(task_row).to_have_count(1)
+
             timeline = page.locator(".timeline-item").filter(has_text="面试")
             click(timeline.get_by_role("button", name="独立 Scorecard"), "填写独立面评")
             scorecard = page.locator(".modal")
@@ -176,6 +197,18 @@ class OperatorClickBudgetAcceptance(unittest.TestCase):
             scorecard.locator("#sc-rec").fill("advance")
             click(scorecard.get_by_role("button", name="提交并锁定"), "提交并锁定面评")
             expect(page.locator("#modal-root .modal")).to_have_count(0)
+            # Stale home task must re-read Core and fail closed after submission:
+            # no new Scorecard modal, no cross-candidate navigation or writes.
+            with task_page.expect_response(
+                lambda response: response.url.endswith("/api/v1/dashboard")
+                and response.request.method == "GET"
+            ):
+                task_row.get_by_role("button", name="处理").click()
+            expect(task_page.locator("#top-title")).to_have_text("今日待办")
+            expect(task_page.locator("#modal-root .modal")).to_have_count(0)
+            expect(task_page.locator("#toast-root")).to_contain_text("待反馈面试已变化")
+            self.assertFalse(task_errors, task_errors)
+            task_page.close()
             self.assertEqual(list_start, 3, clicks)
             self.assertEqual(len(clicks) - list_start, 6, clicks)
             self.assertEqual(len(clicks), 9, clicks)
