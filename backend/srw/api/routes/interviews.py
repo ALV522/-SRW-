@@ -63,6 +63,8 @@ def require_dashboard_interview_target(
 
     if candidate.archived or candidate.merged_into_candidate_id:
         raise V1InvariantError("candidate is archived or no longer canonical; refresh the dashboard")
+    if candidate.pipeline_stage in {"rejected", "withdrawn", "offer", "hired"}:
+        raise V1InvariantError("candidate is no longer eligible for a first interview; refresh the dashboard")
     project = session.get(Project, candidate.project_id)
     if project is None:
         raise V1NotFoundError(f"project not found: {candidate.project_id}")
@@ -95,6 +97,8 @@ def require_dashboard_interview_target(
     )
     if prior_interview:
         raise V1InvariantError("an interview already exists; refresh the dashboard before scheduling")
+    metadata["project_id"] = project.id
+    metadata["material_revision_id"] = material.id
 
 
 def parse_iso(value: str):

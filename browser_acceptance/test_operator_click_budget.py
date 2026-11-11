@@ -308,6 +308,8 @@ class OperatorClickBudgetAcceptance(unittest.TestCase):
                 has_text="Synthetic Schedule Candidate B")
             expect(schedule_row).to_have_count(1)
             expect(schedule_row).to_contain_text("待安排首轮面试")
+            expect(schedule_queue.locator(".quick-item").filter(
+                has_text="Synthetic Schedule Candidate A")).to_have_count(0)
             schedule_clicks = []
             click(schedule_row.get_by_role("button", name="安排面试"),
                   "首页→准确候选人→安排面试表单", schedule_clicks)
@@ -315,6 +317,9 @@ class OperatorClickBudgetAcceptance(unittest.TestCase):
                 "Synthetic Schedule Candidate B")
             schedule_modal = schedule_page.locator(".modal")
             expect(schedule_modal).to_contain_text("新增结构化面试")
+            evidence = ROOT / "artifacts" / "browser"
+            evidence.mkdir(parents=True, exist_ok=True)
+            schedule_page.screenshot(path=str(evidence / "operator-home-schedule-target.png"), full_page=True)
             click(schedule_modal.get_by_role("button", name="保存"),
                   "保存面试排期", schedule_clicks)
             expect(schedule_page.locator("#modal-root .modal")).to_have_count(0)
@@ -349,10 +354,17 @@ class OperatorClickBudgetAcceptance(unittest.TestCase):
                 has=schedule_page.get_by_role("heading", name="运营执行队列"))
             expect(schedule_queue.locator(".quick-item").filter(
                 has_text="Synthetic Schedule Candidate B")).to_have_count(0)
+            (evidence / "operator-home-schedule-budget.json").write_text(
+                json.dumps({"scenario": "synthetic home -> first interview -> completion -> independent scorecard",
+                            "pointer_clicks_from_home": len(schedule_clicks),
+                            "steps": schedule_clicks,
+                            "internal_id_input_required": False,
+                            "published_material_and_protocol_rechecked": True,
+                            "human_completion_and_independent_scorecard_preserved": True},
+                           ensure_ascii=False, indent=2) + "\n",
+                encoding="utf-8")
             schedule_page.close()
 
-            evidence = ROOT / "artifacts" / "browser"
-            evidence.mkdir(parents=True, exist_ok=True)
             (evidence / "operator-click-budget.json").write_text(
                 json.dumps({"scenario": "synthetic candidate B home -> feedback",
                             "precondition": "project, Published criteria and candidates API-seeded",

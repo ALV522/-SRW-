@@ -604,6 +604,11 @@ class InterviewRouteTests(unittest.TestCase):
 
         accepted = post_target(fresh_target)
         self.assertEqual(accepted.status_code, 200, accepted.text)
+        stored_metadata = json.loads(accepted.json()["metadata_json"]) if "metadata_json" in accepted.json() else None
+        with self.factory() as session:
+            stored_metadata = json.loads(session.get(RecruitmentEvent, accepted.json()["event_id"]).metadata_json)
+        self.assertEqual(stored_metadata["project_id"], pid)
+        self.assertEqual(stored_metadata["material_revision_id"], current_material_id)
         self.assertEqual(self.audit_count("RECRUITMENT_EVENT_CREATED"), 1)
         duplicate = post_target(fresh_target)
         self.assertEqual(duplicate.status_code, 409, duplicate.text)
