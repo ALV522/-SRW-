@@ -317,6 +317,8 @@ class OperatorClickBudgetAcceptance(unittest.TestCase):
                 "Synthetic Schedule Candidate B")
             schedule_modal = schedule_page.locator(".modal")
             expect(schedule_modal).to_contain_text("新增结构化面试")
+            expect(schedule_modal.locator("#e-state option")).to_have_count(1)
+            expect(schedule_modal.locator("#e-state")).to_have_value("scheduled")
             evidence = ROOT / "artifacts" / "browser"
             evidence.mkdir(parents=True, exist_ok=True)
             schedule_page.screenshot(path=str(evidence / "operator-home-schedule-target.png"), full_page=True)
