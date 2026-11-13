@@ -34,6 +34,15 @@ UI 的基本对象层级：**今日需要完成的操作 → 项目 → 候选�
 - 从首页点击瞬间再次读 Core，若 candidate archived、event 非本项目、Scorecard 非 interview、Claim/Published revision 过期则 fail closed；A→B 延迟响应不得把旧对象覆盖新表单。
 - 分别实测（甲）已存在待评面试事件与（乙）从未排期、需要安排→完成反馈→独立面评两套路径。全链同源合成 fixture 的首页 9→≤6 为产品目标，不通过偷去人工步骤或替换起点凑数。
 
+#### UX-2b 首轮面试快捷目标（Core/API 实现切片）
+
+Dashboard 的 `operational_queue` 增加 `ready_to_schedule_interview`：只投影招聘中项目、未归档且未合并候选人、当前 Published protocol 含有效面试阶段、当前 Published material 存在、且尚无已排期/已完成结构化面试的候选人。每位候选人单独成行；多个目标由 HR 明确选择，不按最近候选人或前端缓存默认选择。该快捷入口面向首轮面试；后续轮次仍从候选人工作区创建。
+
+点击时前端重新读取 Dashboard 并逐项比较 project/candidate/protocol/material identity；保存排期时 Core 再验证同一身份、项目状态、候选人归属、Published revision/material 及是否已有面试，并把 project/material revision identity 固化到该面试事件元数据。目标过期、归档、跨项目、版本变化或重复排期均 fail closed，不创建 event/audit。快捷入口只减少定位步骤，排期、完成反馈和独立 Scorecard 的人工点击均保留。精确 HEAD 的 CI 和真实 Chromium 结果未出之前，不记为 PASS。
+
+
+**兼容性与约束作用域（#256 非作者复核要求）**：`require_dashboard_interview_target` 是首页「待安排首轮面试」快捷入口专用的 **opt-in 附加写入约束**，并非所有面试创建请求的全局门禁。仅当请求体出现任意 `expected_project_id` / `expected_protocol_revision_id` / `expected_material_revision_id` 时，要求三元组完整，并对首页目标执行当前项目、候选人、Published 标准与材料、重复排期的严格一致性校验；三元组缺失或过期一律拒绝此快捷写入。未携带上述字段的既有候选人工作区/legacy 客户端仍按照原有 API、Published protocol/material 与对象归属规则执行，**不能把该兼容路径解释为绕过安全校验**。两名候选人同时具备独立 Published material 时，首页必须分别显示目标，由 HR 自己选人；相应 Chromium+SQLite 正例验证两个 POST 的身份三元组及实际存储归属。
+
 ### UX-2c：跨页面上下文纪律
 
 - 所有 mutation 通过 Core API；UI 仅持有当前 project/candidate/event、表单序列和待提交 draft。导航和异步返回必须检查来源上下文身份。

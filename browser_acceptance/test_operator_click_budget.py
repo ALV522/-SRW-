@@ -282,8 +282,91 @@ class OperatorClickBudgetAcceptance(unittest.TestCase):
             expect(page.locator(".modal")).to_contain_text("只属于候选人B的面评")
             self.assertFalse(errors, errors)
 
+            # #253 UX-2b: the same first-interview precondition now opens the
+            # exact candidate's schedule form from one Core-verified home action.
+            schedule_project = api("POST", "/api/v1/projects",
+                                   {"title": "Operator Schedule Target", "role_title": "Engineer"})
+            schedule_pid = schedule_project["project_id"]
+            schedule_draft = schedule_project["draft_revision_id"]
+            api("PATCH", f"/api/v1/protocol-revisions/{schedule_draft}", {"payload": PROTOCOL})
+            api("POST", f"/api/v1/protocol-revisions/{schedule_draft}/publish", {})
+            schedule_a = api("POST", f"/api/v1/projects/{schedule_pid}/candidates",
+                             {"display_name": "Synthetic Schedule Candidate A"})["candidate_id"]
+            schedule_b = api("POST", f"/api/v1/projects/{schedule_pid}/candidates",
+                             {"display_name": "Synthetic Schedule Candidate B"})["candidate_id"]
+            api("POST", f"/api/v1/candidates/{schedule_b}/sources/text",
+                {"text_content": "Synthetic published material for schedule candidate B",
+                 "publish_material": True})
+            schedule_page = context.new_page()
+            schedule_errors = []
+            schedule_page.on("pageerror", lambda error: schedule_errors.append(str(error)))
+            schedule_page.goto(self.base + "/v1", wait_until="domcontentloaded")
+            expect(schedule_page.locator(".kpi-card").first).to_be_visible()
+            schedule_queue = schedule_page.locator("section.panel").filter(
+                has=schedule_page.get_by_role("heading", name="运营执行队列"))
+            schedule_row = schedule_queue.locator(".quick-item").filter(
+                has_text="Synthetic Schedule Candidate B")
+            expect(schedule_row).to_have_count(1)
+            expect(schedule_row).to_contain_text("待安排首轮面试")
+            expect(schedule_queue.locator(".quick-item").filter(
+                has_text="Synthetic Schedule Candidate A")).to_have_count(0)
+            schedule_clicks = []
+            click(schedule_row.get_by_role("button", name="安排面试"),
+                  "首页→准确候选人→安排面试表单", schedule_clicks)
+            expect(schedule_page.locator(".candidate-workspace-head h1")).to_have_text(
+                "Synthetic Schedule Candidate B")
+            schedule_modal = schedule_page.locator(".modal")
+            expect(schedule_modal).to_contain_text("新增结构化面试")
+            expect(schedule_modal.locator("#e-state option")).to_have_count(1)
+            expect(schedule_modal.locator("#e-state")).to_have_value("scheduled")
             evidence = ROOT / "artifacts" / "browser"
             evidence.mkdir(parents=True, exist_ok=True)
+            schedule_page.screenshot(path=str(evidence / "operator-home-schedule-target.png"), full_page=True)
+            click(schedule_modal.get_by_role("button", name="保存"),
+                  "保存面试排期", schedule_clicks)
+            expect(schedule_page.locator("#modal-root .modal")).to_have_count(0)
+
+            schedule_timeline = schedule_page.locator(".timeline-item").filter(has_text="面试")
+            click(schedule_timeline.get_by_role("button", name="完成并反馈"),
+                  "打开完成反馈", schedule_clicks)
+            schedule_completion = schedule_page.locator(".modal")
+            schedule_completion.locator(".c-obs").fill("Synthetic interview observation")
+            schedule_completion.locator(".c-rec").fill("建议进入下一轮")
+            click(schedule_completion.get_by_role("button", name="完成"),
+                  "提交完成反馈", schedule_clicks)
+            expect(schedule_page.locator("#modal-root .modal")).to_have_count(0)
+
+            schedule_timeline = schedule_page.locator(".timeline-item").filter(has_text="面试")
+            click(schedule_timeline.get_by_role("button", name="独立 Scorecard"),
+                  "打开独立 Scorecard", schedule_clicks)
+            schedule_scorecard = schedule_page.locator(".modal")
+            schedule_scorecard.locator("#sc-evaluator").fill("Synthetic Schedule Interviewer")
+            schedule_scorecard.locator(".c-obs").fill("只属于候选人 B 的面试观察")
+            schedule_scorecard.locator(".c-rec").fill("建议继续")
+            schedule_scorecard.locator("#sc-rec").fill("advance")
+            click(schedule_scorecard.get_by_role("button", name="提交并锁定"),
+                  "提交并锁定独立面评", schedule_clicks)
+            expect(schedule_page.locator("#modal-root .modal")).to_have_count(0)
+            self.assertEqual(len(schedule_clicks), 6, schedule_clicks)
+            self.assertEqual(schedule_clicks[0], "首页→准确候选人→安排面试表单")
+            self.assertFalse(schedule_errors, schedule_errors)
+            schedule_page.goto(self.base + "/v1", wait_until="domcontentloaded")
+            expect(schedule_page.locator(".kpi-card").first).to_be_visible()
+            schedule_queue = schedule_page.locator("section.panel").filter(
+                has=schedule_page.get_by_role("heading", name="运营执行队列"))
+            expect(schedule_queue.locator(".quick-item").filter(
+                has_text="Synthetic Schedule Candidate B")).to_have_count(0)
+            (evidence / "operator-home-schedule-budget.json").write_text(
+                json.dumps({"scenario": "synthetic home -> first interview -> completion -> independent scorecard",
+                            "pointer_clicks_from_home": len(schedule_clicks),
+                            "steps": schedule_clicks,
+                            "internal_id_input_required": False,
+                            "published_material_and_protocol_rechecked": True,
+                            "human_completion_and_independent_scorecard_preserved": True},
+                           ensure_ascii=False, indent=2) + "\n",
+                encoding="utf-8")
+            schedule_page.close()
+
             (evidence / "operator-click-budget.json").write_text(
                 json.dumps({"scenario": "synthetic candidate B home -> feedback",
                             "precondition": "project, Published criteria and candidates API-seeded",
@@ -298,6 +381,121 @@ class OperatorClickBudgetAcceptance(unittest.TestCase):
                             "reopen_persisted": True}, ensure_ascii=False, indent=2) + "\n",
                 encoding="utf-8")
             page.screenshot(path=str(evidence / "operator-click-budget.png"), full_page=True)
+        finally:
+            context.close()
+
+
+    def test_two_eligible_home_schedule_targets_choose_each_candidate(self):
+        """Two Published-material candidates require two explicit HR choices.
+
+        Assert Core projection, two DOM rows, form identities, posted expected_*
+        identity tuple, and candidate-specific SQLite event lineage.
+        """
+        context = self.browser.new_context(locale="zh-CN", viewport={"width": 1440, "height": 900})
+        page = context.new_page()
+        page.set_default_timeout(12000)
+        errors = []
+        page.on("pageerror", lambda error: errors.append(str(error)))
+
+        def api(method, path, payload):
+            response = page.request.fetch(
+                self.base + path, method=method,
+                data=json.dumps(payload, ensure_ascii=False),
+                headers={"content-type": "application/json"})
+            self.assertEqual(response.status, 200, response.text())
+            return response.json()
+
+        try:
+            project = api("POST", "/api/v1/projects",
+                          {"title": "Two Eligible Schedule Targets", "role_title": "Engineer"})
+            pid = project["project_id"]
+            draft = project["draft_revision_id"]
+            api("PATCH", f"/api/v1/protocol-revisions/{draft}", {"payload": PROTOCOL})
+            api("POST", f"/api/v1/protocol-revisions/{draft}/publish", {})
+
+            candidates = {}
+            for name in ("Synthetic Dual Eligible A", "Synthetic Dual Eligible B"):
+                cid = api("POST", f"/api/v1/projects/{pid}/candidates",
+                          {"display_name": name})["candidate_id"]
+                api("POST", f"/api/v1/candidates/{cid}/sources/text", {
+                    "text_content": f"Distinct Published material belonging to {name}",
+                    "publish_material": True})
+                candidates[name] = cid
+
+            dashboard = api("GET", "/api/v1/dashboard", {})
+            targets = [item for item in dashboard["operational_queue"]["items"]
+                       if item["kind"] == "ready_to_schedule_interview"
+                       and item["project_id"] == pid]
+            self.assertEqual(len(targets), 2, targets)
+            by_candidate = {item["candidate_id"]: item for item in targets}
+            self.assertEqual(set(by_candidate), set(candidates.values()))
+            self.assertEqual({item["candidate_name"] for item in targets},
+                             set(candidates))
+            material_ids = {item["material_revision_id"] for item in targets}
+            self.assertEqual(len(material_ids), 2,
+                             "Published material must remain candidate-specific")
+            protocol_ids = {item["protocol_revision_id"] for item in targets}
+            self.assertEqual(len(protocol_ids), 1)
+            self.assertTrue(all(item["project_id"] == pid for item in targets))
+
+            for name, cid in candidates.items():
+                page.goto(self.base + "/v1", wait_until="domcontentloaded")
+                expect(page.locator(".kpi-card").first).to_be_visible()
+                queue = page.locator("section.panel").filter(
+                    has=page.get_by_role("heading", name="运营执行队列"))
+                rows = queue.locator(".quick-item").filter(
+                    has_text="Synthetic Dual Eligible")
+                expected_remaining = 2 if name.endswith(" A") else 1
+                expect(rows).to_have_count(expected_remaining)
+                row = rows.filter(has_text=name)
+                expect(row).to_have_count(1)
+                expect(row).to_contain_text("待安排首轮面试")
+
+                row.get_by_role("button", name="安排面试").click()
+                expect(page.locator(".candidate-workspace-head h1")).to_have_text(name)
+                modal = page.locator(".modal")
+                expect(modal).to_contain_text("新增结构化面试")
+                expect(modal.locator("#e-state")).to_have_value("scheduled")
+                expect(modal.locator(".criterion-block")).to_have_count(1)
+
+                expected = by_candidate[cid]
+                endpoint = f"/api/v1/candidates/{cid}/events"
+                with page.expect_response(
+                    lambda response: response.request.method == "POST"
+                    and response.url.endswith(endpoint)
+                ) as posted:
+                    modal.get_by_role("button", name="保存").click()
+                response = posted.value
+                self.assertEqual(response.status, 200, response.text())
+                body = json.loads(response.request.post_data)
+                self.assertEqual(body["event_type"], "interview")
+                self.assertEqual(body["event_state"], "scheduled")
+                self.assertEqual(body["expected_project_id"], pid)
+                self.assertEqual(body["expected_protocol_revision_id"],
+                                 expected["protocol_revision_id"])
+                self.assertEqual(body["expected_material_revision_id"],
+                                 expected["material_revision_id"])
+                self.assertEqual(body["metadata"]["protocol_revision_id"],
+                                 expected["protocol_revision_id"])
+                expect(page.locator("#modal-root .modal")).to_have_count(0)
+
+            db_path = Path(self.temp.name) / "data" / "srw_v1.db"
+            with sqlite3.connect(db_path) as db:
+                records = db.execute(
+                    "SELECT candidate_id, event_state, metadata_json "
+                    "FROM recruitment_event WHERE candidate_id IN (?,?)",
+                    tuple(candidates.values())).fetchall()
+            self.assertEqual(len(records), 2, records)
+            for cid, state, raw_metadata in records:
+                self.assertEqual(state, "scheduled")
+                self.assertIn(cid, by_candidate)
+                meta = json.loads(raw_metadata)
+                self.assertEqual(meta["protocol_revision_id"],
+                                 by_candidate[cid]["protocol_revision_id"])
+                self.assertEqual(meta["material_revision_id"],
+                                 by_candidate[cid]["material_revision_id"])
+                self.assertEqual(meta["project_id"], pid)
+            self.assertFalse(errors, errors)
         finally:
             context.close()
 
