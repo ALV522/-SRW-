@@ -385,5 +385,120 @@ class OperatorClickBudgetAcceptance(unittest.TestCase):
             context.close()
 
 
+    def test_two_eligible_home_schedule_targets_choose_each_candidate(self):
+        """Two Published-material candidates require two explicit HR choices.
+
+        Assert Core projection, two DOM rows, form identities, posted expected_*
+        identity tuple, and candidate-specific SQLite event lineage.
+        """
+        context = self.browser.new_context(locale="zh-CN", viewport={"width": 1440, "height": 900})
+        page = context.new_page()
+        page.set_default_timeout(12000)
+        errors = []
+        page.on("pageerror", lambda error: errors.append(str(error)))
+
+        def api(method, path, payload):
+            response = page.request.fetch(
+                self.base + path, method=method,
+                data=json.dumps(payload, ensure_ascii=False),
+                headers={"content-type": "application/json"})
+            self.assertEqual(response.status, 200, response.text())
+            return response.json()
+
+        try:
+            project = api("POST", "/api/v1/projects",
+                          {"title": "Two Eligible Schedule Targets", "role_title": "Engineer"})
+            pid = project["project_id"]
+            draft = project["draft_revision_id"]
+            api("PATCH", f"/api/v1/protocol-revisions/{draft}", {"payload": PROTOCOL})
+            api("POST", f"/api/v1/protocol-revisions/{draft}/publish", {})
+
+            candidates = {}
+            for name in ("Synthetic Dual Eligible A", "Synthetic Dual Eligible B"):
+                cid = api("POST", f"/api/v1/projects/{pid}/candidates",
+                          {"display_name": name})["candidate_id"]
+                api("POST", f"/api/v1/candidates/{cid}/sources/text", {
+                    "text_content": f"Distinct Published material belonging to {name}",
+                    "publish_material": True})
+                candidates[name] = cid
+
+            dashboard = api("GET", "/api/v1/dashboard", {})
+            targets = [item for item in dashboard["operational_queue"]["items"]
+                       if item["kind"] == "ready_to_schedule_interview"
+                       and item["project_id"] == pid]
+            self.assertEqual(len(targets), 2, targets)
+            by_candidate = {item["candidate_id"]: item for item in targets}
+            self.assertEqual(set(by_candidate), set(candidates.values()))
+            self.assertEqual({item["candidate_name"] for item in targets},
+                             set(candidates))
+            material_ids = {item["material_revision_id"] for item in targets}
+            self.assertEqual(len(material_ids), 2,
+                             "Published material must remain candidate-specific")
+            protocol_ids = {item["protocol_revision_id"] for item in targets}
+            self.assertEqual(len(protocol_ids), 1)
+            self.assertTrue(all(item["project_id"] == pid for item in targets))
+
+            for name, cid in candidates.items():
+                page.goto(self.base + "/v1", wait_until="domcontentloaded")
+                expect(page.locator(".kpi-card").first).to_be_visible()
+                queue = page.locator("section.panel").filter(
+                    has=page.get_by_role("heading", name="运营执行队列"))
+                rows = queue.locator(".quick-item").filter(
+                    has_text="Synthetic Dual Eligible")
+                expected_remaining = 2 if name.endswith(" A") else 1
+                expect(rows).to_have_count(expected_remaining)
+                row = rows.filter(has_text=name)
+                expect(row).to_have_count(1)
+                expect(row).to_contain_text("待安排首轮面试")
+
+                row.get_by_role("button", name="安排面试").click()
+                expect(page.locator(".candidate-workspace-head h1")).to_have_text(name)
+                modal = page.locator(".modal")
+                expect(modal).to_contain_text("新增结构化面试")
+                expect(modal.locator("#e-state")).to_have_value("scheduled")
+                expect(modal.locator(".criterion-block")).to_have_count(1)
+
+                expected = by_candidate[cid]
+                endpoint = f"/api/v1/candidates/{cid}/events"
+                with page.expect_response(
+                    lambda response: response.request.method == "POST"
+                    and response.url.endswith(endpoint)
+                ) as posted:
+                    modal.get_by_role("button", name="保存").click()
+                response = posted.value
+                self.assertEqual(response.status, 200, response.text())
+                body = json.loads(response.request.post_data)
+                self.assertEqual(body["event_type"], "interview")
+                self.assertEqual(body["event_state"], "scheduled")
+                self.assertEqual(body["expected_project_id"], pid)
+                self.assertEqual(body["expected_protocol_revision_id"],
+                                 expected["protocol_revision_id"])
+                self.assertEqual(body["expected_material_revision_id"],
+                                 expected["material_revision_id"])
+                self.assertEqual(body["metadata"]["protocol_revision_id"],
+                                 expected["protocol_revision_id"])
+                expect(page.locator("#modal-root .modal")).to_have_count(0)
+
+            db_path = Path(self.temp.name) / "data" / "srw_v1.db"
+            with sqlite3.connect(db_path) as db:
+                records = db.execute(
+                    "SELECT candidate_id, event_state, metadata_json "
+                    "FROM recruitment_event WHERE candidate_id IN (?,?)",
+                    tuple(candidates.values())).fetchall()
+            self.assertEqual(len(records), 2, records)
+            for cid, state, raw_metadata in records:
+                self.assertEqual(state, "scheduled")
+                self.assertIn(cid, by_candidate)
+                meta = json.loads(raw_metadata)
+                self.assertEqual(meta["protocol_revision_id"],
+                                 by_candidate[cid]["protocol_revision_id"])
+                self.assertEqual(meta["material_revision_id"],
+                                 by_candidate[cid]["material_revision_id"])
+                self.assertEqual(meta["project_id"], pid)
+            self.assertFalse(errors, errors)
+        finally:
+            context.close()
+
+
 if __name__ == "__main__":
     unittest.main()

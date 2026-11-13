@@ -40,6 +40,9 @@ Dashboard 的 `operational_queue` 增加 `ready_to_schedule_interview`：只投�
 
 点击时前端重新读取 Dashboard 并逐项比较 project/candidate/protocol/material identity；保存排期时 Core 再验证同一身份、项目状态、候选人归属、Published revision/material 及是否已有面试，并把 project/material revision identity 固化到该面试事件元数据。目标过期、归档、跨项目、版本变化或重复排期均 fail closed，不创建 event/audit。快捷入口只减少定位步骤，排期、完成反馈和独立 Scorecard 的人工点击均保留。精确 HEAD 的 CI 和真实 Chromium 结果未出之前，不记为 PASS。
 
+
+**兼容性与约束作用域（#256 非作者复核要求）**：`require_dashboard_interview_target` 是首页「待安排首轮面试」快捷入口专用的 **opt-in 附加写入约束**，并非所有面试创建请求的全局门禁。仅当请求体出现任意 `expected_project_id` / `expected_protocol_revision_id` / `expected_material_revision_id` 时，要求三元组完整，并对首页目标执行当前项目、候选人、Published 标准与材料、重复排期的严格一致性校验；三元组缺失或过期一律拒绝此快捷写入。未携带上述字段的既有候选人工作区/legacy 客户端仍按照原有 API、Published protocol/material 与对象归属规则执行，**不能把该兼容路径解释为绕过安全校验**。两名候选人同时具备独立 Published material 时，首页必须分别显示目标，由 HR 自己选人；相应 Chromium+SQLite 正例验证两个 POST 的身份三元组及实际存储归属。
+
 ### UX-2c：跨页面上下文纪律
 
 - 所有 mutation 通过 Core API；UI 仅持有当前 project/candidate/event、表单序列和待提交 draft。导航和异步返回必须检查来源上下文身份。
