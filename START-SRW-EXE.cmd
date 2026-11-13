@@ -1,6 +1,8 @@
 @echo off
 setlocal DisableDelayedExpansion
 set "APPROOT=%~dp0"
+set "APPROOT_ARG=%APPROOT%"
+if "%APPROOT_ARG:~-1%"=="\" set "APPROOT_ARG=%APPROOT_ARG:~0,-1%"
 set "EXE=%APPROOT%windows-host\SmartRecruitmentWorkbench.exe"
 set "WORKSPACE=%LOCALAPPDATA%\SRW\DualCarrierV0"
 set "DATA=%WORKSPACE%\data"
@@ -34,7 +36,7 @@ if errorlevel 1 (
 echo [SRW] Windows Native entry. Data remains in:
 echo        %DATA%
 echo [SRW] Close the Local Web terminal before launching this EXE.
-"%EXE%" --application-root "%APPROOT%" --data-root "%DATA%"
+"%EXE%" --application-root "%APPROOT_ARG%" --data-root "%DATA%"
 if errorlevel 1 (
   echo [SRW] Windows application exited with an error. Do not delete lock files.
   echo [SRW] Check the data\logs\host.log in your private local workspace.

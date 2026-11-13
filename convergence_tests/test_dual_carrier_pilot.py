@@ -13,7 +13,13 @@ class DualCarrierPilotLaunchers(unittest.TestCase):
     def test_exe_uses_host_and_explicit_private_data_root(self):
         script = (ROOT / "START-SRW-EXE.cmd").read_text(encoding="utf-8")
         self.assertIn("windows-host\\SmartRecruitmentWorkbench.exe", script)
-        self.assertIn('--application-root "%APPROOT%"', script)
+        # %~dp0 ends with backslash; a quote after it is parsed as escaped.
+        # Only the outbound argument is stripped, not APPROOT file joins.
+        self.assertIn('set "APPROOT_ARG=%APPROOT%"', script)
+        self.assertIn('APPROOT_ARG:~-1%', script)
+        self.assertIn('APPROOT_ARG:~0,-1%', script)
+        self.assertIn('--application-root "%APPROOT_ARG%"', script)
+        self.assertNotIn('--application-root "%APPROOT%"', script)
         self.assertIn('--data-root "%DATA%"', script)
         self.assertIn("%LOCALAPPDATA%\\SRW\\DualCarrierV0", script)
         self.assertNotIn("taskkill", script.lower())

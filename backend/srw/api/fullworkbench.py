@@ -56,6 +56,7 @@ from srw.runtime.jobs.models import Job
 from srw.runtime.settings import RuntimeSettingsRepository
 from srw.surfaces.workbench import get_workbench
 from srw.surfaces.daily_queue import local_day_end_utc
+from srw.surfaces.interview_schedule import get_interview_schedule_targets
 
 
 
@@ -376,8 +377,10 @@ def install_full_workbench_routes(app, factory, registry, secrets, *, data_dir: 
                     "title":"待提交面试反馈",
                     "detail":event.title or "结构化面试",
                 })
+            schedule_targets = get_interview_schedule_targets(s, limit=8)
+            operational_items.extend(schedule_targets["items"])
             operational_items.sort(key=lambda x: (
-                {"overdue_contact":0,"pending_interview_feedback":1,"today_contact":2}.get(x["kind"],99),
+                {"overdue_contact":0,"pending_interview_feedback":1,"today_contact":2,"ready_to_schedule_interview":3}.get(x["kind"],99),
                 x.get("detail",""),x.get("candidate_id",""),
             ))
             workbench=get_workbench(s,evaluation_policy_revision=evaluation_policy_revision)
@@ -388,7 +391,7 @@ def install_full_workbench_routes(app, factory, registry, secrets, *, data_dir: 
                 "offers_by_status":offers_by_status,
                 "upcoming_interviews":int(upcoming),
                 "evidence_review_backlog":int(metrics["unreviewed_claims"]),
-                "operational_todos":{"overdue_contacts":int(overdue),"today_contacts":int(today_contacts),"pending_interview_feedback":int(pending_scorecards),"stale_reevaluations":int(stale_reevaluations),"pending_identity_reviews":int(pending_identity),"open_judgment_reviews":int(open_judgment_reviews)},
+                "operational_todos":{"overdue_contacts":int(overdue),"today_contacts":int(today_contacts),"pending_interview_feedback":int(pending_scorecards),"ready_to_schedule_interview":int(schedule_targets["total"]),"stale_reevaluations":int(stale_reevaluations),"pending_identity_reviews":int(pending_identity),"open_judgment_reviews":int(open_judgment_reviews)},
                 "review_queue":{
                     "items":review_items[:14],
                     "total":int(pending_identity)+int(open_judgment_reviews)+int(metrics["unreviewed_claims"]),
@@ -396,7 +399,7 @@ def install_full_workbench_routes(app, factory, registry, secrets, *, data_dir: 
                     "judgment_count":int(open_judgment_reviews),
                     "claim_count":int(metrics["unreviewed_claims"]),
                 },
-                "operational_queue":{"items":operational_items[:12],"total":int(overdue)+int(today_contacts)+int(pending_scorecards)},
+                "operational_queue":{"items":operational_items[:12],"total":int(overdue)+int(today_contacts)+int(pending_scorecards)+int(schedule_targets["total"])},
                 "decision_workbench":{
                     "conflict_count":workbench.conflict_count,
                     "verify_count":workbench.verify_count,
