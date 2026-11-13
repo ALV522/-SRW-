@@ -1,8 +1,11 @@
 """Pilot package must fail closed on wrong inputs (CI uses synthetic files)."""
+from io import BytesIO
 from pathlib import Path
 import tempfile
 import unittest
-from scripts.package_q1r10_dualcarrier import build
+from unittest.mock import patch
+from zipfile import ZipFile, ZipInfo, ZIP_STORED
+from scripts.package_q1r10_dualcarrier import build, add
 
 
 class Q1R10PilotPackagingTests(unittest.TestCase):
@@ -24,6 +27,30 @@ class Q1R10PilotPackagingTests(unittest.TestCase):
                 build(root, root / "bad.zip", root / "release.zip")
             self.assertFalse((root / "release.zip").exists())
 
+
+    def test_creator_platform_is_fixed_even_with_windows_zipinfo_default(self):
+        # Simulate Windows ZipInfo defaults, without changing process-wide os.name.
+        def windows_zipinfo(*args, **kwargs):
+            entry = ZipInfo(*args, **kwargs)
+            entry.create_system = 0
+            return entry
+
+        def make_archive(simulate_windows):
+            out = BytesIO()
+            if simulate_windows:
+                with patch("scripts.package_q1r10_dualcarrier.ZipInfo", side_effect=windows_zipinfo):
+                    with ZipFile(out, "w") as writer:
+                        add(writer, "test.txt", b"fixed bytes", compression=ZIP_STORED)
+            else:
+                with ZipFile(out, "w") as writer:
+                    add(writer, "test.txt", b"fixed bytes", compression=ZIP_STORED)
+            return out.getvalue()
+
+        posix_bytes = make_archive(False)
+        windows_bytes = make_archive(True)
+        self.assertEqual(windows_bytes, posix_bytes)
+        with ZipFile(BytesIO(windows_bytes)) as archive:
+            self.assertEqual(archive.infolist()[0].create_system, 3)
 
 if __name__ == "__main__":
     unittest.main()

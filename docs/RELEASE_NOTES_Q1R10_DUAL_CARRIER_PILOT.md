@@ -26,8 +26,14 @@
 
 - Q1R10 原包静态哈希、ZIP CRC、Source 456/456、Runtime 2332/2332、Knowledge 5/5 校验通过；此前真实 Windows 四项 GUI 基础验收通过。
 - B/C 在真实 Windows 1920×1200／135% 对**本地修正版启动器+原始 Q1R10** 验证 EXE 创建项目/已发布标准/候选人 → Web 同库配对并新增两条面试 → EXE 读回；工作区并发互斥、另一空工作区反序启动拒绝、正常退出和日志中配对码不泄漏均得到验证。详见 [#258 实机报告](https://github.com/ALV522/-SRW-/issues/258#issuecomment-6847066190)。
-- 原始 PR #259 EXE 启动器存在 Windows 末尾反斜杠+引号的 **P1 FAIL**，本次 FIXED 完整包已经修改这个错误；但**该完整外层安装 ZIP 自身**尚未获得 B/C 逐字节、逐步安装复验，此处绝不借用本地修正版证据冒充同工件 PASS。
+- 原始 PR #259 EXE 启动器曾有路径引号 P1 FAIL；B/C 已在真实 Windows 对修正版完整安装包进行 **6 次 Host 会话、安装后继续读写和 Web 占用时拒绝第二 Core** 验证（[18:58 报告](https://github.com/ALV522/-SRW-/issues/103#issuecomment-6850856228)），该 PASS 绑定 B/C 当时的 Windows ZIP SHA-256 feaad5217284c72db5d0de21927aee88ccb083427edbe01b686c065c46f6eec8，不能外推至未来不同字节包。
 - 不支持两个独立后端同时运行；#230 跨实例 HMAC replay、#43 Supervisor/会话和 CAS、#124 Runtime/Knowledge 来源和许可、#130 物理恢复、#159 间歇退出问题仍未全部解决，因此**不得部署生产数据或标记稳定版**。
+
+### 2026-11-13 跨平台 ZIP 哈希根因与修复
+
+B/C Windows 外层 ZIP 与 A Linux 外层 ZIP 均为 102,277,338 字节，**7 个成员的大小、CRC32、解压后 SHA-256 全部一致**。唯一差异是 Python ZipInfo 默认的 ZIP 中央目录 “version made by” 的平台字节：Windows 为 0，POSIX 为 3。A 在 Linux 完整 ZIP 中仅把 7 个中央目录平台标识从 3 改为 0，重新计算的完整包哈希 **精确复现** B/C 的 feaad5217284c72db5d0de21927aee88ccb083427edbe01b686c065c46f6eec8。由此排除源码/数据库/启动器成员字节不一致。
+
+装配脚本现在固定 info.create_system = 3；合成测试模拟 Windows 默认 0 并断言完整 ZIP 字节相同。Linux 运行修复后的真实 Q1R10 装配器仍得到 b671b38db0595eb6b410d373e947f96f9a4478407ba20cfc53199a94bb0d0d7a。B/C 需对**新 Git HEAD** 从零再装配，并确认 Windows 也得到 b671b38d...，再按来源/许可核验决定是否公开上传资产。本记录不表示已经创建 GitHub Release。
 
 ## 公开分发约束
 

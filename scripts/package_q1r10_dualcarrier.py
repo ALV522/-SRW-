@@ -98,6 +98,9 @@ def digest(data):
 
 def add(z, name, data, *, compression=ZIP_DEFLATED):
     info = ZipInfo(name, STAMP)
+    # ZipInfo defaults to create_system=0 on Windows and 3 on POSIX.
+    # That byte is in the central directory, so equal payloads then hash differently.
+    info.create_system = 3  # pin the same archive metadata on every build host
     info.compress_type = compression
     info.external_attr = 0o644 << 16
     z.writestr(info, data, compress_type=compression, compresslevel=6)
