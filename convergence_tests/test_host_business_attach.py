@@ -156,6 +156,27 @@ class HostBusinessAttachHttpTests(unittest.TestCase):
         self.assertEqual(len(gateway.registry), 0)
         self.assertEqual(self._counts(), before)
 
+    def test_cross_attempt_proof_is_not_replayable(self):
+        token_a, token_b = "synthetic-attempt-A", "synthetic-attempt-B"
+        app_a = self._make_app(enforce=True, mode="desktop", edition="windows", token=token_a)
+        app_b = self._make_app(enforce=True, mode="desktop", edition="windows", token=token_b)
+        before = self._counts()
+        nonce = "b" * 64
+        with TestClient(app_a) as client_a, TestClient(app_b) as client_b:
+            captured = host_headers(nonce=nonce, secret=token_a)
+            self.assertEqual(client_a.post(HOST_ATTACH_PATH, headers=captured).status_code, 200)
+            self.assertEqual(len(app_a.state.business_gateway.registry), 1)
+            rejected = client_b.post(HOST_ATTACH_PATH, headers=captured)
+            self.assertEqual(rejected.status_code, 403, rejected.text)
+            self.assertNotIn("set-cookie", rejected.headers)
+            self.assertEqual(len(app_b.state.business_gateway.registry), 0)
+            self.assertEqual(client_b.get("/api/v1/runtime/info").status_code, 401)
+            self.assertEqual(self._counts(), before)
+            fresh = host_headers(nonce=nonce, secret=token_b)
+            self.assertEqual(client_b.post(HOST_ATTACH_PATH, headers=fresh).status_code, 200)
+            self.assertEqual(len(app_b.state.business_gateway.registry), 1)
+            self.assertEqual(self._counts(), before)
+
     def test_browser_mode_and_default_off_never_mint_a_host_session(self):
         for enforced, mode, edition, token in (
             (True, "browser", "web", SECRET),
