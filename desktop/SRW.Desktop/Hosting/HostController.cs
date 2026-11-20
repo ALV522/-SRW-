@@ -59,11 +59,16 @@ public sealed class HostController
             _lease.UpdatePort(_port);
             _log.Write("port_allocated", new { attempt });
 
+            // Keep lease identity stable, but never reuse an attach secret across retries.
+            var attemptIdentity = _identity with
+            {
+                SessionToken = Convert.ToHexString(System.Security.Cryptography.RandomNumberGenerator.GetBytes(32)).ToLowerInvariant(),
+            };
             try
             {
-                _backend = BackendProcess.Start(Paths, _identity, _build.ReleaseId, _port, _log);
+                _backend = BackendProcess.Start(Paths, attemptIdentity, _build.ReleaseId, _port, _log);
                 _log.Write("backend_process_started", new { pid = _backend.Id, attempt });
-                _runtime = new RuntimeApiClient(_port, _identity.SessionToken);
+                _runtime = new RuntimeApiClient(_port, attemptIdentity.SessionToken);
 
                 using var attemptCts = new CancellationTokenSource();
                 var readyTask = _runtime.WaitUntilReadyAsync(TimeSpan.FromSeconds(20), attemptCts.Token);
