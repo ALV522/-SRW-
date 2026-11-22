@@ -298,10 +298,10 @@ class IANavigationBrowserTests(unittest.TestCase):
 
 
 
-    def test_10_dashboard_project_shortcut_is_one_explicit_click(self):
+    def test_10_home_to_scheduled_interview_prefix_click_budget(self):
         """#240: count a real home-origin action, not a JS navigation shortcut.
 
-        This is only the dashboard-to-project prefix, NOT the full <=6
+        This is only the home-to-scheduling prefix, NOT the full <=6
         interview/feedback/Scorecard acceptance. A missing or ambiguous
         shortcut must fail instead of silently using a project-list fallback.
         """
@@ -318,6 +318,27 @@ class IANavigationBrowserTests(unittest.TestCase):
         expect(page.locator(".project-banner")).to_be_visible(timeout=20000)
         self.assertEqual(clicks, 1, "dashboard -> exact project prefix budget")
         self.assertIn("Synthetic Project", page.locator(".project-banner").inner_text())
+        # Continue with visible controls: this is the home-to-scheduling
+        # prefix, not the later feedback / independent Scorecard segment.
+        page.locator(".tabs .tab").filter(has_text="候选人").click()
+        clicks += 1
+        page.wait_for_selector("tbody tr")
+        row = page.locator("tbody tr").filter(has_text="Synthetic Person")
+        row.locator("button.btn.primary").click()
+        clicks += 1
+        page.wait_for_selector(".candidate-steps")
+        page.locator(".candidate-step").filter(has_text="面试").click()
+        clicks += 1
+        page.get_by_role("button", name="＋ 面试排期").click()
+        clicks += 1
+        page.wait_for_selector("#modal-root .modal")
+        page.locator("#e-title").fill("UX240 合成排期")
+        page.locator("#modal-root").get_by_role("button", name="保存", exact=True).click()
+        clicks += 1
+        page.wait_for_selector("#modal-root .modal", state="detached", timeout=20000)
+        self.assertEqual(clicks, 6, "home -> scheduled interview prefix budget")
+        events = self.call("GET", f"/api/v1/candidates/{self.cid}/events")["events"]
+        self.assertTrue(any(e["event_state"] == "scheduled" for e in events))
         self.assertEqual(self.errors, [], self.errors[:3])
 
     def _required_workbench_breadcrumb(self):
