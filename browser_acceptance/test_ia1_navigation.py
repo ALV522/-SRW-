@@ -311,7 +311,7 @@ class IANavigationBrowserTests(unittest.TestCase):
         expect(page.locator("#content h1")).to_have_text("今日待办")
         host = page.locator("#dashboard-project-resume")
         expect(host).to_be_visible(timeout=20000)
-        shortcut = host.get_by_role("button").filter(has_text="Synthetic Project")
+        shortcut = host.get_by_role("button", name="进入工作区 · Synthetic Project", exact=True)
         expect(shortcut).to_have_count(1, timeout=20000)
         clicks = 0
         shortcut.click()
