@@ -307,6 +307,8 @@ class IANavigationBrowserTests(unittest.TestCase):
         shortcut must fail instead of silently using a project-list fallback.
         """
         page = self.page
+        before_events = self.call("GET", f"/api/v1/candidates/{self.cid}/events")["events"]
+        before_ids = {event["event_id"] for event in before_events}
         page.locator(".nav-item").filter(has_text="今日待办").click()
         expect(page.locator("#content h1")).to_have_text("今日待办")
         host = page.locator("#dashboard-project-resume")
@@ -339,7 +341,12 @@ class IANavigationBrowserTests(unittest.TestCase):
         page.wait_for_selector("#modal-root .modal", state="detached", timeout=20000)
         self.assertEqual(clicks, 6, "home -> scheduled interview prefix budget")
         events = self.call("GET", f"/api/v1/candidates/{self.cid}/events")["events"]
-        self.assertTrue(any(e["event_state"] == "scheduled" for e in events))
+        new_events = [event for event in events if event["event_id"] not in before_ids]
+        self.assertEqual(len(new_events), 1, "save must create exactly one new event")
+        event = new_events[0]
+        self.assertEqual(event["event_state"], "scheduled")
+        self.assertEqual(event.get("candidate_id", self.cid), self.cid)
+        self.assertEqual(event.get("project_id", self.pid), self.pid)
         self.assertEqual(self.errors, [], self.errors[:3])
 
     def _required_workbench_breadcrumb(self):
