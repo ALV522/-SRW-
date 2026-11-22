@@ -183,6 +183,7 @@ class IANavigationBrowserTests(unittest.TestCase):
 
         The measured budget is 4 clicks (row action, 面试 step, ＋面试排期, 保存).
         """
+        before_events = len(self.call("GET", f"/api/v1/candidates/{self.cid}/events")["events"])
         self.open_project()
         self.page.evaluate("window.setProjectTab('candidates')")
         self.page.wait_for_selector("tbody tr")
@@ -202,7 +203,7 @@ class IANavigationBrowserTests(unittest.TestCase):
         self.page.wait_for_selector("#modal-root .modal", state="detached", timeout=20000)
         self.assertEqual(clicks, 4)
         events = self.call("GET", f"/api/v1/candidates/{self.cid}/events")["events"]
-        self.assertEqual(len(events), 1)
+        self.assertEqual(len(events), before_events + 1)
         self.assertEqual(events[0]["event_state"], "scheduled")
 
 
@@ -298,7 +299,7 @@ class IANavigationBrowserTests(unittest.TestCase):
 
 
 
-    def test_10_home_to_scheduled_interview_prefix_click_budget(self):
+    def test_00_home_to_scheduled_interview_prefix_click_budget(self):
         """#240: count a real home-origin action, not a JS navigation shortcut.
 
         This is only the home-to-scheduling prefix, NOT the full <=6
