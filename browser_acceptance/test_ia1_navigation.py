@@ -297,6 +297,29 @@ class IANavigationBrowserTests(unittest.TestCase):
                 self.assertIn(title, page.locator(".nav-item.active").inner_text())
 
 
+
+    def test_10_dashboard_project_shortcut_is_one_explicit_click(self):
+        """#240: count a real home-origin action, not a JS navigation shortcut.
+
+        This is only the dashboard-to-project prefix, NOT the full <=6
+        interview/feedback/Scorecard acceptance. A missing or ambiguous
+        shortcut must fail instead of silently using a project-list fallback.
+        """
+        page = self.page
+        page.locator(".nav-item").filter(has_text="今日待办").click()
+        expect(page.locator("#content h1")).to_have_text("今日待办")
+        host = page.locator("#dashboard-project-resume")
+        expect(host).to_be_visible(timeout=20000)
+        shortcut = host.get_by_role("button").filter(has_text="Synthetic Project")
+        expect(shortcut).to_have_count(1, timeout=20000)
+        clicks = 0
+        shortcut.click()
+        clicks += 1
+        expect(page.locator(".project-banner")).to_be_visible(timeout=20000)
+        self.assertEqual(clicks, 1, "dashboard -> exact project prefix budget")
+        self.assertIn("Synthetic Project", page.locator(".project-banner").inner_text())
+        self.assertEqual(self.errors, [], self.errors[:3])
+
     def _required_workbench_breadcrumb(self):
         """A missing workbench return is a regression, not a skipped test."""
         link = self.page.locator("#top-crumb .crumb-link").filter(has_text="工作台")
