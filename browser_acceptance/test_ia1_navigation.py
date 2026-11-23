@@ -15,6 +15,7 @@ import sys
 import tempfile
 import time
 import unittest
+import urllib.error
 import urllib.request
 from contextlib import closing
 from pathlib import Path
@@ -345,8 +346,15 @@ class IANavigationBrowserTests(unittest.TestCase):
         self.assertEqual(len(new_events), 1, "save must create exactly one new event")
         event = new_events[0]
         self.assertEqual(event["event_state"], "scheduled")
-        self.assertEqual(event.get("candidate_id", self.cid), self.cid)
-        self.assertEqual(event.get("project_id", self.pid), self.pid)
+        # Scoped Core endpoint checks candidate/project and event/candidate joins.
+        scoped = (f"/api/v1/projects/{self.pid}/candidates/{self.cid}"
+                  f"/events/{event['event_id']}/scorecards")
+        self.call("GET", scoped)
+        wrong_scope = (f"/api/v1/projects/ux240-wrong-project/candidates/{self.cid}"
+                       f"/events/{event['event_id']}/scorecards")
+        with self.assertRaises(urllib.error.HTTPError) as denied:
+            self.call("GET", wrong_scope)
+        self.assertEqual(denied.exception.code, 404)
         self.assertEqual(self.errors, [], self.errors[:3])
 
     def _required_workbench_breadcrumb(self):
