@@ -15,6 +15,7 @@ import sys
 import tempfile
 import time
 import unittest
+import urllib.error
 import urllib.request
 from contextlib import closing
 from pathlib import Path
@@ -183,6 +184,7 @@ class IANavigationBrowserTests(unittest.TestCase):
 
         The measured budget is 4 clicks (row action, 面试 step, ＋面试排期, 保存).
         """
+        before_events = len(self.call("GET", f"/api/v1/candidates/{self.cid}/events")["events"])
         self.open_project()
         self.page.evaluate("window.setProjectTab('candidates')")
         self.page.wait_for_selector("tbody tr")
@@ -202,7 +204,7 @@ class IANavigationBrowserTests(unittest.TestCase):
         self.page.wait_for_selector("#modal-root .modal", state="detached", timeout=20000)
         self.assertEqual(clicks, 4)
         events = self.call("GET", f"/api/v1/candidates/{self.cid}/events")["events"]
-        self.assertEqual(len(events), 1)
+        self.assertEqual(len(events), before_events + 1)
         self.assertEqual(events[0]["event_state"], "scheduled")
 
 
@@ -296,6 +298,64 @@ class IANavigationBrowserTests(unittest.TestCase):
                 self.assertEqual(page.locator(".nav-item.active").count(), 1)
                 self.assertIn(title, page.locator(".nav-item.active").inner_text())
 
+
+
+    def test_00_home_to_scheduled_interview_prefix_click_budget(self):
+        """#240: count a real home-origin action, not a JS navigation shortcut.
+
+        This is only the home-to-scheduling prefix, NOT the full <=6
+        interview/feedback/Scorecard acceptance. A missing or ambiguous
+        shortcut must fail instead of silently using a project-list fallback.
+        """
+        page = self.page
+        before_events = self.call("GET", f"/api/v1/candidates/{self.cid}/events")["events"]
+        before_ids = {event["event_id"] for event in before_events}
+        page.locator(".nav-item").filter(has_text="今日待办").click()
+        expect(page.locator("#content h1")).to_have_text("今日待办")
+        host = page.locator("#dashboard-project-resume")
+        expect(host).to_be_visible(timeout=20000)
+        shortcut = host.get_by_role("button", name="进入工作区 · Synthetic Project", exact=True)
+        expect(shortcut).to_have_count(1, timeout=20000)
+        clicks = 0
+        shortcut.click()
+        clicks += 1
+        expect(page.locator(".project-banner")).to_be_visible(timeout=20000)
+        self.assertEqual(clicks, 1, "dashboard -> exact project prefix budget")
+        self.assertIn("Synthetic Project", page.locator(".project-banner").inner_text())
+        # Continue with visible controls: this is the home-to-scheduling
+        # prefix, not the later feedback / independent Scorecard segment.
+        page.locator(".tabs .tab").filter(has_text="候选人").click()
+        clicks += 1
+        page.wait_for_selector("tbody tr")
+        row = page.locator("tbody tr").filter(has_text="Synthetic Person")
+        row.locator("button.btn.primary").click()
+        clicks += 1
+        page.wait_for_selector(".candidate-steps")
+        page.locator(".candidate-step").filter(has_text="面试").click()
+        clicks += 1
+        page.get_by_role("button", name="＋ 面试排期").click()
+        clicks += 1
+        page.wait_for_selector("#modal-root .modal")
+        page.locator("#e-title").fill("UX240 合成排期")
+        page.locator("#modal-root").get_by_role("button", name="保存", exact=True).click()
+        clicks += 1
+        page.wait_for_selector("#modal-root .modal", state="detached", timeout=20000)
+        self.assertEqual(clicks, 6, "home -> scheduled interview prefix budget")
+        events = self.call("GET", f"/api/v1/candidates/{self.cid}/events")["events"]
+        new_events = [event for event in events if event["event_id"] not in before_ids]
+        self.assertEqual(len(new_events), 1, "save must create exactly one new event")
+        event = new_events[0]
+        self.assertEqual(event["event_state"], "scheduled")
+        # Scoped Core endpoint checks candidate/project and event/candidate joins.
+        scoped = (f"/api/v1/projects/{self.pid}/candidates/{self.cid}"
+                  f"/events/{event['event_id']}/scorecards")
+        self.call("GET", scoped)
+        wrong_scope = (f"/api/v1/projects/ux240-wrong-project/candidates/{self.cid}"
+                       f"/events/{event['event_id']}/scorecards")
+        with self.assertRaises(urllib.error.HTTPError) as denied:
+            self.call("GET", wrong_scope)
+        self.assertEqual(denied.exception.code, 404)
+        self.assertEqual(self.errors, [], self.errors[:3])
 
     def _required_workbench_breadcrumb(self):
         """A missing workbench return is a regression, not a skipped test."""
